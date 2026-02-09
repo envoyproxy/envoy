@@ -1,4 +1,4 @@
-load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_proto_plugin_impl")
+load("@envoy//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_proto_plugin_impl")
 
 def _protodoc_impl(target, ctx):
     return api_proto_plugin_impl(target, ctx, "rst", "protodoc", [".rst"])
@@ -12,7 +12,7 @@ def _protodoc_impl(target, ctx):
 #
 # The aspect builds the transitive docs, so any .proto in the dependency graph
 # get docs created.
-protodoc_aspect = api_proto_plugin_aspect("@envoy//tools/protodoc", _protodoc_impl)
+protodoc_aspect = api_proto_plugin_aspect(Label("//tools/protodoc"), _protodoc_impl)
 
 def _protodoc_rule_impl(ctx):
     deps = []

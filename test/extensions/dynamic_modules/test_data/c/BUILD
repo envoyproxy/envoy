@@ -10,6 +10,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -117,3 +118,15 @@ test_program(name = "access_log_missing_logger_log")
 test_program(name = "access_log_missing_logger_destroy")
 
 test_program(name = "access_log_config_new_fail")
+
+test_program(name = "lb_round_robin")
+
+test_program(name = "lb_config_new_fail")
+
+test_program(name = "lb_callbacks_test")
+
+test_program(name = "lb_new_fail")
+
+test_program(name = "lb_no_choose_host")
+
+test_program(name = "lb_invalid_host_index")

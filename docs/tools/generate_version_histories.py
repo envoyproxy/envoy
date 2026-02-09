@@ -12,6 +12,7 @@ from aio.run import runner
 
 from envoy.base import utils
 from envoy.base.utils import IProject, Project
+from envoy.base.utils.project import Inventories
 
 # TODO(phlax): Move all of this to pytooling
 
@@ -117,6 +118,28 @@ VERSION_HISTORY_TPL = """
 """
 
 
+class CustomInventories(Inventories):
+
+    @property
+    def versions_path(self) -> pathlib.Path:
+        return self.project.versions_path
+
+
+class CustomProject(Project):
+
+    def __init__(self, path, versions):
+        self.versions = versions
+        super().__init__(path=path)
+
+    @cached_property
+    def inventories(self):
+        return CustomInventories(self)
+
+    @property
+    def versions_path(self) -> pathlib.Path:
+        return pathlib.Path(self.versions)
+
+
 def versionize_filter(text, mapped_version):
     """Replace refinks with versioned reflinks."""
     if not mapped_version:
@@ -147,7 +170,7 @@ class VersionHistories(runner.Runner):
 
     @cached_property
     def project(self) -> IProject:
-        return Project(path=self.args.path)
+        return CustomProject(self.args.path, self.args.versions)
 
     @cached_property
     def sections(self) -> frozendict:
@@ -172,6 +195,7 @@ class VersionHistories(runner.Runner):
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
         parser.add_argument("--path")
+        parser.add_argument("--versions")
         parser.add_argument("output_file")
 
     def minor_index_path(self, minor_version) -> pathlib.Path:

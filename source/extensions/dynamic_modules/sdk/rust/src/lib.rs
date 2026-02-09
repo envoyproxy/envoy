@@ -96,6 +96,53 @@ pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
 }
 
+/// Register a function pointer under a name in the process-wide function registry.
+///
+/// This allows modules loaded in the same process to expose functions that other modules can
+/// resolve by name and call directly, enabling zero-copy cross-module interactions. For example,
+/// a bootstrap extension can register a function that returns a pointer to a tenant snapshot,
+/// and HTTP filters can resolve and call it on every request.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized`).
+/// Duplicate registration under the same key returns `false`.
+///
+/// Callers are responsible for agreeing on the function signature out-of-band, since the
+/// registry stores opaque pointers — analogous to `dlsym` semantics.
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
+/// process.
+pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_function(
+      str_to_module_buffer(key),
+      function_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered function pointer by name from the process-wide function
+/// registry. The returned pointer can be cast to the expected function signature and called
+/// directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found =
+    unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
@@ -7841,6 +7888,445 @@ macro_rules! declare_bootstrap_init_functions {
         .get_or_init(|| $new_bootstrap_extension_config_fn);
       if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Load Balancer Dynamic Module Support
+// =================================================================================================
+
+/// Trait for interacting with the Envoy load balancer and its context.
+///
+/// This trait provides access to both cluster/host information and request context.
+/// The cluster/host methods are always available, while the context methods are only
+/// valid during the [`LoadBalancer::choose_host`] callback.
+#[automock]
+pub trait EnvoyLoadBalancer {
+  /// Returns the cluster name.
+  fn get_cluster_name(&self) -> String;
+
+  /// Returns the number of all hosts at a given priority.
+  fn get_hosts_count(&self, priority: u32) -> usize;
+
+  /// Returns the number of healthy hosts at a given priority.
+  fn get_healthy_hosts_count(&self, priority: u32) -> usize;
+
+  /// Returns the number of degraded hosts at a given priority.
+  fn get_degraded_hosts_count(&self, priority: u32) -> usize;
+
+  /// Returns the number of priority levels.
+  fn get_priority_set_size(&self) -> usize;
+
+  /// Returns the address of a healthy host by index at a given priority.
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String>;
+
+  /// Returns the weight of a healthy host by index at a given priority.
+  fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32;
+
+  /// Returns the health status of a host by index within all hosts at a given priority.
+  fn get_host_health(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> abi::envoy_dynamic_module_type_host_health;
+
+  // -------------------------------------------------------------------------
+  // Context methods are only valid during choose_host callback.
+  // -------------------------------------------------------------------------
+
+  /// Returns whether the context is available.
+  /// Context methods will return default values if this returns false.
+  fn has_context(&self) -> bool;
+
+  /// Computes a hash key for consistent hashing from the request context.
+  /// Only valid during choose_host callback.
+  fn context_compute_hash_key(&self) -> Option<u64>;
+
+  /// Returns the number of downstream request headers.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_headers_size(&self) -> usize;
+
+  /// Returns all downstream request headers as a vector of (key, value) pairs.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
+
+  /// Returns a downstream request header value by key and index.
+  /// Since a header can have multiple values, the index is used to get the specific value.
+  /// Returns the value and optionally the total number of values for the key.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
+}
+
+/// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
+pub struct EnvoyLoadBalancerImpl {
+  lb_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  context_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+}
+
+impl EnvoyLoadBalancerImpl {
+  /// Creates a new EnvoyLoadBalancerImpl with both LB and context pointers.
+  pub fn new(
+    lb_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+    context_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+  ) -> Self {
+    Self {
+      lb_ptr,
+      context_ptr,
+    }
+  }
+}
+
+impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
+  fn get_cluster_name(&self) -> String {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.lb_ptr, &mut result);
+      if !result.ptr.is_null() && result.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      }
+    }
+  }
+
+  fn get_hosts_count(&self, priority: u32) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_hosts_count(self.lb_ptr, priority) }
+  }
+
+  fn get_healthy_hosts_count(&self, priority: u32) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_healthy_hosts_count(self.lb_ptr, priority) }
+  }
+
+  fn get_degraded_hosts_count(&self, priority: u32) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_degraded_hosts_count(self.lb_ptr, priority) }
+  }
+
+  fn get_priority_set_size(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.lb_ptr) }
+  }
+
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_healthy_host_address(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_healthy_host_weight(self.lb_ptr, priority, index)
+    }
+  }
+
+  fn get_host_health(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> abi::envoy_dynamic_module_type_host_health {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_health(self.lb_ptr, priority, index) }
+  }
+
+  fn has_context(&self) -> bool {
+    !self.context_ptr.is_null()
+  }
+
+  fn context_compute_hash_key(&self) -> Option<u64> {
+    if self.context_ptr.is_null() {
+      return None;
+    }
+    let mut hash: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_compute_hash_key(self.context_ptr, &mut hash)
+    };
+    if found {
+      Some(hash)
+    } else {
+      None
+    }
+  }
+
+  fn context_get_downstream_headers_size(&self) -> usize {
+    if self.context_ptr.is_null() {
+      return 0;
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(self.context_ptr)
+    }
+  }
+
+  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
+    if self.context_ptr.is_null() {
+      return None;
+    }
+    let size = self.context_get_downstream_headers_size();
+    if size == 0 {
+      return Some(Vec::new());
+    }
+    let mut headers = vec![
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: std::ptr::null(),
+        key_length: 0,
+        value_ptr: std::ptr::null(),
+        value_length: 0,
+      };
+      size
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+        self.context_ptr,
+        headers.as_mut_ptr(),
+      )
+    };
+    if !success {
+      return None;
+    }
+    Some(
+      headers
+        .iter()
+        .map(|h| unsafe {
+          (
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              h.key_ptr as *const _,
+              h.key_length,
+            ))
+            .to_string(),
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              h.value_ptr as *const _,
+              h.value_length,
+            ))
+            .to_string(),
+          )
+        })
+        .collect(),
+    )
+  }
+
+  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
+    if self.context_ptr.is_null() {
+      return None;
+    }
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header(
+        self.context_ptr,
+        key_buf,
+        &mut result,
+        index,
+        &mut count,
+      )
+    };
+    if found {
+      unsafe {
+        Some((
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+          count,
+        ))
+      }
+    } else {
+      None
+    }
+  }
+}
+
+/// Trait for the load balancer configuration.
+///
+/// This is created once when the load balancer policy is configured and shared across all
+/// worker threads. Implementations must be `Sync` since they are accessed from worker threads.
+pub trait LoadBalancerConfig: Sync {
+  /// Creates a new load balancer instance for each worker thread.
+  ///
+  /// This is called once per worker thread when the thread is initialized.
+  /// The `envoy_lb` provides access to cluster information (context methods are not available).
+  fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
+}
+
+/// Trait for a load balancer instance.
+///
+/// All the event hooks are called on the same thread as the one that the [`LoadBalancer`] is
+/// created via the [`LoadBalancerConfig::new_load_balancer`] method. In other words, the
+/// [`LoadBalancer`] object is thread-local.
+pub trait LoadBalancer {
+  /// Chooses a host for an upstream request.
+  ///
+  /// The `envoy_lb` provides access to both cluster/host information and request context.
+  /// Context methods (those starting with `context_`) are only valid during this callback.
+  ///
+  /// Returns the index of the selected host in the healthy hosts list at priority 0,
+  /// or `None` if no host should be selected (which will result in no upstream connection).
+  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize>;
+}
+
+/// The function signature for creating a new load balancer configuration.
+pub type NewLoadBalancerConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn LoadBalancerConfig>>;
+
+/// Global function for creating load balancer configurations.
+pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunction> =
+  OnceLock::new();
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
+  _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
+  config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_lb_module_ptr {
+  // During new_load_balancer, context is not available.
+  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+  let lb_config = {
+    let raw = config_ptr as *const *const dyn LoadBalancerConfig;
+    &**raw
+  };
+  let lb = lb_config.new_load_balancer(&envoy_lb);
+  wrap_into_c_void_ptr!(lb)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+  context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+) -> i64 {
+  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
+  let lb = {
+    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+    &mut **raw
+  };
+  match lb.choose_host(&envoy_lb) {
+    Some(index) => index as i64,
+    None => -1,
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
+  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+}
+
+/// Declare the init functions for a load balancer dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the load balancer module.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_lb_config(name: &str, config: &[u8]) -> Option<Box<dyn LoadBalancerConfig>> {
+///   Some(Box::new(MyLbConfig {}))
+/// }
+///
+/// declare_load_balancer_init_functions!(program_init, new_lb_config);
+///
+/// struct MyLbConfig {}
+///
+/// impl LoadBalancerConfig for MyLbConfig {
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
+///     Box::new(MyLoadBalancer { next_index: 0 })
+///   }
+/// }
+///
+/// struct MyLoadBalancer {
+///   next_index: usize,
+/// }
+///
+/// impl LoadBalancer for MyLoadBalancer {
+///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize> {
+///     let count = envoy_lb.get_healthy_hosts_count(0);
+///     if count == 0 {
+///       return None;
+///     }
+///     let index = self.next_index % count;
+///     self.next_index += 1;
+///     Some(index)
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_load_balancer_init_functions {
+  ($f:ident, $new_lb_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION
+        .get_or_init(|| $new_lb_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()

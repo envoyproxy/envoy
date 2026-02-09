@@ -23,6 +23,9 @@ on:
       bazel-cache:
         type: boolean
         default: false
+      bazel-cache-output-base:
+        type: string
+        default: base
       bazel-extra:
         type: string
       bazel-rbe-jobs:
@@ -280,19 +283,33 @@ jobs:
     # Caches
     - uses: envoyproxy/toolshed/actions/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: >-
-        inputs.bazel-cache
+        fromJSON(inputs.bazel-cache)
       name: >-
         Restore Bazel cache
         (${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }})
       with:
         artifact-id: >-
-          ${{ inputs.arch == 'arm64'
-              && fromJSON(inputs.request).config.ci.cache.bazel.arm64
-              || fromJSON(inputs.request).config.ci.cache.bazel.x64 }}
-        artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
+          ${{ inputs.bazel-cache-output-base == 'docs'
+              && fromJSON(inputs.request).config.ci.cache.bazel['docs-x64']
+              || (inputs.bazel-cache-output-base == 'external'
+                  && fromJSON(inputs.request).config.ci.cache.bazel['external-x64']
+                  || (inputs.arch == 'arm64'
+                      && fromJSON(inputs.request).config.ci.cache.bazel.arm64
+                      || fromJSON(inputs.request).config.ci.cache.bazel.x64)) }}
+        artifact-name: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.bazel-cache-output-base != 'base'
+            && format('{0}-', inputs.bazel-cache-output-base)
+            || ''
+          }}${{ inputs.arch || 'x64' }}
         artifact-wf-path: .github/workflows/request.yml
         cache-type: artifact
-        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch || 'x64' }}
+        key: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.bazel-cache-output-base != 'base'
+            && format('{0}-', inputs.bazel-cache-output-base)
+            || ''
+          }}${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/container/bazel_root
 
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)

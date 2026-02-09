@@ -1,12 +1,14 @@
-load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@docs_pip3//:requirements.bzl", "requirement")
+load("@envoy//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
+
+exports_files(["protodoc_manifest.yaml"])
 
 py_binary(
     name = "generate_empty",
@@ -38,7 +40,7 @@ py_proto_library(
 
 envoy_py_data(
     name = "protodoc_manifest_untyped",
-    src = "//docs:protodoc_manifest.yaml",
+    src = ":protodoc_manifest.yaml",
 )
 
 py_binary(
@@ -101,9 +103,9 @@ json_merge(
              .[$posture.name] = $posture.description))}
     """,
     yaml_srcs = [
-        "//source/extensions:extensions_metadata.yaml",
-        "//contrib:extensions_metadata.yaml",
-        "//tools/extensions:extensions_schema.yaml",
+        "@envoy//source/extensions:extensions_metadata.yaml",
+        "@envoy//contrib:extensions_metadata.yaml",
+        "@envoy//tools/extensions:extensions_schema.yaml",
     ],
 )
 
@@ -120,7 +122,7 @@ py_binary(
         ":data",
         ":jinja",
         ":validate_py_pb2",
-        "//tools/api_proto_plugin",
+        "@envoy//tools/api_proto_plugin",
         "@xds//udpa/annotations:pkg_py_proto",
         "@xds//xds/annotations/v3:pkg_py_proto",
         requirement("envoy.code.check"),

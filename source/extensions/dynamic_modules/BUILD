@@ -29,6 +29,8 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
