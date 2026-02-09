@@ -19,6 +19,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_codec_impl.h"
+
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
@@ -878,7 +879,8 @@ AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
 }
 
 AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connection,
-                                                   milliseconds timeout) {
+                                                   milliseconds timeout,
+                                                   OptRef<Event::Dispatcher> dispatcher) {
   if (!initialized_) {
     return AssertionFailure()
            << "Must initialize the FakeUpstream first by calling initializeServer().";
@@ -890,9 +892,16 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
       return !new_connections_.empty();
     };
 
-    ENVOY_LOG(debug, "waiting for raw connection");
-    if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
-      return AssertionFailure() << "Timed out waiting for raw connection";
+    if (dispatcher) {
+      ENVOY_LOG(debug, "waiting for raw connection with dispatcher run");
+      if (!waitForWithDispatcherRun(time_system_, lock_, reached, *dispatcher, timeout)) {
+        return AssertionFailure() << "Timed out waiting for raw connection";
+      }
+    } else {
+      ENVOY_LOG(debug, "waiting for raw connection");
+      if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
+        return AssertionFailure() << "Timed out waiting for raw connection";
+      }
     }
   }
 

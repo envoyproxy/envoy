@@ -24,6 +24,7 @@
 #include "source/common/http/matching/inputs.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -36,6 +37,7 @@
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
+#include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer.pb.h"
 
 #if defined(__APPLE__)
 #include "library/common/network/apple_proxy_resolution.h"
@@ -393,6 +395,33 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
 
 EngineBuilder& EngineBuilder::setNodeMetadata(Protobuf::Struct node_metadata) {
   node_metadata_ = std::move(node_metadata);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer) {
+  use_quic_platform_packet_writer_ = use_quic_platform_packet_writer;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
+  enable_quic_connection_migration_ = quic_connection_migration_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
+  migrate_idle_quic_connection_ = migrate_idle_quic_connection;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration) {
+  max_idle_time_before_quic_migration_seconds_ = max_idle_time_before_quic_migration;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network) {
+  max_time_on_non_default_network_seconds_ = max_time_on_non_default_network;
   return *this;
 }
 
@@ -885,7 +914,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     } else {
       quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     }
-    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);
     quic_protocol_options->mutable_initial_connection_window_size()->set_value(
@@ -902,6 +930,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (max_concurrent_streams_ > 0) {
       quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
+    }
+    if (enable_quic_connection_migration_) {
+      auto* migration_setting = quic_protocol_options->mutable_connection_migration();
+      if (migrate_idle_quic_connection_) {
+        auto* migrate_idle_connections = migration_setting->mutable_migrate_idle_connections();
+        if (max_idle_time_before_quic_migration_seconds_ > 0) {
+          migrate_idle_connections->mutable_max_idle_time_before_migration()->set_seconds(
+              max_idle_time_before_quic_migration_seconds_);
+        }
+      }
+      if (max_time_on_non_default_network_seconds_ > 0) {
+        migration_setting->mutable_max_time_on_non_default_network()->set_seconds(
+            max_time_on_non_default_network_seconds_);
+      }
+    }
+
+    if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
+      envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
+          writer_config;
+      quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(
+          writer_config);
+      quic_protocol_options->mutable_client_packet_writer()->set_name(
+          "envoy.quic.packet_writer.platform");
     }
 
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
@@ -1023,17 +1074,27 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   Protobuf::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   for (auto& guard_and_value : runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(absl::StrJoin(
+            {"envoy", "reloadable_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
   Protobuf::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(
+            absl::StrJoin({"envoy", "restart_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   Protobuf::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(

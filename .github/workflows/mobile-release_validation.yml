@@ -51,7 +51,7 @@ jobs:
   #       build
   #       --config=mobile-remote-ci-macos-ios
   #       //:ios_xcframework
-  #     command: ./bazelw
+  #     command: bazel
   #     container-command:
   #     docker-ipv6: false
   #     request: ${{ needs.load.outputs.request }}

@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 61]
+// [#next-free-field: 62]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -141,7 +141,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 13]
+  // [#next-free-field: 14]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -243,6 +243,20 @@ message HttpConnectionManager {
     // :ref:`HTTP access logging <config_access_log>` applies here, however
     // unknown specifier values are replaced with the empty string instead of ``-``.
     string upstream_operation = 12;
+
+    // If set to true, trace context propagation is disabled, meaning that trace context headers
+    // (e.g. ``traceparent``, ``tracestate`` for OpenTelemetry/W3C, or ``X-B3-*`` headers for Zipkin)
+    // will not be injected when proxying requests to upstreams.
+    //
+    // This is useful for scenarios where you want to report spans from a proxy (e.g., an egress
+    // gateway) while preventing trace context from being propagated to external services,
+    // effectively stopping the trace at the mesh boundary.
+    //
+    // Note that span reporting is still performed when this is set to true - only context
+    // propagation is disabled.
+    //
+    // Default: false (context propagation is enabled)
+    bool no_context_propagation = 13;
   }
 
   message InternalAddressConfig {
@@ -819,8 +833,51 @@ message HttpConnectionManager {
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
 
-  // The matcher for forwarding client cert details.
-  // [#not-implemented-hide:]
+  // The matcher for forwarding client cert details. This allows per-request configuration
+  // of forward client cert behavior based on request properties. If a matcher is configured
+  // and matches a request, the matched action's forward client cert config will be used.
+  // If the matcher is not configured or doesn't match, the static
+  // :ref:`forward_client_cert_details
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+  // and
+  // :ref:`set_current_client_cert_details
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+  // config will be used as fallback.
+  //
+  // Example: If the x-forwarded-client-cert header contains "trusted-client", use APPEND_FORWARD,
+  // otherwise use SANITIZE_SET:
+  //
+  // .. code-block:: yaml
+  //
+  //   forward_client_cert_matcher:
+  //     matcher_list:
+  //       matchers:
+  //       - predicate:
+  //           single_predicate:
+  //             input:
+  //               name: envoy.matching.inputs.request_headers
+  //               typed_config:
+  //                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //                 header_name: "x-forwarded-client-cert"
+  //             value_match:
+  //               string_match:
+  //                 contains: "trusted-client"
+  //         on_match:
+  //           action:
+  //             name: forward_client_cert
+  //             typed_config:
+  //               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+  //               forward_client_cert_details: APPEND_FORWARD
+  //               set_current_client_cert_details:
+  //                 uri: true
+  //     on_no_match:
+  //       action:
+  //         name: forward_client_cert
+  //         typed_config:
+  //           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+  //           forward_client_cert_details: SANITIZE_SET
+  //           set_current_client_cert_details:
+  //             uri: true
   xds.type.matcher.v3.Matcher forward_client_cert_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
@@ -1008,6 +1065,49 @@ message HttpConnectionManager {
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // Configuration for controlling how the ``x-forwarded-proto`` header is set.
+  // This allows customization of protocol inference, including support for inferring the original
+  // protocol (HTTP or HTTPS) from the PROXY protocol destination port.
+  //
+  // This is useful when a Layer 4 load balancer (such as AWS NLB) terminates TLS and uses
+  // PROXY protocol to communicate with Envoy.
+  //
+  // When configured and the local address was restored from PROXY protocol (indicating the
+  // original destination address is available), the ``x-forwarded-proto`` header will be set
+  // based on whether the destination port is in ``https_destination_ports`` or
+  // ``http_destination_ports``.
+  //
+  // Example configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_connection_manager:
+  //     forward_proto_config:
+  //       https_destination_ports: [443, 8443]
+  //       http_destination_ports: [80, 8080]
+  //
+  // If not configured, defaults to disabled and the standard behavior applies (using connection
+  // TLS status or trusted downstream headers).
+  ForwardProtoConfig forward_proto_config = 61;
+}
+
+// Configuration options for setting the ``x-forwarded-proto`` header.
+// This message provides flexibility for future enhancements to protocol inference.
+message ForwardProtoConfig {
+  // List of destination ports that should be treated as HTTPS.
+  // When the PROXY protocol destination port matches one of these ports,
+  // ``x-forwarded-proto`` will be set to ``https``.
+  //
+  // Common values: 443, 8443
+  repeated uint32 https_destination_ports = 1;
+
+  // List of destination ports that should be treated as HTTP.
+  // When the PROXY protocol destination port matches one of these ports,
+  // ``x-forwarded-proto`` will be set to ``http``.
+  //
+  // Common values: 80, 8080
+  repeated uint32 http_destination_ports = 2;
 }
 
 // The configuration to customize local reply returned by Envoy.

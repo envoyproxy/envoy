@@ -543,6 +543,28 @@ public:
    * to assume that any set of headers will be valid for the duration of the stream.
    */
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
+
+  /**
+   * This routine may be called to change the buffer limit for filters.
+   *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > bufferLimit()) {setBufferLimit(desired_limit);}
+   *
+   * @param limit supplies the desired buffer limit.
+   */
+  virtual void setBufferLimit(uint64_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for filters. Filters should abide by
+   * this limit or change it via setBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint64_t bufferLimit() PURE;
 };
 
 /**
@@ -629,6 +651,9 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
@@ -764,28 +789,6 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
-   * This routine may be called to change the buffer limit for decoder filters.
-   *
-   * It is recommended (but not required) that filters calling this function should
-   * generally only perform increases to the buffer limit, to avoid potentially
-   * conflicting with the buffer requirements of other filters in the chain, i.e.
-   *
-   * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
-   *
-   * @param limit supplies the desired buffer limit.
-   */
-  virtual void setDecoderBufferLimit(uint64_t limit) PURE;
-
-  /**
-   * This routine returns the current buffer limit for decoder filters. Filters should abide by
-   * this limit or change it via setDecoderBufferLimit.
-   * A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @return the buffer limit the filter should apply.
-   */
-  virtual uint64_t decoderBufferLimit() PURE;
-
-  /**
    * @return the account, if any, used by this stream.
    */
   virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
@@ -841,6 +844,13 @@ public:
    * @return true if the filter should shed load based on the system pressure, typically memory.
    */
   virtual bool shouldLoadShed() const PURE;
+
+  /**
+   * Deprecated methods for decoder buffer limit accessors. Use setBufferLimit and bufferLimit
+   * instead. This is kept for backward compatibility and will be removed in next few releases.
+   */
+  void setDecoderBufferLimit(uint64_t limit) { setBufferLimit(limit); }
+  uint64_t decoderBufferLimit() { return bufferLimit(); }
 };
 
 /**
@@ -1058,6 +1068,9 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
@@ -1111,26 +1124,11 @@ public:
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
-   * This routine may be called to change the buffer limit for encoder filters.
-   *
-   * It is recommended (but not required) that filters calling this function should
-   * generally only perform increases to the buffer limit, to avoid potentially
-   * conflicting with the buffer requirements of other filters in the chain, i.e.
-   *
-   * if (desired_limit > encoderBufferLimit()) {setEncoderBufferLimit(desired_limit);}
-   *
-   * @param limit supplies the desired buffer limit.
+   * Deprecated methods for encoder buffer limit accessors. Use setBufferLimit and bufferLimit
+   * instead. This is kept for backward compatibility and will be removed in next few releases.
    */
-  virtual void setEncoderBufferLimit(uint32_t limit) PURE;
-
-  /**
-   * This routine returns the current buffer limit for encoder filters. Filters should abide by
-   * this limit or change it via setEncoderBufferLimit.
-   * A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @return the buffer limit the filter should apply.
-   */
-  virtual uint32_t encoderBufferLimit() PURE;
+  void setEncoderBufferLimit(uint64_t limit) { setBufferLimit(limit); }
+  uint64_t encoderBufferLimit() { return bufferLimit(); }
 };
 
 /**
@@ -1276,6 +1274,51 @@ public:
    * @param return the worker thread's dispatcher.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return absl::string_view the filter config name that used to create the filter. This
+   * will return the latest set name by the setFilterConfigName() method.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
+
+  /**
+   * Set the configured name of the filter in the filter chain. This name is used to identify
+   * the filter self and look up filter-specific configuration in various places (e.g., route
+   * configuration).
+   *
+   * NOTE: This method should be called for each filter before adding the filter to the filter
+   * chain via addStreamDecoderFilter(), addStreamEncoderFilter(), or addStreamFilter().
+   * NOTE: By default, the FilterChainFactory will call this method to set the config name
+   * from configuration and the per filter factory does not need to care this method except
+   * it wants to override the config name.
+   *
+   * @param name the name to be used for looking up filter-specific configuration.
+   */
+  virtual void setFilterConfigName(absl::string_view name) PURE;
+
+  /**
+   * @return OptRef<const Router::Route> the route selected for this stream, if any.
+   */
+  virtual OptRef<const Router::Route> route() const PURE;
+
+  /**
+   * Check whether the filter chain is disabled for this stream.
+   * @param name the name of the filter chain to check.
+   *
+   * @return absl::optional<bool> whether the filter chain is disabled for this stream.
+   */
+  virtual absl::optional<bool> filterDisabled(absl::string_view name) const PURE;
+
+  /**
+   * @return const StreamInfo::StreamInfo& the stream info for this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /**
+   * @return RequestHeaderMapOptRef the request headers for this stream.
+   */
+  virtual RequestHeaderMapOptRef requestHeaders() const PURE;
 };
+
 } // namespace Http
 } // namespace Envoy

@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_benchmark_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
     "envoy_proto_descriptor",
@@ -52,8 +53,9 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/status",
+        "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -71,6 +73,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/proto_api_scrubber:filter",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
@@ -84,8 +87,8 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -114,8 +117,8 @@ envoy_extension_cc_test(
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:registry_lib",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_cel_cpp//parser",
+        "@abseil-cpp//absl/strings:str_format",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -142,8 +145,31 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
-        "@com_google_cel_cpp//parser",
+        "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "filter_fuzz_proto",
+    srcs = ["filter_fuzz.proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "filter_fuzz_test",
+    srcs = ["filter_fuzz_test.cc"],
+    corpus = "fuzz_corpus",
+    deps = [
+        ":filter_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:filter",
+        "//source/extensions/filters/http/proto_api_scrubber:filter_config",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

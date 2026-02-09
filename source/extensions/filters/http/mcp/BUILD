@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/mcp:constants_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )
@@ -29,9 +30,13 @@ envoy_cc_library(
         ":mcp_json_parser_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],

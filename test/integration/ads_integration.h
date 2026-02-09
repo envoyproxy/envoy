@@ -74,7 +74,15 @@ public:
   envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
                                                                 const std::string& cluster);
 
+  envoy::config::route::v3::RouteConfiguration buildRouteConfigWithVhds(const std::string& name);
+
+  envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                         const std::string& domain,
+                                                         const std::string& prefix,
+                                                         const std::string& cluster);
+
   void makeSingleRequest();
+  void makeSingleRequestWithDropOverload();
 
   void initialize() override;
   void initializeAds(const bool rate_limiting);
@@ -103,14 +111,33 @@ public:
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
-    return fmt::format(
-        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
-        std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
+    absl::string_view sotw_or_delta_str;
+    switch (std::get<2>(p.param)) {
+    case Grpc::SotwOrDelta::Sotw:
+      sotw_or_delta_str = "Sotw";
+      break;
+    case Grpc::SotwOrDelta::Delta:
+      sotw_or_delta_str = "Delta";
+      break;
+    case Grpc::SotwOrDelta::UnifiedSotw:
+      sotw_or_delta_str = "UnifiedSotw";
+      break;
+    case Grpc::SotwOrDelta::UnifiedDelta:
+      sotw_or_delta_str = "UnifiedDelta";
+      break;
+    }
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                            : "EnvoyGrpc",
+                       sotw_or_delta_str);
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+  bool isSotw() const {
+    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
+  }
 };
 
 // When old delta subscription state goes away, we could replace this macro back with

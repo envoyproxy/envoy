@@ -19,6 +19,7 @@ namespace {
 using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::Not;
+using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {
 protected:
@@ -84,12 +85,25 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Check extracted metadata contains params.name
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->string_value(), "calculator");
+}
+
+TEST_F(McpJsonParserTest, ResourcesListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 100
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_LIST);
 }
 
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
@@ -105,11 +119,64 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->string_value(), "file:///path/to/resource.txt");
+}
+
+TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/subscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 102
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_SUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/unsubscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 103
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_UNSUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, PromptsListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 200
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
@@ -129,7 +196,7 @@ TEST_F(McpJsonParserTest, PromptsGetExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_GET);
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_GET);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -156,7 +223,22 @@ TEST_F(McpJsonParserTest, CompletionCompleteExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
+
+  // Verify that params.ref object was extracted
+  const auto* ref = parser_->getNestedValue("params.ref");
+  ASSERT_NE(ref, nullptr);
+  ASSERT_TRUE(ref->has_struct_value());
+
+  // Verify nested fields within the extracted object
+  const auto& ref_struct = ref->struct_value();
+  auto type_it = ref_struct.fields().find("type");
+  ASSERT_NE(type_it, ref_struct.fields().end());
+  EXPECT_EQ(type_it->second.string_value(), "ref/resource");
+
+  auto uri_it = ref_struct.fields().find("uri");
+  ASSERT_NE(uri_it, ref_struct.fields().end());
+  EXPECT_EQ(uri_it->second.string_value(), "file:///document.md");
 }
 
 TEST_F(McpJsonParserTest, InitializeExtraction) {
@@ -183,7 +265,7 @@ TEST_F(McpJsonParserTest, InitializeExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::INITIALIZE);
+  EXPECT_EQ(parser_->getMethod(), Methods::INITIALIZE);
 
   const auto* version_value = parser_->getNestedValue("params.protocolVersion");
   ASSERT_NE(version_value, nullptr);
@@ -207,7 +289,7 @@ TEST_F(McpJsonParserTest, NotificationProgressExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_PROGRESS);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_PROGRESS);
 
   const auto* token = parser_->getNestedValue("params.progressToken");
   ASSERT_NE(token, nullptr);
@@ -231,7 +313,7 @@ TEST_F(McpJsonParserTest, NotificationCancelledExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_CANCELLED);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_CANCELLED);
 
   const auto* request_id = parser_->getNestedValue("params.requestId");
   ASSERT_NE(request_id, nullptr);
@@ -268,7 +350,7 @@ TEST_F(McpJsonParserTest, PartialParsingSingleChunk) {
   EXPECT_OK(status3); // Complete now
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -290,7 +372,7 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
   ASSERT_TRUE(parser_->finishParse().ok());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -298,14 +380,15 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
 }
 
 TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
-  // Split in the middle of an escape sequence
+  // Split in the middle of an escape sequence inside params object.
+  // The JSON parsing will fail due to incomplete escape sequence,
+  // but the MCP request is still valid if we have jsonrpc and method.
   std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"text": "line1\)";
 
   auto status = parser_->parse(json1);
 
-  // Early termination.
+  // Parse fails due to incomplete escape sequence (invalid JSON)
   EXPECT_FALSE(status.ok());
-
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
@@ -331,7 +414,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationToolsCall) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -359,12 +442,43 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   // Should have extracted params.uri
   const auto* uri = parser_->getNestedValue("params.uri");
   ASSERT_NE(uri, nullptr);
   EXPECT_EQ(uri->string_value(), "file:///test.txt");
+}
+
+TEST_F(McpJsonParserTest, EarlyTerminationWithObjectField) {
+  // Verify early termination works when extracting object fields (params.ref)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "params": {
+      "ref": {
+        "type": "ref/resource",
+        "uri": "file:///doc.md"
+      }
+    },
+    "id": 1,
+    "extra_field_1": "should not be parsed",
+    "extra_field_2": {"nested": {"deeply": {"more": "data"}}}
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isAllFieldsCollected()); // Verify early-stop worked
+
+  // Verify params.ref was extracted correctly
+  const auto* ref = parser_->getNestedValue("params.ref");
+  ASSERT_NE(ref, nullptr);
+  ASSERT_TRUE(ref->has_struct_value());
+
+  // Extra fields should not be extracted
+  const auto* extra = parser_->getNestedValue("extra_field_1");
+  EXPECT_EQ(extra, nullptr);
 }
 
 TEST_F(McpJsonParserTest, DeeplyNestedStructures) {
@@ -391,7 +505,7 @@ TEST_F(McpJsonParserTest, DeeplyNestedStructures) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
 }
 
 TEST_F(McpJsonParserTest, InvalidJson) {
@@ -448,7 +562,7 @@ TEST_F(McpJsonParserTest, NumericValues) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::LOGGING_SET_LEVEL);
+  EXPECT_EQ(parser_->getMethod(), Methods::LOGGING_SET_LEVEL);
 
   const auto* level = parser_->getNestedValue("params.level");
   ASSERT_NE(level, nullptr);
@@ -477,7 +591,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json1);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name1 = parser_->getNestedValue("params.name");
   ASSERT_NE(name1, nullptr);
@@ -491,7 +605,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json2);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* uri = parser_->getNestedValue("params.uri");
   ASSERT_NE(uri, nullptr);
@@ -510,7 +624,7 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
       McpParserConfig::AttributeExtractionRule("params.custom_field"),
       McpParserConfig::AttributeExtractionRule("params.metadata.version")};
 
-  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
 
   auto custom_parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -550,6 +664,115 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
   EXPECT_EQ(author, nullptr);
 }
 
+TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
+  // params._meta is a global optional field, so any method could have optional fields
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name")};
+
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
+
+  EXPECT_OK(parser->parse(json));
+  EXPECT_TRUE(parser->hasOptionalFields());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  EXPECT_EQ(meta, nullptr);
+}
+
+TEST_F(McpJsonParserTest, EarlyStopWithMetaAsRequiredField) {
+  // When params._meta is explicitly configured as a required (extracted) field,
+  // there should be no optional fields, and early stop should trigger as soon
+  // as all required fields are found.
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+
+  // Override tools/call config to include _meta as required field
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
+      McpParserConfig::AttributeExtractionRule("params._meta") // _meta as required
+  };
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  // JSON with _meta present followed by extra data - early stop should trigger
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "_meta": {"trace": "t1"}, "extra": "data"}})";
+
+  EXPECT_OK(parser->parse(json));
+
+  // Since _meta is required (not optional), hasOptionalFields should be false
+  EXPECT_FALSE(parser->hasOptionalFields());
+  // All required fields were found, so early stop should have triggered
+  EXPECT_TRUE(parser->isAllFieldsCollected());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  // Verify extracted fields
+  const auto* name = parser->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "tool");
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta, nullptr);
+  ASSERT_TRUE(meta->has_struct_value());
+}
+
+TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
+  // params._meta is a global optional field and should be extracted
+  // for all methods when present
+  McpParserConfig config = McpParserConfig::createDefault();
+  auto parser = std::make_unique<McpJsonParser>(config);
+
+  std::string json1 = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool",
+      "_meta": {"trace_id": "t1"}
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json1));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta1 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta1, nullptr);
+  ASSERT_TRUE(meta1->has_struct_value());
+  const auto& meta1_fields = meta1->struct_value().fields();
+  auto meta1_it = meta1_fields.find("trace_id");
+  ASSERT_NE(meta1_it, meta1_fields.end());
+  EXPECT_EQ(meta1_it->second.string_value(), "t1");
+
+  parser->reset();
+
+  std::string json2 = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "params": {
+      "uri": "file:///test.txt",
+      "_meta": {"trace_id": "t2"}
+    },
+    "id": 2
+  })";
+
+  EXPECT_OK(parser->parse(json2));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta2 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta2, nullptr);
+  ASSERT_TRUE(meta2->has_struct_value());
+  const auto& meta2_fields = meta2->struct_value().fields();
+  auto meta2_it = meta2_fields.find("trace_id");
+  ASSERT_NE(meta2_it, meta2_fields.end());
+  EXPECT_EQ(meta2_it->second.string_value(), "t2");
+}
+
 TEST_F(McpJsonParserTest, BooleanValues) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -567,14 +790,14 @@ TEST_F(McpJsonParserTest, BooleanValues) {
       McpParserConfig::AttributeExtractionRule("params.subscribe"),
   };
 
-  custom_config.addMethodConfig(McpConstants::Methods::RESOURCES_SUBSCRIBE, rules);
+  custom_config.addMethodConfig(Methods::RESOURCES_SUBSCRIBE, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
   EXPECT_OK(parser->parse(json));
 
   EXPECT_TRUE(parser->isValidMcpRequest());
-  EXPECT_EQ(parser->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+  EXPECT_EQ(parser->getMethod(), Methods::RESOURCES_SUBSCRIBE);
 
   const auto* subscribe = parser->getNestedValue("params.subscribe");
   ASSERT_NE(subscribe, nullptr);
@@ -602,7 +825,7 @@ TEST_F(McpJsonParserTest, LargePayload) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have only extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -779,7 +1002,7 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.level"),
       McpParserConfig::AttributeExtractionRule("params.other")};
-  custom_config.addMethodConfig(McpConstants::Methods::LOGGING_SET_LEVEL, rules);
+  custom_config.addMethodConfig(Methods::LOGGING_SET_LEVEL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -900,7 +1123,7 @@ TEST_F(McpJsonParserTest, ArrayWithNestedObjectsAndStrings) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should extract params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -925,7 +1148,7 @@ TEST_F(McpJsonParserTest, JsonRpcBeforeMethod) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 }
 
 TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
@@ -1040,7 +1263,7 @@ TEST_F(McpJsonParserTest, MethodBeforeJsonRpc) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name = parser_->getNestedValue("params.name");
   ASSERT_NE(name, nullptr);
@@ -1193,6 +1416,86 @@ TEST_F(McpJsonParserTest, CheckIdForRegularRequest) {
   const auto* id = parser_->getNestedValue("id");
   ASSERT_NE(id, nullptr);
   EXPECT_EQ(id->number_value(), 2);
+}
+
+// Method Group Tests
+TEST(McpParserConfigTest, BuiltInMethodGroups) {
+  McpParserConfig config = McpParserConfig::createDefault();
+
+  // Lifecycle
+  EXPECT_EQ(config.getMethodGroup("initialize"), "lifecycle");
+  EXPECT_EQ(config.getMethodGroup("notifications/initialized"), "lifecycle");
+  EXPECT_EQ(config.getMethodGroup("ping"), "lifecycle");
+
+  // Tool
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
+  EXPECT_EQ(config.getMethodGroup("tools/list"), "tool");
+
+  // Resource
+  EXPECT_EQ(config.getMethodGroup("resources/read"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/list"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/subscribe"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/unsubscribe"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/templates/list"), "resource");
+
+  // Prompt
+  EXPECT_EQ(config.getMethodGroup("prompts/get"), "prompt");
+  EXPECT_EQ(config.getMethodGroup("prompts/list"), "prompt");
+
+  // Other built-ins
+  EXPECT_EQ(config.getMethodGroup("logging/setLevel"), "logging");
+  EXPECT_EQ(config.getMethodGroup("sampling/createMessage"), "sampling");
+  EXPECT_EQ(config.getMethodGroup("completion/complete"), "completion");
+
+  // Notifications (prefix match)
+  EXPECT_EQ(config.getMethodGroup("notifications/progress"), "notification");
+  EXPECT_EQ(config.getMethodGroup("notifications/cancelled"), "notification");
+  EXPECT_EQ(config.getMethodGroup("notifications/custom"), "notification");
+
+  // Unknown
+  EXPECT_EQ(config.getMethodGroup("unknown/method"), "unknown");
+  EXPECT_EQ(config.getMethodGroup("custom/extension"), "unknown");
+}
+
+TEST(McpParserConfigTest, MethodGroupFromProtoWithOverrides) {
+  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
+  proto_config.set_group_metadata_key("method_group");
+
+  // Override initialize to be in "admin" group
+  auto* method1 = proto_config.add_methods();
+  method1->set_method("initialize");
+  method1->set_group("admin");
+
+  // Override tools/call to be in "operations" group
+  auto* method2 = proto_config.add_methods();
+  method2->set_method("tools/call");
+  method2->set_group("operations");
+
+  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+
+  EXPECT_EQ(config.groupMetadataKey(), "method_group");
+  EXPECT_EQ(config.getMethodGroup("initialize"), "admin");
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "operations");
+
+  // Non-overridden methods use built-in
+  EXPECT_EQ(config.getMethodGroup("tools/list"), "tool");
+  EXPECT_EQ(config.getMethodGroup("resources/read"), "resource");
+  EXPECT_EQ(config.getMethodGroup("ping"), "lifecycle");
+}
+
+TEST(McpParserConfigTest, MethodGroupEmptyGroupFallsBackToBuiltIn) {
+  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
+  proto_config.set_group_metadata_key("group");
+
+  // Empty group means use built-in
+  auto* method = proto_config.add_methods();
+  method->set_method("tools/call");
+  method->set_group(""); // Empty group
+
+  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+
+  // Should fall back to built-in group
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
 }
 
 } // namespace

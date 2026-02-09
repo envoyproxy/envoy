@@ -198,7 +198,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values.
-  //`statsAsPrometheus()` should return two implying it found two unique stat names
+  //`statsAsPrometheusText()` should return two implying it found two unique stat names
 
   addCounter("cluster.test_cluster_1.upstream_cx_total",
              {{makeStat("a.tag-name"), makeStat("a.tag-value")}});
@@ -210,7 +210,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(2UL, size);
@@ -220,7 +220,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
 
   // Create two counters and two gauges, all with unique names.
-  // statsAsPrometheus() should return four implying it found
+  // statsAsPrometheusText() should return four implying it found
   // four unique stat names.
 
   addCounter("cluster.test_cluster_1.upstream_cx_total",
@@ -233,7 +233,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
@@ -251,7 +251,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -296,7 +296,7 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   StatsParams params = StatsParams();
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -359,7 +359,7 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
   // re-try the streaming Prometheus implementation.
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1, size);
@@ -380,7 +380,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -420,7 +420,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -429,7 +429,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
 envoy_histogram1_bucket{le="0.5"} 1
 envoy_histogram1_bucket{le="1"} 2
 envoy_histogram1_bucket{le="+Inf"} 3
-envoy_histogram1_sum{} 2.2599999999999997868371792719699
+envoy_histogram1_sum{} 2.2578688482015323302221077028662
 envoy_histogram1_count{} 3
 )EOF";
 
@@ -455,22 +455,22 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
 envoy_histogram1_bucket{le="0.5"} 0
-envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="1"} 100000
 envoy_histogram1_bucket{le="5"} 100000
 envoy_histogram1_bucket{le="10"} 100000
 envoy_histogram1_bucket{le="25"} 100000
 envoy_histogram1_bucket{le="50"} 100000
-envoy_histogram1_bucket{le="100"} 100000
+envoy_histogram1_bucket{le="100"} 1100000
 envoy_histogram1_bucket{le="250"} 1100000
 envoy_histogram1_bucket{le="500"} 1100000
-envoy_histogram1_bucket{le="1000"} 1100000
+envoy_histogram1_bucket{le="1000"} 101100000
 envoy_histogram1_bucket{le="2500"} 101100000
 envoy_histogram1_bucket{le="5000"} 101100000
 envoy_histogram1_bucket{le="10000"} 101100000
@@ -481,7 +481,7 @@ envoy_histogram1_bucket{le="600000"} 101100000
 envoy_histogram1_bucket{le="1800000"} 101100000
 envoy_histogram1_bucket{le="3600000"} 101100000
 envoy_histogram1_bucket{le="+Inf"} 101100000
-envoy_histogram1_sum{} 105105105000
+envoy_histogram1_sum{} 104866771428.571441650390625
 envoy_histogram1_count{} 101100000
 )EOF";
 
@@ -520,7 +520,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(12UL, size);
@@ -543,13 +543,13 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"}
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 3
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 5
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
@@ -558,7 +558,7 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
-envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5531.1160155998386471765115857124
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 # TYPE envoy_cluster_endpoint_c1 counter
 envoy_cluster_endpoint_c1{a_tag_name="a.tag-value",envoy_cluster_name="cluster1",envoy_endpoint_address="127.0.0.1:80"} 11
@@ -598,7 +598,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
                   {makeStat("tag3"), makeStat(R"(")")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
@@ -647,7 +647,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
   }
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(6UL, size);
@@ -674,13 +674,13 @@ envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="60000"} 7
@@ -689,20 +689,20 @@ envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="aaa"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="aaa"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="0.5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="60000"} 7
@@ -711,20 +711,20 @@ envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="bbb"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="bbb"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="0.5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="60000"} 7
@@ -733,7 +733,7 @@ envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="ccc"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="ccc"} 7
 # TYPE envoy_cluster_upstream_rq_time histogram
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="0.5"} 0
@@ -741,13 +741,13 @@ envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="60000"} 7
@@ -756,20 +756,20 @@ envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="aaa"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="aaa"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="0.5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="60000"} 7
@@ -778,20 +778,20 @@ envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="bbb"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="bbb"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="0.5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="60000"} 7
@@ -800,7 +800,7 @@ envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="ccc"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="ccc"} 7
 )EOF";
 
@@ -833,7 +833,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   Buffer::OwnedImpl response;
   StatsParams params;
   params.used_only_ = true;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -844,13 +844,13 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"}
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 3
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 5
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
@@ -859,7 +859,7 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
-envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5531.1160155998386471765115857124
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 
@@ -880,7 +880,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Exclude;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -893,7 +893,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::ShowOnly;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -906,7 +906,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Include;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -939,7 +939,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(0UL, size);
@@ -950,7 +950,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -989,7 +989,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -1001,7 +1001,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total&safe", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -1013,7 +1013,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     Buffer::OwnedImpl response;
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("/stats?filter=cluster.test_1.endpoint.*c1", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected =
@@ -1023,6 +1023,319 @@ envoy_cluster_endpoint_c1{a_tag_name="a.tag-value",envoy_cluster_name="test_1",e
     EXPECT_EQ(1UL, size);
     EXPECT_EQ(expected, response.toString());
   }
+}
+
+// Protobuf Format Tests
+
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithCountersAndGauges) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addCounter("cluster.test_1.upstream_cx_total", {{makeStat("cluster_name"), makeStat("test_1")}});
+  addCounter("cluster.test_2.upstream_cx_total", {{makeStat("cluster_name"), makeStat("test_2")}});
+  addGauge("cluster.test_1.upstream_cx_active", {{makeStat("cluster_name"), makeStat("test_1")}});
+
+  counters_[0]->add(10);
+  counters_[1]->add(20);
+  gauges_[0]->set(5);
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(3UL, size);
+
+  EXPECT_EQ("application/vnd.google.protobuf; "
+            "proto=io.prometheus.client.MetricFamily; encoding=delimited",
+            response_headers.getContentTypeValue());
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(3, families.size());
+
+  EXPECT_EQ("envoy_cluster_test_1_upstream_cx_total", families[0].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::COUNTER, families[0].type());
+  ASSERT_EQ(1, families[0].metric_size());
+  EXPECT_EQ(10, families[0].metric(0).counter().value());
+  ASSERT_EQ(1, families[0].metric(0).label_size());
+  EXPECT_EQ("cluster_name", families[0].metric(0).label(0).name());
+  EXPECT_EQ("test_1", families[0].metric(0).label(0).value());
+
+  EXPECT_EQ("envoy_cluster_test_2_upstream_cx_total", families[1].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::COUNTER, families[1].type());
+  ASSERT_EQ(1, families[1].metric_size());
+  EXPECT_EQ(20, families[1].metric(0).counter().value());
+
+  EXPECT_EQ("envoy_cluster_test_1_upstream_cx_active", families[2].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::GAUGE, families[2].type());
+  ASSERT_EQ(1, families[2].metric_size());
+  EXPECT_EQ(5, families[2].metric(0).gauge().value());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithHistogram) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
+  histogram->unit_ = Stats::Histogram::Unit::Milliseconds;
+  addHistogram(histogram);
+  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(1UL, size);
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(1, families.size());
+
+  EXPECT_EQ("envoy_cluster_test_1_upstream_rq_time", families[0].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::HISTOGRAM, families[0].type());
+  ASSERT_EQ(1, families[0].metric_size());
+
+  const auto& metric = families[0].metric(0);
+  ASSERT_EQ(1, metric.label_size());
+  EXPECT_EQ("cluster", metric.label(0).name());
+  EXPECT_EQ("test_1", metric.label(0).value());
+
+  // Verify histogram data
+  const auto& hist = metric.histogram();
+  EXPECT_EQ(6, hist.sample_count());
+  EXPECT_GT(hist.sample_sum(), 0);
+
+  // Verify exact buckets match the supported buckets from the histogram statistics.
+  Stats::ConstSupportedBuckets& supported_buckets = h1_cumulative_statistics.supportedBuckets();
+  const std::vector<uint64_t>& computed_buckets = h1_cumulative_statistics.computedBuckets();
+  EXPECT_EQ(supported_buckets.size(), hist.bucket_size());
+  for (size_t i = 0; i < supported_buckets.size(); ++i) {
+    EXPECT_EQ(supported_buckets[i], hist.bucket(i).upper_bound());
+    EXPECT_EQ(computed_buckets[i], hist.bucket(i).cumulative_count());
+  }
+
+  // Verify +Inf bucket
+  EXPECT_EQ(6, hist.bucket(hist.bucket_size() - 1).cumulative_count());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithSummary) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100};
+  HistogramWrapper h1_interval;
+  h1_interval.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
+
+  auto histogram =
+      makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
+  addHistogram(histogram);
+  EXPECT_CALL(*histogram, intervalStatistics()).WillOnce(ReturnRef(h1_interval_statistics));
+
+  StatsParams params;
+  params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces);
+  EXPECT_EQ(1UL, size);
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(1, families.size());
+
+  EXPECT_EQ("envoy_cluster_test_1_upstream_rq_time", families[0].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::SUMMARY, families[0].type());
+  ASSERT_EQ(1, families[0].metric_size());
+
+  const auto& metric = families[0].metric(0);
+  const auto& summary = metric.summary();
+  EXPECT_EQ(5, summary.sample_count());
+  EXPECT_GT(summary.sample_sum(), 0);
+
+  // Verify exact quantiles match the supported quantiles from the histogram statistics.
+  Stats::ConstSupportedBuckets& supported_quantiles = h1_interval_statistics.supportedQuantiles();
+  const std::vector<double>& computed_quantiles = h1_interval_statistics.computedQuantiles();
+  EXPECT_EQ(supported_quantiles.size(), summary.quantile_size());
+  for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+    EXPECT_EQ(supported_quantiles[i], summary.quantile(i).quantile());
+    EXPECT_EQ(computed_quantiles[i], summary.quantile(i).value());
+  }
+}
+
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithTextReadouts) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addTextReadout("control_plane.identifier", "CP-1", {{makeStat("cluster"), makeStat("c1")}});
+  addTextReadout("version", "1.2.3", {{makeStat("env"), makeStat("prod")}});
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(2UL, size);
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(2, families.size());
+
+  EXPECT_EQ("envoy_control_plane_identifier", families[0].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::GAUGE, families[0].type());
+  ASSERT_EQ(1, families[0].metric_size());
+  const auto& metric1 = families[0].metric(0);
+  EXPECT_EQ(0, metric1.gauge().value());
+
+  // Should have cluster label + text_value label
+  ASSERT_EQ(2, metric1.label_size());
+  bool found_text_value = false;
+  for (int i = 0; i < metric1.label_size(); i++) {
+    if (metric1.label(i).name() == "text_value") {
+      EXPECT_EQ("CP-1", metric1.label(i).value());
+      found_text_value = true;
+    }
+  }
+  EXPECT_TRUE(found_text_value);
+
+  // Second text readout
+  EXPECT_EQ("envoy_version", families[1].name());
+  EXPECT_EQ(io::prometheus::client::MetricType::GAUGE, families[1].type());
+}
+
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithMultipleTags) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addCounter("http.ingress.downstream_rq_total",
+             {{makeStat("envoy_http_conn_manager_prefix"), makeStat("ingress")},
+              {makeStat("envoy_response_code_class"), makeStat("2xx")}});
+
+  counters_[0]->add(42);
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, StatsParams(), custom_namespaces);
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(1, families.size());
+  ASSERT_EQ(1, families[0].metric_size());
+
+  const auto& metric = families[0].metric(0);
+  ASSERT_EQ(2, metric.label_size());
+
+  // Validate label contents - should have envoy_http_conn_manager_prefix and
+  // envoy_response_code_class
+  bool found_prefix = false;
+  bool found_code_class = false;
+  for (int i = 0; i < metric.label_size(); ++i) {
+    if (metric.label(i).name() == "envoy_http_conn_manager_prefix") {
+      EXPECT_EQ("ingress", metric.label(i).value());
+      found_prefix = true;
+    } else if (metric.label(i).name() == "envoy_response_code_class") {
+      EXPECT_EQ("2xx", metric.label(i).value());
+      found_code_class = true;
+    }
+  }
+  EXPECT_TRUE(found_prefix);
+  EXPECT_TRUE(found_code_class);
+
+  EXPECT_EQ(42, metric.counter().value());
+}
+
+// Test that protobuf is chosen when it is the first accept value.
+TEST_F(PrometheusStatsFormatterTest, ContentNegotiationProtobufAcceptHeader) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("test.counter", {});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      // This header value was copied from a real prometheus scraper request.
+      {"accept", "application/"
+                 "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q="
+                 "0.6,application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.5,text/"
+                 "plain;version=0.0.4;q=0.4,*/*;q=0.3"}};
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      response_headers, response, StatsParams(), custom_namespaces);
+
+  EXPECT_EQ("application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; "
+            "encoding=delimited",
+            response_headers.getContentTypeValue());
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  EXPECT_EQ(1, families.size());
+}
+
+// Test that text is chosen when it is the first accept value.
+TEST_F(PrometheusStatsFormatterTest, ContentNegotiationTextPlainAcceptHeader) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("test.counter", {});
+
+  // Both text and protobuf are accepted, with text as a higher priority.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"accept", "text/plain;version=0.0.4;q=0.6,vnd.google.protobuf;proto=io.prometheus.client."
+                 "MetricFamily;encoding=delimited;q=0.5,*/*;q=0.4"}};
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      response_headers, response, StatsParams(), custom_namespaces);
+
+  EXPECT_TRUE(response_headers.getContentTypeValue().empty());
+
+  std::string output = response.toString();
+  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+}
+
+TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("test.counter", {});
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  // No Accept header
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      response_headers, response, StatsParams(), custom_namespaces);
+
+  // Should default to text format
+  std::string output = response.toString();
+  EXPECT_TRUE(output.find("# TYPE") != std::string::npos);
+}
+
+TEST_F(PrometheusStatsFormatterTest, QueryParamOverridesAcceptHeader) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("test.counter", {});
+
+  Http::TestRequestHeaderMapImpl request_headers{{"accept", "text/plain"}};
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+
+  StatsParams params;
+  Buffer::OwnedImpl parse_buffer;
+  params.parse("?prom_protobuf=1", parse_buffer);
+
+  PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      response_headers, response, params, custom_namespaces);
+
+  // Query param should override Accept header - should use protobuf
+  EXPECT_EQ("application/vnd.google.protobuf; "
+            "proto=io.prometheus.client.MetricFamily; encoding=delimited",
+            response_headers.getContentTypeValue());
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  EXPECT_EQ(1, families.size());
 }
 
 } // namespace Server

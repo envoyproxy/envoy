@@ -67,6 +67,7 @@ TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
   engine_builder.addQuicConnectionOption("10AF")
       .addQuicConnectionOption("MPQC")
+      .addQuicClientConnectionOption("1RTT")
       .addQuicHint("www.abc.com", 443)
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
@@ -82,7 +83,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addH2ConnectionKeepaliveTimeoutSeconds(333)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .addRuntimeGuard("test_feature_false", true)
+      .addRuntimeGuard("quic_no_tcp_delay", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .setDeviceOs("probably-ubuntu-on-CI");
@@ -99,6 +100,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
       "connection_options: \"AKDU,BWRS,5RTO,EVMB,10AF,MPQC\"",
+      "client_connection_options: \"1RTT\"",
       "hostname: \"www.abc.com\"",
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",
@@ -106,7 +108,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "num_timeouts_to_trigger_port_migration { value: 4 }",
       "idle_network_timeout { seconds: 60 }",
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
-      "key: \"test_feature_false\" value { bool_value: true }",
+      "key: \"quic_no_tcp_delay\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
@@ -118,15 +120,27 @@ TEST(TestConfig, ConfigIsApplied) {
   }
 }
 
-TEST(TestConfig, MultiFlag) {
+TEST(TestConfig, SameFlagMultiTimes) {
   EngineBuilder engine_builder;
-  engine_builder.addRuntimeGuard("test_feature_false", true)
-      .addRuntimeGuard("test_feature_true", false);
+  engine_builder.addRuntimeGuard("quic_no_tcp_delay", true)
+      .addRuntimeGuard("quic_no_tcp_delay", false);
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   const std::string bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_true\" value { bool_value: false }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"quic_no_tcp_delay\" value { bool_value: false }"));
+}
+
+TEST(TestConfig, InvalidRuntimeFlagIgnored) {
+  EngineBuilder engine_builder;
+  engine_builder.addRuntimeGuard("quic_no_tcp_delay", true)
+      .addRuntimeGuard("not_a_real_flag", true)
+      .addRestartRuntimeGuard("also_not_a_real_flag", true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string bootstrap_str = bootstrap->ShortDebugString();
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"quic_no_tcp_delay\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("\"not_a_real_flag\"")));
+  EXPECT_THAT(bootstrap_str, Not(HasSubstr("\"also_not_a_real_flag\"")));
 }
 
 TEST(TestConfig, ConfigIsValid) {
@@ -645,11 +659,11 @@ TEST(TestConfig, XdsConfig) {
 
 TEST(TestConfig, MoveConstructor) {
   EngineBuilder engine_builder;
-  engine_builder.addRuntimeGuard("test_feature_false", true).enableGzipDecompression(false);
+  engine_builder.addRuntimeGuard("quic_no_tcp_delay", true).enableGzipDecompression(false);
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   std::string bootstrap_str = bootstrap->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"quic_no_tcp_delay\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, Not(HasSubstr("envoy.filters.http.decompressor")));
 
   EngineBuilder engine_builder_move1(std::move(engine_builder));
@@ -658,13 +672,13 @@ TEST(TestConfig, MoveConstructor) {
   xdsBuilder.addClusterDiscoveryService();
   engine_builder_move1.setXds(xdsBuilder);
   bootstrap_str = engine_builder_move1.generateBootstrap()->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"quic_no_tcp_delay\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 
   EngineBuilder engine_builder_move2(std::move(engine_builder_move1));
   bootstrap_str = engine_builder_move2.generateBootstrap()->ShortDebugString();
-  EXPECT_THAT(bootstrap_str, HasSubstr("\"test_feature_false\" value { bool_value: true }"));
+  EXPECT_THAT(bootstrap_str, HasSubstr("\"quic_no_tcp_delay\" value { bool_value: true }"));
   EXPECT_THAT(bootstrap_str, HasSubstr("envoy.filters.http.decompressor"));
   EXPECT_THAT(bootstrap_str, HasSubstr("FAKE_XDS_SERVER"));
 }

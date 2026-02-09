@@ -41,6 +41,16 @@ void DynamicModuleListenerFilter::destroy() {
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
 
+  const std::string& worker_name = cb.dispatcher().name();
+  auto pos = worker_name.find_first_of('_');
+  ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+  if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index_)) {
+    IS_ENVOY_BUG("failed to parse worker index from name");
+  }
+  // Delay the in-module filter initialization until callbacks are set
+  // to allow accessing worker thread index during filter creation.
+  initializeInModuleFilter();
+
   if (in_module_filter_ == nullptr) {
     // Module failed to create filter, close the connection.
     cb.socket().ioHandle().close();
@@ -79,6 +89,13 @@ size_t DynamicModuleListenerFilter::maxReadBytes() const {
   }
   return config_->on_listener_filter_get_max_read_bytes_(
       const_cast<DynamicModuleListenerFilter*>(this)->thisAsVoidPtr(), in_module_filter_);
+}
+
+void DynamicModuleListenerFilter::onScheduled(uint64_t event_id) {
+  // By the time this event is invoked, the filter might be destroyed.
+  if (in_module_filter_ && config_->on_listener_filter_scheduled_) {
+    config_->on_listener_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
+  }
 }
 
 } // namespace ListenerFilters

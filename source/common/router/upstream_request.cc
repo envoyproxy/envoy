@@ -82,7 +82,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(),
+                   parent_.callbacks()->connection().has_value()
+                       ? parent_.callbacks()->connection()->connectionInfoProviderSharedPtr()
+                       : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
@@ -93,7 +96,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       enable_half_close_(enable_half_close) {
-  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+  // Get tracing config once and reuse it.
+  auto tracing_config = parent_.callbacks()->tracingConfig();
+
+  if (tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
@@ -108,20 +114,30 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
-  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
-                                            &upstream_host->cluster(),     // cluster_
-                                            Tracing::ServiceType::Unknown, // service_type_
-                                            false                          // async_client_span_
-  );
 
-  if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+  // Only inject trace context if propagation is not disabled.
+  // When noContextPropagation is true, spans are still reported but trace context
+  // headers (e.g., traceparent, X-B3-*) are not injected into upstream requests.
+  const bool no_context_propagation =
+      tracing_config.has_value() && tracing_config->noContextPropagation();
+
+  if (!no_context_propagation) {
+    Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+    Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                              &upstream_host->cluster(),     // cluster_
+                                              Tracing::ServiceType::Unknown, // service_type_
+                                              false                          // async_client_span_
+    );
+
+    if (span_ != nullptr) {
+      span_->injectContext(trace_context, upstream_context);
+    } else {
+      // No independent child span for current upstream request then inject the parent span's
+      // tracing context into the request headers.
+      // The injectContext() of the parent span may be called repeatedly when the request is
+      // retried.
+      parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+    }
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -142,7 +158,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *this);
+      parent_.callbacks()->bufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
 
