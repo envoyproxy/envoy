@@ -129,7 +129,7 @@ void ActiveStreamFilterBase::commonContinue() {
   // on doData() to do so.
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
-    doData(observedEndStream() && !had_trailers_before_data);
+    doData(end_stream_ && !had_trailers_before_data);
   }
 
   if (!canContinue()) {
