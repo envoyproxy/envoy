@@ -190,7 +190,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   std::map<std::string, std::string> geo_headers = {
-      {"x-geo-region", "dummy-region"},   {"x-geo-city", "dummy-city"},
+      {"x-geo-region", "dummy-region"},     {"x-geo-city", "dummy-city"},
       {"x-geo-country", "dummy-country"},   {"x-geo-asn", "dummy-asn"},
       {"x-geo-asn-org", "dummy-asn-org"},   {"x-geo-isp", "dummy-isp"},
       {"x-geo-apple-private-relay", "true"}};
