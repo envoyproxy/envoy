@@ -104,6 +104,12 @@ def csv_row(dep):
     return [dep.name, dep.version, dep.release_date, dep.cpe, dep.license]
 
 
+def filter_output(tarinfo):
+    return (
+        None if (lambda n: n == "external" or n.startswith("external/") or n.startswith("tools"))(
+            tarinfo.name.lstrip("./")) else tarinfo)
+
+
 def main():
     repository_locations = json.loads(pathlib.Path(sys.argv[1]).read_text())
     output_filename = sys.argv[2]
@@ -152,7 +158,8 @@ def main():
         output_path.write_text(content)
 
     with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(generated_rst_dir, arcname=".")
+
+        tar.add(generated_rst_dir, arcname=".", filter=filter_output)
 
 
 if __name__ == '__main__':

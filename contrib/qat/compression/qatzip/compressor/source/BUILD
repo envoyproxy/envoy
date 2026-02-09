@@ -15,7 +15,10 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 COMMON_ENV = {
-    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+    "LDFLAGS": " ".join([
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/envoy/bazel/external/lib",
+    ]),
 }
 
 configure_make(

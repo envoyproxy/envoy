@@ -2004,6 +2004,13 @@ envoy.load_balancing_policies.wrr_locality:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality
+envoy.load_balancing_policies.dynamic_modules:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

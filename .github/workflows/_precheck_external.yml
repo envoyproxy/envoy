@@ -28,6 +28,7 @@ jobs:
     name: ${{ matrix.target }}
     with:
       bazel-cache: true
+      bazel-cache-output-base: external
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
