@@ -679,7 +679,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
 
-  auto* existing_state = filter_state->getDataMutable<Network::ProxyProtocolFilterState>(
+  const auto* existing_state = filter_state->getDataReadOnly<Network::ProxyProtocolFilterState>(
       Network::ProxyProtocolFilterState::key());
 
   if (existing_state == nullptr) {
