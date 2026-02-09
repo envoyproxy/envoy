@@ -1034,6 +1034,147 @@ typed_config:
   cleanupUpstreamAndDownstream();
 }
 
+// Multi-worker reverse tunnel test where:
+// 1. Envoy is configured with 4 workers (concurrency = 4).
+// 2. Each worker initiates a reverse tunnel connection to the upstream tunnel listener.
+// 3. Stats verify that 4 total nodes are connected and properly distributed across workers.
+TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnelTest) {
+  DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for stats.
+
+  // Set concurrency to 4 to create 4 workers.
+  concurrency_ = 4;
+
+  const uint32_t tunnel_listener_port =
+      GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
+  const std::string loopback_addr =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+
+  // Configure the reverse tunnel setup. Each worker will initiate its own connection.
+  config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port);
+  });
+
+  // Initialize the test server with 4 workers.
+  initialize();
+
+  // Register listener ports.
+  registerTestServerPorts({"tunnel_listener", "egress_listener"});
+
+  ENVOY_LOG_MISC(info, "Waiting for all 4 workers to establish reverse tunnel connections.");
+
+  // Each of the 4 workers should establish 1 connection, so we expect 4 total handshakes.
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 4,
+                                 std::chrono::milliseconds(10000));
+
+  // Verify total node connections. Since all workers use the same node-id (test-node-id),
+  // the acceptor should show 4 connections from the same logical node.
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 4);
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.test-cluster-id", 4);
+
+  // Verify no handshake errors occurred.
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.parse_error")->value(), 0);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.rejected")->value(), 0);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.validation_failed")->value(), 0);
+
+  ENVOY_LOG_MISC(info, "All 4 worker tunnels established. Verifying per-worker reverse connection stats.");
+
+  // Verify that each worker initiated exactly 1 connection (initiator side).
+  ENVOY_LOG_MISC(info, "Verifying per-worker initiator connections.");
+  const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
+  for (int worker_id = 0; worker_id < 4; worker_id++) {
+    // Check per-worker host stat (connected to tunnel_cluster)
+    const std::string worker_host_stat =
+        fmt::format("reverse_tunnel_initiator.worker_{}.host.{}.connected", worker_id, tunnel_address);
+    test_server_->waitForGaugeGe(worker_host_stat, 1, std::chrono::milliseconds(2000));
+    
+    // Check per-worker cluster stat 
+    const std::string worker_cluster_stat =
+        fmt::format("reverse_tunnel_initiator.worker_{}.cluster.tunnel_cluster.connected", worker_id);
+    test_server_->waitForGaugeGe(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
+    
+    ENVOY_LOG_MISC(info, "Worker {} has initiated 1 reverse connection.", worker_id);
+  }
+
+  // Verify that each worker accepted exactly 1 connection (acceptor side).
+  ENVOY_LOG_MISC(info, "Verifying per-worker acceptor connections.");
+  for (int worker_id = 0; worker_id < 4; worker_id++) {
+    // Check per-worker node stat
+    const std::string worker_node_stat =
+        fmt::format("reverse_tunnel_acceptor.worker_{}.node.test-node-id", worker_id);
+    test_server_->waitForGaugeEq(worker_node_stat, 1, std::chrono::milliseconds(2000));
+    
+    // Check per-worker cluster stat
+    const std::string worker_cluster_stat =
+        fmt::format("reverse_tunnel_acceptor.worker_{}.cluster.test-cluster-id", worker_id);
+    test_server_->waitForGaugeEq(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
+    
+    ENVOY_LOG_MISC(info, "Worker {} has accepted 1 reverse connection.", worker_id);
+  }
+
+  ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
+
+  // Send multiple requests to verify load distribution across the 4 worker tunnels.
+  codec_client_ = makeHttpConnection(lookupPort("egress_listener"));
+
+  std::vector<IntegrationStreamDecoderPtr> responses;
+  const int num_requests = 12; // Send 12 requests to distribute across 4 workers
+
+  for (int i = 0; i < num_requests; i++) {
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "GET"},
+        {":path", fmt::format("/test/path{}", i)},
+        {":scheme", "http"},
+        {":authority", "host"}};
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    responses.push_back(std::move(encoder_decoder.second));
+    codec_client_->sendData(encoder_decoder.first, 0, true);
+  }
+
+  ENVOY_LOG_MISC(info, "Waiting for upstream connection and streams.");
+
+  // Wait for the upstream connection and collect all streams.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  std::vector<FakeStreamPtr> upstream_streams;
+  for (int i = 0; i < num_requests; i++) {
+    FakeStreamPtr stream;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, stream));
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+    upstream_streams.push_back(std::move(stream));
+  }
+
+  // Respond to all requests.
+  ENVOY_LOG_MISC(info, "Responding to {} requests.", num_requests);
+  for (auto& stream : upstream_streams) {
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    stream->encodeHeaders(response_headers, true);
+  }
+
+  // Wait for all responses.
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  ENVOY_LOG_MISC(info, "All {} requests completed successfully.", num_requests);
+
+  // Verify cluster stats.
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_total",
+                                 num_requests);
+  test_server_->waitForCounterGe("cluster.reverse_connection_cluster.upstream_rq_completed",
+                                 num_requests);
+
+  // Verify that all 4 worker tunnels are still active.
+  EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.accepted")->value(), 4);
+
+  ENVOY_LOG_MISC(info, "Multi-worker reverse tunnel test completed successfully!");
+
+  // Cleanup.
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace ReverseConnection
 } // namespace Clusters
