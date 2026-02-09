@@ -881,7 +881,7 @@ TEST_F(McpFilterTest, NonMcpJsonEarlyStopInPassThroughMode) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
 
-// Test multi-chunk non-MCP JSON: first chunk buffers, second chunk closes root and stops.
+// Test multi-chunk non-MCP JSON.
 TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
@@ -890,11 +890,9 @@ TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
 
   filter_->decodeHeaders(headers, false);
 
-  // First chunk: partial JSON, root object not closed yet.
   Buffer::OwnedImpl buffer1(R"({"foo": "bar", )");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
 
-  // Second chunk: closes the root object. Parser should stop immediately.
   Buffer::OwnedImpl buffer2(R"("baz": 123})");
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
@@ -912,7 +910,6 @@ TEST_F(McpFilterTest, NonMcpJsonEarlyStopInRejectMode) {
 
   filter_->decodeHeaders(headers, false);
 
-  // Complete JSON object with no JSON-RPC fields.
   std::string json = R"({"foo": "bar", "baz": 123})";
   Buffer::OwnedImpl buffer(json);
 
