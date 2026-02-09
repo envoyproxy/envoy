@@ -1378,6 +1378,71 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithMultipleTags) {
   EXPECT_EQ(42, metric.counter().value());
 }
 
+TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithClusterEndpoints) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+
+  addClusterEndpoints("cluster1", 1, {{"region", "us-east"}});
+  addClusterEndpoints("cluster2", 2, {{"region", "us-west"}});
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      response, StatsParams(), custom_namespaces);
+  EXPECT_EQ(5UL, size);
+
+  auto prom_families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(5, prom_families.size());
+
+  std::map<std::string, io::prometheus::client::MetricType> expected_families = {
+      {"envoy_cluster_endpoint_c1", io::prometheus::client::MetricType::COUNTER},
+      {"envoy_cluster_endpoint_c2", io::prometheus::client::MetricType::COUNTER},
+      {"envoy_cluster_endpoint_g1", io::prometheus::client::MetricType::GAUGE},
+      {"envoy_cluster_endpoint_g2", io::prometheus::client::MetricType::GAUGE},
+      {"envoy_cluster_endpoint_healthy", io::prometheus::client::MetricType::GAUGE},
+  };
+
+  for (const auto& prom_family : prom_families) {
+    auto it = expected_families.find(prom_family.name());
+    ASSERT_NE(it, expected_families.end()) << "Unexpected metric family: " << prom_family.name();
+    EXPECT_EQ(it->second, prom_family.type()) << "Wrong type for: " << prom_family.name();
+
+    ASSERT_EQ(3, prom_family.metric_size()) << "Wrong metric count for: " << prom_family.name();
+
+    for (int i = 0; i < prom_family.metric_size(); ++i) {
+      const auto& metric = prom_family.metric(i);
+
+      EXPECT_GE(metric.label_size(), 3)
+          << "Metric " << i << " in " << prom_family.name() << " should have at least 3 labels";
+
+      bool found_cluster_name = false;
+      bool found_endpoint_address = false;
+      bool found_region = false;
+      for (int j = 0; j < metric.label_size(); ++j) {
+        if (metric.label(j).name() == "envoy_cluster_name") {
+          found_cluster_name = true;
+          EXPECT_TRUE(metric.label(j).value() == "cluster1" ||
+                      metric.label(j).value() == "cluster2");
+        } else if (metric.label(j).name() == "envoy_endpoint_address") {
+          found_endpoint_address = true;
+          EXPECT_FALSE(metric.label(j).value().empty());
+        } else if (metric.label(j).name() == "region") {
+          found_region = true;
+        }
+      }
+      EXPECT_TRUE(found_cluster_name) << "Missing envoy_cluster_name label";
+      EXPECT_TRUE(found_endpoint_address) << "Missing envoy_endpoint_address label";
+      EXPECT_TRUE(found_region) << "Missing region label";
+
+      if (prom_family.type() == io::prometheus::client::MetricType::COUNTER) {
+        EXPECT_GT(metric.counter().value(), 0);
+      } else {
+        EXPECT_GT(metric.gauge().value(), 0);
+      }
+    }
+  }
+}
+
 // Test that protobuf is chosen when it is the first accept value.
 TEST_F(PrometheusStatsFormatterTest, ContentNegotiationProtobufAcceptHeader) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
