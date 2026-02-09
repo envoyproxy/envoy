@@ -679,7 +679,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
 
-  const auto* existing_state = filter_state->getDataReadOnly<Network::ProxyProtocolFilterState>(
+  auto* existing_state = filter_state->getDataMutable<Network::ProxyProtocolFilterState>(
       Network::ProxyProtocolFilterState::key());
 
   if (existing_state == nullptr) {
@@ -690,7 +690,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
-        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::Connection);
   } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() !=
              envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT) {
