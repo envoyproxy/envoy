@@ -16,7 +16,7 @@ namespace McpRouter {
 namespace {
 
 // Extract media type from Content-Type header (before any semicolon).
-absl::string_view extractMediaType(absl::string_view content_type) {
+inline absl::string_view extractMediaType(absl::string_view content_type) {
   const std::vector<absl::string_view> parts =
       absl::StrSplit(content_type, absl::MaxSplits(';', 1));
   return absl::StripAsciiWhitespace(parts.front());
