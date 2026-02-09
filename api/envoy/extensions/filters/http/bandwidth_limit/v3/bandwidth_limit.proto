@@ -153,6 +153,12 @@ message BandwidthLimit {
   // scope, so can be configured once at the filter chain and used in per-route or
   // per-vhost configurations. Any named bucket that doesn't have an explicit
   // configuration will use the ``limit_kbps`` and ``fill_interval`` defined in
-  // the configuration scope at which a request first uses that bucket.
+  // the configuration scope at which a request first uses that bucket, if
+  // ``create_bucket_if_not_existing`` is true, otherwise requests using an
+  // unconfigured bucket name will be unlimited.
+  //
+  // Configuring the same bucket name from multiple places in the configuration is
+  // undefined behavior; the configuration that loaded last will be used, and there
+  // are no guarantees about loading order.
   repeated NamedBucketConfiguration named_bucket_configurations = 9;
 }

@@ -50,11 +50,8 @@ NamedBucketSelector::getBucket(const StreamInfo::StreamInfo& stream_info) {
 absl::Status NamedBucketSingleton::setBucket(absl::string_view name,
                                              std::unique_ptr<BucketAndStats> bucket) {
   absl::MutexLock lock(mu_);
-  auto result = buckets_.try_emplace(name, std::move(bucket));
-  if (result.second) {
-    return absl::OkStatus();
-  }
-  return absl::InvalidArgumentError("duplicate bucket name in named_bucket_configurations");
+  buckets_.insert_or_assign(name, std::move(bucket));
+  return absl::OkStatus();
 }
 
 OptRef<BucketAndStats> NamedBucketSingleton::getBucket(absl::string_view name,

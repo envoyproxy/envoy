@@ -170,7 +170,7 @@ TEST_F(FactoryTest, FixedNameBucketSelectorUsesNamedBucket) {
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 20);
 }
 
-TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsIsAnError) {
+TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsUsesLastInstance) {
   auto config = configFromYaml(R"(
   stat_prefix: test
   limit_kbps: 50
@@ -183,9 +183,9 @@ TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsIsAnError) {
   - name: test_explicit_bucket
     limit_kbps: 101
     fill_interval: 0.03s
-  )");
-  EXPECT_THAT(config,
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("duplicate bucket name")));
+  )")
+                    .value();
+  EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 30);
 }
 
 TEST_F(FactoryTest, FixedNameBucketSelectorCreatesDefaultBucket) {
