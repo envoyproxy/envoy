@@ -237,5 +237,10 @@ new_features:
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: geoip
+  change: |
+    Added ``asn_org`` field to :ref:`geo_field_keys
+    <envoy_v3_api_msg_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys>`
+    to populate a header with the autonomous system organization name from the MaxMind ASN database.
 
 deprecated:
