@@ -65,7 +65,7 @@ envoy_cc_library(
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:statusor_lib",
         "//source/common/common:stl_helpers",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
@@ -84,14 +84,14 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_jbeder_yaml_cpp//:yaml-cpp",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//third_party/utf8_range:utf8_validity",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@xds//udpa/annotations:pkg_cc_proto",
+        "@yaml-cpp",
     ],
 )
 

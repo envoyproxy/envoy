@@ -2283,6 +2283,50 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
 }
 
+TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  // Create trigger pipe BEFORE initiating connection to ensure it's ready.
+  createTriggerPipe();
+  EXPECT_TRUE(isTriggerPipeReady());
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts.
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host.
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).Times(0);
+
+  // Create HostConnectionInfo entry.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Simulate a upstream connection in connecting state.
+  io_handle_->updateConnectionState("192.168.1.1", "test-cluster", "fake_pending_key",
+                                    ReverseConnectionState::Connecting);
+
+  RemoteClusterConnectionConfig cluster_config("test-cluster", 1);
+  maintainClusterConnections("test-cluster", cluster_config);
+
+  EXPECT_EQ(getConnectionWrappers().size(), 0);
+}
+
 // Test ReverseConnectionIOHandle::close() method without trigger pipe.
 TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
   auto config = createDefaultTestConfig();

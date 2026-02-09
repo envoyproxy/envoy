@@ -26,7 +26,6 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"

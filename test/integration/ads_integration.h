@@ -74,6 +74,13 @@ public:
   envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
                                                                 const std::string& cluster);
 
+  envoy::config::route::v3::RouteConfiguration buildRouteConfigWithVhds(const std::string& name);
+
+  envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                         const std::string& domain,
+                                                         const std::string& prefix,
+                                                         const std::string& cluster);
+
   void makeSingleRequest();
   void makeSingleRequestWithDropOverload();
 

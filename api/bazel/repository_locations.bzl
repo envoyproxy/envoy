@@ -24,7 +24,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
     ),
-    com_github_openzipkin_zipkinapi = dict(
+    zipkin_api = dict(
         version = "1.0.0",
         sha256 = "6c8ee2014cf0746ba452e5f2c01f038df60e85eb2d910b226f9aa27ddc0e44cf",
         strip_prefix = "zipkin-api-{version}",

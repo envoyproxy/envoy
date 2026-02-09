@@ -4,11 +4,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche_platform_impl/quiche_mem_slice_impl.h"
+
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
-
-#include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace quiche {
 
