@@ -3986,22 +3986,19 @@ class MockSrdsFactory : public Router::SrdsFactory {
 public:
   std::string name() const override { return "envoy.srds_factory.default"; }
   std::unique_ptr<Envoy::Config::ConfigProviderManager>
-  createScopedRoutesConfigProviderManager(
-      Server::Configuration::ServerFactoryContext&,
-      Router::RouteConfigProviderManager&) override {
+  createScopedRoutesConfigProviderManager(Server::Configuration::ServerFactoryContext&,
+                                          Router::RouteConfigProviderManager&) override {
     return nullptr;
   }
-  MOCK_METHOD(
-      Envoy::Config::ConfigProviderPtr, createConfigProvider,
-      (const envoy::extensions::filters::network::http_connection_manager::v3::
-           HttpConnectionManager& config,
-       Server::Configuration::ServerFactoryContext& factory_context,
-       Init::Manager& init_manager, const std::string& stat_prefix,
-       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager));
-  MOCK_METHOD(
-      Router::ScopeKeyBuilderPtr, createScopeKeyBuilder,
-      (const envoy::extensions::filters::network::http_connection_manager::v3::
-           HttpConnectionManager& config));
+  MOCK_METHOD(Envoy::Config::ConfigProviderPtr, createConfigProvider,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
+               Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager));
+  MOCK_METHOD(Router::ScopeKeyBuilderPtr, createScopeKeyBuilder,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config));
 };
 
 // Test that SRDS createConfigProvider receives the listener init manager.
@@ -4032,16 +4029,15 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_CALL(mock_srds_factory,
-              createConfigProvider(_, _, Ref(context_.init_manager_), _, _))
+  EXPECT_CALL(mock_srds_factory, createConfigProvider(_, _, Ref(context_.init_manager_), _, _))
       .WillOnce(Return(ByMove(Envoy::Config::ConfigProviderPtr())));
   EXPECT_CALL(mock_srds_factory, createScopeKeyBuilder(_))
       .WillOnce(Return(ByMove(Router::ScopeKeyBuilderPtr())));
 
-  HttpConnectionManagerConfig config(
-      parseHttpConnectionManagerFromYaml(yaml_string), context_, date_provider_,
-      route_config_provider_manager_, &scoped_routes_config_provider_manager_,
-      tracer_manager_, filter_config_provider_manager_, creation_status_);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 }
 
