@@ -178,8 +178,8 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
     auto now = context.mainThreadDispatcher().timeSource().monotonicTime();
     auto cache_result = module_cache.lookup(sha256_hash, now);
 
-    if (cache_result.cache_hit && !cache_result.module.empty()) {
-      auto filter_config = createFilterConfigFromBytes(cache_result.module, sha256_hash,
+    if (cache_result.cache_hit && cache_result.module) {
+      auto filter_config = createFilterConfigFromBytes(*cache_result.module, sha256_hash,
                                                        proto_config, context, scope);
       if (!filter_config.ok()) {
         return filter_config.status();
@@ -197,10 +197,9 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       return absl::UnavailableError("Module fetch in progress");
     }
 
-    if (cache_result.cache_hit && cache_result.module.empty()) {
+    if (cache_result.cache_hit && !cache_result.module) {
       // Negative cache hit -- a recent fetch failed. In NACK mode, reject immediately.
-      // In warming mode, fall through to re-fetch (the negative TTL will have expired
-      // by the time we get a new config push anyway).
+      // In warming mode, fall through to re-fetch since the module may now be available.
       if (module_config.nack_on_module_cache_miss()) {
         return absl::UnavailableError(
             "Module fetch recently failed (negative cache hit), NACK'ing configuration");
@@ -212,29 +211,34 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
     if (module_config.nack_on_module_cache_miss()) {
       module_cache.markInProgress(sha256_hash, now);
 
-      // FetchHolder bundles the adapter + fetcher so they share the same DeferredDeletable
-      // lifetime, preventing use-after-free on the callback.
-      struct FetchHolder : public Event::DeferredDeletable {
-        Extensions::DynamicModules::RemoteDataFetcherAdapter adapter;
-        std::unique_ptr<Config::DataFetcher::RemoteDataFetcher> fetcher;
+      // Use shared_ptr<unique_ptr<DeferredDeletable>> to keep the adapter+fetcher alive until
+      // the fetch callback fires. The shared_ptr is captured by the callback closure, forming
+      // a reference cycle that keeps everything alive. The cycle is broken inside the callback
+      // via holder->release() + deferredDelete. Without this, calling deferredDelete immediately
+      // after fetch() would destroy the fetcher at the end of the current event loop iteration,
+      // canceling the in-flight HTTP request before the response arrives.
+      auto holder = std::make_shared<std::unique_ptr<Event::DeferredDeletable>>();
 
-        FetchHolder(Extensions::DynamicModules::FetchCallback cb) : adapter(std::move(cb)) {}
-        ~FetchHolder() override = default;
-      };
+      auto adapter = std::make_unique<Extensions::DynamicModules::RemoteDataFetcherAdapter>(
+          [sha256_hash, &context, holder](const std::string& data) {
+            auto& cache = Extensions::DynamicModules::getModuleCache();
+            auto fetch_time = context.mainThreadDispatcher().timeSource().monotonicTime();
+            // RemoteDataFetcher already verifies the SHA256 hash before calling onSuccess,
+            // so non-empty data here is guaranteed to be valid.
+            cache.update(sha256_hash, data, fetch_time);
+            // Break the reference cycle and schedule cleanup.
+            if (*holder) {
+              context.mainThreadDispatcher().deferredDelete(
+                  Event::DeferredDeletablePtr{holder->release()});
+            }
+          });
 
-      auto holder = std::make_unique<FetchHolder>([sha256_hash, &context](const std::string& data) {
-        auto& cache = Extensions::DynamicModules::getModuleCache();
-        auto fetch_time = context.mainThreadDispatcher().timeSource().monotonicTime();
-        // RemoteDataFetcher already verifies the SHA256 hash before calling onSuccess,
-        // so non-empty data here is guaranteed to be valid.
-        cache.update(sha256_hash, data, fetch_time);
-      });
-
-      holder->fetcher = std::make_unique<Config::DataFetcher::RemoteDataFetcher>(
-          context.clusterManager(), remote_source.http_uri(), sha256_hash, holder->adapter);
-      holder->fetcher->fetch();
-
-      context.mainThreadDispatcher().deferredDelete(std::move(holder));
+      auto fetcher = std::make_unique<Config::DataFetcher::RemoteDataFetcher>(
+          context.clusterManager(), remote_source.http_uri(), sha256_hash, *adapter);
+      auto fetcher_ptr = fetcher.get();
+      adapter->setFetcher(std::move(fetcher));
+      *holder = std::move(adapter);
+      fetcher_ptr->fetch();
 
       return absl::UnavailableError(
           "Remote module not in cache, background fetch started, NACK'ing configuration");
@@ -272,15 +276,22 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
           cache.update(sha256_hash, data, fetch_time);
 
           auto state = weak_state.lock();
-          if (!state || data.empty()) {
+          if (data.empty()) {
+            ENVOY_LOG_MISC(warn, "Remote dynamic module fetch failed for SHA256 {}", sha256_hash);
+            return;
+          }
+          if (!state) {
             return;
           }
           auto filter_config =
               createFilterConfigFromBytes(data, sha256_hash, proto_config_copy, context, scope);
-          if (filter_config.ok()) {
-            state->filter_config = filter_config.value();
-            context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+          if (!filter_config.ok()) {
+            ENVOY_LOG_MISC(warn, "Remote dynamic module fetched but failed to load for SHA256 {}: {}",
+                           sha256_hash, filter_config.status().message());
+            return;
           }
+          state->filter_config = filter_config.value();
+          context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
         });
 
     // If the fetch failed, filter_config will be null and we silently skip (fail-open).

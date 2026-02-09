@@ -46,33 +46,33 @@ CacheLookupResult DynamicModuleCache::lookup(const std::string& key, MonotonicTi
 
   auto it = cache_.find(key);
   if (it == cache_.end()) {
-    return CacheLookupResult{"", false, false};
+    return CacheLookupResult{nullptr, false, false};
   }
 
   ModuleCacheEntry& entry = it->second;
   entry.use_time = now;
 
   if (entry.in_progress) {
-    return CacheLookupResult{"", true, true};
+    return CacheLookupResult{nullptr, true, true};
   }
 
-  // Check if this is a negative cache entry (empty module with recent fetch).
-  if (entry.module.empty()) {
+  // Check if this is a negative cache entry (no module data from a recent failed fetch).
+  if (!entry.module) {
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - entry.fetch_time).count();
     if (elapsed < NEGATIVE_CACHE_SECONDS) {
       // Still within negative cache TTL - return empty but mark as cache hit.
-      return CacheLookupResult{"", false, true};
+      return CacheLookupResult{nullptr, false, true};
     }
     // Negative cache expired - treat as cache miss.
     cache_.erase(it);
-    return CacheLookupResult{"", false, false};
+    return CacheLookupResult{nullptr, false, false};
   }
 
   // Check TTL for positive cache entries.
   auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - entry.fetch_time).count();
   if (elapsed >= CACHE_TTL_SECONDS) {
     cache_.erase(it);
-    return CacheLookupResult{"", false, false};
+    return CacheLookupResult{nullptr, false, false};
   }
 
   return CacheLookupResult{entry.module, false, true};
@@ -94,7 +94,7 @@ void DynamicModuleCache::update(const std::string& key, const std::string& modul
   now += time_offset_for_testing_;
 
   ModuleCacheEntry& entry = cache_[key];
-  entry.module = module;
+  entry.module = module.empty() ? nullptr : std::make_shared<const std::string>(module);
   entry.in_progress = false;
   entry.use_time = now;
   entry.fetch_time = now;
@@ -120,17 +120,14 @@ void DynamicModuleCache::removeExpiredEntries(MonotonicTime now) {
   // Called with mutex held.
   for (auto it = cache_.begin(); it != cache_.end();) {
     const ModuleCacheEntry& entry = it->second;
-
-    // Don't remove in-progress entries.
-    if (entry.in_progress) {
-      ++it;
-      continue;
-    }
-
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - entry.fetch_time).count();
 
     bool expired = false;
-    if (entry.module.empty()) {
+    if (entry.in_progress) {
+      // Evict in-progress entries that have been stuck longer than the timeout.
+      // This prevents a hung fetch from permanently blocking a SHA256 key.
+      expired = elapsed >= IN_PROGRESS_TIMEOUT_SECONDS;
+    } else if (!entry.module) {
       // Negative cache entry.
       expired = elapsed >= NEGATIVE_CACHE_SECONDS;
     } else {

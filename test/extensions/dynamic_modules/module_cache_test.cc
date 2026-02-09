@@ -23,7 +23,7 @@ TEST_F(ModuleCacheTest, LookupMiss) {
   auto result = cache.lookup("nonexistent_key", now);
   EXPECT_FALSE(result.cache_hit);
   EXPECT_FALSE(result.fetch_in_progress);
-  EXPECT_TRUE(result.module.empty());
+  EXPECT_EQ(result.module, nullptr);
 }
 
 TEST_F(ModuleCacheTest, MarkInProgressAndLookup) {
@@ -36,7 +36,7 @@ TEST_F(ModuleCacheTest, MarkInProgressAndLookup) {
   auto result = cache.lookup("test_key", now);
   EXPECT_TRUE(result.cache_hit);
   EXPECT_TRUE(result.fetch_in_progress);
-  EXPECT_TRUE(result.module.empty());
+  EXPECT_EQ(result.module, nullptr);
 }
 
 TEST_F(ModuleCacheTest, UpdateWithModuleAndLookup) {
@@ -49,7 +49,8 @@ TEST_F(ModuleCacheTest, UpdateWithModuleAndLookup) {
   auto result = cache.lookup("test_key", now);
   EXPECT_TRUE(result.cache_hit);
   EXPECT_FALSE(result.fetch_in_progress);
-  EXPECT_EQ(result.module, "module_binary_data");
+  ASSERT_NE(result.module, nullptr);
+  EXPECT_EQ(*result.module, "module_binary_data");
 }
 
 TEST_F(ModuleCacheTest, NegativeCaching) {
@@ -63,14 +64,14 @@ TEST_F(ModuleCacheTest, NegativeCaching) {
   auto result = cache.lookup("test_key", now);
   EXPECT_TRUE(result.cache_hit);
   EXPECT_FALSE(result.fetch_in_progress);
-  EXPECT_TRUE(result.module.empty());
+  EXPECT_EQ(result.module, nullptr);
 
   // Lookup after negative cache TTL expires (10 seconds).
   MonotonicTime after_expiry = now + std::chrono::seconds(11);
   result = cache.lookup("test_key", after_expiry);
   EXPECT_FALSE(result.cache_hit);
   EXPECT_FALSE(result.fetch_in_progress);
-  EXPECT_TRUE(result.module.empty());
+  EXPECT_EQ(result.module, nullptr);
 }
 
 TEST_F(ModuleCacheTest, PositiveCacheTTL) {
@@ -83,13 +84,14 @@ TEST_F(ModuleCacheTest, PositiveCacheTTL) {
   MonotonicTime within_ttl = now + std::chrono::hours(23);
   auto result = cache.lookup("test_key", within_ttl);
   EXPECT_TRUE(result.cache_hit);
-  EXPECT_EQ(result.module, "module_binary_data");
+  ASSERT_NE(result.module, nullptr);
+  EXPECT_EQ(*result.module, "module_binary_data");
 
   // Lookup after cache TTL expires.
   MonotonicTime after_ttl = now + std::chrono::hours(25);
   result = cache.lookup("test_key", after_ttl);
   EXPECT_FALSE(result.cache_hit);
-  EXPECT_TRUE(result.module.empty());
+  EXPECT_EQ(result.module, nullptr);
 }
 
 TEST_F(ModuleCacheTest, MultipleEntries) {
@@ -104,15 +106,18 @@ TEST_F(ModuleCacheTest, MultipleEntries) {
 
   auto result1 = cache.lookup("key1", now);
   EXPECT_TRUE(result1.cache_hit);
-  EXPECT_EQ(result1.module, "data1");
+  ASSERT_NE(result1.module, nullptr);
+  EXPECT_EQ(*result1.module, "data1");
 
   auto result2 = cache.lookup("key2", now);
   EXPECT_TRUE(result2.cache_hit);
-  EXPECT_EQ(result2.module, "data2");
+  ASSERT_NE(result2.module, nullptr);
+  EXPECT_EQ(*result2.module, "data2");
 
   auto result3 = cache.lookup("key3", now);
   EXPECT_TRUE(result3.cache_hit);
-  EXPECT_EQ(result3.module, "data3");
+  ASSERT_NE(result3.module, nullptr);
+  EXPECT_EQ(*result3.module, "data3");
 }
 
 TEST_F(ModuleCacheTest, Clear) {
@@ -139,23 +144,32 @@ TEST_F(ModuleCacheTest, GlobalCacheAccessor) {
   auto& cache2 = getModuleCache();
   auto result = cache2.lookup("global_key", now);
   EXPECT_TRUE(result.cache_hit);
-  EXPECT_EQ(result.module, "global_data");
+  ASSERT_NE(result.module, nullptr);
+  EXPECT_EQ(*result.module, "global_data");
 
   // Both should be the same instance.
   EXPECT_EQ(&cache1, &cache2);
 }
 
-TEST_F(ModuleCacheTest, InProgressDoesNotExpire) {
+TEST_F(ModuleCacheTest, InProgressExpiresAfterTimeout) {
   DynamicModuleCache cache;
   MonotonicTime now = MonotonicTime(std::chrono::seconds(1000));
 
   cache.markInProgress("test_key", now);
 
-  // Even after a long time, in-progress entries should not be removed.
-  MonotonicTime much_later = now + std::chrono::hours(100);
-  auto result = cache.lookup("test_key", much_later);
+  // Within the 5-minute timeout, in-progress entries should still be present.
+  MonotonicTime within_timeout = now + std::chrono::seconds(299);
+  auto result = cache.lookup("test_key", within_timeout);
   EXPECT_TRUE(result.cache_hit);
   EXPECT_TRUE(result.fetch_in_progress);
+
+  // After the 5-minute timeout, in-progress entries should be evicted.
+  MonotonicTime after_timeout =
+      now + std::chrono::seconds(DynamicModuleCache::IN_PROGRESS_TIMEOUT_SECONDS + 1);
+  result = cache.lookup("test_key", after_timeout);
+  EXPECT_FALSE(result.cache_hit);
+  EXPECT_FALSE(result.fetch_in_progress);
+  EXPECT_EQ(result.module, nullptr);
 }
 
 TEST_F(ModuleCacheTest, UpdateClearsInProgress) {
@@ -171,7 +185,8 @@ TEST_F(ModuleCacheTest, UpdateClearsInProgress) {
 
   result = cache.lookup("test_key", now);
   EXPECT_FALSE(result.fetch_in_progress);
-  EXPECT_EQ(result.module, "module_data");
+  ASSERT_NE(result.module, nullptr);
+  EXPECT_EQ(*result.module, "module_data");
 }
 
 } // namespace DynamicModules

@@ -395,6 +395,12 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingNackFetchInProgress) {
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
 
+  // Clearing the deferred delete list here simulates what the real event loop does at the end
+  // of each iteration. The shared_ptr<unique_ptr<>> holder pattern must keep the adapter+fetcher
+  // alive through this; without it, the fetcher would be destroyed and async_callbacks would
+  // become a dangling pointer.
+  dispatcher_.clearDeferredDeleteList();
+
   // Now let the background fetch complete.
   ASSERT_NE(async_callbacks, nullptr);
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(

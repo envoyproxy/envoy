@@ -21,18 +21,19 @@ namespace DynamicModules {
  * Represents an entry in the module cache.
  */
 struct ModuleCacheEntry {
-  std::string module;       // Module binary data.
-  bool in_progress;         // Fetch is ongoing.
-  MonotonicTime use_time;   // Last access time.
-  MonotonicTime fetch_time; // When the module was fetched.
+  std::shared_ptr<const std::string> module; // Module binary data (nullptr for negative/in-progress).
+  bool in_progress{false};                   // Fetch is ongoing.
+  MonotonicTime use_time;                    // Last access time.
+  MonotonicTime fetch_time;                  // When the module was fetched.
 };
 
 /**
  * Result of a cache lookup operation.
  */
 struct CacheLookupResult {
-  // The cached module if found and valid, empty string otherwise.
-  std::string module;
+  // The cached module if found and valid, nullptr otherwise. Shared ownership avoids copying
+  // potentially multi-MB module binaries on every cache hit.
+  std::shared_ptr<const std::string> module;
   // True if a fetch operation is already in progress for this key.
   bool fetch_in_progress;
   // True if a cache entry exists (even if in_progress or expired for negative cache).
@@ -55,6 +56,9 @@ public:
   static constexpr int CACHE_TTL_SECONDS = 24 * 3600;
   // Negative cache TTL in seconds (10 seconds).
   static constexpr int NEGATIVE_CACHE_SECONDS = 10;
+  // In-progress fetch timeout in seconds (5 minutes). Entries stuck in-progress longer than
+  // this are treated as failed and evicted, allowing a re-fetch on the next config push.
+  static constexpr int IN_PROGRESS_TIMEOUT_SECONDS = 5 * 60;
 
   DynamicModuleCache() = default;
   ~DynamicModuleCache() = default;
