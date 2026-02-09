@@ -412,8 +412,7 @@ private:
   // Since Histogram::recordValue() only accepts integers, the minimum non-zero value is 1.
   // Setting threshold to 0.5 ensures:
   // - Zeros go to zero bucket (0 < 0.5)
-  // - Values >= 1 get positive bucket indices (1 > 0.5). This code assumes positive
-  //   indices in several places.
+  // - Values >= 1 get positive bucket indices (1 > 0.5).
   // Using 0.5 avoids interpolation issues at bucket boundaries that occur with 1.0.
   // For Percent unit histograms, values are scaled by 1/PercentScale, so the threshold
   // must also be scaled accordingly.
@@ -589,8 +588,7 @@ private:
         continue; // Entire bucket is in zero bucket range
       }
 
-      ASSERT(bucket.lower_bound_ >= 0,
-             "Envoy histograms only have unsigned integers so negative buckets are impossible");
+      ASSERT(bucket.lower_bound_ >= 0, "Envoy histograms only have unsigned integers recorded.");
 
       // Clamp lower bound to zero_threshold to prevent log(0).
       const double effective_lower = std::max(bucket.lower_bound_, zero_threshold);

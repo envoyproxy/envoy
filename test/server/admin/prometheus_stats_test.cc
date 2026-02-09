@@ -2125,6 +2125,18 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
         << "Bucket " << i << " lower_bound too high for value " << value;
     EXPECT_GE(bucket.upper_bound, value * 0.99)
         << "Bucket " << i << " upper_bound too low for value " << value;
+
+    // Verify bucket index matches expected calculation
+    const int32_t expected_index =
+        DecodedNativeHistogram::expectedBucketIndex(hist.schema(), value);
+    EXPECT_EQ(expected_index, bucket.index)
+        << "Bucket " << i << " index mismatch for value " << value;
+
+    if (value > 1.0) {
+      EXPECT_GE(bucket.index, 0);
+    } else {
+      EXPECT_LT(bucket.index, 0);
+    }
   }
 }
 
