@@ -1,3 +1,15 @@
-FROM debian:bullseye-slim
-COPY --from=envoyproxy/envoy:distroless-dev / /distroless-dev
+FROM envoyproxy/envoy:distroless-dev as distroless-dev
+
+
+FROM envoyproxy/envoy:contrib-distroless-dev as contrib-distroless-dev
+
+
+FROM debian:trixie-slim as envoy-distroless
+COPY --from=distroless-dev / /distroless-dev
 CMD ["/bin/sh", "-c", "stat -c '%A' /distroless-dev/etc/envoy | grep -q '...x' && echo OK || (echo FAIL: Envoy config is not readable in distroless container; exit 1)"]
+
+
+FROM debian:trixie-slim as envoy-contrib-distroless
+COPY --from=contrib-distroless-dev /usr/local/bin/envoy /usr/local/bin/envoy
+# TODO(phlax): Make this an error not warning, once it lands and ci is fixed
+CMD ["/bin/sh", "-c", "/usr/local/bin/envoy --version 2>&1 | grep -q '\\-contrib' && echo 'OK: contrib-distroless contains contrib binary' || (echo 'WARNING: contrib-distroless does NOT contain contrib binary - version:'; /usr/local/bin/envoy --version 2>&1; exit 0)"]

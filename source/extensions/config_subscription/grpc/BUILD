@@ -49,7 +49,7 @@ envoy_cc_extension(
         "//source/common/config:xds_resource_lib",
         "//source/common/memory:utils_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:btree",
+        "@abseil-cpp//absl/container:btree",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

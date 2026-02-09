@@ -10,7 +10,7 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
         "//envoy/type/tracing/v3:pkg",
-        "@opentelemetry_proto//:common_proto",
+        "@opentelemetry-proto//:common_proto",
         "@xds//udpa/annotations:pkg",
     ],
 )

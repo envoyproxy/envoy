@@ -461,6 +461,9 @@ TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
+  const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_disable_data_read_immediately");
+
   std::string large_request(1024, 'a');
   // Sending such large request will cause read to be disabled.
   size_t payload_offset = receiveRequest(large_request, false, 512);
@@ -468,13 +471,15 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   // Disable reading one more time.
   quic_stream_->readDisable(true);
   std::string second_part_request = bodyToHttp3StreamPayload("bbb");
-  // Receiving more data in the same event loop will push the receiving pipe line.
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(3u, buffer.length());
-        EXPECT_EQ("bbb", buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }));
+  if (!disable_data_read_immediately) {
+    // Receiving more data in the same event loop will push the receiving pipe line.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(3u, buffer.length());
+          EXPECT_EQ("bbb", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  }
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
   quic_stream_->OnStreamFrame(frame);
   payload_offset += second_part_request.length();
@@ -493,15 +498,26 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).Times(0);
   receiveTrailers(payload_offset);
 
-  // Unblock stream now. The remaining data in the receiving buffer should be
-  // pushed to upstream.
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(3u, buffer.length());
-        EXPECT_EQ("ccc", buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }));
+  // Unblock stream now.
+  if (disable_data_read_immediately) {
+    // All the data should be pushed to upstream only after re-enabling read.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(6u, buffer.length());
+          EXPECT_EQ("bbbccc", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  } else {
+    // The remaining data in the receiving buffer should be pushed to upstream.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(3u, buffer.length());
+          EXPECT_EQ("ccc", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  }
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_));
+  // Only after the read block counter goes back to zero and event loop runs, reading continues.
   quic_stream_->readDisable(false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -543,12 +559,17 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
+  const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_disable_data_read_immediately");
+
   std::string payload(1024, 'a');
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
         quic_stream_->readDisable(true);
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(_, _));
+  if (!disable_data_read_immediately) {
+    EXPECT_CALL(stream_decoder_, decodeData(_, _));
+  }
   std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
                                   bodyToHttp3StreamPayload(payload));
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
@@ -556,7 +577,7 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   // Stream should be blocked in the next event loop.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // Receiving more date shouldn't trigger decoding.
+  // Receiving more data shouldn't trigger decoding since read is still disabled.
   EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
   data = bodyToHttp3StreamPayload(payload);
   quic::QuicStreamFrame frame2(stream_id_, false, 0, data);

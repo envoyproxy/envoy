@@ -43,7 +43,7 @@ envoy_cc_test_library(
         "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
@@ -60,7 +60,7 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
-        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+        "@libprotobuf-mutator//:libprotobuf_mutator",
     ],
 )
 
@@ -80,8 +80,8 @@ envoy_cc_test_library(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@quiche//:http2_adapter",
     ],
 )
 
@@ -94,7 +94,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib_header",
         "//source/common/protobuf:visitor_lib",
-        "@com_google_absl//absl/cleanup",
+        "@abseil-cpp//absl/cleanup",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
@@ -108,7 +108,7 @@ envoy_cc_test_library(
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
         "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
-        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+        "@libprotobuf-mutator//:libprotobuf_mutator",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
