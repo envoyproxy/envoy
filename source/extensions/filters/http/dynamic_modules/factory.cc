@@ -286,7 +286,8 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
           auto filter_config =
               createFilterConfigFromBytes(data, sha256_hash, proto_config_copy, context, scope);
           if (!filter_config.ok()) {
-            ENVOY_LOG_MISC(warn, "Remote dynamic module fetched but failed to load for SHA256 {}: {}",
+            ENVOY_LOG_MISC(warn,
+                           "Remote dynamic module fetched but failed to load for SHA256 {}: {}",
                            sha256_hash, filter_config.status().message());
             return;
           }

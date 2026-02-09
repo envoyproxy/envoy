@@ -21,10 +21,11 @@ namespace DynamicModules {
  * Represents an entry in the module cache.
  */
 struct ModuleCacheEntry {
-  std::shared_ptr<const std::string> module; // Module binary data (nullptr for negative/in-progress).
-  bool in_progress{false};                   // Fetch is ongoing.
-  MonotonicTime use_time;                    // Last access time.
-  MonotonicTime fetch_time;                  // When the module was fetched.
+  std::shared_ptr<const std::string>
+      module;               // Module binary data (nullptr for negative/in-progress).
+  bool in_progress{false};  // Fetch is ongoing.
+  MonotonicTime use_time;   // Last access time.
+  MonotonicTime fetch_time; // When the module was fetched.
 };
 
 /**
