@@ -202,6 +202,11 @@ new_features:
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
+- area: dynamic_modules
+  change: |
+    Added :ref:`load balancing policies
+    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
