@@ -328,10 +328,11 @@ public:
   Envoy::Config::ConfigProviderPtr createConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Init::Manager& init_manager, const std::string& stat_prefix,
       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager) override {
     return Router::ScopedRoutesConfigProviderUtil::create(
-        config, factory_context, factory_context.initManager(), stat_prefix,
+        config, factory_context, init_manager, stat_prefix,
         scoped_routes_config_provider_manager);
   }
 

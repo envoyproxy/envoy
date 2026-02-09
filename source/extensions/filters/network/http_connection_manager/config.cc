@@ -596,7 +596,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       return;
     }
     scoped_routes_config_provider_ =
-        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
+        srds_factory->createConfigProvider(config, context_.serverFactoryContext(),
+                                           context_.initManager(), stats_prefix_,
                                            *scoped_routes_config_provider_manager_);
     scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
