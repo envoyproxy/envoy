@@ -18,6 +18,9 @@ on:
       caches:
         type: string
         required: true
+      output-base:
+        type: string
+        default: base
       request:
         type: string
         required: true
@@ -30,6 +33,9 @@ on:
       targets:
         type: string
         default: ...
+      working-dir:
+        type: string
+        default: ""
 
 
 jobs:
@@ -39,8 +45,18 @@ jobs:
       contents: read
       packages: read
     runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
-    name: "[${{ inputs.arch }}] Prime Bazel cache"
-    if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
+    name: >-
+      [${{ inputs.arch }}${{
+        inputs.output-base != 'base'
+        && format('/{0}', inputs.output-base)
+        || ''
+      }}] Prime Bazel cache
+    if: >-
+      ${{
+        (inputs.output-base == 'base'
+         && ! fromJSON(inputs.caches).bazel[inputs.arch])
+        || ! fromJSON(inputs.caches).bazel[format('{0}-{1}', inputs.output-base, inputs.arch)]
+      }}
     steps:
     - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
@@ -77,7 +93,12 @@ jobs:
       id: bazel-cache
       name: Prime Bazel cache
       with:
-        artifact-name: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch }}
+        artifact-name: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.output-base != 'base'
+            && format('{0}-', inputs.output-base)
+            || ''
+          }}${{ inputs.arch }}
         artifact-wf-path: .github/workflows/request.yml
         cache-type: artifact
         change-directory: false
@@ -87,11 +108,18 @@ jobs:
           cd /source
           export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci --config=rbe"
           export ENVOY_CACHE_ROOT=/build/bazel_root
+          export ENVOY_CACHE_OUTPUT_BASE="${{ inputs.output-base }}"
           export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
+          export ENVOY_CACHE_WORKING_DIR="${{ inputs.working-dir }}"
           # ironically the repository_cache is just about the only thing you dont want to cache
           export ENVOY_REPOSITORY_CACHE=/tmp/cache
           ./ci/do_ci.sh cache-create
-        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{ inputs.arch }}
+        key: >-
+          ${{ fromJSON(inputs.request).config.ci.cache.bazel.hash }}-${{
+            inputs.output-base != 'base'
+            && format('{0}-', inputs.output-base)
+            || ''
+          }}${{ inputs.arch }}
         lock-token: ${{ steps.appauth.outputs.token }}
         lock-repository: ${{ inputs.lock-repository }}
         mount-tmpfs: false
