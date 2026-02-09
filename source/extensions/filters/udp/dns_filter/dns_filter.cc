@@ -10,6 +10,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
@@ -197,10 +198,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     max_pending_lookups_ = 0;
   }
 
-  // Initialize access logs
+  // Initialize access logs with DNS-specific command parser
   for (const auto& log_config : config.access_log()) {
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createDnsFilterCommandParser());
     AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(log_config, context);
+        AccessLog::AccessLogFactory::fromProto(log_config, context, std::move(command_parsers));
     access_logs_.push_back(current_access_log);
   }
 }
