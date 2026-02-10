@@ -115,44 +115,33 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       gauges_([&]() {
         std::vector<Gauge> gauges;
         for (const auto& gauge_cfg : config.gauges()) {
+          if (gauge_cfg.has_add_subtract() && gauge_cfg.has_set()) {
+            throw EnvoyException(
+                "Stats logger gauge cannot have both SET and PAIRED_ADD/PAIRED_SUBTRACT "
+                "operations.");
+          }
+
+          if (!gauge_cfg.has_add_subtract() && !gauge_cfg.has_set()) {
+            throw EnvoyException("Stats logger gauge must have at least one operation configured.");
+          }
+
           absl::InlinedVector<
               std::pair<envoy::data::accesslog::v3::AccessLogType, Gauge::OperationType>, 2>
               operations;
 
-          int add_count = 0;
-          int subtract_count = 0;
-
-          for (const auto& trigger : gauge_cfg.operations()) {
-            for (const auto& op : operations) {
-              if (op.first == trigger.log_type()) {
-                throw EnvoyException(
-                    fmt::format("Duplicate access log type '{}' in gauge operations.",
-                                static_cast<int>(trigger.log_type())));
-              }
+          if (gauge_cfg.has_add_subtract()) {
+            if (gauge_cfg.add_subtract().add_log_type() ==
+                gauge_cfg.add_subtract().sub_log_type()) {
+              throw EnvoyException(
+                  fmt::format("Duplicate access log type '{}' in gauge operations.",
+                              static_cast<int>(gauge_cfg.add_subtract().add_log_type())));
             }
-            if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::Config::
-                                                Gauge::Operation::UNSPECIFIED) {
-              throw EnvoyException("Stats logger gauge operation cannot be UNSPECIFIED.");
-            }
-            operations.emplace_back(trigger.log_type(), trigger.operation_type());
-
-            if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::Config::
-                                                Gauge::Operation::PAIRED_ADD) {
-              add_count++;
-            } else if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::
-                                                       Config::Gauge::Operation::PAIRED_SUBTRACT) {
-              subtract_count++;
-            }
-          }
-
-          if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
-            throw EnvoyException(
-                "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT "
-                "operation defined if either is present.");
-          }
-
-          if (operations.empty()) {
-            throw EnvoyException("Stats logger gauge must have at least one operation configured.");
+            operations.emplace_back(gauge_cfg.add_subtract().add_log_type(),
+                                    Gauge::OperationType::PAIRED_ADD);
+            operations.emplace_back(gauge_cfg.add_subtract().sub_log_type(),
+                                    Gauge::OperationType::PAIRED_SUBTRACT);
+          } else {
+            operations.emplace_back(gauge_cfg.set().log_type(), Gauge::OperationType::SET);
           }
 
           Gauge& inserted =
@@ -309,13 +298,12 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   Gauge::OperationType op = it->second;
 
   auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
-  using Operation = envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation;
-  Stats::Gauge::ImportMode import_mode = op == Operation::SET
+  Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
   auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (op == Operation::PAIRED_ADD || op == Operation::PAIRED_SUBTRACT) {
+  if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
@@ -324,7 +312,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
-    if (op == Operation::PAIRED_ADD) {
+    if (op == Gauge::OperationType::PAIRED_ADD) {
       state->addInflightGauge(&gauge_stat, value);
       gauge_stat.add(value);
     } else {
@@ -337,7 +325,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   }
 
   switch (op) {
-  case Operation::SET:
+  case Gauge::OperationType::SET:
     gauge_stat.set(value);
     break;
   default:

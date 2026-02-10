@@ -190,11 +190,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                         - name: request_header_tag
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
-                    operations:
-                    - log_type: DownstreamStart
-                      operation_type: PAIRED_ADD
-                    - log_type: DownstreamEnd
-                      operation_type: PAIRED_SUBTRACT
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
 )EOF";
 
   init(config_yaml, /*autonomous_upstream=*/false,
@@ -242,11 +240,9 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
                         - name: request_header_tag
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
-                    operations:
-                    - log_type: DownstreamStart
-                      operation_type: PAIRED_ADD
-                    - log_type: DownstreamEnd
-                      operation_type: PAIRED_SUBTRACT
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
 )EOF";
 
   init(config_yaml, /*autonomous_upstream=*/false,

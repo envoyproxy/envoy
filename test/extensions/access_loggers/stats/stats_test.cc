@@ -310,9 +310,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
       - stat:
           name: gauge
         value_format: '%RESPONSE_CODE_DETAILS%'
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
 
   initialize(yaml);
@@ -335,9 +334,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
       - stat:
           name: gauge
         value_format: '%BYTES_RECEIVED%'
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
 
   initialize(yaml);
@@ -362,9 +360,8 @@ TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
             - name: other_tag
               value_format: '%RESPONSE_CODE%'
         value_fixed: 42
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
 
   initialize(yaml);
@@ -385,9 +382,8 @@ TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
       - stat:
           name: gauge
         value_fixed: 42
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
   initialize(yaml);
 
@@ -408,9 +404,8 @@ TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
           name: gauge
         value_format: '%BYTES_RECEIVED%'
         value_fixed: 1
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -424,9 +419,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
     gauges:
       - stat:
           name: gauge
-        operations:
-        - log_type: NotSet
-          operation_type: SET
+        set:
+          log_type: NotSet
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
                             "Stats logger gauge must have either `value_format` or `value_fixed`.");
@@ -439,16 +433,15 @@ TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
       - stat:
           name: gauge
         value_fixed: 42
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-        - log_type: DownstreamEnd
-          operation_type: SET
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+        set:
+          log_type: DownstreamEnd
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
-      "defined if either is present.");
+      "Stats logger gauge cannot have both SET and PAIRED_ADD/PAIRED_SUBTRACT operations.");
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
@@ -458,48 +451,12 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
       - stat:
           name: gauge
         value_fixed: 42
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-        - log_type: DownstreamEnd
-          operation_type: PAIRED_ADD
-)EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
-      "defined if either is present.");
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeMissingSubtract) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 42
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-)EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
-      "defined if either is present.");
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeUnspecifiedOperation) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 42
-        operations:
-        - log_type: DownstreamStart
-          operation_type: UNSPECIFIED
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamStart
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
-                            "Stats logger gauge operation cannot be UNSPECIFIED.");
+                            "Duplicate access log type '4' in gauge operations.");
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
@@ -521,11 +478,9 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
       - stat:
           name: gauge
         value_fixed: 1
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-        - log_type: DownstreamEnd
-          operation_type: PAIRED_SUBTRACT
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
 )EOF";
   initialize(yaml);
 
@@ -575,11 +530,9 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
       - stat:
           name: gauge
         value_fixed: 10
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-        - log_type: DownstreamEnd
-          operation_type: PAIRED_SUBTRACT
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
 )EOF";
   initialize(yaml);
 
@@ -603,11 +556,9 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
       - stat:
           name: gauge
         value_fixed: 10
-        operations:
-        - log_type: DownstreamStart
-          operation_type: PAIRED_ADD
-        - log_type: DownstreamEnd
-          operation_type: PAIRED_SUBTRACT
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
 )EOF";
   initialize(yaml);
 

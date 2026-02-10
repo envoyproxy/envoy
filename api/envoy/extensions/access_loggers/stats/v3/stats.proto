@@ -33,11 +33,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   It is required to use a delta stat sink (e.g. OpenTelemetry) because this
 //   extension sets the ``Counter`` and the ``Histogram`` as evictable in the
 //   stats scope. They will be evicted periodically and only the delta values
-//   are effective. Gauges will be kept in memory for their lifetime because
-//   PAIRED_ADD/PAIRED_SUBTRACT/SET operations depend on the previous status.
-//   Please have an estimate on the cardinality of dynamic gauges introduced
-//   and keep in mind on the memory overhead.
-
+//   are effective.
+//
 // [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
@@ -106,70 +103,31 @@ message Config {
   // Configuration for a gauge stat. Gauges can be used to add, subtract, or set
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
-  //
-  // The ``operations`` field determines how the gauge is modified based on the
-  // access log type.
-  // Using the ``SET`` operation is straightforward and self-explanatory.
-  // The following example demonstrates how to use an ``ADD/SUBTRACT`` pair to
-  // track a gauge by configuring a single stats access logger:
-  //
-  // .. code-block:: yaml
-  //
-  //   http_connection_manager:
-  //     access_log:
-  //     - name: envoy.access_loggers.stats
-  //       typed_config:
-  //         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-  //         stat_prefix: "my_prefix"
-  //         gauges:
-  //         - stat:
-  //             name: "http_active_requests"
-  //           operations:
-  //           - log_type: DownstreamStart
-  //             operation_type: PAIRED_ADD
-  //           - log_type: DownstreamEnd
-  //             operation_type: PAIRED_SUBTRACT
-  //           value_fixed: 1
   message Gauge {
-    // An operation to perform on the gauge.
-    message Operation {
-      // The operation to perform on the gauge.
-      //
-      // Usage restrictions:
-      // i). Only one PAIRED_ADD/PAIRED_SUBTRACT pair at most can be defined in
-      // the
-      // ``operations``. PAIRED_ADD/PAIRED_SUBTRACT not matched with the other
-      // isn't allowed. ii). We only support add first then subtract logic and
-      // we rely on the symmetrical log types (e.g.,
-      // DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
-      // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
-      // PAIRED_ADD operation has been done, tracked by inflight counter in
-      // filter state.
-      // iv). If the PAIRED_ADD operation was executed, the
-      // PAIRED_SUBTRACT will happen when the stream/connection is closed, even
-      // if the configured log type didn't happen.
-      enum OperationType {
-        // Not a valid operation. It will fail validation if used.
-        UNSPECIFIED = 0;
-
-        // Set the gauge value to the configured value.
-        SET = 1;
-
-        // Add the configured value to the gauge.
-        PAIRED_ADD = 2;
-
-        // Subtract the value from the gauge.
-        // The value subtracted will be the same as the value added by the
-        // paired PAIRED_ADD operation, regardless of the value configured
-        // for this operation.
-        PAIRED_SUBTRACT = 3;
-      }
-
+    // The Set operation config.
+    message Set {
       // The access log type to trigger the operation.
-      data.accesslog.v3.AccessLogType log_type = 1 [(validate.rules).enum = {defined_only: true}];
+      envoy.data.accesslog.v3.AccessLogType log_type = 1
+          [(validate.rules).enum = { defined_only: true }];
+    }
 
-      // The operation to perform.
-      OperationType operation_type = 2 [(validate.rules).enum = {defined_only: true}];
+    // The PairedAddSubtract operation config.
+    // Usage restrictions:
+    //
+    // 1. We only support add first then subtract logic and we rely on the symmetrical log types
+    //    (e.g., DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
+    // 2. During runtime, sub_log_type will execute if and only if add_log_type operation has
+    //    been done, tracked by inflight counter in filter state.
+    // 3. If the add_log_type operation was executed, the sub_log_type will happen when the
+    //    stream/connection is closed, even if the configured log type didn't happen.
+    message PairedAddSubtract {
+      // The access log type to trigger the add operation.
+      data.accesslog.v3.AccessLogType add_log_type = 1
+          [(validate.rules).enum = {defined_only: true}];
+
+      // The access log type to trigger the subtract operation.
+      data.accesslog.v3.AccessLogType sub_log_type = 2
+          [(validate.rules).enum = {defined_only: true}];
     }
 
     // The name and tags of this gauge.
@@ -185,8 +143,13 @@ message Config {
     // One of ``value_format`` or ``value_fixed`` must be configured.
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
 
-    // The collection of operations that define how the gauge is modified.
-    repeated Operation operations = 4;
+    // The PairedAddSubtract operation.
+    // Only one of PairedAddSubtract and Set can be defined.
+    PairedAddSubtract add_subtract = 4;
+
+    // The Set operation.
+    // Only one of PairedAddSubtract and Set can be defined.
+    Set set = 5;
   }
 
   // The stat prefix for the generated stats.

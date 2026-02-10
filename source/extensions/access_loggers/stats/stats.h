@@ -67,8 +67,11 @@ private:
   };
 
   struct Gauge {
-    using OperationType =
-        envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType;
+    enum class OperationType {
+      SET,
+      PAIRED_ADD,
+      PAIRED_SUBTRACT,
+    };
 
     NameAndTags stat_;
     Formatter::FormatterProviderPtr value_formatter_;
