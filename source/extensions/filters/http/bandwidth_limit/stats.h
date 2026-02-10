@@ -2,6 +2,8 @@
 
 #include "envoy/stats/stats_macros.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

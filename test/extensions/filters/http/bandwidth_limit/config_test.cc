@@ -19,6 +19,7 @@ namespace BandwidthLimitFilter {
 using EnableMode = envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
 using StatusHelpers::HasStatus;
 using testing::HasSubstr;
+using testing::Return;
 using testing::ReturnRef;
 
 class FactoryTest : public Event::TestUsingSimulatedTime, public testing::Test {
@@ -170,7 +171,7 @@ TEST_F(FactoryTest, FixedNameBucketSelectorUsesNamedBucket) {
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 20);
 }
 
-TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsUsesLastInstance) {
+TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsUsesLastConfiguredInstance) {
   auto config = configFromYaml(R"(
   stat_prefix: test
   limit_kbps: 50
@@ -260,14 +261,17 @@ TEST_F(FactoryTest, ClientCnBucketSelectorUsesCertificateNameOrDefaultBucket) {
   )")
                     .value();
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  std::string no_cn;
-  std::string example_cn = "example_cn";
-  EXPECT_CALL(*ssl, subjectPeerCertificate)
-      .WillOnce(ReturnRef(no_cn))
-      .WillOnce(ReturnRef(example_cn));
+  Ssl::ParsedX509Name no_cn = {"", {}};
+  Ssl::ParsedX509Name example_cn = {"example_cn", {}};
+  EXPECT_CALL(*ssl, parsedSubjectPeerCertificate)
+      .WillOnce(Return(absl::nullopt))
+      .WillOnce(Return(makeOptRef<Ssl::ParsedX509Name>(no_cn)))
+      .WillOnce(Return(makeOptRef<Ssl::ParsedX509Name>(example_cn)));
   // No SSL connection uses default bucket.
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 250);
   mock_stream_info_.downstream_connection_info_provider_->setSslConnection(ssl);
+  // No peer cert uses default bucket.
+  EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 250);
   // No CN uses default bucket.
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 250);
   // example_cn uses example_cn bucket.
@@ -294,8 +298,9 @@ TEST_F(FactoryTest, ClientCnBucketSelectorUsesCertificateNameWithTemplate) {
   // No SSL connection uses default bucket without templating.
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 250);
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  std::string example_cn = "example_cn";
-  EXPECT_CALL(*ssl, subjectPeerCertificate).WillOnce(ReturnRef(example_cn));
+  Ssl::ParsedX509Name example_cn = {"example_cn", {}};
+  EXPECT_CALL(*ssl, parsedSubjectPeerCertificate)
+      .WillOnce(Return(makeOptRef<Ssl::ParsedX509Name>(example_cn)));
   mock_stream_info_.downstream_connection_info_provider_->setSslConnection(ssl);
   // example_cn uses prefix_example_cn_postfix bucket due to name_template.
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 260);

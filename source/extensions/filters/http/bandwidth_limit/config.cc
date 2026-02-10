@@ -16,12 +16,11 @@ namespace BandwidthLimitFilter {
 using Common::StreamRateLimiter;
 
 namespace {
-absl::StatusOr<std::shared_ptr<NamedBucketSelector>> maybeNamedBucketSelector(
+absl::Status populateNamedBucketConfigurations(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context) {
-  if (proto_config.named_bucket_configurations().size() == 0 &&
-      !proto_config.has_named_bucket_selector()) {
-    return nullptr;
+  if (proto_config.named_bucket_configurations_size() == 0) {
+    return absl::OkStatus();
   }
   std::shared_ptr<NamedBucketSingleton> named_bucket_singleton = NamedBucketSingleton::get(context);
   std::chrono::milliseconds default_fill_interval =
@@ -39,6 +38,17 @@ absl::StatusOr<std::shared_ptr<NamedBucketSelector>> maybeNamedBucketSelector(
     new_bucket->bucket()->maybeReset(initial_tokens);
     RETURN_IF_NOT_OK(named_bucket_singleton->setBucket(bucket.name(), std::move(new_bucket)));
   }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::shared_ptr<NamedBucketSelector>> maybeNamedBucketSelector(
+    const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
+    Server::Configuration::ServerFactoryContext& context) {
+  if (!proto_config.has_named_bucket_selector()) {
+    return nullptr;
+  }
+  std::shared_ptr<NamedBucketSingleton> named_bucket_singleton = NamedBucketSingleton::get(context);
+
   int selected_options =
       (proto_config.named_bucket_selector().explicit_bucket().empty() ? 0 : 1) +
       (proto_config.named_bucket_selector().has_client_cn_with_default() ? 1 : 0);
@@ -52,12 +62,15 @@ absl::StatusOr<std::shared_ptr<NamedBucketSelector>> maybeNamedBucketSelector(
       return absl::InvalidArgumentError(
           "limit_kbps must be set if create_bucket_if_not_existing is set");
     }
-    bucket_creation_fn = [&time_source = context.timeSource(), &scope = context.scope(),
-                          default_limit_kbps = proto_config.limit_kbps().value(),
-                          default_fill_interval](absl::string_view name) {
-      return std::make_unique<BucketAndStats>(name, time_source, scope, default_limit_kbps,
-                                              default_fill_interval);
-    };
+    bucket_creation_fn =
+        [&time_source = context.timeSource(), &scope = context.scope(),
+         default_limit_kbps = proto_config.limit_kbps().value(),
+         default_fill_interval = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+             proto_config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))](
+            absl::string_view name) {
+          return std::make_unique<BucketAndStats>(name, time_source, scope, default_limit_kbps,
+                                                  default_fill_interval);
+        };
   }
   if (!proto_config.named_bucket_selector().explicit_bucket().empty()) {
     return std::make_shared<FixedNamedBucketSelector>(
@@ -76,12 +89,12 @@ absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFa
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
-
   absl::StatusOr<std::shared_ptr<NamedBucketSelector>> bucket_selector =
       maybeNamedBucketSelector(proto_config, server_context);
   if (!bucket_selector.ok()) {
     return bucket_selector.status();
   }
+  RETURN_IF_NOT_OK(populateNamedBucketConfigurations(proto_config, server_context));
   absl::StatusOr<FilterConfigSharedPtr> filter_config =
       FilterConfig::create(proto_config, std::move(bucket_selector.value()), context.scope(),
                            server_context.runtime(), server_context.timeSource());
@@ -100,6 +113,7 @@ BandwidthLimitFilterConfig::createRouteSpecificFilterConfigTyped(
   if (!bucket_selector.ok()) {
     return bucket_selector.status();
   }
+  RETURN_IF_NOT_OK(populateNamedBucketConfigurations(proto_config, context));
   return FilterConfig::create(proto_config, bucket_selector.value(), context.scope(),
                               context.runtime(), context.timeSource(), true);
 }

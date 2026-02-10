@@ -35,11 +35,11 @@ std::string ClientCnBucketSelector::bucketName(const StreamInfo::StreamInfo& str
   if (!ssl) {
     return default_bucket_name_;
   }
-  const std::string& cert = ssl->subjectPeerCertificate();
-  if (cert.empty()) {
+  const auto subject = ssl->parsedSubjectPeerCertificate();
+  if (subject == absl::nullopt || subject->commonName_.empty()) {
     return default_bucket_name_;
   }
-  return absl::StrReplaceAll(name_template_, {{"{CN}", cert}});
+  return absl::StrReplaceAll(name_template_, {{"{CN}", subject->commonName_}});
 }
 
 OptRef<const BucketAndStats>

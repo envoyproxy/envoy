@@ -129,8 +129,8 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
             request_delay_ += delay;
           }
         },
-        const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), bucket(), fillInterval());
+        config.timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope(),
+        bucket(), fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -142,7 +142,7 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
 
     if (!request_latency_) {
       request_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          stats().request_transfer_duration_, const_cast<FilterConfig*>(&config)->timeSource());
+          stats().request_transfer_duration_, config.timeSource());
       stats().request_pending_.inc();
     }
     stats().request_incoming_size_.set(data.length());
@@ -200,8 +200,8 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
             response_delay_ += delay;
           }
         },
-        const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), bucket(), fillInterval());
+        config.timeSource(), encoder_callbacks_->dispatcher(), encoder_callbacks_->scope(),
+        bucket(), fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -221,7 +221,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
 
     if (!response_latency_) {
       response_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          stats().response_transfer_duration_, const_cast<FilterConfig*>(&config)->timeSource());
+          stats().response_transfer_duration_, config.timeSource());
       stats().response_pending_.inc();
     }
     stats().response_incoming_size_.set(data.length());

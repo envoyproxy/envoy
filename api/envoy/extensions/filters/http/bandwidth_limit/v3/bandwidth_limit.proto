@@ -82,15 +82,15 @@ message BandwidthLimit {
     // multiple routes share a common token bucket.
     string explicit_bucket = 2;
 
-    // Optional template for the stat prefix, with ``{BUCKET}`` representing the bucket
-    // name. If not set, behaves the same as if the template is just ``{BUCKET}``.
-    string stat_prefix_template = 3;
-
     // If true, and the selected named bucket does not already exist, create a new bucket
     // with the ``limit_kbps`` and ``fill_interval`` from the parent ``BandwidthLimit`` config.
     //
     // If false, and the selected named bucket does not exist, pass through without limiting.
-    bool create_bucket_if_not_existing = 4;
+    //
+    // WARNING: do not use ``create_bucket_if_not_existing`` with dynamic bucket names
+    // that can be controlled by untrusted clients, as an unlimited number of buckets could
+    // be created.
+    bool create_bucket_if_not_existing = 3;
   }
 
   // The human readable prefix to use when emitting stats.

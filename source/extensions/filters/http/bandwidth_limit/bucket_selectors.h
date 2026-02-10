@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -11,6 +12,7 @@
 #include "source/common/common/shared_token_bucket_impl.h"
 #include "source/extensions/filters/http/bandwidth_limit/stats.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 
