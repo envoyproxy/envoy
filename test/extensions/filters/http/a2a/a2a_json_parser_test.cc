@@ -52,14 +52,9 @@ TEST_F(A2aJsonParserTest, ParseSimpleMessageSend) {
   EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
 
   // Verify fields within params.
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("taskId")
-                .string_value(),
-            "task-abc-987");
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
+      "task-abc-987");
 
   // Verify fields within params.message.
   EXPECT_EQ(parser_.metadata()
