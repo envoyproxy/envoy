@@ -48,6 +48,7 @@ message SseToMetadata {
     // - Which values to extract from the parsed content (e.g., JSON paths like usage.total_tokens)
     // - How to map extracted values to metadata (namespace, key, type conversions)
     // - When to write metadata (on_present, on_missing, on_error actions)
+    // [#extension-category: envoy.content_parsers]
     config.core.v3.TypedExtensionConfig content_parser = 1
         [(validate.rules).message = {required: true}];
 
