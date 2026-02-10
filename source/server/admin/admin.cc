@@ -130,7 +130,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
                       MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false,
-                      {{ParamDescriptor::Type::String, "filter",
+                      {{Admin::ParamDescriptor::Type::String, "filter",
                         "Regular expression (Google re2) for filtering clusters by name"}}),
           makeHandler(
               "/config_dump", "dump current Envoy configs (experimental)",
