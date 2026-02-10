@@ -93,12 +93,10 @@ ActiveQuicListener::ActiveQuicListener(
   }
   // TODO(panting): Pass in a non-null session_idle_list when configured.
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
-      crypto_config_.get(), quic_config, &version_manager_,
-      std::move(connection_helper), std::move(alarm_factory),
-      quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names,
-      crypto_server_stream_factory_, *connection_id_generator_,
-      debug_visitor_factory, /*session_idle_list=*/nullptr);
+      crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
+      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
+      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
+      *connection_id_generator_, debug_visitor_factory, /*session_idle_list=*/nullptr);
 
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 

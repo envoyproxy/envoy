@@ -55,24 +55,19 @@ private:
 };
 
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
- public:
+public:
   EnvoyQuicDispatcher(
-      const quic::QuicCryptoServerConfig* crypto_config,
-      const quic::QuicConfig& quic_config,
+      const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
       quic::QuicVersionManager* version_manager,
       std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
       std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-      uint8_t expected_server_connection_id_length,
-      Network::ConnectionHandler& connection_handler,
-      Network::ListenerConfig& listener_config,
-      Server::ListenerStats& listener_stats,
-      Server::PerHandlerListenerStats& per_worker_stats,
-      Event::Dispatcher& dispatcher, Network::Socket& listen_socket,
-      QuicStatNames& quic_stat_names,
+      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
+      Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
+      Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
+      Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       quic::ConnectionIdGeneratorInterface& generator,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
-          debug_visitor_factory,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
       std::unique_ptr<Http::SessionIdleList> session_idle_list);
 
   // quic::QuicDispatcher
@@ -93,14 +88,12 @@ class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 
   void closeIdleQuicConnections(bool is_saturated);
 
- protected:
+protected:
   // quic::QuicDispatcher
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
-      quic::QuicConnectionId server_connection_id,
-      const quic::QuicSocketAddress& self_address,
+      quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
-      const quic::ParsedQuicVersion& version,
-      const quic::ParsedClientHello& parsed_chlo,
+      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
       quic::ConnectionIdGeneratorInterface& connection_id_generator) override;
 
   // quic::QuicDispatcher
@@ -108,11 +101,9 @@ class EnvoyQuicDispatcher : public quic::QuicDispatcher {
   // then calls the parent class implementation.
   bool OnFailedToDispatchPacket(const quic::ReceivedPacketInfo& received_packet_info) override;
 
- private:
+private:
   friend class EnvoyQuicDispatcherTest;
-  Http::SessionIdleListInterface* idle_session_list() {
-    return session_idle_list_.get();
-  }
+  Http::SessionIdleListInterface* idle_session_list() { return session_idle_list_.get(); }
 
   Network::ConnectionHandler& connection_handler_;
   Network::ListenerConfig* listener_config_{nullptr};

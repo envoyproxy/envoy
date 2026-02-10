@@ -1,22 +1,24 @@
-#include "source/common/http/session_idle_list.h"
-
 #include <chrono>
 #include <memory>
 #include <utility>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include "absl/time/time.h"
 #include "envoy/event/timer.h"
+
+#include "source/common/http/session_idle_list.h"
 #include "source/common/http/session_idle_list_interface.h"
+
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+
+#include "absl/time/time.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Http {
 
 class TestIdleSession : public IdleSessionInterface {
- public:
+public:
   TestIdleSession() = default;
   virtual ~TestIdleSession() = default;
 
@@ -24,14 +26,13 @@ class TestIdleSession : public IdleSessionInterface {
 
   bool is_closed() const { return is_closed_; }
 
- private:
+private:
   bool is_closed_ = false;
 };
 
 class TestSessionIdleList : public SessionIdleList {
- public:
-  explicit TestSessionIdleList(Event::Dispatcher& dispatcher)
-      : SessionIdleList(dispatcher) {};
+public:
+  explicit TestSessionIdleList(Event::Dispatcher& dispatcher) : SessionIdleList(dispatcher) {};
 
   // This type is neither copyable nor movable.
   TestSessionIdleList(const TestSessionIdleList&) = delete;
@@ -41,7 +42,7 @@ class TestSessionIdleList : public SessionIdleList {
 };
 
 class SessionIdleListTest : public ::testing::Test {
- public:
+public:
   SessionIdleListTest() : idle_list_(dispatcher_) {
     auto sim_time = std::make_unique<Event::SimulatedTimeSystem>();
     time_system_ = sim_time.get();
@@ -54,7 +55,7 @@ class SessionIdleListTest : public ::testing::Test {
     idle_list_.set_max_sessions_to_terminate_in_one_round_when_saturated(2);
   }
 
- protected:
+protected:
   Event::SimulatedTimeSystem* time_system_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   TestSessionIdleList idle_list_;
@@ -149,5 +150,5 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsWhenOverloaded) {
   EXPECT_EQ(idle_list_.idle_sessions()->size(), 1);
 }
 
-}  // namespace Http
-}  // namespace Envoy
+} // namespace Http
+} // namespace Envoy

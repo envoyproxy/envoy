@@ -55,6 +55,7 @@ envoy_cc_mock(
     rbe_pool = "6gig",
     deps = [
         ":conn_pool_mocks",
+        ":session_idle_list_mock",
         ":stream_decoder_mock",
         ":stream_encoder_mock",
         ":stream_mock",
@@ -148,7 +149,7 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
-    name = "session_idle_list_mocks",
+    name = "session_idle_list_mock",
     hdrs = ["session_idle_list.h"],
     deps = [
         "//source/common/http:session_idle_list_lib",

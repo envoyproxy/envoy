@@ -5,7 +5,7 @@ namespace Http {
 
 // Interface for an idle session that can be terminated due to overload.
 class IdleSessionInterface {
- public:
+public:
   virtual ~IdleSessionInterface() = default;
 
   // Terminates the idle session. This is called by the SessionIdleList when
@@ -15,7 +15,7 @@ class IdleSessionInterface {
 
 // Interface for managing a list of idle sessions.
 class SessionIdleListInterface {
- public:
+public:
   virtual ~SessionIdleListInterface() = default;
 
   // Adds a session to the idle list.
@@ -29,5 +29,5 @@ class SessionIdleListInterface {
   virtual void MaybeTerminateIdleSessions(bool is_saturated) = 0;
 };
 
-}  // namespace Http
-}  // namespace Envoy
+} // namespace Http
+} // namespace Envoy

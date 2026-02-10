@@ -175,7 +175,6 @@ envoy_cc_test(
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/http:mock_session_idle_list",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",

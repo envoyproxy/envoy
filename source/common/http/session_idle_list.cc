@@ -3,18 +3,19 @@
 #include <algorithm>
 #include <cstddef>
 
-#include "absl/time/time.h"
 #include "envoy/common/time.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/session_idle_list_interface.h"
+
+#include "absl/time/time.h"
 
 namespace Envoy {
 namespace Http {
 
 void SessionIdleList::AddSession(IdleSessionInterface& session) {
-  idle_sessions_.AddSessionToList(dispatcher_.approximateMonotonicTime(),
-                                  session);
+  idle_sessions_.AddSessionToList(dispatcher_.approximateMonotonicTime(), session);
 }
 
 void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
@@ -22,21 +23,17 @@ void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
 }
 
 void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
-  const int max_sessions_to_terminate = std::min<size_t>(
-      MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
+  const int max_sessions_to_terminate =
+      std::min<size_t>(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
   int num_terminated;
-  for (num_terminated = 0; num_terminated < max_sessions_to_terminate;
-       ++num_terminated) {
-    IdleSessionInterface& next_session =
-        idle_sessions_.next_session_to_terminate();
-    absl::Duration time_since_enqueue =
-        absl::FromChrono(dispatcher_.approximateMonotonicTime() -
-                         idle_sessions_.GetEnqueueTime(next_session));
+  for (num_terminated = 0; num_terminated < max_sessions_to_terminate; ++num_terminated) {
+    IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
+    absl::Duration time_since_enqueue = absl::FromChrono(
+        dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
     // If the resource pressure is scaling but not saturated, we should respect
     // the min_time_before_termination_allowed_ and only terminate connections
     // that has been idle longer than the threshold.
-    if (!is_saturated &&
-        time_since_enqueue < min_time_before_termination_allowed_) {
+    if (!is_saturated && time_since_enqueue < min_time_before_termination_allowed_) {
       break;
     }
     next_session.TerminateIdleSession();
@@ -56,8 +53,8 @@ absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed() const {
   return min_time_before_termination_allowed_;
 };
 
-void SessionIdleList::IdleSessions::AddSessionToList(
-    MonotonicTime enqueue_time, IdleSessionInterface& session) {
+void SessionIdleList::IdleSessions::AddSessionToList(MonotonicTime enqueue_time,
+                                                     IdleSessionInterface& session) {
   if (map_.find(&session) != map_.end()) {
     IS_ENVOY_BUG("Session is already on the idle list.");
     return;
@@ -67,13 +64,11 @@ void SessionIdleList::IdleSessions::AddSessionToList(
   if (added) {
     map_.emplace(&session, *iter);
   } else {
-    ENVOY_BUG(added,
-              "Attempt to add session which is already in the idle set.");
+    ENVOY_BUG(added, "Attempt to add session which is already in the idle set.");
   }
 }
 
-void SessionIdleList::IdleSessions::RemoveSessionFromList(
-    IdleSessionInterface& session) {
+void SessionIdleList::IdleSessions::RemoveSessionFromList(IdleSessionInterface& session) {
   auto it = map_.find(&session);
   if (it != map_.end()) {
     set_.erase(it->second);
@@ -81,16 +76,14 @@ void SessionIdleList::IdleSessions::RemoveSessionFromList(
   }
 }
 
-MonotonicTime SessionIdleList::IdleSessions::GetEnqueueTime(
-    IdleSessionInterface& session) const {
+MonotonicTime SessionIdleList::IdleSessions::GetEnqueueTime(IdleSessionInterface& session) const {
   auto it = map_.find(&session);
   if (it != map_.end()) {
     return it->second.enqueue_time;
   }
-  IS_ENVOY_BUG(
-      "Attempt to get enqueue time for session which is not in the idle set.");
+  IS_ENVOY_BUG("Attempt to get enqueue time for session which is not in the idle set.");
   return MonotonicTime{};
 }
 
-}  // namespace Http
-}  // namespace Envoy
+} // namespace Http
+} // namespace Envoy

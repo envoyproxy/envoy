@@ -3,12 +3,12 @@
 #include <memory>
 #include <ostream>
 
+#include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
-#include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/send_buffer_monitor.h"
 
@@ -53,22 +53,17 @@ struct ConnectionMapPosition {
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public QuicFilterManagerConnectionImpl,
                                public Envoy::Http::IdleSessionInterface {
- public:
+public:
   EnvoyQuicServerSession(
-      const quic::QuicConfig& config,
-      const quic::ParsedQuicVersionVector& supported_versions,
-      std::unique_ptr<EnvoyQuicServerConnection> connection,
-      quic::QuicSession::Visitor* visitor,
+      const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
+      std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
       quic::QuicCryptoServerStreamBase::Helper* helper,
       const quic::QuicCryptoServerConfig* crypto_config,
-      quic::QuicCompressedCertsCache* compressed_certs_cache,
-      Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-      QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+      quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
+      uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
-      QuicConnectionStats& connection_stats,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
-          debug_visitor_factory,
+      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
       Http::SessionIdleListInterface* session_idle_list);
 
   ~EnvoyQuicServerSession() override;
@@ -158,7 +153,7 @@ protected:
   void MaybeAddSessionToIdleList();
   void MaybeRemoveSessionFromIdleList();
 
- private:
+private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
   void ActivateStream(std::unique_ptr<quic::QuicStream> stream) override;
   void OnLastActiveStreamClosed();

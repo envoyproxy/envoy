@@ -49,28 +49,23 @@ const size_t kNumSessionsToCreatePerLoopForTests = 16;
 
 class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 protected Logger::Loggable<Logger::Id::main> {
- public:
+public:
   EnvoyQuicDispatcherTest()
-      : version_(GetParam()),
-        api_(Api::createApiForTest(time_system_)),
+      : version_(GetParam()), api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        listen_socket_(
-            std::make_unique<Network::NetworkListenSocket<
-                Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>>(
-                Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
-                /*bind*/ true)),
-        connection_helper_(*dispatcher_),
-        proof_source_(new TestProofSource()),
-        crypto_config_(quic::QuicCryptoServerConfig::TESTING,
-                       quic::QuicRandom::GetInstance(),
+        listen_socket_(std::make_unique<Network::NetworkListenSocket<
+                           Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>>(
+            Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+            /*bind*/ true)),
+        connection_helper_(*dispatcher_), proof_source_(new TestProofSource()),
+        crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::unique_ptr<TestProofSource>(proof_source_),
                        quic::KeyExchangeSource::Default()),
         version_manager_(quic::CurrentSupportedHttp3Versions()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
-        listener_stats_({ALL_LISTENER_STATS(
-            POOL_COUNTER(listener_config_.listenerScope()),
-            POOL_GAUGE(listener_config_.listenerScope()),
-            POOL_HISTOGRAM(listener_config_.listenerScope()))}),
+        listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
+                                            POOL_GAUGE(listener_config_.listenerScope()),
+                                            POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
@@ -80,18 +75,15 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
-            std::make_unique<EnvoyQuicAlarmFactory>(
-                *dispatcher_, *connection_helper_.GetClock()),
-            quic::kQuicDefaultConnectionIdLength, connection_handler_,
-            listener_config_, listener_stats_, per_worker_stats_, *dispatcher_,
-            *listen_socket_, quic_stat_names_, crypto_stream_factory_,
-            connection_id_generator_, std::nullopt,
+            std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
+            quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
+            crypto_stream_factory_, connection_id_generator_, std::nullopt,
             std::make_unique<Http::SessionIdleList>(*dispatcher_)),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
             true, listener_config_.listenerScope(),
-            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(),
-            ssl_context_manager_)) {
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
@@ -249,17 +241,15 @@ class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::
     envoy_quic_dispatcher_.Shutdown();
   }
   Http::SessionIdleList* getIdleList() {
-    return dynamic_cast<Http::SessionIdleList*>(
-        envoy_quic_dispatcher_.idle_session_list());
+    return dynamic_cast<Http::SessionIdleList*>(envoy_quic_dispatcher_.idle_session_list());
   }
 
   void createSession(uint16_t client_port) {
     connection_id_ = quic::test::TestConnectionId(client_port);
-    quic::QuicSocketAddress peer_addr(
-        version_ == Network::Address::IpVersion::v4
-            ? quic::QuicIpAddress::Loopback4()
-            : quic::QuicIpAddress::Loopback6(),
-        client_port);
+    quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                          ? quic::QuicIpAddress::Loopback4()
+                                          : quic::QuicIpAddress::Loopback6(),
+                                      client_port);
     processValidChloPacket(peer_addr);
   }
 
@@ -531,17 +521,14 @@ TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {
 TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
       .WillRepeatedly(Return(&proof_source_->filterChain()));
-  EXPECT_CALL(listener_config_.filter_chain_factory_,
-              createQuicListenerFilterChain(_))
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(listener_config_.filter_chain_factory_,
-              createNetworkFilterChain(_, _))
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillRepeatedly(ReturnRef(empty_filter_factory_));
 
-  envoy_quic_dispatcher_.ProcessBufferedChlos(
-      kNumSessionsToCreatePerLoopForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   createSession(50000);
   createSession(50001);
   createSession(50002);
@@ -560,17 +547,14 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsWhenSaturated) {
 TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
       .WillRepeatedly(Return(&proof_source_->filterChain()));
-  EXPECT_CALL(listener_config_.filter_chain_factory_,
-              createQuicListenerFilterChain(_))
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(listener_config_.filter_chain_factory_,
-              createNetworkFilterChain(_, _))
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillRepeatedly(ReturnRef(empty_filter_factory_));
 
-  envoy_quic_dispatcher_.ProcessBufferedChlos(
-      kNumSessionsToCreatePerLoopForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   createSession(50000);
   createSession(50001);
   createSession(50002);
@@ -578,8 +562,7 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
 
   getIdleList()->set_max_sessions_to_terminate_in_one_round(1);
   getIdleList()->set_max_sessions_to_terminate_in_one_round_when_saturated(2);
-  getIdleList()->set_min_time_before_termination_allowed(
-      absl::Milliseconds(10));
+  getIdleList()->set_min_time_before_termination_allowed(absl::Milliseconds(10));
   // No time has passed, no session should be closed.
   EXPECT_EQ(3u, envoy_quic_dispatcher_.NumSessions());
 
@@ -594,5 +577,5 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
   EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
 }
 
-}  // namespace Quic
-}  // namespace Envoy
+} // namespace Quic
+} // namespace Envoy

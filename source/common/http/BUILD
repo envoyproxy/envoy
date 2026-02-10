@@ -695,13 +695,13 @@ envoy_cc_library(
     hdrs = ["session_idle_list.h"],
     deps = [
         ":session_idle_list_interface",
-        "@abseil-cpp//absl/container:btree",
-        "@abseil-cpp//absl/container:node_hash_map",
-        "@abseil-cpp//absl/time",
         "//envoy/access_log:access_log_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/quic:envoy_quic_clock_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/time",
     ],
 )
