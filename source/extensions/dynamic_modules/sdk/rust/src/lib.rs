@@ -3932,17 +3932,17 @@ macro_rules! declare_network_filter_init_functions {
   };
 }
 
-/// Declare the init functions for the dynamic module with any combination of filter types.     
-///         
-/// This macro allows a single module to provide any combination of HTTP, Network, Listener,    
-/// UDP Listener, and Bootstrap filters.     
-///         
+/// Declare the init functions for the dynamic module with any combination of filter types.
+///
+/// This macro allows a single module to provide any combination of HTTP, Network, Listener,
+/// UDP Listener, and Bootstrap filters.
+///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
-///         
+///
 /// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be
-/// registered.         
-/// Supported filters:          
+/// registered.
+/// Supported filters:
 /// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters
 /// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters
 /// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
@@ -3951,10 +3951,10 @@ macro_rules! declare_network_filter_init_functions {
 ///
 /// # Examples
 ///
-/// HTTP only:                   
+/// HTTP only:
 /// ```ignore
-/// declare_all_init_functions!(my_program_init,      
-///     http: my_new_http_filter_config_fn,           
+/// declare_all_init_functions!(my_program_init,
+///     http: my_new_http_filter_config_fn,
 /// );
 /// ```
 ///
@@ -3963,8 +3963,8 @@ macro_rules! declare_network_filter_init_functions {
 /// declare_all_init_functions!(my_program_init,
 ///     network: my_new_network_filter_config_fn,
 ///     udp_listener: my_new_udp_listener_filter_config_fn,
-/// );      
-/// ```     
+/// );
+/// ```
 #[macro_export]
 macro_rules! declare_all_init_functions {
   ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
