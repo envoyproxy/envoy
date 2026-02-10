@@ -45,7 +45,7 @@ message BandwidthLimit {
     // The limit supplied in KiB/s, shared between all requests using the named bucket.
     uint64 limit_kbps = 2 [(validate.rules).uint64 = {gte: 1}];
 
-    // Optional fill interval in milliseconds for the token refills. Defaults to
+    // Optional fill interval for the token refills. Defaults to
     // inheriting the ``fill_interval`` value from the parent ``BandwidthLimit``.
     //
     // It must be at least 20ms to avoid too aggressive refills.
@@ -160,5 +160,10 @@ message BandwidthLimit {
   // Configuring the same bucket name from multiple places in the configuration is
   // undefined behavior; the configuration that loaded last will be used, and there
   // are no guarantees about loading order.
+  //
+  // Removing a named bucket configuration will not remove the bucket from a live
+  // service. A bucket can only be removed by a full restart. If the intent is to
+  // dynamically remove a bandwidth limit, the bucket could be explicitly
+  // reconfigured with an extremely large limit, to achieve a similar effect.
   repeated NamedBucketConfiguration named_bucket_configurations = 9;
 }
