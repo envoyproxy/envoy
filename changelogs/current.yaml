@@ -145,6 +145,10 @@ new_features:
     where modules built with a SDK version can be loaded by Envoy
     binaries of the next Envoy version. For example, A module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
+- area: dynamic modules
+  change: |
+    Added support for dynamic modules authors to register any combination of http, network, listener,
+    udp listener, and bootstrap filters in the rust SDK.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
