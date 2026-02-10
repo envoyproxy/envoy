@@ -39,6 +39,7 @@ message FileServerConfig {
   }
 
   message DirectoryBehavior {
+    // [#not-implemented-hide:] Directory operations currently have no async implementation.
     message List {
     }
 
