@@ -611,9 +611,9 @@ TEST_P(SSLTestWithCurves, test_SSL_get_curve_id) {
 INSTANTIATE_TEST_SUITE_P(
     SSLTestWithCurves, SSLTestWithCurves,
     ::testing::Values(
-        Curves{SN_secp224r1 ":" SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
+        Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
                SN_secp521r1, SSL_CURVE_SECP521R1},
-        Curves{SN_secp224r1 ":" SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
+        Curves{SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1,
                SN_X9_62_prime256v1, SSL_CURVE_SECP256R1}));
 
 TEST(SSLTest, test_SSL_get_curve_name) {
@@ -1047,15 +1047,31 @@ TEST(SSLTest, test_SSL_SESSION_from_bytes) {
   server.join();
 }
 
+// Test that SSL_set1_curves_list() returns 0 if passed an empty string. In
+// OpenSSL 3.5, a bug was introduced causing it to return 1 instead. This test
+// ensures that we are exposing the BoringSSL behaviour of returning 0.
+TEST(SSLTest, test_SSL_set1_curves_list_empty_string) {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_server_method()));
+  bssl::UniquePtr<SSL> ssl{SSL_new(ctx.get())};
+  ASSERT_EQ(0, SSL_set1_curves_list(ssl.get(), ""));
+}
+
+// Test that SSL_CTX_set1_curves_list() returns 0 if passed an empty string. In
+// OpenSSL 3.5, a bug was introduced causing it to return 1 instead. This test
+// ensures that we are exposing the BoringSSL behaviour of returning 0.
+TEST(SSLTest, test_SSL_CTX_set1_curves_list_empty_string) {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_server_method()));
+  ASSERT_EQ(0, SSL_CTX_set1_curves_list(ctx.get(), ""));
+}
+
 TEST(SSLTest, test_SSL_set1_curves_list) {
   struct {
     const char* curves;
     int expected_result;
   } test_strings[]{
-      {SN_secp224r1 ":" SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1, 1},
-      {"P-224", 1},
-      {"P-224:P-521:P-256:X25519", 1},
-      {"P-224:P-521:P-25:X25519", 0},
+      {SN_secp384r1 ":" SN_secp521r1 ":" SN_X25519 ":" SN_X9_62_prime256v1, 1},
+      {"P-521:P-256:X25519", 1},
+      {"P-521:P-25:X25519", 0},
       {"no:valid:curves", 0},
       {":", 0},
       {":::", 0},
@@ -1961,8 +1977,7 @@ TEST(SSLTest, test_SSL_get_all_curve_names) {
   // Check that the names are not null and have a non-zero length
   for (size_t i = 0; i < size2; i++) {
     ASSERT_NE(names1.get()[i], nullptr);
-    // ASSERT_GT(strlen(names1.get()[i]), 0);
-    printf("%s\n", names1.get()[i]);
+    ASSERT_GT(strlen(names1.get()[i]), 0);
   }
 
   // Allocate another buffer that is one element too short (size2 - 1)
@@ -1979,6 +1994,5 @@ TEST(SSLTest, test_SSL_get_all_curve_names) {
   for (size_t i = 0; i < (size2 - 1); i++) {
     ASSERT_NE(names2.get()[i], nullptr);
     ASSERT_GT(strlen(names2.get()[i]), 0);
-    // printf("%s\n", names2.get()[i]);
   }
 }

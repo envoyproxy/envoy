@@ -23,7 +23,7 @@ jobs:
       uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
     - run: |
-        ./ci/run_envoy_docker.sh './ci/do_ci.sh dev //test/...'
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh dev @bssl-compat//test/... //test/...'
       env:
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           --config=rbe

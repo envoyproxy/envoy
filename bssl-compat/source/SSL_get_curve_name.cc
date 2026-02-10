@@ -59,9 +59,14 @@ static std::vector<std::string> init_all_curve_names() {
     bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
     if (ssl) {
       for (size_t i = 0; i < CANDIDATES_SIZE; ++i) {
-        if (ossl.ossl_SSL_set1_groups_list(ssl.get(), kCurveCandidates[i].name)) {
-          // Success: OpenSSL knows this curve and can handle it.
-          names.push_back(kCurveCandidates[i].name);
+        // OpenSSL 3.5 introduced a change/bug in SSL_set1_groups_list() where it
+        // returns 1 (success) instead of 0 (failure) when passed an empty groups
+        // list, so if the candidate group name is blank, just skip the call.
+        if (kCurveCandidates[i].name[0] != '\0') {
+          if (ossl.ossl_SSL_set1_groups_list(ssl.get(), kCurveCandidates[i].name)) {
+            // Success: OpenSSL knows this curve and can handle it.
+            names.push_back(kCurveCandidates[i].name);
+          }
         }
       }
     }

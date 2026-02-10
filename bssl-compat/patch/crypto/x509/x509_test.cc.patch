@@ -1,6 +1,6 @@
---- a/source/crypto/x509/x509_test.cc
-+++ b/source/crypto/x509/x509_test.cc
-@@ -1275,6 +1275,9 @@
+--- a/x509_test.cc
++++ b/x509_test.cc
+@@ -1289,6 +1289,9 @@
            Verify(root_cross_signed.get(), {cross_signing_root.get()}, {},
                   /*crls=*/{}, /*flags=*/0, configure_callback));
  
@@ -10,7 +10,28 @@
        // An explicitly trusted self-signed certificate is unaffected by depth
        // checks.
        EXPECT_EQ(X509_V_OK,
-@@ -1987,14 +1990,23 @@
+@@ -2009,10 +2012,20 @@
+       {GEN_URI, "foo:/not-a-url", "not-a-url",
+        X509_V_ERR_UNSUPPORTED_NAME_SYNTAX},
+       {GEN_URI, "foo:///not-a-url", "not-a-url",
++#ifdef BSSL_COMPAT
++       // OpenSSL considers "foo:///not-a-url" to be a valid URI
++       X509_V_ERR_PERMITTED_VIOLATION},
++#else // BSSL_COMPAT
+        X509_V_ERR_UNSUPPORTED_NAME_SYNTAX},
++#endif // BSSL_COMPAT
+       {GEN_URI, "foo://:not-a-url", "not-a-url",
+        X509_V_ERR_UNSUPPORTED_NAME_SYNTAX},
++#ifdef BSSL_COMPAT
++      // OpenSSL considers "foo://" to be a valid URI
++      {GEN_URI, "foo://", "not-a-url", X509_V_ERR_PERMITTED_VIOLATION},
++#else // BSSL_COMPAT
+       {GEN_URI, "foo://", "not-a-url", X509_V_ERR_UNSUPPORTED_NAME_SYNTAX},
++#endif // BSSL_COMPAT
+       // Hosts are an exact match.
+       {GEN_URI, "foo://example.com", "example.com", X509_V_OK},
+       {GEN_URI, "foo://example.com:443", "example.com", X509_V_OK},
+@@ -2071,14 +2084,23 @@
  
      bssl::UniquePtr<NAME_CONSTRAINTS> nc(NAME_CONSTRAINTS_new());
      ASSERT_TRUE(nc);
@@ -36,7 +57,7 @@
  
      bssl::UniquePtr<X509> root =
          MakeTestCert("Root", "Root", key.get(), /*is_ca=*/true);
-@@ -2936,11 +2948,13 @@
+@@ -3097,11 +3119,13 @@
    // |X509_check_purpose| with |X509_PURPOSE_ANY| and purpose -1 do not check
    // basicConstraints, but other purpose types do. (This is redundant with the
    // actual basicConstraints check, but |X509_check_purpose| is public API.)
@@ -50,7 +71,7 @@
  }
  
  TEST(X509Test, NoBasicConstraintsNetscapeCA) {
-@@ -3767,6 +3781,7 @@
+@@ -3994,6 +4018,7 @@
  t6uPxHrmpUY=
  -----END CERTIFICATE-----
  )";
@@ -58,7 +79,7 @@
  static const char kP256InvalidParam[] = R"(
  -----BEGIN CERTIFICATE-----
  MIIBMTCBz6ADAgECAgIE0jATBggqhkjOPQQDAgQHZ2FyYmFnZTAPMQ0wCwYDVQQD
-@@ -3778,6 +3793,7 @@
+@@ -4005,6 +4030,7 @@
  fLULTZnynuQUULQkRcF7S7T2WpIL
  -----END CERTIFICATE-----
  )";
@@ -66,7 +87,7 @@
  static const char kRSANoParam[] = R"(
  -----BEGIN CERTIFICATE-----
  MIIBWzCBx6ADAgECAgIE0jALBgkqhkiG9w0BAQswDzENMAsGA1UEAxMEVGVzdDAg
-@@ -3802,6 +3818,7 @@
+@@ -4029,6 +4055,7 @@
  SwmQUz4bRpckRBj+sIyp1We+pg==
  -----END CERTIFICATE-----
  )";
@@ -74,7 +95,7 @@
  static const char kRSAInvalidParam[] = R"(
  -----BEGIN CERTIFICATE-----
  MIIBbTCB0KADAgECAgIE0jAUBgkqhkiG9w0BAQsEB2dhcmJhZ2UwDzENMAsGA1UE
-@@ -3814,7 +3831,7 @@
+@@ -4041,7 +4068,7 @@
  5OMNZ/ajVwOssw61GcAlScRqEHkZFBoGp7e+QpgB2tf9
  -----END CERTIFICATE-----
  )";
@@ -83,7 +104,7 @@
  TEST(X509Test, AlgorithmParameters) {
    // P-256 parameters should be omitted, but we accept NULL ones.
    bssl::UniquePtr<EVP_PKEY> key = PrivateKeyFromPEM(kP256Key);
-@@ -3828,11 +3845,13 @@
+@@ -4055,11 +4082,13 @@
    ASSERT_TRUE(cert);
    EXPECT_TRUE(X509_verify(cert.get(), key.get()));
  
@@ -97,7 +118,7 @@
  
    // RSA parameters should be NULL, but we accept omitted ones.
    key = PrivateKeyFromPEM(kRSAKey);
-@@ -3846,11 +3865,13 @@
+@@ -4073,11 +4102,13 @@
    ASSERT_TRUE(cert);
    EXPECT_TRUE(X509_verify(cert.get(), key.get()));
  
@@ -110,4 +131,4 @@
 +#endif
  }
  
- // TEST(X509Test, GeneralName)  {
+ TEST(X509Test, GeneralName) {

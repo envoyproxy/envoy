@@ -826,6 +826,7 @@ mapping_func_filegroup(
         "X509_PUBKEY_get0_param",
         "X509_set_issuer_name",
         "X509_set_pubkey",
+        "X509_set_serialNumber",
         "X509_set_subject_name",
         "X509_set_version",
         "X509_sign",

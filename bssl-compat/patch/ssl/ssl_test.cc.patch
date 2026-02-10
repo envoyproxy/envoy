@@ -1,14 +1,6 @@
---- a/source/ssl/ssl_test.cc
-+++ b/source/ssl/ssl_test.cc
-@@ -23,7 +23,6 @@
- #include <utility>
- #include <vector>
- 
--#include <gmock/gmock.h>
- #include <gtest/gtest.h>
- 
- #include <openssl/aead.h>
-@@ -84,13 +83,19 @@
+--- a/
++++ b/
+@@ -87,13 +87,19 @@
  static const size_t kTicketKeyLen = 48;
  
  static const VersionParam kAllVersions[] = {
@@ -28,23 +20,23 @@
  };
  
  struct ExpectedCipher {
-@@ -984,6 +989,7 @@
+@@ -1324,6 +1330,7 @@
      int auth_nid;
      int prf_nid;
    } kTests[] = {
-+#ifdef SSL3_CK_RSA_DES_192_CBC3_SHA
++#ifdef SSL_CIPHER_RSA_WITH_3DES_EDE_CBC_SHA
        {
-           SSL3_CK_RSA_DES_192_CBC3_SHA,
+           SSL_CIPHER_RSA_WITH_3DES_EDE_CBC_SHA,
            "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
-@@ -993,6 +999,7 @@
+@@ -1333,6 +1340,7 @@
            NID_auth_rsa,
            NID_md5_sha1,
        },
-+#endif
++#endif // SSL_CIPHER_RSA_WITH_3DES_EDE_CBC_SHA
        {
-           TLS1_CK_RSA_WITH_AES_128_SHA,
+           SSL_CIPHER_RSA_WITH_AES_128_CBC_SHA,
            "TLS_RSA_WITH_AES_128_CBC_SHA",
-@@ -1540,7 +1547,11 @@
+@@ -1880,7 +1888,11 @@
      if (client_err != SSL_ERROR_NONE &&        //
          client_err != SSL_ERROR_WANT_READ &&   //
          client_err != SSL_ERROR_WANT_WRITE &&  //
@@ -56,7 +48,7 @@
        fprintf(stderr, "Client error: %s\n", SSL_error_description(client_err));
        return false;
      }
-@@ -1550,7 +1561,11 @@
+@@ -1890,7 +1902,11 @@
      if (server_err != SSL_ERROR_NONE &&        //
          server_err != SSL_ERROR_WANT_READ &&   //
          server_err != SSL_ERROR_WANT_WRITE &&  //
@@ -68,7 +60,7 @@
        fprintf(stderr, "Server error: %s\n", SSL_error_description(server_err));
        return false;
      }
-@@ -1639,7 +1654,12 @@
+@@ -1979,7 +1995,12 @@
      return false;
    }
    if (config.early_data) {
@@ -81,7 +73,7 @@
    }
    if (config.session) {
      SSL_set_session(client.get(), config.session);
-@@ -1649,18 +1669,29 @@
+@@ -1989,18 +2010,29 @@
      return false;
    }
    if (!config.verify_hostname.empty()) {
@@ -111,15 +103,15 @@
  
    if (!CompleteHandshakes(client.get(), server.get())) {
      return false;
-@@ -3518,12 +3549,15 @@
+@@ -3858,12 +3890,16 @@
    // However, for historical reasons, the X509 chain includes the leaf on the
    // client, but does not on the server.
    EXPECT_EQ(sk_X509_num(SSL_get_peer_cert_chain(client_.get())), 1u);
 +#ifndef BSSL_COMPAT // Envoy doesn't need SSL_get0_peer_certificates() so skip this
    EXPECT_EQ(sk_CRYPTO_BUFFER_num(SSL_get0_peer_certificates(client_.get())),
              1u);
--
 +#endif
+ 
    EXPECT_EQ(sk_X509_num(SSL_get_peer_cert_chain(server_.get())), 0u);
 +#ifndef BSSL_COMPAT // Envoy doesn't need SSL_get0_peer_certificates() so skip this  
    EXPECT_EQ(sk_CRYPTO_BUFFER_num(SSL_get0_peer_certificates(server_.get())),
@@ -128,7 +120,7 @@
  }
  
  TEST_P(SSLVersionTest, NoPeerCertificate) {
-@@ -3536,7 +3570,9 @@
+@@ -3876,7 +3912,9 @@
    // Server should not see a peer certificate.
    bssl::UniquePtr<X509> peer(SSL_get_peer_certificate(server_.get()));
    ASSERT_FALSE(peer);
@@ -138,16 +130,29 @@
  }
  
  TEST_P(SSLVersionTest, RetainOnlySHA256OfCerts) {
-@@ -4228,7 +4264,11 @@
+@@ -4569,7 +4607,11 @@
    ASSERT_TRUE(CreateClientAndServer(&client_, &server_, client_ctx_.get(),
                                      server_ctx_.get()));
    // Before the handshake, |SSL_version| reports some placeholder value.
--  const uint16_t placeholder = is_dtls() ? DTLS1_2_VERSION : TLS1_2_VERSION;
 +#ifdef BSSL_COMPAT // Default versions are different when running on OpenSSL
 +  const uint16_t placeholder = is_dtls() ? DTLS1_2_VERSION : TLS1_3_VERSION;
 +#else
-+  const uint16_t placeholder = is_dtls() ? DTLS1_2_VERSION : TLS1_2_VERSION;
+   const uint16_t placeholder = is_dtls() ? DTLS1_2_VERSION : TLS1_2_VERSION;
 +#endif
    EXPECT_EQ(SSL_version(client_.get()), placeholder);
    EXPECT_EQ(SSL_version(server_.get()), placeholder);
  
+@@ -6217,8 +6259,13 @@
+   int ret = SSL_do_handshake(ssl.get());
+   EXPECT_EQ(-1, ret);
+   EXPECT_EQ(SSL_ERROR_SSL, SSL_get_error(ssl.get(), ret));
++#ifdef BSSL_COMPAT
++  EXPECT_TRUE(
++      ErrorEquals(ERR_get_error(), ERR_LIB_SSL, ossl_SSL_R_NO_PROTOCOLS_AVAILABLE));
++#else // BSSL_COMPAT
+   EXPECT_TRUE(
+       ErrorEquals(ERR_get_error(), ERR_LIB_SSL, SSL_R_NO_CIPHERS_AVAILABLE));
++#endif // BSSL_COMPAT
+ }
+ 
+ TEST_P(SSLVersionTest, SessionVersion) {

@@ -21,6 +21,7 @@ def patched_bssl_filegroup(name, srcs):
                 # Set up paths - all paths need to be relative to bssl-compat package
                 SRC_FILE="$(location {src_file})"
                 DST_FILE="$(location {dst_file})"
+                BASENAME="$$(basename $$SRC_FILE)"
                 # Patch files are in the package, so use relative paths from execroot
                 PATCH_SCRIPT="external/bssl-compat/patch/{dst_file}.sh"
                 PATCH_FILE="external/bssl-compat/patch/{dst_file}.patch"
@@ -31,30 +32,34 @@ def patched_bssl_filegroup(name, srcs):
                 # Create temporary directory
                 TMP_DIR="$$DST_FILE.tmp"
                 mkdir -p "$$TMP_DIR"
-                trap 'rm -rf $$TMP_DIR' EXIT
 
                 # Copy source file to working file
-                WORKING="$$TMP_DIR/working.h"
+                WORKING="$$TMP_DIR/working"
+                cp "$$SRC_FILE" "$$TMP_DIR/00.$$BASENAME"
                 cp "$$SRC_FILE" "$$WORKING"
                 chmod +w "$$WORKING"
 
                 # Apply patch file if it exists
                 if [ -f "$$PATCH_FILE" ]; then
-                    patch -s -f "$$WORKING" "$$PATCH_FILE" -o "$$TMP_DIR/applied.patch.h"
-                    cp "$$TMP_DIR/applied.patch.h" "$$WORKING"
+                    cp "$$PATCH_FILE" "$$TMP_DIR/01.$$(basename $$PATCH_FILE)"
+                    patch -s -f "$$WORKING" "$$PATCH_FILE" -o "$$TMP_DIR/02.$$BASENAME.applied.patch"
+                    cp "$$TMP_DIR/02.$$BASENAME.applied.patch" "$$WORKING"
                 fi
 
                 # Apply patch script if it exists, otherwise comment out the whole file
                 if [ -f "$$PATCH_SCRIPT" ]; then
+                    cp "$$PATCH_SCRIPT" "$$TMP_DIR/03.$$(basename $$PATCH_SCRIPT)"
                     TOOLS_DIR="$$(dirname "$(location //tools:uncomment.sh)")"
                     PATH="$$TOOLS_DIR:$$PATH" bash "$$PATCH_SCRIPT" "$$WORKING"
-                    cp "$$WORKING" "$$TMP_DIR/applied.script.h"
+                    cp "$$WORKING" "$$TMP_DIR/04.$$BASENAME.applied.sh"
                 else
                     bash $(location //tools:uncomment.sh) "$$WORKING" --comment
+                    cp "$$WORKING" "$$TMP_DIR/05.commented.out"
                 fi
 
                 # Copy result to destination
                 cp "$$WORKING" "$$DST_FILE"
+                rm "$$WORKING"
             """.format(src_file = src_file, dst_file = dst_file),
             tools = ["//tools:uncomment.sh"],
         )
