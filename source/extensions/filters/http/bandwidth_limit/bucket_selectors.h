@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/server/factory_context.h"
