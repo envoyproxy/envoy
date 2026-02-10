@@ -66,9 +66,9 @@ message BandwidthLimit {
       string default_bucket = 1;
 
       // Optional template for the bucket name, with ``{CN}`` representing the client
-      // certificate name. If not set, behaves the same as if the template is just ``{CN}}``
+      // certificate name. If not set, behaves the same as if the template is just ``{CN}``
       //
-      // If set, must contain ``{CN}``.
+      // If set, must contain ``{CN}`` as a literal substring.
       //
       // This value also overrides ``stat_prefix`` from ``BandwidthLimit`` for the bucket.
       string name_template = 2 [(validate.rules).string = {pattern: "|.*{CN}.*"}];
