@@ -3979,7 +3979,8 @@ macro_rules! declare_network_filter_init_functions {
 ///     http: my_new_http_filter_config_fn,                                                                          
 ///     network: my_new_network_filter_config_fn,                                                                    
 /// );                                                                                                               
-/// ```                                                                                                              #[macro_export]                                                                                                      
+/// ```                                                                                                              
+#[macro_export]                                                                                                      
 macro_rules! declare_all_init_functions {                                                                            
   ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {                                                   
     #[no_mangle]                                                                                                     
