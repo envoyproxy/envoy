@@ -345,8 +345,13 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   // Wait for initiator connection stats - the stat name includes the actual address:port
   // Format: reverse_tunnel_initiator.host.<address>:<port>.connected
+  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
+  const std::string formatted_tunnel_address =
+      (GetParam() == Network::Address::IpVersion::v6)
+          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
+          : tunnel_address;
   const std::string initiator_host_stat =
-      fmt::format("reverse_tunnel_initiator.host.{}.connected", tunnel_address);
+      fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
   test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(2000));
 
   // Verify cluster-level initiator stats.
@@ -594,17 +599,19 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
   // Verify downstream initiator stats.
   ENVOY_LOG_MISC(info, "Verifying downstream reverse tunnel initiator stats.");
   const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
+  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
+  const std::string formatted_tunnel_address =
+      (GetParam() == Network::Address::IpVersion::v6)
+          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
+          : tunnel_address;
   const std::string initiator_host_stat =
-      fmt::format("reverse_tunnel_initiator.host.{}.connected", tunnel_address);
+      fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
   test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(1000));
   test_server_->waitForGaugeGe("reverse_tunnel_initiator.cluster.tunnel_cluster.connected", 1);
 
-  // Give a small delay for rpings to occur.
+  // Give a small delay for pings to occur.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
                                  std::chrono::milliseconds(1000));
-
-  ENVOY_LOG_MISC(info, "Waiting for rpings to occur.");
-  std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
   ENVOY_LOG_MISC(info, "Sending HTTP request through mTLS tunnel.");
 
@@ -944,10 +951,6 @@ typed_config:
   test_server_->waitForCounterGe("listener_manager.listener_removed",
                                  2); // 2 node-1 listeners removed
 
-  // Wait for node-1 connections to close and be cleaned up.
-  ENVOY_LOG_MISC(info, "Waiting for node-1 connections to be cleaned up.");
-  std::this_thread::sleep_for(std::chrono::milliseconds(4000)); // drain_time + buffer
-
   // Verify stats show reduced connections (should drop from 4 to 2).
   ENVOY_LOG_MISC(info, "Verifying that node-1 connections are gone.");
   test_server_->waitForGaugeEq("reverse_tunnel_acceptor.nodes.node-1", 0);
@@ -1077,38 +1080,66 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.rejected")->value(), 0);
   EXPECT_EQ(test_server_->counter("reverse_tunnel.handshake.validation_failed")->value(), 0);
 
-  ENVOY_LOG_MISC(info, "All 4 worker tunnels established. Verifying per-worker reverse connection stats.");
+  ENVOY_LOG_MISC(
+      info, "All 4 worker tunnels established. Verifying per-worker reverse connection stats.");
 
   // Verify that each worker initiated exactly 1 connection (initiator side).
   ENVOY_LOG_MISC(info, "Verifying per-worker initiator connections.");
   const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
+  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
+  const std::string formatted_tunnel_address =
+      (GetParam() == Network::Address::IpVersion::v6)
+          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
+          : tunnel_address;
+
   for (int worker_id = 0; worker_id < 4; worker_id++) {
     // Check per-worker host stat (connected to tunnel_cluster)
     const std::string worker_host_stat =
-        fmt::format("reverse_tunnel_initiator.worker_{}.host.{}.connected", worker_id, tunnel_address);
-    test_server_->waitForGaugeGe(worker_host_stat, 1, std::chrono::milliseconds(2000));
-    
-    // Check per-worker cluster stat 
-    const std::string worker_cluster_stat =
-        fmt::format("reverse_tunnel_initiator.worker_{}.cluster.tunnel_cluster.connected", worker_id);
-    test_server_->waitForGaugeGe(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
-    
+        fmt::format("reverse_tunnel_initiator.worker_{}.host.{}.connected", worker_id,
+                    formatted_tunnel_address);
+    test_server_->waitForGaugeEq(worker_host_stat, 1, std::chrono::milliseconds(2000));
+
+    // Check per-worker cluster stat
+    const std::string worker_cluster_stat = fmt::format(
+        "reverse_tunnel_initiator.worker_{}.cluster.tunnel_cluster.connected", worker_id);
+    test_server_->waitForGaugeEq(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
+
     ENVOY_LOG_MISC(info, "Worker {} has initiated 1 reverse connection.", worker_id);
   }
 
+  // Verify cross-worker initiator stats (aggregated across all workers).
+  const std::string cross_worker_initiator_host_stat =
+      fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
+  test_server_->waitForGaugeEq(cross_worker_initiator_host_stat, 4,
+                               std::chrono::milliseconds(2000));
+  const std::string cross_worker_initiator_cluster_stat =
+      "reverse_tunnel_initiator.cluster.tunnel_cluster.connected";
+  test_server_->waitForGaugeEq(cross_worker_initiator_cluster_stat, 4,
+                               std::chrono::milliseconds(2000));
+
   // Verify that each worker accepted exactly 1 connection (acceptor side).
   ENVOY_LOG_MISC(info, "Verifying per-worker acceptor connections.");
+
   for (int worker_id = 0; worker_id < 4; worker_id++) {
     // Check per-worker node stat
     const std::string worker_node_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.node.test-node-id", worker_id);
     test_server_->waitForGaugeEq(worker_node_stat, 1, std::chrono::milliseconds(2000));
-    
+
     // Check per-worker cluster stat
     const std::string worker_cluster_stat =
         fmt::format("reverse_tunnel_acceptor.worker_{}.cluster.test-cluster-id", worker_id);
     test_server_->waitForGaugeEq(worker_cluster_stat, 1, std::chrono::milliseconds(2000));
-    
+
+    // Check per-worker aggregate metrics (total_nodes and total_clusters for each worker)
+    const std::string worker_total_nodes_stat =
+        fmt::format("reverse_tunnel_acceptor.worker_{}.total_nodes", worker_id);
+    test_server_->waitForGaugeEq(worker_total_nodes_stat, 1, std::chrono::milliseconds(2000));
+
+    const std::string worker_total_clusters_stat =
+        fmt::format("reverse_tunnel_acceptor.worker_{}.total_clusters", worker_id);
+    test_server_->waitForGaugeEq(worker_total_clusters_stat, 1, std::chrono::milliseconds(2000));
+
     ENVOY_LOG_MISC(info, "Worker {} has accepted 1 reverse connection.", worker_id);
   }
 
@@ -1121,11 +1152,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   const int num_requests = 12; // Send 12 requests to distribute across 4 workers
 
   for (int i = 0; i < num_requests; i++) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "GET"},
-        {":path", fmt::format("/test/path{}", i)},
-        {":scheme", "http"},
-        {":authority", "host"}};
+    Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                           {":path", fmt::format("/test/path{}", i)},
+                                           {":scheme", "http"},
+                                           {":authority", "host"}};
     auto encoder_decoder = codec_client_->startRequest(headers);
     responses.push_back(std::move(encoder_decoder.second));
     codec_client_->sendData(encoder_decoder.first, 0, true);

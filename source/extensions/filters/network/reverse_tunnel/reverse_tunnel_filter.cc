@@ -458,7 +458,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   if (socket_manager != nullptr) {
     ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
     socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
-                                        std::move(wrapped_socket), ping_seconds);
+                                        std::move(wrapped_socket), ping_seconds,
+                                        false /* rebalanced */);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }

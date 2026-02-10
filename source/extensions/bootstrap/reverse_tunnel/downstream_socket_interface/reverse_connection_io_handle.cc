@@ -66,8 +66,7 @@ void ReverseConnectionIOHandle::cleanup() {
   }
 
   // Cancel the retry timer safely.
-  if (rev_conn_retry_timer_ && rev_conn_retry_timer_->enabled()) {
-    ENVOY_LOG_MISC(trace, "reverse_tunnel: cancelling and resetting retry timer.");
+  if (rev_conn_retry_timer_) {
     rev_conn_retry_timer_.reset();
   }
 
