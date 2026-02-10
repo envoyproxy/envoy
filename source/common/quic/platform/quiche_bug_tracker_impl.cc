@@ -1,6 +1,7 @@
+#include "quiche_platform_impl/quiche_bug_tracker_impl.h"
+
 #include "source/common/common/assert.h"
 
-#include "quiche_platform_impl/quiche_bug_tracker_impl.h"
 #include "quiche_platform_impl/quiche_logging_impl.h"
 
 // NOLINT(namespace-envoy)

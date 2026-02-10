@@ -39,7 +39,7 @@ envoy_cc_library(
     deps = [
         ":message_lib",
         "//source/common/buffer:buffer_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

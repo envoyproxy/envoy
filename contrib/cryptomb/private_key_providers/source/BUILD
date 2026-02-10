@@ -48,7 +48,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
+    lib_source = "@ipp-crypto//:all",
     out_static_libs = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),

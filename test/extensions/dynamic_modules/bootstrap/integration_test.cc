@@ -72,6 +72,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register and resolve functions
+// via the process-wide function registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap function registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

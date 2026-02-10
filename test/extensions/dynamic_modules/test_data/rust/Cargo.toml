@@ -49,3 +49,9 @@ name = "network_no_op"
 path = "network_no_op.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "bootstrap_function_registry_test"
+path = "bootstrap_function_registry_test.rs"
+crate-type = ["cdylib"]
+test = true

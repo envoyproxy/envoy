@@ -141,7 +141,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 13]
+  // [#next-free-field: 14]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -243,6 +243,20 @@ message HttpConnectionManager {
     // :ref:`HTTP access logging <config_access_log>` applies here, however
     // unknown specifier values are replaced with the empty string instead of ``-``.
     string upstream_operation = 12;
+
+    // If set to true, trace context propagation is disabled, meaning that trace context headers
+    // (e.g. ``traceparent``, ``tracestate`` for OpenTelemetry/W3C, or ``X-B3-*`` headers for Zipkin)
+    // will not be injected when proxying requests to upstreams.
+    //
+    // This is useful for scenarios where you want to report spans from a proxy (e.g., an egress
+    // gateway) while preventing trace context from being propagated to external services,
+    // effectively stopping the trace at the mesh boundary.
+    //
+    // Note that span reporting is still performed when this is set to true - only context
+    // propagation is disabled.
+    //
+    // Default: false (context propagation is enabled)
+    bool no_context_propagation = 13;
   }
 
   message InternalAddressConfig {

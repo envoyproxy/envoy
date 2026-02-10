@@ -2890,7 +2890,7 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
-TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
+TEST(SubstitutionFormatterTest, QueryParameterFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
 
@@ -2916,6 +2916,73 @@ TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
     EXPECT_EQ("xx", formatter.format(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("xx")));
+  }
+}
+
+TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{
+      {":method", "GET"}, {":path", "/path?x=xxxxxx&y=yyyyy&z=zzz&encoded=%23"}};
+
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header);
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%").IgnoreError(), EnvoyException,
+        "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed");
+  }
+
+  {
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption(""),
+                                       absl::optional<size_t>());
+    EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23",
+              formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23")));
+  }
+
+  {
+
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("ORIG"),
+                                       absl::optional<size_t>());
+    EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23",
+              formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=%23")));
+  }
+
+  {
+
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("DECODED"),
+                                       absl::optional<size_t>());
+    EXPECT_EQ("x=xxxxxx&y=yyyyy&z=zzz&encoded=#", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xxxxxx&y=yyyyy&z=zzz&encoded=#")));
+  }
+
+  {
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption(""),
+                                       absl::optional<size_t>(4));
+    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xx")));
+  }
+
+  {
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("ORIG"),
+                                       absl::optional<size_t>(4));
+    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xx")));
+  }
+
+  {
+    QueryParametersFormatter formatter(QueryParametersFormatter::parseDecodeOption("DECODED"),
+                                       absl::optional<size_t>(4));
+    EXPECT_EQ("x=xx", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("x=xx")));
   }
 }
 

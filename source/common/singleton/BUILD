@@ -31,6 +31,6 @@ envoy_cc_library(
     hdrs = ["threadsafe_singleton.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/base",
+        "@abseil-cpp//absl/base",
     ],
 )
