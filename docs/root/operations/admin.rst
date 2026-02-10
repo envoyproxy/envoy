@@ -772,6 +772,17 @@ modify different aspects of the server:
         - 'PrometheusProto'
         - 'PrometheusText0.0.4'
 
+  .. http:get:: /stats/prometheus?histogram_buckets=prometheusnative&native_histogram_max_buckets=20
+
+  Outputs histograms as `Prometheus native histograms <https://prometheus.io/docs/specs/native_histograms>`_.
+  This is only available when using the protobuf exposition format.
+
+  This mode ignores :ref:`configured histogram bucket limits
+  <envoy_v3_api_field_config.metrics.v3.StatsConfig.histogram_bucket_settings>`
+  and generates a sparse histogram representation which will use a maximum number of buckets, with
+  accuracy adjusted to that number. The default values is 20 if no value for `native_histogram_max_buckets`
+  is specified.
+
   .. http:get:: /stats?format=prometheus&usedonly
 
   You can optionally pass the ``usedonly`` URL query parameter to only get statistics that
