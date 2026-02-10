@@ -690,8 +690,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
-        StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() !=
              envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT) {
     // Existing state found and merge policy is not ADD_IF_ABSENT - merge TLVs.
