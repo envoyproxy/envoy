@@ -264,9 +264,9 @@ are rooted at *cluster.<name>.* and contain the following statistics:
    ``retry.upstream_rq_<*xx>`` and ``retry.upstream_rq_<*>`` instead (see
    :ref:`retry statistics <config_cluster_manager_cluster_stats_retry>` below).
 
-   For example, if a request receives 503 → 503 → 200 (two retries before success):
+   For example, if a request receives ``503`` → ``503`` → ``200`` (two retries before success):
 
-   * ``retry.upstream_rq_503`` = 2 (the two 503s that were retried)
+   * ``retry.upstream_rq_503`` = 2 (the two ``503`` responses that were retried)
    * ``upstream_rq_503`` = 0 (no 503 was sent downstream)
    * ``upstream_rq_200`` = 1 (the final successful response)
 
@@ -276,15 +276,15 @@ Retry statistics
 ----------------
 
 When retries are enabled and a response triggers a retry, the following dynamic HTTP statistics
-are emitted. These are rooted at *cluster.<name>.retry.* and track responses that were **not**
+are emitted. These are rooted at ``cluster.<name>.retry.`` and track responses that were **not**
 sent to the downstream client because they triggered a retry:
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes that triggered retry (e.g., 5xx)"
-  upstream_rq_<\*>, Counter, "Specific HTTP response codes that triggered retry (e.g., 503)"
+  ``upstream_rq_<\*xx>``, Counter, "Aggregate HTTP response codes that triggered retry (e.g., 5xx)"
+  ``upstream_rq``_<\*>, Counter, "Specific HTTP response codes that triggered retry (e.g., ``503``)"
 
 .. note::
    These counters are incremented when a response triggers a retry and is **not** forwarded
