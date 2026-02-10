@@ -10,6 +10,7 @@ x-envoy-build-base: &envoy-build-base
   environment:
   # Core build environment
   - BUILD_DIR=/build
+  - DOCKER_COMMAND
   - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
   - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
   - ENVOY_OCI_DIR
