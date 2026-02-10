@@ -633,7 +633,7 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigSet) {
             "abc");
 }
 
-// TODO(tyxia) Handle unreconnized methods/fields.
+// TODO(tyxia) Handle unrecognized methods/fields.
 TEST_F(A2aJsonParserTest, ParseUnrecognizedMethod) {
   const std::string json = R"({
     "jsonrpc": "2.0",
