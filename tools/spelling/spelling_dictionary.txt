@@ -1669,3 +1669,5 @@ UIDs
 configurability
 WDS
 OIDC
+Bredband
+Bevtec
