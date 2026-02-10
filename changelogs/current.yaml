@@ -119,6 +119,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    in external languages (Rust, Go, C) via dynamic modules.
 - area: ext_authz
   change: |
     Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
