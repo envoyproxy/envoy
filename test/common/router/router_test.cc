@@ -4698,9 +4698,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
               putResult(_, absl::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-  EXPECT_EQ(0U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
-            .value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 
   // We expect the 5xx response to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
@@ -4735,9 +4735,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
                 .value());
   // General upstream_rq_503 should be 0 because the 503 was retried (not a final response)
-  EXPECT_EQ(0U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
-                .value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
@@ -4838,13 +4838,13 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
                 .value());
   // General upstream_rq_503 should be 0 because both 503s were retried (not final responses)
-  EXPECT_EQ(0U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503")
-                .value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
   // Only the final 200 response should be counted
-  EXPECT_EQ(1U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200")
-                .value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_200")
                     .value());
