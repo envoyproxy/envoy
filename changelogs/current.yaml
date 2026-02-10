@@ -147,7 +147,8 @@ new_features:
     can now be loaded by an Envoy binary of v1.39.
 - area: dynamic modules
   change: |
-    Added support for dynamic modules authors to register any combination of http, network, listener, udp listener, and bootstrap filters in the rust SDK.
+    Added support for dynamic modules authors to register any combination of http, network,
+    listener, UDP listener, and bootstrap filters in the rust SDK.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
