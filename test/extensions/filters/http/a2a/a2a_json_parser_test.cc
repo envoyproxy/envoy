@@ -414,6 +414,55 @@ TEST_F(A2aJsonParserTest, ParseMessageSend) {
             "text/plain");
 }
 
+TEST_F(A2aJsonParserTest, ParseMessageSendChunks) {
+  const std::string part1 = R"({
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "id": "123",
+    "params": {
+      "taskId": "task-abc-987",
+      "message": {
+        "taskId": "task1")";
+
+  const std::string part2 = R"(,
+        "contextId": "context1",
+        "messageId": "msg1",
+        "role": "user",
+        "parts": [
+          {
+            "type": "text",
+            "text": "Can you analyze the attached CSV for Q3 sales trends?"
+          }
+        ]
+      }
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(part1).ok());
+  ASSERT_TRUE(parser_.parse(part2).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "message/send");
+  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
+
+  // Verify some fields to ensure partial parsing worked
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
+      "task-abc-987");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("message")
+                .struct_value()
+                .fields()
+                .at("taskId")
+                .string_value(),
+            "task1");
+}
+
 TEST_F(A2aJsonParserTest, ParseTasksGet) {
   const std::string json = R"({
     "jsonrpc": "2.0",

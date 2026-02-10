@@ -93,6 +93,8 @@ void A2aParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
   always_extract_.insert("jsonrpc");
   always_extract_.insert("method");
+  // TODO(tyxia) id is required for requests that expect a response. id is NOT present for
+  // notifications.
   always_extract_.insert("id");
 
   addMethodConfig(A2aConstants::Methods::MESSAGE_SEND, getMessageSendRules());
