@@ -47,7 +47,7 @@ Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_he
   const auto format_value = Utility::formatParam(admin_stream.queryParams());
   const auto filter_value = admin_stream.queryParams().getFirstValue("filter");
 
-  std::optional<re2::RE2> re2_filter;
+  std::optional<const re2::RE2> re2_filter;
   if (filter_value.has_value() && !filter_value.value().empty()) {
     re2::RE2::Options options;
     options.set_log_errors(false);
@@ -120,7 +120,7 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsJson(const std::optional<re2::RE2>& filter,
+void ClustersHandler::writeClustersAsJson(const std::optional<const re2::RE2>& filter,
                                           Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
@@ -215,7 +215,7 @@ void ClustersHandler::writeClustersAsJson(const std::optional<re2::RE2>& filter,
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsText(const std::optional<re2::RE2>& filter,
+void ClustersHandler::writeClustersAsText(const std::optional<const re2::RE2>& filter,
                                           Buffer::Instance& response) {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -290,7 +290,7 @@ void ClustersHandler::writeClustersAsText(const std::optional<re2::RE2>& filter,
 }
 
 bool ClustersHandler::shouldIncludeCluster(const std::string& cluster_name,
-                                           const std::optional<re2::RE2>& filter) {
+                                           const std::optional<const re2::RE2>& filter) {
   return !filter.has_value() || re2::RE2::PartialMatch(cluster_name, filter.value());
 }
 void ClustersHandler::addOutlierInfo(const std::string& cluster_name,

@@ -37,9 +37,10 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-  bool shouldIncludeCluster(const std::string& cluster_name, const std::optional<re2::RE2>& filter);
-  void writeClustersAsJson(const std::optional<re2::RE2>& filter, Buffer::Instance& response);
-  void writeClustersAsText(const std::optional<re2::RE2>& filter, Buffer::Instance& response);
+  bool shouldIncludeCluster(const std::string& cluster_name,
+                            const std::optional<const re2::RE2>& filter);
+  void writeClustersAsJson(const std::optional<const re2::RE2>& filter, Buffer::Instance& response);
+  void writeClustersAsText(const std::optional<const re2::RE2>& filter, Buffer::Instance& response);
 };
 
 } // namespace Server
