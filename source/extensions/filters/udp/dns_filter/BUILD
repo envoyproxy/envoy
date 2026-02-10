@@ -34,7 +34,6 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listener_interface",
-        "//envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/common:radix_tree_lib",
