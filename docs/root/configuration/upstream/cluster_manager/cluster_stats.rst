@@ -284,7 +284,7 @@ sent to the downstream client because they triggered a retry:
   :widths: 1, 1, 2
 
   ``upstream_rq_<\*xx>``, Counter, "Aggregate HTTP response codes that triggered retry (e.g., 5xx)"
-  ``upstream_rq``_<\*>, Counter, "Specific HTTP response codes that triggered retry (e.g., ``503``)"
+  ``upstream_rq_<\*>``, Counter, "Specific HTTP response codes that triggered retry (e.g., ``503``)"
 
 .. note::
    These counters are incremented when a response triggers a retry and is **not** forwarded
