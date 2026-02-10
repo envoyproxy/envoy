@@ -3932,64 +3932,75 @@ macro_rules! declare_network_filter_init_functions {
   };
 }
 
-/// Declare the init functions for the dynamic module with both HTTP and Network filter support.
+/// Declare the init functions for the dynamic module with any combination of filter types.
 ///
-/// This macro allows a single module to provide both HTTP filters and Network filters.
+/// This macro allows a single module to provide any combination of HTTP, Network, Listener,
+/// UDP Listener, and Bootstrap filters.
 ///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
 ///
-/// The second argument has [`NewHttpFilterConfigFunction`] type, and it is called when the new
-/// HTTP filter configuration is created.
+/// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be
+/// registered.
+/// Supported filters:
+/// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters
+/// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters
+/// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
+/// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
+/// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 ///
-/// The third argument has [`NewNetworkFilterConfigFunction`] type, and it is called when the new
-/// Network filter configuration is created.
+/// # Examples
 ///
-/// # Example
-///
+/// HTTP only:
 /// ```ignore
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// declare_all_init_functions!(my_program_init,
+///     http: my_new_http_filter_config_fn,
+/// );
+/// ```
 ///
-/// declare_all_init_functions!(my_program_init, my_new_http_filter_config_fn, my_new_network_filter_config_fn);
-///
-/// fn my_program_init() -> bool {
-///   true
-/// }
-///
-/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-///   _envoy_filter_config: &mut EC,
-///   _name: &str,
-///   _config: &[u8],
-/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
-///   Some(Box::new(MyHttpFilterConfig {}))
-/// }
-///
-/// fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
-///   _envoy_filter_config: &mut EC,
-///   _name: &str,
-///   _config: &[u8],
-/// ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
-///   Some(Box::new(MyNetworkFilterConfig {}))
-/// }
+/// Network + UDP Listener:
+/// ```ignore
+/// declare_all_init_functions!(my_program_init,
+///     network: my_new_network_filter_config_fn,
+///     udp_listener: my_new_udp_listener_filter_config_fn,
+/// );
 /// ```
 #[macro_export]
 macro_rules! declare_all_init_functions {
-  ($f:ident, $new_http_filter_config_fn:expr, $new_network_filter_config_fn:expr) => {
+  ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init(
-      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
-    ) -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_network_filter_config_fn);
-      if ($f(server_factory_context_ptr)) {
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      $(
+        declare_all_init_functions!(@register $filter_type : $filter_fn);
+      )+
+      if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
       }
     }
+  };
+
+  (@register http : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register network : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register udp_listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register bootstrap : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
   };
 }
 
