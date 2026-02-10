@@ -30,8 +30,8 @@
 #include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "quiche_platform_impl/quiche_flags_impl.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {

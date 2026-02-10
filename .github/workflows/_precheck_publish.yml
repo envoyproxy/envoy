@@ -33,7 +33,8 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     with:
       arch: ${{ matrix.arch }}
-      bazel-cache: true
+      bazel-cache: ${{ matrix.bazel-cache != 'DISABLE' }}
+      bazel-cache-output-base: ${{ matrix.bazel-cache-output-base || 'base' }}
       bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
@@ -66,8 +67,15 @@ jobs:
           rbe: true
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           timeout-minutes: 180
+        - target: config
+          name: Config
+          bazel-cache: true
+          bazel-cache-output-base: docs
+          rbe: true
         - target: docs
           name: Docs
+          bazel-cache: true
+          bazel-cache-output-base: docs
           bazel-extra: >-
             --config=rbe
             --config=docs-ci

@@ -1,5 +1,4 @@
 #include "contrib/postgres_proxy/filters/network/source/postgres_filter.h"
-#include "postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
