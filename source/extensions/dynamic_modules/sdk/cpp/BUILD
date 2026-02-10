@@ -42,17 +42,8 @@ cc_library(
     name = "sdk_fake",
     hdrs = ["sdk_fake.h"],
     visibility = ["//visibility:public"],
-    deps = [":sdk"],
-)
-
-# Mock implementations for plugin handle interfaces.
-# Used for testing.
-cc_library(
-    name = "sdk_mocks",
-    hdrs = ["sdk_mocks.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":sdk",
-        "@googletest//:gtest",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

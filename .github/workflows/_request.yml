@@ -129,6 +129,16 @@ jobs:
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-arm64
         wf-path: .github/workflows/request.yml
+    - id: cache-id-bazel-docs-x64
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      with:
+        name: ${{ steps.bazel-cache-hash.outputs.value }}-docs-x64
+        wf-path: .github/workflows/request.yml
+    - id: cache-id-bazel-external-x64
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      with:
+        name: ${{ steps.bazel-cache-hash.outputs.value }}-external-x64
+        wf-path: .github/workflows/request.yml
 
     - name: Environment data
       uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
@@ -140,6 +150,8 @@ jobs:
               hash: ${{ steps.bazel-cache-hash.outputs.value }}
               arm64: ${{ steps.cache-id-bazel-arm64.outputs.id || '' }}
               x64: ${{ steps.cache-id-bazel-x64.outputs.id || '' }}
+              docs-x64: ${{ steps.cache-id-bazel-docs-x64.outputs.id || '' }}
+              external-x64: ${{ steps.cache-id-bazel-external-x64.outputs.id || '' }}
           env: ${{ steps.env.outputs.data }}
           title: ${{ steps.summary.outputs.title }}
           link: ${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
@@ -185,6 +197,8 @@ jobs:
           bazel:
             x64: ${{ steps.cache-id-bazel-x64.outputs.id || '' }}
             arm64: ${{ steps.cache-id-bazel-arm64.outputs.id || '' }}
+            docs-x64: ${{ steps.cache-id-bazel-docs-x64.outputs.id || '' }}
+            external-x64: ${{ steps.cache-id-bazel-external-x64.outputs.id || '' }}
           docker:
             x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
             arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}

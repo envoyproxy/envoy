@@ -30,10 +30,13 @@ constexpr absl::string_view kGatewayName = "envoy-mcp-gateway";
 constexpr absl::string_view kGatewayVersion = "1.0.0";
 constexpr absl::string_view kProtocolVersion = "2025-06-18";
 
+constexpr absl::string_view kContentTypeJson = "application/json";
+constexpr absl::string_view kContentTypeSse = "text/event-stream";
+
 void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
   // Headers that we set explicitly or should not be forwarded
   static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
-      ":method", ":path", ":authority", "host", "content-type", kSessionIdHeader};
+      ":method", ":path", ":authority", "host", "content-type", "accept", kSessionIdHeader};
 
   source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key = header.key().getStringView();
@@ -76,55 +79,6 @@ McpMethod parseMethodString(absl::string_view method_str) {
   return it != mcpMethodMap().end() ? it->second : McpMethod::Unknown;
 }
 
-BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
-                                               std::function<void(BackendResponse)> on_complete)
-    : backend_name_(backend_name), on_complete_(std::move(on_complete)) {
-  response_.backend_name = backend_name;
-}
-
-void BackendStreamCallbacks::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
-  if (headers && headers->Status()) {
-    response_.status_code = Http::Utility::getResponseStatus(*headers);
-    response_.success = (response_.status_code >= 200 && response_.status_code < 300);
-
-    // Extract session ID from response header
-    auto session_header = headers->get(Http::LowerCaseString(std::string(kSessionIdHeader)));
-    if (!session_header.empty()) {
-      response_.session_id = std::string(session_header[0]->value().getStringView());
-    }
-  }
-
-  if (end_stream) {
-    complete();
-  }
-}
-
-void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
-  response_.body.append(data.toString());
-  if (end_stream) {
-    complete();
-  }
-}
-
-void BackendStreamCallbacks::onTrailers(Http::ResponseTrailerMapPtr&&) { complete(); }
-
-void BackendStreamCallbacks::onComplete() { complete(); }
-
-void BackendStreamCallbacks::onReset() {
-  response_.success = false;
-  response_.error = "Stream reset";
-  complete();
-}
-
-void BackendStreamCallbacks::complete() {
-  if (!completed_) {
-    completed_ = true;
-    ENVOY_LOG(debug, "Backend '{}' complete: status={}, body_size={}", backend_name_,
-              response_.status_code, response_.body.size());
-    on_complete_(std::move(response_));
-  }
-}
-
 McpRouterFilter::McpRouterFilter(McpRouterConfigSharedPtr config)
     : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())) {}
 
@@ -136,6 +90,8 @@ void McpRouterFilter::onDestroy() {
   }
   stream_callbacks_.clear();
   upstream_headers_.clear();
+  aggregation_callback_ = nullptr;
+  single_backend_callback_ = nullptr;
 }
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -632,13 +588,19 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
     auto expected_count = expected;
     auto agg_callback = aggregation_callback_;
 
+    // Pass request_id and aggregate_mode=true for fanout operations.
+    // This enables early completion when SSE backends return a valid JSON-RPC response,
+    // avoiding the need to wait for end_stream (which never comes for SSE).
+    // Pass parent weak_ptr to enable intermediate event (notification/server request) forwarding.
     auto stream_cb = std::make_shared<BackendStreamCallbacks>(
-        backend.name, [responses, count, expected_count, agg_callback](BackendResponse resp) {
+        backend.name,
+        [responses, count, expected_count, agg_callback](BackendResponse resp) {
           responses->push_back(std::move(resp));
           if (++(*count) >= expected_count && agg_callback) {
             agg_callback(std::move(*responses));
           }
-        });
+        },
+        request_id_, true /* aggregate_mode */, weak_from_this());
 
     // Create per-backend StreamOptions with the backend-specific timeout.
     Http::AsyncClient::StreamOptions backend_options;
@@ -683,6 +645,12 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
 
 void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
                                               std::function<void(BackendResponse)> callback) {
+  initializeSingleBackend(backend, std::move(callback), false);
+}
+
+void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
+                                              std::function<void(BackendResponse)> callback,
+                                              bool streaming_enabled) {
   if (!muxdemux_->isIdle()) {
     ENVOY_LOG(warn, "MuxDemux not idle, cannot start new single backend request for '{}'",
               backend.name);
@@ -693,7 +661,9 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
   }
 
   single_backend_callback_ = std::move(callback);
-  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_);
+  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_,
+                                                            request_id_, false /* aggregate_mode */,
+                                                            weak_from_this(), streaming_enabled);
   stream_callbacks_.push_back(stream_cb);
 
   Http::AsyncClient::StreamOptions options;
@@ -742,6 +712,61 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+void McpRouterFilter::pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  // Remove backend's session ID and replace with the request's session ID.
+  headers->remove(Http::LowerCaseString("mcp-session-id"));
+  if (!encoded_session_id_.empty()) {
+    headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+  }
+
+  ENVOY_LOG(debug, "SSE streaming: forwarding headers to client, end_stream={}", end_stream);
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "mcp_router");
+}
+
+void McpRouterFilter::pushSseData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "SSE streaming: forwarding {} bytes, end_stream={}", data.length(), end_stream);
+  decoder_callbacks_->encodeData(data, end_stream);
+}
+
+void McpRouterFilter::pushSseEvent(const std::string& backend_name, const std::string& event_data,
+                                   SseMessageType event_type) {
+  ENVOY_LOG(debug, "SSE aggregation: forwarding {} event from backend '{}' (size {})",
+            event_type == SseMessageType::Notification ? "notification" : "server_request",
+            backend_name, event_data.size());
+
+  // Send SSE headers on first intermediate event (converts response from JSON to SSE).
+  if (!sse_headers_sent_) {
+    auto headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    headers->setContentType("text/event-stream");
+    headers->addCopy(Http::LowerCaseString("cache-control"), "no-cache");
+    if (!encoded_session_id_.empty()) {
+      headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+    }
+    ENVOY_LOG(debug, "SSE aggregation: sending SSE headers to client");
+    decoder_callbacks_->encodeHeaders(std::move(headers), false, "mcp_router");
+    sse_headers_sent_ = true;
+  }
+
+  // TODO(botengyao): Transform server-to-client request IDs for proper routing.
+  // For ServerRequest events (roots/list, sampling/createMessage), the ID needs to be
+  // prefixed with backend_name so client responses can be routed back correctly.
+
+  // Format and send the SSE event to client.
+  Buffer::OwnedImpl buffer;
+  buffer.add("event: message\ndata: ");
+  buffer.add(event_data);
+  buffer.add("\n\n");
+  decoder_callbacks_->encodeData(buffer, false);
+}
+
+void McpRouterFilter::onStreamingError(absl::string_view error) {
+  ENVOY_LOG(warn, "SSE streaming error: {}", error);
+  sendHttpError(500, std::string(error));
+}
+
+void McpRouterFilter::onStreamingComplete() { ENVOY_LOG(debug, "SSE streaming: complete"); }
+
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
@@ -762,9 +787,14 @@ void McpRouterFilter::handleInitialize() {
     }
   }
 
-  initializeFanout([this, subject = std::move(subject)](std::vector<BackendResponse> responses) {
-    // TODO(botengyao): handle text/event-stream from backends.
-    std::string response_body = aggregateInitialize(responses);
+  initializeFanout([weak_self = weak_from_this(),
+                    subject = std::move(subject)](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "Initialize callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateInitialize(responses);
 
     absl::flat_hash_map<std::string, std::string> sessions;
     for (const auto& resp : responses) {
@@ -774,24 +804,30 @@ void McpRouterFilter::handleInitialize() {
     }
 
     if (sessions.empty()) {
-      sendHttpError(500, "All backends failed to initialize");
+      self->sendHttpError(500, "All backends failed to initialize");
       return;
     }
 
-    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, subject, sessions);
+    std::string composite =
+        SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
     std::string encoded_session = SessionCodec::encode(composite);
 
-    sendJsonResponse(response_body, encoded_session);
+    self->sendJsonResponse(response_body, encoded_session);
   });
 }
 
 void McpRouterFilter::handleToolsList() {
   ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregateToolsList(responses);
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "tools/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateToolsList(responses);
     ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
   });
 }
 
@@ -809,20 +845,36 @@ void McpRouterFilter::handleToolsCall() {
     return;
   }
 
-  // Store the unprefixed tool name for body rewriting
+  // Store the unprefixed tool name for body rewriting.
   unprefixed_tool_name_ = actual_tool;
   needs_body_rewrite_ = (tool_name_ != unprefixed_tool_name_);
 
   ENVOY_LOG(debug, "tools/call: backend='{}', tool='{}' -> '{}', needs_rewrite={}", backend_name,
             tool_name_, actual_tool, needs_body_rewrite_);
 
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
-    if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
-    } else {
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
-    }
-  });
+  // Use streaming mode for SSE pass-through, with fallback for JSON responses.
+  initializeSingleBackend(
+      *backend,
+      [weak_self = weak_from_this()](BackendResponse resp) {
+        auto self = weak_self.lock();
+        if (!self) {
+          return;
+        }
+        // This callback is invoked for non-SSE responses (JSON) or errors.
+        // SSE responses are streamed directly by the parent filter.
+        if (resp.success) {
+          if (resp.isSse()) {
+            // Should not reach here for successful SSE in streaming mode.
+            ENVOY_LOG(warn, "tools/call: SSE response reached non-streaming path");
+            self->sendHttpError(500, "Internal error: streaming failed for SSE response");
+          } else {
+            self->sendJsonResponse(resp.body, self->encoded_session_id_);
+          }
+        } else {
+          self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+        }
+      },
+      true /* streaming_enabled */);
 }
 
 void McpRouterFilter::handlePing() {
@@ -840,10 +892,25 @@ void McpRouterFilter::handleNotification(absl::string_view notification_name) {
 
   // Forward notification to all backends and wait for responses.
   // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
-  initializeFanout([this](std::vector<BackendResponse>) {
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse>) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "notifications/initialized callback ignored: filter destroyed");
+      return;
+    }
     // All backends have responded (or failed), send 202 to client.
-    sendAccepted();
+    self->sendAccepted();
   });
+}
+
+std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
+  const std::string& result = response.getJsonRpc();
+  ENVOY_LOG(debug,
+            "extractJsonRpcFromResponse: backend='{}', content_type={}, body_size={}, "
+            "extracted_size={}",
+            response.backend_name, static_cast<int>(response.content_type), response.body.size(),
+            result.size());
+  return result;
 }
 
 void McpRouterFilter::handleResourcesList() {
@@ -1119,8 +1186,9 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
     if (!resp.success) {
       continue;
     }
-    ENVOY_LOG(debug, "Aggregating tools from backend '{}'", resp.backend_name);
-    extractAndPrefixTools(resp.body, resp.backend_name, is_multiplexing, all_tools);
+    std::string json_body = extractJsonRpcFromResponse(resp);
+    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, json_body);
+    extractAndPrefixTools(json_body, resp.backend_name, is_multiplexing, all_tools);
   }
 
   return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{"tools":[)",
@@ -1341,16 +1409,20 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
                                        const std::string& backend_session_id) {
   auto headers = Http::RequestHeaderMapImpl::create();
 
-  // Set required headers for MCP backend
+  // Set required headers for MCP backend.
   headers->setMethod(Http::Headers::get().MethodValues.Post);
   headers->setPath(backend.path);
-  // Use host_rewrite_literal if configured, otherwise pass through original host
+  // Use host_rewrite_literal if configured, otherwise pass through original host.
   if (!backend.host_rewrite_literal.empty()) {
     headers->setHost(backend.host_rewrite_literal);
   } else if (request_headers_ != nullptr) {
     headers->setHost(request_headers_->getHostValue());
   }
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
+
+  // Accept both JSON and SSE responses.
+  headers->addCopy(Http::LowerCaseString("accept"),
+                   absl::StrCat(kContentTypeSse, ", ", kContentTypeJson));
 
   if (!backend_session_id.empty()) {
     headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
@@ -1400,9 +1472,21 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 }
 
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
+  // If SSE headers were already sent (due to intermediate events), send response as SSE event.
+  if (sse_headers_sent_) {
+    ENVOY_LOG(debug, "Sending aggregated response as SSE event: {}", body);
+    Buffer::OwnedImpl response_body;
+    response_body.add("event: message\ndata: ");
+    response_body.add(body);
+    response_body.add("\n\n");
+    decoder_callbacks_->encodeData(response_body, true);
+    return;
+  }
+
+  // Standard JSON response path.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
   headers->setContentLength(body.length());
 
   if (!session_id.empty()) {

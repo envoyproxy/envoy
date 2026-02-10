@@ -1,3 +1,5 @@
+#include "source/exe/service_base.h"
+
 #include <codecvt>
 #include <locale>
 
@@ -6,7 +8,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/event/signal_impl.h"
 #include "source/exe/main_common.h"
-#include "source/exe/service_base.h"
 
 #include "absl/debugging/symbolize.h"
 
