@@ -63,6 +63,13 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.filters.network.http_connection_manager.local_reply_owner``
   Shared filter status for logging which filter config name in the HTTP filter chain sent the local reply.
 
+``envoy.network.transport_socket.http_11_proxy.info``
+  Sets per-request HTTP/1.1 proxy information for upstream connections. This is used to inform the http_11_proxy
+  transport socket of the proxy information for the upstream connection.
+  Accepts a constructor string of the form ``"<target_host:port>,<proxy_ip:port>"``. If ``proxy_ip`` is an IPv6
+  address, it must use bracket notation (for example, ``[::1]:15002``). For example:
+  ``"example.com:443,127.0.0.1:15002"`` or ``"example.com:443,[::1]:15002"``.
+
 ``envoy.tcp_proxy.per_connection_idle_timeout_ms``
   :ref:`TCP proxy idle timeout duration
   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
