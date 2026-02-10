@@ -633,6 +633,26 @@ TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigSet) {
             "abc");
 }
 
+// TODO(tyxia) Handle unreconnized methods/fields.
+TEST_F(A2aJsonParserTest, ParseUnrecognizedMethod) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "unknown/method",
+    "id": "123",
+    "params": {
+      "someField": "someValue"
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "unknown/method");
+  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
+  // params should not be extracted for unknown method
+  EXPECT_FALSE(parser_.metadata().fields().contains("params"));
+}
+
 TEST_F(A2aJsonParserTest, InvalidJson) {
   // Invalid JSON (truncated)
   const std::string json = R"({
