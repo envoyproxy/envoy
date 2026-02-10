@@ -103,12 +103,12 @@ message Config {
   // Configuration for a gauge stat. Gauges can be used to add, subtract, or set
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
+  // [#next-free-field: 6]
   message Gauge {
     // The Set operation config.
     message Set {
       // The access log type to trigger the operation.
-      envoy.data.accesslog.v3.AccessLogType log_type = 1
-          [(validate.rules).enum = { defined_only: true }];
+      data.accesslog.v3.AccessLogType log_type = 1 [(validate.rules).enum = {defined_only: true}];
     }
 
     // The PairedAddSubtract operation config.
