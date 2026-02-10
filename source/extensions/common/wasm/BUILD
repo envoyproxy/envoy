@@ -16,7 +16,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/config:typed_config_interface",
-        "@proxy_wasm_cpp_host//:wasm_vm_headers",
+        "@proxy-wasm-cpp-host//:wasm_vm_headers",
     ],
     alwayslink = 1,
 )
@@ -49,8 +49,8 @@ envoy_cc_library(
         "@cel-cpp//eval/public:activation",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:headers",
-        "@proxy_wasm_cpp_sdk//:common_lib",
+        "@proxy-wasm-cpp-host//:headers",
+        "@proxy-wasm-cpp-sdk//:common_lib",
     ],
     alwayslink = 1,
 )
@@ -125,8 +125,8 @@ envoy_cc_extension(
         "@cel-cpp//eval/public/containers:field_backed_map_impl",
         "@cel-cpp//eval/public/structs:cel_proto_wrapper",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:base_lib",
-        "@proxy_wasm_cpp_host//:null_lib",
+        "@proxy-wasm-cpp-host//:base_lib",
+        "@proxy-wasm-cpp-host//:null_lib",
     ] + select(
         {
             "//bazel:windows_x86_64": [],

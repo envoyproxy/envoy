@@ -19,12 +19,22 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
+common --enable_bzlmod
+common --noenable_workspace
+common --//bazel:enable_bzlmod=True
 
 fetch --color=yes
 run --color=yes
-
 build --color=yes
+
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/toolshed/76cd5dfaf0f479849544d8258f8007e3daa4c347/bazel-registry
+common --registry=https://raw.githubusercontent.com/phlax/bazel-central-registry/b739c7fa56b971d695af9600b88099236dcfef76
+
+# common --registry=file:///toolshed/bazel-registry
+# common --registry=https://raw.githubusercontent.com/envoyproxy/toolshed/824ecbcaff66b9a353a3bc1da57c62834e5ab7bf/bazel-registry  # 0.0.2-dev
+# this can be useful for dev# common --lockfile_mode=off
+
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
@@ -61,10 +71,6 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
-# Python
-common --@rules_python//python/config_settings:bootstrap_impl=script
-build --incompatible_default_to_explicit_init_py
-
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
@@ -78,8 +84,37 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+
+#############################################################################
+# global: deps
+#############################################################################
+
+# Python
+common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
+
+# Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
+# grpc
+build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
+build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+
+# kafka
+build --@librdkafka//:with_ssl=false
+build --@librdkafka//:with_zlib=false
+build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
+
+# protobuf
+common --incompatible_enable_proto_toolchain_resolution=true
+common --@com_google_protobuf//bazel/toolchains:prefer_prebuilt_protoc
+common --@com_google_protobuf//:zlib=@zlib-ng
+# these are here to detect if the toolchain attempts to compile protoc
+common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
+
+# proxy-wasm-cpp-host
+common --@proxy-wasm-cpp-host//bazel:crypto_lib=//bazel:crypto
 
 
 #############################################################################
@@ -162,6 +197,26 @@ build:libstdc++ --@envoy//bazel:libstdc++=true
 
 
 #############################################################################
+# SSL
+#############################################################################
+
+common:fips-common --build_tag_filters=-nofips
+common:fips-common --test_tag_filters=-nofips
+
+build:fips --define=boringssl=fips
+build:fips --config=fips-common
+build:fips --//bazel:crypto=@boringssl-fips//:crypto
+build:fips --//bazel:ssl=@boringssl-fips//:ssl
+
+build:aws-lc-fips --define=aws_lc=fips
+build:aws-lc-fips --config=fips-common
+build:aws-lc-fips --//bazel:http3=False
+build:aws-lc-fips --@proxy-wasm-cpp-host//bazel:crypto_lib=@aws-lc-fips//:crypto
+build:aws-lc-fips --@grpc//third_party:ssl_lib=@aws-lc-fips//:ssl
+build:aws-lc-fips --@grpc//third_party:crypto_lib=@aws-lc-fips//:crypto
+
+
+#############################################################################
 # tests
 #############################################################################
 
@@ -200,6 +255,7 @@ build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
 # changes, this build type may need to be broken up.
+build:compile-time-options --config=fips
 build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled

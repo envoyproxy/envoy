@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+bzlmod
 FLUSHALL
 NUMPAT
 PUBSUB
@@ -213,6 +214,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+bzlmod
 curr
 doo
 eslint
@@ -1594,6 +1596,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1670,3 +1673,4 @@ UIDs
 configurability
 WDS
 OIDC
+workspaces

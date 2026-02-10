@@ -8,6 +8,7 @@ license = "Apache-2.0"
 repository = "https://github.com/envoyproxy/envoy"
 
 [dependencies]
+log = "=0.4.27"
 mockall = "0.13.1"
 
 [build-dependencies]

@@ -229,7 +229,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "update_ack_lib",
     hdrs = ["update_ack.h"],
-    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
+    deps = ["@googleapis//google/rpc:status_cc_proto"],
 )
 
 envoy_cc_library(

@@ -1,6 +1,6 @@
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
+load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
 load("@com_google_protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
@@ -35,10 +35,10 @@ _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:struct_proto",
     "@com_google_protobuf//:timestamp_proto",
     "@com_google_protobuf//:wrappers_proto",
-    "@com_google_googleapis//google/api:http_proto",
-    "@com_google_googleapis//google/api:httpbody_proto",
-    "@com_google_googleapis//google/api:annotations_proto",
-    "@com_google_googleapis//google/rpc:status_proto",
+    "@googleapis//google/api:http_proto",
+    "@googleapis//google/api:httpbody_proto",
+    "@googleapis//google/api:annotations_proto",
+    "@googleapis//google/rpc:status_proto",
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
@@ -97,12 +97,13 @@ def api_cc_py_proto_library(
         name = cc_proto_library_name,
         linkstatic = linkstatic,
         cc_deps = [_cc_proto_mapping(dep) for dep in deps] + [
-            "@com_google_googleapis//google/api:http_cc_proto",
-            "@com_google_googleapis//google/api:httpbody_cc_proto",
-            "@com_google_googleapis//google/api:annotations_cc_proto",
-            "@com_google_googleapis//google/rpc:status_cc_proto",
+            "@googleapis//google/api:http_cc_proto",
+            "@googleapis//google/api:httpbody_cc_proto",
+            "@googleapis//google/api:annotations_cc_proto",
+            "@googleapis//google/rpc:status_cc_proto",
         ],
         deps = [relative_name],
+        re2 = "@re2",
         visibility = ["//visibility:public"],
     )
 

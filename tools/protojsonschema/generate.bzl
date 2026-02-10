@@ -1,5 +1,5 @@
 load(
-    "@rules_proto_grpc//:defs.bzl",
+    "@rules_proto_@grpc//:defs.bzl",
     "ProtoPluginInfo",
     "proto_compile_attrs",
     "proto_compile_impl",
@@ -18,5 +18,5 @@ jsonschema_compile = rule(
             doc = "List of protoc plugins to apply",
         ),
     ),
-    toolchains = [str(Label("@rules_proto_grpc//protobuf:toolchain_type"))],
+    toolchains = [str(Label("@rules_proto_@grpc//protobuf:toolchain_type"))],
 )

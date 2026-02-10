@@ -21,9 +21,6 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
-    external_http_archive(
-        name = "envoy_toolshed",
-    )
 
     # WORKSPACE-only dependencies (available in BCR for bzlmod or not needed)
     if bzlmod:
@@ -36,16 +33,19 @@ def api_dependencies(bzlmod = False):
         name = "rules_jvm_external",
     )
     external_http_archive(
-        name = "com_envoyproxy_protoc_gen_validate",
+        name = "protoc-gen-validate",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:pgv.patch"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
-        name = "com_google_googleapis",
+        name = "googleapis",
     )
     external_http_archive(
         name = "xds",
+    )
+    external_http_archive(
+        name = "envoy_toolshed",
     )
     external_http_archive(
         name = "rules_buf",
@@ -117,8 +117,8 @@ alias(
 
 # Aligned target names with https://github.com/bazelbuild/bazel-central-registry/tree/main/modules/opentelemetry-proto
 OPENTELEMETRY_BUILD_CONTENT = """
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
+load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")

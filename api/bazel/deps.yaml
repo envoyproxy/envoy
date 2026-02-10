@@ -7,7 +7,7 @@ bazel_skylib:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
-com_envoyproxy_protoc_gen_validate:
+protoc-gen-validate:
   project_name: "protoc-gen-validate (PGV)"
   project_desc: "protoc plugin to generate polyglot message validators"
   project_url: "https://github.com/bufbuild/protoc-gen-validate"
@@ -51,7 +51,7 @@ zipkin_api:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/openzipkin/zipkin-api/blob/{version}/LICENSE"
-com_google_googleapis:
+googleapis:
   project_name: "Google APIs"
   project_desc: "Public interface definitions of Google APIs"
   project_url: "https://github.com/googleapis/googleapis"

@@ -1,4 +1,4 @@
-load("@rules_proto_grpc//:defs.bzl", "proto_plugin")
+load("@rules_proto_@grpc//:defs.bzl", "proto_plugin")
 load(":generate.bzl", "jsonschema_compile")
 
 licenses(["notice"])  # Apache 2

@@ -11,6 +11,27 @@ index 9e067aa29e..089a447ec4 100644
      ],
  )
  
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 60f216d6a8..7e475404fe 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -19,6 +19,8 @@ module(
+     repo_name = "com_github_grpc_grpc",
+ )
+ 
++bazel_dep(name = "envoy", version = "")
++
+ # Regular dependencies
+ # ====================
+ 
+@@ -68,7 +70,6 @@ PYTHON_VERSIONS = [
+     "3.11",
+     "3.12",
+     "3.13",
+-    "3.14.0b2",
+ ]
+ 
+ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
 index a3b8923b6e..f4a2ed3f13 100644
 --- a/bazel/grpc_build_system.bzl
@@ -264,7 +285,7 @@ index f6165e0392..374653516a 100644
 +    visibility = ["//visibility:public"],
 +)
 diff --git a/third_party/BUILD b/third_party/BUILD
-index 13a4714d4b..8664e99ffc 100644
+index 13a4714d4b..dbb986f405 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
 @@ -33,25 +33,19 @@ config_setting(

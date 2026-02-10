@@ -683,7 +683,7 @@ envoy_extension_cc_test_library(
         "//envoy/network:address_interface",
         "//test/test_common:network_utility_lib",
         "@abseil-cpp//absl/strings:str_format",
-        "@com_github_grpc_grpc//:grpc++",
+        "@grpc//:grpc++",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_grpc",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -735,11 +735,11 @@ envoy_extension_cc_test_library(
         "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@com_github_grpc_grpc//:grpc++",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@grpc//:grpc++",
     ],
 )
 

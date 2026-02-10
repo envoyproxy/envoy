@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ENVOY_BIN=${TEST_SRCDIR}/envoy/source/exe/envoy-static
+ENVOY_BIN=${TEST_SRCDIR}/_main/source/exe/envoy-static
 
 if [[ $(uname) == "Darwin" ]]; then
     echo "macOS doesn't support statically linked binaries, skipping."
