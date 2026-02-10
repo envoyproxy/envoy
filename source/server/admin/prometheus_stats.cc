@@ -602,11 +602,11 @@ private:
 
       for (int32_t idx = lower_index; idx <= upper_index; ++idx) {
         indices.insert(idx);
-      }
 
-      // Early termination if we've exceeded the limit
-      if (max_buckets.has_value() && indices.size() > *max_buckets) {
-        return absl::nullopt;
+        // Early termination if we've exceeded the limit
+        if (max_buckets.has_value() && indices.size() > *max_buckets) {
+          return absl::nullopt;
+        }
       }
     }
 
