@@ -1239,9 +1239,9 @@ TEST_F(RouterTest, OutlierDetectionFivexxTakesPriorityOverDegraded) {
   response_headers->setEnvoyDegraded("");
 
   // Should report failed, not degraded (5xx takes priority)
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed,
-                        absl::optional<uint64_t>(503)));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -1262,9 +1262,9 @@ TEST_F(RouterTest, OutlierDetectionSuccessResponseWithoutDegradedHeader) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
 
   // Should report success
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess,
-                        absl::optional<uint64_t>(200)));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, absl::optional<uint64_t>(200)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
