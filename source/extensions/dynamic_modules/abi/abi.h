@@ -6031,6 +6031,301 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
 
+// =============================================================================
+// =============================== Load Balancer ===============================
+// =============================================================================
+//
+// This extension enables custom load balancing algorithms via dynamic modules.
+// The module implements the host selection logic while Envoy handles cluster
+// management, health checking, and connection pooling.
+//
+// The module only needs to implement the chooseHost event hook which receives
+// host information and context to make a selection decision.
+
+// =============================================================================
+// Load Balancer Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_lb_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleLbConfig class in Envoy. This is passed to the module when
+ * creating a new in-module load balancer configuration.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_lb_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_config_module_ptr is a pointer to an in-module
+ * load balancer configuration. This is created by the module when the
+ * configuration is loaded.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_lb_config_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_lb_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_envoy_ptr is a raw pointer to the
+ * DynamicModuleLoadBalancer class in Envoy. This is passed to the module for callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the event hook calls.
+ */
+typedef void* envoy_dynamic_module_type_lb_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_module_ptr is a pointer to an in-module
+ * load balancer instance. This is created per worker thread.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_lb_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_lb_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_context_envoy_ptr is a raw pointer to the
+ * LoadBalancerContext in Envoy. This is passed to the module during chooseHost.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the chooseHost call.
+ */
+typedef void* envoy_dynamic_module_type_lb_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_host_health represents the health status of an upstream host.
+ */
+typedef enum {
+  // Host is unhealthy and should not be used for traffic.
+  envoy_dynamic_module_type_host_health_Unhealthy = 0,
+  // Host is healthy but degraded. It can receive traffic but healthy hosts are preferred.
+  envoy_dynamic_module_type_host_health_Degraded = 1,
+  // Host is healthy and can receive traffic.
+  envoy_dynamic_module_type_host_health_Healthy = 2,
+} envoy_dynamic_module_type_host_health;
+
+// =============================================================================
+// Load Balancer Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_lb_config_new is called by the main thread when
+ * a new load balancer configuration is loaded.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the Envoy load balancer config object.
+ * @param name is the name identifying the load balancer implementation in the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_lb_config_module_ptr is the pointer to
+ * the in-module configuration. Returning nullptr indicates a failure and the configuration will
+ * be rejected.
+ */
+envoy_dynamic_module_type_lb_config_module_ptr envoy_dynamic_module_on_lb_config_new(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_lb_config_destroy is called when the load balancer
+ * configuration is destroyed. The module should release any resources associated with it.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ */
+void envoy_dynamic_module_on_lb_config_destroy(
+    envoy_dynamic_module_type_lb_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_lb_new is called when a new load balancer instance is
+ * created for a worker thread.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object for callbacks.
+ * @return envoy_dynamic_module_type_lb_module_ptr is the pointer to the in-module
+ * load balancer instance. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_lb_module_ptr
+envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr config_module_ptr,
+                               envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_lb_choose_host is called when a host needs to be selected
+ * for an upstream request. The module should return the index of the selected host.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext (may be null).
+ * @return the index of the selected host in the healthy hosts list, or a negative value
+ *         if no host should be selected (which will result in no upstream connection).
+ */
+int64_t envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
+ * destroyed. The module should release any resources associated with it.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ */
+void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr);
+
+// =============================================================================
+// Load Balancer Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_lb_get_cluster_name returns the name of the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param result is the output for the cluster name.
+ */
+void envoy_dynamic_module_callback_lb_get_cluster_name(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_hosts_count returns the number of all hosts
+ * in the cluster (across all priorities and health states).
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of all hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_hosts_count returns the number of healthy hosts
+ * in the cluster at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of healthy hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_healthy_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_degraded_hosts_count returns the number of degraded hosts
+ * in the cluster at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of degraded hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_priority_set_size returns the number of priority levels
+ * in the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @return the number of priority levels.
+ */
+size_t envoy_dynamic_module_callback_lb_get_priority_set_size(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_host_address returns the address of a host
+ * by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_host_weight returns the load balancing weight
+ * of a host by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_health returns the health status of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_health(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from
+ * the load balancer context.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param hash_out is the output for the computed hash.
+ * @return true if a hash was computed, false if the context is null or no hash is available.
+ */
+bool envoy_dynamic_module_callback_lb_context_compute_hash_key(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size returns
+ * the number of downstream request headers. Combined with
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers, this can be used to iterate
+ * over all downstream request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @return the number of headers, or 0 if context is null or headers are not available.
+ */
+size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers is called by the module to get
+ * all the downstream request headers. The headers are returned as an array of
+ * envoy_dynamic_module_type_envoy_http_header.
+ *
+ * PRECONDITION: The module must ensure that the result_headers is valid and has enough length to
+ * store all the headers. The module can use
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size to get the number of
+ * headers before calling this function.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param result_headers is the pointer to the array of envoy_dynamic_module_type_envoy_http_header
+ * where the headers will be stored. The lifetime of the buffer of key and value of each header is
+ * guaranteed until the end of the current choose_host callback.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_header is called by the module to get
+ * the value of the downstream request header with the given key. Since a header can have multiple
+ * values, the index is used to get the specific value. This returns the number of values for the
+ * given key via optional_size, so it can be used to iterate over all values by starting from 0 and
+ * incrementing the index until the return value.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param key is the key of the header.
+ * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
+ * the index is out of range, this will be set to a null buffer (length 0).
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param optional_size is the pointer to the variable where the number of values for the given key
+ * will be stored.
+ * NOTE: This parameter is optional and can be null if the module does not need this information.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
 #ifdef __cplusplus
 }
 #endif
