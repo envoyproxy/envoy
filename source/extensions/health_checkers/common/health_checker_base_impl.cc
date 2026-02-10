@@ -172,11 +172,12 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
 
 void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
-  // Skip adding hosts while cluster is still warming (e.g., waiting for SDS secrets).
-  // start() will add all existing hosts after warming completes.
-  if (cluster_.info()->configUpdateStats().warming_state_.value() == 0) {
-    addHosts(hosts_added);
+  // Skip processing updates while cluster is still warming (e.g., waiting for SDS secrets).
+  // All existing hosts will be added when start() is called.
+  if (!started_) {
+    return;
   }
+  addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
     if (host->disableActiveHealthCheck()) {
       continue;
@@ -235,6 +236,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
 }
 
 void HealthCheckerImplBase::start() {
+  started_ = true;
   for (auto& host_set : cluster_.prioritySet().hostSetsPerPriority()) {
     addHosts(host_set->hosts());
   }
