@@ -355,7 +355,7 @@ message TcpProxy {
   // .. note::
   //   To ensure the TLVs are allowed upstream, configure passthrough TLVs on the upstream
   //   proxy protocol transport. See :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs
-  //   <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`.
+  //   <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>` for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 
   // Specifies how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state
