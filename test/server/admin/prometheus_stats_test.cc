@@ -1747,11 +1747,11 @@ public:
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::AllocatorImpl alloc_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   Stats::Scope& scope_;
   NiceMock<Stats::MockSink> sink_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
