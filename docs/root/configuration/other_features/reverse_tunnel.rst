@@ -199,6 +199,22 @@ Upstream socket interface
 
 This extension enables the responder Envoy to accept and manage incoming reverse tunnel connections from initiator Envoys.
 
+Tenant isolation can be enabled at the bootstrap level by setting ``enable_tenant_isolation: true`` in the
+upstream socket interface configuration:
+
+.. literalinclude:: /_configs/reverse_connection/responder-envoy-tenant-isolation.yaml
+    :language: yaml
+    :lines: 7-13
+    :linenos:
+    :lineno-start: 7
+    :caption: :download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`
+
+When tenant isolation is enabled, Envoy scopes cached reverse tunnel sockets by tenant. The socket interface
+concatenates the tenant identifier with the node and cluster identifiers using the ``:`` delimiter (for example
+``tenant-a:node-1``). Because the delimiter is part of the composite key, handshake requests that include ``:``
+in any of the reverse tunnel headers are rejected with ``400`` to prevent ambiguous lookups. The flag defaults
+to ``false`` to preserve existing behaviour.
+
 .. _config_reverse_tunnel_network_filter:
 
 Reverse tunnel network filter
@@ -207,12 +223,6 @@ Reverse tunnel network filter
 The ``envoy.filters.network.reverse_tunnel`` network filter implements the reverse tunnel handshake
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
 parameters.
-
-When ``enable_tenant_isolation`` is set to ``true`` on the filter configuration, Envoy scopes cached
-reverse tunnel sockets by tenant. The filter concatenates the tenant identifier with the node and cluster
-identifiers using the ``:`` delimiter (for example ``tenant-a:node-1``). Because the delimiter is part of
-the composite key, handshake requests that include ``:`` in any of the reverse tunnel headers are rejected
-with ``400`` to prevent ambiguous lookups. The flag defaults to ``false`` to preserve existing behaviour.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
@@ -234,17 +244,19 @@ Each data request must include a ``host_id`` that identifies the target downstre
 specified directly in request headers or computed from them. The cluster extracts the ``host_id`` using
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
 
-When tenant isolation is enabled (via ``enable_tenant_isolation: true`` in the reverse tunnel filter),
-the cluster **must** be configured with the ``tenant_id_format`` field. The cluster automatically
-constructs tenant-scoped identifiers using the formatted tenant ID and the formatted host ID.
+When tenant isolation is enabled (via ``enable_tenant_isolation: true`` in the upstream socket interface
+bootstrap extension), the cluster **must** be configured with the ``tenant_id_format`` field. The cluster
+automatically constructs tenant-scoped identifiers using the formatted tenant ID and the formatted host ID.
 
 .. important::
 
-   When tenant isolation is enabled, ``tenant_id_format`` is **required**. The tenant identifier must
-   be inferrable from the request context (i.e., the formatter must evaluate to a non-empty value).
-   If ``tenant_id_format`` is not configured or the tenant identifier cannot be inferred, host selection
-   will fail and the request will not be routed. This ensures strict tenant isolation and prevents
-   requests from being routed without proper tenant scoping.
+   When tenant isolation is enabled in the bootstrap configuration, ``tenant_id_format`` is **required**
+   for all reverse connection clusters. Envoy will fail to start if tenant isolation is enabled but
+   ``tenant_id_format`` is not configured in any reverse connection cluster. Additionally, the tenant
+   identifier must be inferrable from the request context (i.e., the formatter must evaluate to a non-empty
+   value) at runtime. If the tenant identifier cannot be inferred, host selection will fail and the request
+   will not be routed. This ensures strict tenant isolation and prevents requests from being routed without
+   proper tenant scoping.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml

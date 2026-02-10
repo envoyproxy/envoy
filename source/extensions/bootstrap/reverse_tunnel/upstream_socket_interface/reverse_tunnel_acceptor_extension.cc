@@ -38,9 +38,10 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
   // Set up the thread-local dispatcher and socket manager.
   tls_slot_->set([this](Event::Dispatcher& dispatcher) {
     auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
-    // Propagate configured miss threshold into the socket manager.
+    // Propagate configured miss threshold and tenant isolation into the socket manager.
     if (tls->socketManager()) {
       tls->socketManager()->setMissThreshold(ping_failure_threshold_);
+      tls->socketManager()->setTenantIsolationEnabled(enable_tenant_isolation_);
     }
     return tls;
   });

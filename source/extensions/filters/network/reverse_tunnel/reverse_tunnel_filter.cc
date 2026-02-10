@@ -114,10 +114,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
-      required_cluster_name_(proto_config.required_cluster_name()),
-      enable_tenant_isolation_(proto_config.has_enable_tenant_isolation()
-                                   ? proto_config.enable_tenant_isolation().value()
-                                   : false) {}
+      required_cluster_name_(proto_config.required_cluster_name()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
@@ -322,7 +319,26 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
-  if (parent_.config_->enableTenantIsolation()) {
+  // Get tenant isolation setting from socket manager (configured at bootstrap level).
+  bool tenant_isolation_enabled = false;
+  auto* base_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  if (base_interface != nullptr) {
+    const auto* acceptor =
+        dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
+            base_interface);
+    if (acceptor != nullptr) {
+      auto* tls_registry = acceptor->getLocalRegistry();
+      if (tls_registry != nullptr) {
+        auto* socket_manager = tls_registry->socketManager();
+        if (socket_manager != nullptr) {
+          tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
+        }
+      }
+    }
+  }
+
+  if (tenant_isolation_enabled) {
     const absl::string_view delimiter = ReverseTunnelFilterConfig::tenantDelimiter();
     const auto contains_delimiter = [&](absl::string_view value) -> bool {
       return value.find(delimiter) != absl::string_view::npos;
@@ -481,7 +497,10 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Register the wrapped socket for reuse under the provided identifiers.
   // Note: The socket manager is expected to be thread-safe.
-  const bool tenant_isolation_enabled = config_->enableTenantIsolation();
+  // Get tenant isolation setting from socket manager (configured at bootstrap level).
+  const bool tenant_isolation_enabled = socket_manager != nullptr
+                                            ? socket_manager->tenantIsolationEnabled()
+                                            : false;
   const std::string socket_node_id =
       tenant_isolation_enabled
           ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
@@ -495,7 +514,6 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   if (socket_manager != nullptr) {
     ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
-    socket_manager->setTenantIsolationEnabled(tenant_isolation_enabled);
     socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id,
                                         std::move(wrapped_socket), ping_seconds);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",

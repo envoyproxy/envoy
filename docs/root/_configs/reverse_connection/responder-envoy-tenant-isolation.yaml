@@ -10,6 +10,7 @@ bootstrap_extensions:
     "@type": >-
       type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
     stat_prefix: "upstream_reverse_connection"
+    enable_tenant_isolation: true
 
 static_resources:
   listeners:
@@ -26,7 +27,6 @@ static_resources:
           "@type": >-
             type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
           ping_interval: 2s
-          enable_tenant_isolation: true
 
   # Listener that will route the downstream request to the reverse connection cluster
   - name: egress_listener

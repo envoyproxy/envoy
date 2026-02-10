@@ -91,10 +91,13 @@ public:
     ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
     // Configure detailed stats flag (defaults to false).
     enable_detailed_stats_ = config.enable_detailed_stats();
+    // Configure tenant isolation flag (defaults to false).
+    enable_tenant_isolation_ =
+        config.has_enable_tenant_isolation() ? config.enable_tenant_isolation().value() : false;
     ENVOY_LOG(debug,
               "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
-              "socket interface with stat_prefix: {}",
-              stat_prefix_);
+              "socket interface with stat_prefix: {}, tenant_isolation: {}",
+              stat_prefix_, enable_tenant_isolation_);
     // Construct the reporter if enabled from the yaml.
     if (config.has_reporter_config()) {
       auto& reporter_factory =
@@ -175,6 +178,11 @@ public:
   Stats::Scope& getStatsScope() const { return context_.scope(); }
 
   /**
+   * @return whether tenant isolation is enabled.
+   */
+  bool enableTenantIsolation() const { return enable_tenant_isolation_; }
+
+  /**
    * Forward a connection event to the configured reporter.
    * If no reporter is present, the call is ignored.
    * @param node_id node to which the connection is made.
@@ -217,6 +225,7 @@ private:
   std::string stat_prefix_;
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
+  bool enable_tenant_isolation_{false};
   ReverseTunnelReporterPtr reporter_{nullptr};
 
   /**

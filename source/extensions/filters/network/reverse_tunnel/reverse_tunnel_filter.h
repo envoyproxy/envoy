@@ -37,7 +37,6 @@ public:
   bool autoCloseConnections() const { return auto_close_connections_; }
   const std::string& requestPath() const { return request_path_; }
   const std::string& requestMethod() const { return request_method_string_; }
-  bool enableTenantIsolation() const { return enable_tenant_isolation_; }
   static constexpr absl::string_view tenantDelimiter() {
     return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
         TENANT_SCOPE_DELIMITER;
@@ -79,7 +78,6 @@ private:
 
   // Required cluster name for validation (empty means no validation).
   const std::string required_cluster_name_;
-  const bool enable_tenant_isolation_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

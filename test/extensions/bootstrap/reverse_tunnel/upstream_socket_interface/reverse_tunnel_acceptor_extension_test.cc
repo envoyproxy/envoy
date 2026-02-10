@@ -622,6 +622,47 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
   extension_->reportDisconnection(node_id, cluster_id);
 }
 
+// Test extension initialization with tenant isolation enabled.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithTenantIsolation) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface tenant_isolation_config;
+  tenant_isolation_config.set_stat_prefix("reverse_connections");
+  tenant_isolation_config.mutable_enable_tenant_isolation()->set_value(true);
+
+  auto tenant_isolation_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, tenant_isolation_config);
+
+  EXPECT_TRUE(tenant_isolation_extension->enableTenantIsolation());
+}
+
+// Test extension initialization without tenant isolation (default behavior).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithoutTenantIsolation) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface default_config;
+  default_config.set_stat_prefix("reverse_connections");
+  // Don't set enable_tenant_isolation - should default to false.
+
+  auto default_extension =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, default_config);
+
+  EXPECT_FALSE(default_extension->enableTenantIsolation());
+}
+
+// Test tenant isolation flag is propagated to socket manager during TLS initialization.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToSocketManager) {
+  config_.mutable_enable_tenant_isolation()->set_value(true);
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                  config_);
+
+  extension_->onServerInitialized();
+
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  auto* socket_manager = registry->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
