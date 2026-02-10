@@ -10,6 +10,11 @@ number of active connections and requests.
 High-Level Overview
 -------------------
 
+.. note::
+  Matt Klein wrote a `detailed blog post <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_ 
+  on the Envoy threading model. Though it is a bit old, it is still accurate anda great companion to this
+  document.
+
 At a high level, the threading model consists of three main components:
 
 1. **Main Thread**: A single thread that handles various (critical) coordination tasks. This
@@ -70,6 +75,12 @@ in the future) that manages:
 The Dispatcher allows code to be written in a single-threaded, non-blocking style. Instead of
 blocking on I/O, you register a callback that triggers when the I/O is ready.
 
+When running the dispatcher, you can specify how it should run using `Event::Dispatcher::RunType`:
+
+*   **Block**: Runs the event loop until there are no pending events. This is useful for clearing out any work that is ready to be executed.
+*   **NonBlock**: Checks for any pending events that are ready to activate, executes them, and then exits. It exits immediately if there are no events ready.
+*   **RunUntilExit**: Runs the event loop indefinitely until `dispatcher.exit()` is called. This is the standard mode for long-running threads like the main thread or workers.
+
 io_uring
 ^^^^^^^^
 
@@ -120,13 +131,15 @@ The Main Thread receives special treatment. Its responsibilities include:
 Exceptions and Extensions
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-While the core model is strict, some extensions may need their own threads.
+While the core model is strict, some extensions may need their own threads to manage their memory or perform complex operations.
 
 *   **Async File I/O**: The `AsyncFileManagerThreadPool <https://github.com/envoyproxy/envoy/blob/main/source/extensions/common/async_files/async_file_manager_thread_pool.h>`_ manages a pool of threads to perform
     blocking file operations (like opening files or reading large bodies) without blocking the
     non-blocking worker threads.
 *   **Cache Eviction**: The `CacheEvictionThread <https://github.com/envoyproxy/envoy/blob/main/source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h>`_ runs in the background to enforce cache size
     limits and evict old entries, preventing these expensive iterators from stalling the data path.
+*   **Geolocation**: The `GeoipProvider <https://github.com/envoyproxy/envoy/blob/main/source/extensions/geoip_providers/maxmind/geoip_provider.cc>`_ (MaxMind) uses a background thread to reload the database file when it changes.
+*   **DNS Resolution**: The `GetAddrInfoDnsResolver <https://github.com/envoyproxy/envoy/blob/main/source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.cc>`_ uses a pool of dedicated threads to perform blocking ``getaddrinfo`` calls, ensuring that the main event loop is never blocked by OS-level DNS resolution.
 
 Development Patterns (Extension Guide)
 --------------------------------------
@@ -135,6 +148,8 @@ If you are writing an Envoy extension, follow these patterns to ensure thread sa
 
 Spawning Threads
 ^^^^^^^^^^^^^^^^
+
+Developers might want to spawn threads for tasks that involve heavy processing which should not interfere with the request's "hot path", such as blocking I/O, complex computations, or background maintenance tasks (e.g. database reloading).
 
 Do **not** use ``std::thread`` directly. Instead, use the `Thread::ThreadFactory <https://github.com/envoyproxy/envoy/blob/main/envoy/thread/thread.h>`_ available in the
 `Server::Configuration::FactoryContext <https://github.com/envoyproxy/envoy/blob/main/envoy/server/factory_context.h>`_.
@@ -216,6 +231,52 @@ objects like ``absl::Notification``.
   done.WaitForNotification();
 
 This is an extremely powerful way to reproduce (or prevent) race conditions.
+
+Threading in Integration Tests
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Integration tests in Envoy are designed to test the interaction between components using real threads. Understanding the threading model of the test framework is crucial for writing reliable tests.
+
+Component Threading
+"""""""""""""""""""
+
+*   **Test Environment**: The main test thread orchestrates the test. It creates the server, upstreams, and drives the test logic.
+*   **IntegrationTestServer**: Runs the Envoy server instance on a separate thread. This thread runs the `runs()` loop of the server.
+*   **FakeUpstream**: Typically runs on its own thread (or shares a thread pool), accepting connections and processing requests from Envoy.
+*   **RawConnectionDriver**: Usually runs on the main test thread but drives a `ClientConnection` that uses a `Dispatcher`. It delegates I/O events to the dispatcher which might be running on the same or different thread depending on the setup.
+
+Thread Synchronization
+""""""""""""""""""""""
+
+To test race conditions or specific sequences of events across these threads, Envoy uses `ThreadSynchronizer <https://github.com/envoyproxy/envoy/blob/main/source/common/common/thread_synchronizer.h>`_.
+
+*   **Sync Points**: You can define sync points in the production code using ``thread_synchronizer.syncPoint("event_name")``.
+*   **Wait and Signal**: In the test code, you can use ``thread_synchronizer.waitOn("event_name")`` to block the test execution until the production code reaches that point, or ``thread_synchronizer.signal("event_name")`` to unblock a thread waiting at a sync point.
+
+This allows for deterministic testing of concurrent behaviors that would otherwise be flaky.
+
+Custom Threads in Tests
+"""""""""""""""""""""""
+
+Sometimes tests effectively act as a client or a concurrent actor. Use ``Thread::ThreadFactory`` to spawn threads in tests to simulate concurrent events.
+
+.. code-block:: cpp
+
+  // Example from TrackedWatermarkBufferTest
+  auto thread1 = Thread::threadFactoryForTest().createThread([&]() { buffer1->add("a"); });
+  auto thread2 = Thread::threadFactoryForTest().createThread([&]() { buffer2->add("b"); });
+  // ...
+  thread1->join();
+  thread2->join();
+
+Simulated Time in Integration Tests
+"""""""""""""""""""""""""""""""""""
+
+When using `TestUsingSimulatedTime` (or `SimulatedTimeSystem`) in integration tests, time advances are broadcast to all schedulers.
+
+*   **Event Loops**: Implementations of `Event::Dispatcher` register their schedulers with the simulated time system.
+*   **Advancing Time**: When the test calls ``timeSystem().advanceTimeWait(duration)``, it advances the simulated time and wakes up all registered schedulers. The schedulers then process any timers that have expired due to the time advance.
+*   **Real Threads**: Since integration tests use real threads for the server and upstreams, those threads will process the expired timers in their respective event loops. This synchronization ensures that time-dependent behavior (like timeouts) can be tested reliably without waiting for real wall-clock time.
 
 Troubleshooting
 ---------------
