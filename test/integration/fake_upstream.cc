@@ -19,6 +19,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_codec_impl.h"
+
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 

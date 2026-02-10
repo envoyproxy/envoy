@@ -5,7 +5,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/strings/str_split.h"
 #include "access_log.h"

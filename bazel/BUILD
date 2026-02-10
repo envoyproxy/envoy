@@ -8,6 +8,7 @@ load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load(":deprecated_features.bzl", "check_removed_fips_define")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -489,60 +490,60 @@ config_setting(
     values = {"define": "force_libcpp=enabled"},
 )
 
-config_setting(
-    name = "boringssl_fips",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    values = {"define": "boringssl=fips"},
+# SSL library selection using label_flag and bool_flag
+label_flag(
+    name = "ssl",
+    build_setting_default = "@boringssl//:ssl",
+)
+
+label_flag(
+    name = "crypto",
+    build_setting_default = "@boringssl//:crypto",
+)
+
+bool_flag(
+    name = "fips",
+    build_setting_default = False,
 )
 
 config_setting(
-    name = "boringssl_disabled",
-    values = {"define": "boringssl=disabled"},
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_x86",
-    match_all = [
-        ":boringssl_fips",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_ppc",
-    match_all = [
-        ":boringssl_fips",
-        ":linux_ppc64le",
-    ],
-)
-
-selects.config_setting_group(
-    name = "boringssl_fips_not_ppc",
-    match_all = [
-        ":boringssl_fips",
-        ":not_ppc",
-    ],
+    name = "fips_build",
+    flag_values = {":fips": "True"},
 )
 
 config_setting(
-    name = "zlib_ng",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    values = {"define": "zlib=ng"},
+    name = "using_boringssl",
+    flag_values = {":ssl": "@boringssl//:ssl"},
 )
 
-# Alias pointing to the selected version of zlib:
-# - zlib-ng from //bazel/foreign_cc:zlib_ng when --define zlib=ng is specified (Linux only).
-# - Regular zlib from @zlib otherwise.
-alias(
+config_setting(
+    name = "using_boringssl_fips",
+    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+)
+
+config_setting(
+    name = "using_aws_lc",
+    flag_values = {":ssl": "@aws_lc//:ssl"},
+)
+
+# Convenience grouping for any FIPS SSL library
+selects.config_setting_group(
+    name = "using_fips_ssl",
+    match_any = [
+        ":using_boringssl_fips",
+        ":using_aws_lc",
+    ],
+)
+
+check_removed_fips_define(
+    name = "check_removed_fips_define",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
     name = "zlib",
-    actual = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:zlib",
-        "//conditions:default": "@zlib",
-    }),
+    build_setting_default = "@zlib-ng",
 )
 
 config_setting(
@@ -573,28 +574,6 @@ config_setting(
 config_setting(
     name = "uhv_enabled",
     values = {"define": "uhv=enabled"},
-)
-
-# Alias pointing to the selected version of BoringSSL:
-# - BoringSSL FIPS from @boringssl_fips//:ssl,
-# - non-FIPS BoringSSL from @boringssl//:ssl.
-# - aws-lc from @aws_lc//:ssl
-alias(
-    name = "boringssl",
-    actual = select({
-        "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
-        "//conditions:default": "@boringssl//:ssl",
-    }),
-)
-
-alias(
-    name = "boringcrypto",
-    actual = select({
-        "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
-        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
-        "//conditions:default": "@boringssl//:crypto",
-    }),
 )
 
 config_setting(
@@ -1022,9 +1001,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = selects.with_or({
         ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
+            "@tcmalloc//tcmalloc",
+            "@tcmalloc//tcmalloc:profile_marshaler",
+            "@tcmalloc//tcmalloc:malloc_extension",
         ],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
@@ -1037,7 +1016,7 @@ cc_library(
         (
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
-        ): ["@com_github_google_tcmalloc//tcmalloc"],
+        ): ["@tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )

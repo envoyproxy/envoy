@@ -1,7 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -11,6 +9,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/muxdemux.h"
+#include "source/extensions/filters/http/mcp_router/backend_stream.h"
 #include "source/extensions/filters/http/mcp_router/filter_config.h"
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
@@ -21,10 +20,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
-
-namespace MetadataKeys {
-constexpr absl::string_view kFilterNamespace = "envoy.filters.http.mcp";
-} // namespace MetadataKeys
 
 /** Enumeration of supported MCP protocol methods. */
 enum class McpMethod {
@@ -38,6 +33,8 @@ enum class McpMethod {
   ResourcesUnsubscribe,
   PromptsList,
   PromptsGet,
+  CompletionComplete,
+  LoggingSetLevel,
   Ping,
   // Notifications (client -> server, fire-and-forget).
   NotificationInitialized,
@@ -47,55 +44,24 @@ enum class McpMethod {
 
 McpMethod parseMethodString(absl::string_view method_str);
 
-/** Response received from a backend MCP server. */
-struct BackendResponse {
-  std::string backend_name;
-  bool success{false};
-  uint64_t status_code{0};
-  std::string body;
-  std::string session_id;
-  std::string error;
-};
-
-using AggregationCallback = std::function<void(std::vector<BackendResponse>)>;
-
-/**
- * Callbacks for handling async HTTP responses from backend MCP servers.
- * Accumulates response data and invokes completion callback when stream ends.
- */
-class BackendStreamCallbacks : public Http::AsyncClient::StreamCallbacks,
-                               public std::enable_shared_from_this<BackendStreamCallbacks>,
-                               public Logger::Loggable<Logger::Id::filter> {
-public:
-  BackendStreamCallbacks(const std::string& backend_name,
-                         std::function<void(BackendResponse)> on_complete);
-
-  // AsyncClient::StreamCallbacks
-  void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
-  void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-  void onComplete() override;
-  void onReset() override;
-
-private:
-  void complete();
-
-  std::string backend_name_;
-  std::function<void(BackendResponse)> on_complete_;
-  BackendResponse response_;
-  bool completed_{false};
-};
-
 /**
  * HTTP filter that routes MCP requests to one or more backend servers.
- * Supports fanout to multiple backends for initialize/tools-list and
- * single-backend routing for tools-call based on tool name prefix.
  */
 class McpRouterFilter : public Http::StreamDecoderFilter,
-                        public Logger::Loggable<Logger::Id::filter> {
+                        public SseStreamHandler,
+                        public Logger::Loggable<Logger::Id::filter>,
+                        public std::enable_shared_from_this<McpRouterFilter> {
 public:
   explicit McpRouterFilter(McpRouterConfigSharedPtr config);
   ~McpRouterFilter() override;
+
+  // SSE stream handler interface implementation.
+  void pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void pushSseData(Buffer::Instance& data, bool end_stream) override;
+  void pushSseEvent(const std::string& backend_name, const std::string& event_data,
+                    SseMessageType event_type) override;
+  void onStreamingError(absl::string_view error) override;
+  void onStreamingComplete() override;
 
   void onDestroy() override;
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -122,13 +88,14 @@ private:
   ssize_t rewriteResourceUriBody(Buffer::Instance& buffer);
   // Rewrites the prompt name in the buffer. Returns the size delta (new_size - old_size).
   ssize_t rewritePromptsGetBody(Buffer::Instance& buffer);
+  // Rewrites the completion ref (prompt name or resource URI) in the buffer.
+  ssize_t rewriteCompletionCompleteBody(Buffer::Instance& buffer);
   // Helper to replace content at a position in the buffer, and return the delta.
   ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
                             const std::string& replacement);
   // Helper for resource methods that route to a single backend based on URI.
   void handleSingleBackendResourceMethod(absl::string_view method_name);
 
-  // Initialization handlers - set up connections, don't send body.
   void handleInitialize();
   void handleToolsList();
   void handleToolsCall();
@@ -138,6 +105,8 @@ private:
   void handleResourcesUnsubscribe();
   void handlePromptsList();
   void handlePromptsGet();
+  void handleCompletionComplete();
+  void handleLoggingSetLevel();
   void handlePing();
   // Generic handler for client→server notifications (fanout to all backends).
   void handleNotification(absl::string_view notification_name);
@@ -148,12 +117,20 @@ private:
   std::string aggregateResourcesList(const std::vector<BackendResponse>& responses);
   std::string aggregatePromptsList(const std::vector<BackendResponse>& responses);
 
+  // SSE-aware response extraction: extracts JSON-RPC from SSE events if needed.
+  std::string extractJsonRpcFromResponse(const BackendResponse& response);
+
   // Initialize fanout connections.
   void initializeFanout(AggregationCallback callback);
 
   // Initialize single backend connection.
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback);
+
+  // Initialize single backend connection with optional streaming mode for SSE.
+  void initializeSingleBackend(const McpBackendConfig& backend,
+                               std::function<void(BackendResponse)> callback,
+                               bool streaming_enabled);
 
   // Stream data to established connection(s)
   void streamData(Buffer::Instance& data, bool end_stream);
@@ -179,6 +156,7 @@ private:
   std::string rewritten_uri_;        // Rewritten URI for backend (e.g., "file://path/to/resource")
   std::string prompt_name_;          // Original prefixed prompt name (e.g., "time__greeting")
   std::string unprefixed_prompt_name_; // Unprefixed prompt name for backend (e.g., "greeting")
+  std::string completion_ref_type_;    // Completion reference type: "ref/prompt" or "ref/resource"
   bool needs_body_rewrite_{false};     // Whether tool/prompt name or URI rewriting is needed
 
   std::string route_name_{"default"};
@@ -201,7 +179,10 @@ private:
   AggregationCallback aggregation_callback_;
   std::function<void(BackendResponse)> single_backend_callback_;
 
-  bool initialized_{false}; // Track if fanout/backend has been initialized
+  // Track if fanout/backend has been initialized
+  bool initialized_{false};
+  // Track if SSE headers were sent (for aggregation with SSE backends)
+  bool sse_headers_sent_{false};
 };
 
 } // namespace McpRouter

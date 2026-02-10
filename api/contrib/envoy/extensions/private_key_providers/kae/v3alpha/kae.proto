@@ -5,6 +5,7 @@ package envoy.extensions.private_key_providers.kae.v3alpha;
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -37,4 +38,9 @@ message KaePrivateKeyMethodConfig {
     required: true
     gte {nanos: 1000000}
   }];
+
+  // The number of instances to start during initialization.
+  // Too many instances may create a large number of threads, increasing resource usage and potential overhead.
+  // max_instances must be at least 1.
+  google.protobuf.UInt32Value max_instances = 3 [(validate.rules).uint32 = {gte: 1}];
 }

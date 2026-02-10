@@ -15,10 +15,10 @@ envoy_cc_library(
     hdrs = ["session_codec.h"],
     deps = [
         "//source/common/common:base64_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -28,8 +28,26 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//envoy/server:filter_config_interface",
-        "@com_google_absl//absl/types:variant",
+        "//source/extensions/filters/common/mcp:filter_state_lib",
+        "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "backend_stream_lib",
+    srcs = ["backend_stream.cc"],
+    hdrs = ["backend_stream.h"],
+    deps = [
+        "//envoy/http:async_client_interface",
+        "//envoy/http:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/sse:sse_parser_lib",
+        "//source/common/json:json_loader_lib",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -38,6 +56,7 @@ envoy_cc_library(
     srcs = ["mcp_router.cc"],
     hdrs = ["mcp_router.h"],
     deps = [
+        ":backend_stream_lib",
         ":filter_config_lib",
         ":session_codec_lib",
         "//envoy/http:async_client_interface",
@@ -54,10 +73,10 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

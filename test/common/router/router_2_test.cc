@@ -718,6 +718,98 @@ TEST_F(RouterTestNoChildSpan, BasicFlow) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
+// Test that when noContextPropagation is true, injectContext is not called.
+class RouterTestDisableContextPropagation : public RouterTestBase {
+public:
+  RouterTestDisableContextPropagation()
+      : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+    // Enable the no_context_propagation flag
+    callbacks_.tracing_config_.no_context_propagation_ = true;
+  }
+};
+
+TEST_F(RouterTestDisableContextPropagation, NoContextInjection) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // injectContext should NOT be called when noContextPropagation is true
+  EXPECT_CALL(callbacks_.active_span_, injectContext(_, _)).Times(0);
+
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Test with child span and noContextPropagation enabled
+class RouterTestDisableContextPropagationWithChildSpan : public RouterTestBase {
+public:
+  RouterTestDisableContextPropagationWithChildSpan()
+      : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+    // Enable the no_context_propagation flag
+    callbacks_.tracing_config_.no_context_propagation_ = true;
+  }
+};
+
+TEST_F(RouterTestDisableContextPropagationWithChildSpan, NoContextInjectionWithChildSpan) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Child span is still created but injectContext should NOT be called
+  // Use NiceMock to ignore all other expectations (setTag, finishSpan, etc.)
+  NiceMock<Tracing::MockSpan>* child_span{new NiceMock<Tracing::MockSpan>()};
+  EXPECT_CALL(*child_span, injectContext(_, _)).Times(0);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router observability_name egress", _))
+      .WillOnce(Return(child_span));
+
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 namespace {
 
 Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::string>& v) {

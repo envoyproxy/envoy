@@ -1,6 +1,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

@@ -46,10 +46,10 @@ envoy_cc_test(
     srcs = ["server_test.cc"],
     data = [
         ":server_test_data",
-        "//configs:example_configs",
-        "//test/config_test:example_configs_test_setup.sh",
+        "//configs",
+        "//test/config_test:configs_test_setup.sh",
     ],
-    env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stream:config",

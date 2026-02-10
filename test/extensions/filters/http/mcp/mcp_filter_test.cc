@@ -191,7 +191,7 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
 
@@ -334,7 +334,7 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
@@ -359,7 +359,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}})";
   Buffer::OwnedImpl buffer(json);
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
@@ -391,6 +391,180 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
+// Test that having optional fields configured allows partial parsing when size limit is hit.
+// The parser continues without error because optional fields (like params._meta) don't need
+// to be found. This test does NOT verify _meta extraction - it only verifies that parsing
+// succeeds when required fields are found but optional fields may be beyond the size limit.
+TEST_F(McpFilterTest, PartialParsingSucceedsWithOptionalFieldConfig) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("tools/call");
+
+  // Required field.
+  method_rule->add_extraction_rules()->set_path("params.name");
+  const std::string prefix =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "padding": ")";
+  const uint32_t limit = static_cast<uint32_t>(prefix.size() + 5);
+  proto_config.mutable_max_request_body_size()->set_value(limit);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(limit));
+  filter_->decodeHeaders(headers, false);
+
+  std::string padding(200, 'a');
+  std::string json = prefix + padding + R"("}})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "tool");
+
+        // _meta is not present in the JSON, so it should not be in the metadata
+        EXPECT_EQ(params.find("_meta"), params.end());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that params._meta is correctly extracted when it appears before the size limit is reached.
+TEST_F(McpFilterTest, OptionalMetaFieldExtractedWithPartialParsing) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("tools/call");
+
+  // Required field.
+  method_rule->add_extraction_rules()->set_path("params.name");
+
+  // Set a size limit that allows _meta to be parsed but cuts off extra padding
+  const std::string json_with_meta =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", "_meta": {"trace_id": "abc123"}, "padding": ")";
+  const uint32_t limit = static_cast<uint32_t>(json_with_meta.size() + 5);
+  proto_config.mutable_max_request_body_size()->set_value(limit);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(limit));
+  filter_->decodeHeaders(headers, false);
+
+  std::string padding(200, 'a');
+  std::string json = json_with_meta + padding + R"("}})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        // Required field should be extracted
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "mytool");
+
+        // _meta should be extracted since it appears before the size limit
+        auto meta_it = params.find("_meta");
+        ASSERT_NE(meta_it, params.end());
+        ASSERT_TRUE(meta_it->second.has_struct_value());
+        const auto& meta_fields = meta_it->second.struct_value().fields();
+        auto trace_it = meta_fields.find("trace_id");
+        ASSERT_NE(trace_it, meta_fields.end());
+        EXPECT_EQ(trace_it->second.string_value(), "abc123");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that chunk-by-chunk parsing does NOT trigger early stop when optional fields
+// (like params._meta) are configured. The parser should continue buffering to look
+// for optional fields even after all required fields are found.
+TEST_F(McpFilterTest, ChunkByChunkParsingNoEarlyStopWithOptionalFields) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("tools/call");
+
+  // Required field.
+  method_rule->add_extraction_rules()->set_path("params.name");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // First chunk: contains required field (params.name) but NOT _meta yet
+  std::string chunk1 =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "mytool", )";
+  Buffer::OwnedImpl buffer1(chunk1);
+
+  // Should NOT early stop - must continue buffering to look for optional _meta
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+
+  // Second chunk: contains _meta
+  std::string chunk2 = R"("_meta": {"trace_id": "abc123"}}})";
+  Buffer::OwnedImpl buffer2(chunk2);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        // Required field should be extracted
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "mytool");
+
+        // _meta should be extracted from the second chunk
+        auto meta_it = params.find("_meta");
+        ASSERT_NE(meta_it, params.end());
+        ASSERT_TRUE(meta_it->second.has_struct_value());
+        const auto& meta_fields = meta_it->second.struct_value().fields();
+        auto trace_it = meta_fields.find("trace_id");
+        ASSERT_NE(trace_it, meta_fields.end());
+        EXPECT_EQ(trace_it->second.string_value(), "abc123");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
+}
+
 // Test request body with limit disabled (0 = no limit) allows large bodies
 TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
@@ -413,7 +587,7 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data +
                      R"("}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Should succeed even with large body
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -530,7 +704,7 @@ TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache NOT to be cleared (default behavior)
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -553,7 +727,7 @@ TEST_F(McpFilterTest, RouteCacheNotClearedWhenDisabled) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache NOT to be cleared
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -576,7 +750,7 @@ TEST_F(McpFilterTest, RouteCacheClearedWhenExplicitlyEnabled) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache to be cleared
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
@@ -631,7 +805,7 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set with the custom field
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
         auto it = fields.find("params");
@@ -672,7 +846,7 @@ TEST_F(McpFilterTest, ParsingCompleteIgnoresExtraData) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(extra_buffer, true));
 }
 
-// Test that partial valid JSON returns StopIterationAndBuffer
+// Test that partial valid JSON returns StopIterationAndWatermark
 TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
@@ -687,7 +861,62 @@ TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   Buffer::OwnedImpl buffer(json);
 
   // Should buffer and wait for more data
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+}
+
+// Test that non-JSON-RPC JSON stops buffering immediately after root object closes
+TEST_F(McpFilterTest, NonMcpJsonEarlyStopInPassThroughMode) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Complete JSON object that is NOT JSON-RPC (no "jsonrpc" or "method" fields).
+  std::string json = R"({"foo": "bar", "nested": {"deep": 123}, "baz": true})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+}
+
+// Test multi-chunk non-MCP JSON.
+TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer1(R"({"foo": "bar", )");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+
+  Buffer::OwnedImpl buffer2(R"("baz": 123})");
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, false));
+}
+
+// Test that non-MCP JSON is rejected early in REJECT_NO_MCP mode after root closes.
+TEST_F(McpFilterTest, NonMcpJsonEarlyStopInRejectMode) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"foo": "bar", "baz": 123})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
 }
 
 // Test per-route max body size override with smaller limit
@@ -790,7 +1019,7 @@ TEST_F(McpFilterTest, MethodGroupAddedToMetadata) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
 
@@ -832,7 +1061,7 @@ TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
         auto group_it = fields.find("group");
@@ -970,7 +1199,7 @@ TEST_F(McpFilterTest, DefaultStorageModeDynamicMetadataOnly) {
   Buffer::OwnedImpl buffer(json);
 
   // Dynamic metadata should be set by default
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
@@ -1002,7 +1231,7 @@ TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
   Buffer::OwnedImpl buffer(json);
 
   // Both should be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 

@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/proto_message_extraction:extractor_impl",
         "//source/extensions/filters/http/proto_message_extraction:filter_config",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
@@ -64,6 +65,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/proto:apikeys_proto_cc_proto",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )

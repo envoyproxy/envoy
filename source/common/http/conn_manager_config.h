@@ -20,6 +20,9 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tracing/tracer_config_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -568,6 +571,18 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTPS when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTP when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

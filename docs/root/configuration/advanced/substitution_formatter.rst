@@ -622,6 +622,12 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+.. _config_access_log_format_upstream_detected_close_type:
+
+``%UPSTREAM_DETECTED_CLOSE_TYPE%``
+    The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+
 .. _config_access_log_format_downstream_transport_failure_reason:
 
 ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%``
@@ -632,9 +638,6 @@ Current supported substitution commands include:
 
     .. note::
       It only works in listener access config, and the HTTP or TCP access logs would observe empty values.
-
-  UDP
-    Not implemented. It will appear as ``"-"`` in the access logs.
 
 .. _config_access_log_format_downstream_local_close_reason:
 
@@ -1474,6 +1477,7 @@ Current supported substitution commands include:
   * ``TcpUpstreamConnected`` - When TCP Proxy filter has successfully established an upstream connection.
   * ``TcpPeriodic`` - On any TCP Proxy filter periodic log record.
   * ``TcpConnectionEnd`` - When a TCP connection is ended on TCP Proxy filter.
+  * ``TcpConnectionStart`` - When a TCP connection is accepted by the TCP Proxy filter.
   * ``DownstreamStart`` - When HTTP Connection Manager filter receives a new HTTP request.
   * ``DownstreamTunnelSuccessfullyEstablished`` - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.
   * ``DownstreamPeriodic`` - On any HTTP Connection Manager periodic log record.
@@ -1507,6 +1511,21 @@ Current supported substitution commands include:
   HTTP
     The value of the query parameter ``X``. If the query parameter ``X`` is not present, ``"-"`` symbol will be used.
     ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%QUERY_PARAMS(X):Z%``
+  HTTP
+    All of the query parameters. The parameter ``X`` is used to specify how the query parameters are presented
+    and is optional, with ``ORIG`` then being the default.
+
+    The ``X`` parameter can be:
+
+    * ``ORIG``: The output will be original query params string part of the path with no treatment.
+    * ``DECODED``: The query params will be URL decoded.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

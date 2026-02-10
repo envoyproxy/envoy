@@ -697,6 +697,74 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   EXPECT_GE(1200, sampled_count);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing: {}
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // By default, trace context propagation is enabled (no_context_propagation is false)
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is disabled when the flag is set to true
+  EXPECT_TRUE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: false
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is enabled when the flag is explicitly set to false
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -3838,6 +3906,78 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   ASSERT(hcm != nullptr);
   hcm->initializeReadFilterCallbacks(cb);
   EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
+}
+
+// Test valid configuration for forward_proto_config.
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigValid) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+forward_proto_config:
+  https_destination_ports: [443, 8443]
+  http_destination_ports: [80, 8080]
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  const auto& https_ports = config.httpsDestinationPorts();
+  EXPECT_EQ(2, https_ports.size());
+  EXPECT_TRUE(https_ports.contains(443));
+  EXPECT_TRUE(https_ports.contains(8443));
+
+  const auto& http_ports = config.httpDestinationPorts();
+  EXPECT_EQ(2, http_ports.size());
+  EXPECT_TRUE(http_ports.contains(80));
+  EXPECT_TRUE(http_ports.contains(8080));
+}
+
+// Test empty forward_proto_config is valid (feature disabled).
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigEmpty) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+forward_proto_config: {}
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_TRUE(config.httpsDestinationPorts().empty());
+  EXPECT_TRUE(config.httpDestinationPorts().empty());
 }
 
 } // namespace

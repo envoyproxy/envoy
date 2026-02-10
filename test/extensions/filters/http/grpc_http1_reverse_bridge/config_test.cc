@@ -58,6 +58,23 @@ TEST(ReverseBridgeFilterFactoryTest, ReverseBridgeFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+TEST(ReverseBridgeFilterFactoryTest, ReverseBridgeFilterWithServerContext) {
+  const std::string yaml_string = R"EOF(
+content_type: application/grpc+proto
+withhold_grpc_frames: true
+  )EOF";
+
+  envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Config config_factory;
+  Http::FilterFactoryCb cb =
+      config_factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters

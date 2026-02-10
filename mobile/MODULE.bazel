@@ -22,3 +22,10 @@ local_path_override(
     module_name = "envoy_build_config",
     path = "envoy_build_config",
 )
+
+pip.parse(
+    experimental_index_url = "https://us-python.pkg.dev/artifact-foundry-prod/python-3p-trusted/simple/",
+    hub_name = "pypi",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//:requirements.txt",
+)

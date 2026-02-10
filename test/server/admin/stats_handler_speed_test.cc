@@ -195,12 +195,15 @@ public:
    */
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
+    // TODO(ggreenway): add a test variation that does protobuf
+    auto request_headers = Http::RequestHeaderMapImpl::create();
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
     if (params.format_ == StatsFormat::Prometheus) {
-      StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, data);
+      StatsHandler::prometheusRender(*store_, custom_namespaces_, cm_, params, *request_headers,
+                                     *response_headers, data);
       return data.length();
     }
     Admin::RequestPtr request = StatsHandler::makeRequest(*store_, params, cm_);
-    auto response_headers = Http::ResponseHeaderMapImpl::create();
     request->start(*response_headers);
     uint64_t count = 0;
     bool more = true;
