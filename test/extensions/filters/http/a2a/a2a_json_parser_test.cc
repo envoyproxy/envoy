@@ -17,6 +17,157 @@ protected:
   A2aJsonParser parser_;
 };
 
+// TODO(tyxia) Handle and test top-level ID field.
+TEST_F(A2aJsonParserTest, ParseSimpleMessageSend) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "params": {
+      "taskId": "task-abc-987",
+      "message": {
+        "taskId": "task1",
+        "contextId": "context1",
+        "messageId": "msg1",
+        "role": "user",
+      },
+      "configuration": {
+        "blocking": true,
+        "acceptedOutputModes": ["text/plain"]
+      },
+      "metadata": {
+        "baz": "qux"
+      }
+    }
+  })";
+
+  // Parse the JSON string.
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+
+  // Verify overall validity and method.
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "message/send");
+
+  // Verify top-level extracted fields.
+  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
+
+  // Verify fields within params.
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("taskId")
+                .string_value(),
+            "task-abc-987");
+
+  // Verify fields within params.message.
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("message")
+                .struct_value()
+                .fields()
+                .at("taskId")
+                .string_value(),
+            "task1");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("message")
+                .struct_value()
+                .fields()
+                .at("contextId")
+                .string_value(),
+            "context1");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("message")
+                .struct_value()
+                .fields()
+                .at("messageId")
+                .string_value(),
+            "msg1");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("message")
+                .struct_value()
+                .fields()
+                .at("role")
+                .string_value(),
+            "user");
+
+  // Verify fields within params.configuration.
+  EXPECT_TRUE(parser_.metadata()
+                  .fields()
+                  .at("params")
+                  .struct_value()
+                  .fields()
+                  .at("configuration")
+                  .struct_value()
+                  .fields()
+                  .at("blocking")
+                  .bool_value());
+
+  // Verify fields within params.metadata.
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("metadata")
+                .struct_value()
+                .fields()
+                .at("baz")
+                .string_value(),
+            "qux");
+  EXPECT_TRUE(parser_.metadata()
+                  .fields()
+                  .at("params")
+                  .struct_value()
+                  .fields()
+                  .at("configuration")
+                  .struct_value()
+                  .fields()
+                  .at("acceptedOutputModes")
+                  .has_list_value());
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("configuration")
+                .struct_value()
+                .fields()
+                .at("acceptedOutputModes")
+                .list_value()
+                .values_size(),
+            1);
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("configuration")
+                .struct_value()
+                .fields()
+                .at("acceptedOutputModes")
+                .list_value()
+                .values(0)
+                .string_value(),
+            "text/plain");
+}
+
 TEST_F(A2aJsonParserTest, ParseMessageSend) {
   const std::string json = R"({
     "jsonrpc": "2.0",
@@ -508,6 +659,34 @@ TEST_F(A2aJsonParserTest, MissingJsonRpc) {
   ASSERT_TRUE(parser_.finishParse().ok());
   // Should return false because 'jsonrpc' field is missing from extracted metadata
   EXPECT_FALSE(parser_.isValidA2aRequest());
+}
+
+TEST_F(A2aJsonParserTest, ParseTasksListMissingOptionalFields) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tasks/list",
+    "params": {
+      "tenant": "mytenant",
+      "contextId": "ctx-123",
+      "status": "working",
+      "pageSize": 50,
+      "pageToken": "token123",
+      "lastUpdatedAfter": 1234567890,
+      "includeArtifacts": true
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/list");
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("tenant").string_value(),
+      "mytenant");
+
+  // Verify historyLength is missing
+  EXPECT_FALSE(
+      parser_.metadata().fields().at("params").struct_value().fields().contains("historyLength"));
 }
 
 TEST_F(A2aJsonParserTest, GetTaskRequest) {
