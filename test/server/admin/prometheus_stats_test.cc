@@ -2787,5 +2787,66 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
                  value_counts.size(), total_count, decoded.positive_buckets.size(), hist.schema());
 }
 
+// Test that triggers the schema selection fallback path when even the coarsest schema
+// exceeds max_buckets.
+TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
+  Stats::Histogram& h1 = makeHistogram("histogram_fallback", Stats::Histogram::Unit::Unspecified);
+
+  // Record two values that span more than 65536x (the bucket width at schema -4).
+  recordValue(h1, 1);
+  recordValue(h1, 1000000000);
+  mergeHistograms();
+
+  auto parent_histogram = getParentHistogram("histogram_fallback");
+  ASSERT_NE(nullptr, parent_histogram);
+
+  std::vector<Stats::CounterSharedPtr> counters;
+  std::vector<Stats::GaugeSharedPtr> gauges;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
+  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+
+  StatsParams params;
+  params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
+  // Set max_buckets to 1 so that even schema -4 will exceed the limit during the loop,
+  // triggering the fallback path.
+  params.native_histogram_max_buckets_ = 1;
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
+  EXPECT_EQ(1UL, size);
+
+  auto families = parsePrometheusProtobuf(response.toString());
+  ASSERT_EQ(1, families.size());
+
+  const auto& hist = families[0].metric(0).histogram();
+
+  // The fallback should use schema -4 (the coarsest schema).
+  EXPECT_EQ(-4, hist.schema()) << "Fallback should use coarsest schema -4";
+
+  EXPECT_EQ(2, hist.sample_count());
+  EXPECT_EQ(0, hist.zero_count()); // No zeros recorded
+
+  // Decode buckets and verify we got valid output despite exceeding max_buckets
+  const DecodedNativeHistogram decoded(hist);
+
+  ASSERT_EQ(2, decoded.positive_buckets.size())
+      << "Should have 2 buckets at schema -4 for values spanning > 65536x";
+
+  EXPECT_EQ(1, decoded.positive_buckets[0].count);
+  EXPECT_EQ(1, decoded.positive_buckets[1].count);
+  EXPECT_EQ(2, decoded.totalPositiveBucketCount());
+
+  // At schema -4, base = 2^16 = 65536
+  // Value 1: bucket index = ceil(log(1)/log(65536)) - 1 = ceil(0) - 1 = -1
+  // Value 1000000000: bucket index = ceil(log(1e9)/log(65536)) - 1 = ceil(1.87) - 1 = 1
+  // So indices should be -1 and 1.
+  EXPECT_EQ(-1, decoded.positive_buckets[0].index) << "Value 1 should be in bucket -1 at schema -4";
+  EXPECT_EQ(1, decoded.positive_buckets[1].index)
+      << "Value 1000000000 should be in bucket 1 at schema -4";
+}
+
 } // namespace Server
 } // namespace Envoy
