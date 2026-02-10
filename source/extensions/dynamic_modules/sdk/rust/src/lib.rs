@@ -3937,17 +3937,17 @@ macro_rules! declare_network_filter_init_functions {
 /// This macro allows a single module to provide any combination of HTTP, Network, Listener,    
 /// UDP Listener, and Bootstrap filters.     
 ///         
-/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is                 
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
 ///         
-/// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be registered.    
-///         
+/// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be
+/// registered.         
 /// Supported filters:          
-/// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters           
-/// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters  
-/// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters                    
-/// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters         
-/// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions           
+/// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters
+/// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters
+/// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
+/// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
+/// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 ///
 /// # Examples
 ///
