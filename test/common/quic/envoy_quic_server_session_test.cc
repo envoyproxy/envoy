@@ -17,6 +17,7 @@
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/session_idle_list.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/overload_manager.h"
@@ -30,6 +31,7 @@
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
+#include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -48,8 +50,10 @@ namespace Quic {
 
 // Derive to have simpler priority mechanism.
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
-public:
+ public:
   using EnvoyQuicServerSession::EnvoyQuicServerSession;
+  using EnvoyQuicServerSession::MaybeAddSessionToIdleList;
+  using EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList;
 
   bool ShouldYield(quic::QuicStreamId /*stream_id*/) override {
     // Never yield to other stream so that it's easier to predict stream write
@@ -160,7 +164,7 @@ public:
                 dispatcher_->timeSource(),
                 quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr(),
                 StreamInfo::FilterState::LifeSpan::Connection),
-            connection_stats_, debug_visitor_factory_),
+            connection_stats_, debug_visitor_factory_, &session_idle_list_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -175,12 +179,16 @@ public:
     connection_helper_.GetClock()->Now();
 
     ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
-        .WillByDefault(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
-                                 const quic::QuicSocketAddress&, quic::PerPacketOptions*,
-                                 const quic::QuicPacketWriterParams&) {
-          return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
-        }));
-    ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
+        .WillByDefault(
+            [](const char*, size_t buf_len, const quic::QuicIpAddress&,
+               const quic::QuicSocketAddress&, quic::PerPacketOptions*,
+               const quic::QuicPacketWriterParams&) {
+              return quic::WriteResult{quic::WRITE_STATUS_OK,
+                                       static_cast<int>(buf_len)};
+            });
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_)).WillRepeatedly(Return(true));
+    ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _))
+        .WillByDefault(Return(true));
     EXPECT_CALL(write_total_, add(_)).Times(AnyNumber());
     EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionClosed(_, _));
   }
@@ -231,15 +239,23 @@ public:
         }));
   }
 
-  quic::QuicStream* createNewStream(Http::MockRequestDecoder& request_decoder,
-                                    Http::MockStreamCallbacks& stream_callbacks) {
+  quic::QuicStream* createNewStream(
+      Http::MockRequestDecoder& request_decoder,
+      Http::MockStreamCallbacks& stream_callbacks) {
+    return createNewStreamWithId(/*stream_id=*/4u, request_decoder,
+                                 stream_callbacks);
+  }
+
+  quic::QuicStream* createNewStreamWithId(
+      quic::QuicStreamId stream_id, Http::MockRequestDecoder& request_decoder,
+      Http::MockStreamCallbacks& stream_callbacks) {
     EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-        .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
-                                                               bool) -> Http::RequestDecoder& {
-          encoder.getStream().addCallbacks(stream_callbacks);
-          return request_decoder;
-        }));
-    quic::QuicStreamId stream_id = 4u;
+        .WillOnce(
+            [&request_decoder, &stream_callbacks](
+                Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
+              encoder.getStream().addCallbacks(stream_callbacks);
+              return request_decoder;
+            });
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
@@ -273,6 +289,7 @@ protected:
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
   EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;
   QuicConnectionStats connection_stats_;
+  testing::NiceMock<Envoy::Http::MockSessionIdleList> session_idle_list_;
   TestEnvoyQuicServerSession envoy_quic_session_;
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   std::shared_ptr<Network::MockReadFilter> read_filter_;
@@ -1246,6 +1263,92 @@ TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
   absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_FALSE(envoy_quic_session_.setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(EnvoyQuicServerSessionTest, SessionBecomesIdleOnlyWhenLastStreamCloses) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks1, stream_callbacks2;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers()).Times(2);
+
+  // session_idle_list_.AddSession() is called in SetUp.
+  // Session starts idle, creating first stream moves it to active.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(1);
+  auto* stream1 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks1));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Creating a second stream shouldn't change idle state because session is
+  // already active.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  auto* stream2 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(8u, request_decoder, stream_callbacks2));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Closing stream1 shouldn't move session to idle as stream2 is active.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(stream_callbacks1,
+              onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Closing stream2 should move session to idle.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(1);
+  EXPECT_CALL(stream_callbacks2,
+              onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream2->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // session_idle_list_.RemoveSession() will be called in TearDown.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(1);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
+  installReadFilter();
+
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(1);
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NETWORK_IDLE_TIMEOUT, _, _));
+  EXPECT_CALL(network_connection_callbacks_,
+              onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_session_.TerminateIdleSession();
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
+  installReadFilter();
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  // Re-adding shouldn't trigger callback because it's already on idle list
+  // after init.
+  envoy_quic_session_.MaybeAddSessionToIdleList();
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers()).Times(1);
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(1);
+  // Creating a stream moves session to active.
+  auto* stream = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks));
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  // Removing from idle list again shouldn't trigger callback.
+  EXPECT_CALL(session_idle_list_, AddSession(_)).Times(0);
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(0);
+  envoy_quic_session_.MaybeRemoveSessionFromIdleList();
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(&session_idle_list_));
+
+  EXPECT_CALL(stream_callbacks,
+              onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+  // session_idle_list_.RemoveSession() will be called in TearDown.
+  EXPECT_CALL(session_idle_list_, RemoveSession(_)).Times(1);
 }
 
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {

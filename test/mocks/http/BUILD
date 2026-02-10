@@ -146,3 +146,11 @@ envoy_cc_mock(
         "//envoy/http:early_header_mutation_interface",
     ],
 )
+
+envoy_cc_mock(
+    name = "session_idle_list_mocks",
+    hdrs = ["session_idle_list.h"],
+    deps = [
+        "//source/common/http:session_idle_list_lib",
+    ],
+)

@@ -4,13 +4,20 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 
 #include "envoy/common/optref.h"
+#include "envoy/network/connection.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/http/session_idle_list.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+
+#include "quiche/quic/core/crypto/quic_crypto_server_config.h"
+#include "quiche/quic/core/quic_dispatcher.h"
 
 namespace Envoy {
 namespace Quic {
@@ -42,29 +49,40 @@ void EnvoyQuicTimeWaitListManager::SendPublicReset(const quic::QuicSocketAddress
 }
 
 EnvoyQuicDispatcher::EnvoyQuicDispatcher(
-    const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
+    const quic::QuicCryptoServerConfig* crypto_config,
+    const quic::QuicConfig& quic_config,
     quic::QuicVersionManager* version_manager,
     std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
     std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-    uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
-    Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
-    Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-    Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+    uint8_t expected_server_connection_id_length,
+    Network::ConnectionHandler& connection_handler,
+    Network::ListenerConfig& listener_config,
+    Server::ListenerStats& listener_stats,
+    Server::PerHandlerListenerStats& per_worker_stats,
+    Event::Dispatcher& dispatcher, Network::Socket& listen_socket,
+    QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     quic::ConnectionIdGeneratorInterface& generator,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
-    : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
-                           std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
-                           std::move(alarm_factory), expected_server_connection_id_length,
-                           generator),
-      connection_handler_(connection_handler), listener_config_(&listener_config),
-      listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
-      listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    std::unique_ptr<Http::SessionIdleList> session_idle_list)
+    : quic::QuicDispatcher(
+          &quic_config, crypto_config, version_manager, std::move(helper),
+          std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
+          std::move(alarm_factory), expected_server_connection_id_length,
+          generator),
+      connection_handler_(connection_handler),
+      listener_config_(&listener_config),
+      listener_stats_(listener_stats),
+      per_worker_stats_(per_worker_stats),
+      dispatcher_(dispatcher),
+      listen_socket_(listen_socket),
+      quic_stat_names_(quic_stat_names),
       crypto_server_stream_factory_(crypto_server_stream_factory),
       quic_stats_(generateStats(listener_config.listenerScope())),
-      connection_stats_({QUIC_CONNECTION_STATS(
-          POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
-      debug_visitor_factory_(debug_visitor_factory) {}
+      connection_stats_({QUIC_CONNECTION_STATS(POOL_COUNTER_PREFIX(
+          listener_config.listenerScope(), "quic.connection"))}),
+      debug_visitor_factory_(debug_visitor_factory),
+      session_idle_list_(std::move(session_idle_list)) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -126,12 +144,15 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       quic::ParsedQuicVersionVector{version}, std::move(connection_socket), connection_id_generator,
       std::move(listener_filter_manager));
+
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
-      quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
-      session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
+      quic_config, quic::ParsedQuicVersionVector{version},
+      std::move(quic_connection), this, session_helper(), crypto_config(),
+      compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
-      listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
-      connection_stats_, debug_visitor_factory_);
+      listener_config_->listenerScope(), crypto_server_stream_factory_,
+      std::move(stream_info), connection_stats_, debug_visitor_factory_,
+      session_idle_list_.get());
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
@@ -199,6 +220,13 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
 
 void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_listener_config) {
   listener_config_ = &new_listener_config;
+}
+
+// Close all connections currently in the idle list.
+void EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
+  // This method is called from the worker thread, triggered by the
+  // Overload Manager.
+  session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
 }
 
 } // namespace Quic

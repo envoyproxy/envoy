@@ -4,6 +4,7 @@
 
 #include "envoy/network/listener.h"
 
+#include "source/common/http/session_idle_list.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_session.h"
@@ -15,6 +16,8 @@
 
 namespace Envoy {
 namespace Quic {
+
+class EnvoyQuicDispatcherTest;
 
 #define QUIC_DISPATCHER_STATS(COUNTER) COUNTER(stateless_reset_packets_sent)
 
@@ -52,19 +55,25 @@ private:
 };
 
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
-public:
+ public:
   EnvoyQuicDispatcher(
-      const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
+      const quic::QuicCryptoServerConfig* crypto_config,
+      const quic::QuicConfig& quic_config,
       quic::QuicVersionManager* version_manager,
       std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
       std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
-      Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
-      Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-      Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+      uint8_t expected_server_connection_id_length,
+      Network::ConnectionHandler& connection_handler,
+      Network::ListenerConfig& listener_config,
+      Server::ListenerStats& listener_stats,
+      Server::PerHandlerListenerStats& per_worker_stats,
+      Event::Dispatcher& dispatcher, Network::Socket& listen_socket,
+      QuicStatNames& quic_stat_names,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       quic::ConnectionIdGeneratorInterface& generator,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
+          debug_visitor_factory,
+      std::unique_ptr<Http::SessionIdleList> session_idle_list);
 
   // quic::QuicDispatcher
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
@@ -82,12 +91,16 @@ public:
                      const quic::QuicSocketAddress& peer_address,
                      const quic::QuicReceivedPacket& packet);
 
-protected:
+  void closeIdleQuicConnections(bool is_saturated);
+
+ protected:
   // quic::QuicDispatcher
   std::unique_ptr<quic::QuicSession> CreateQuicSession(
-      quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
+      quic::QuicConnectionId server_connection_id,
+      const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
-      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
+      const quic::ParsedQuicVersion& version,
+      const quic::ParsedClientHello& parsed_chlo,
       quic::ConnectionIdGeneratorInterface& connection_id_generator) override;
 
   // quic::QuicDispatcher
@@ -95,7 +108,12 @@ protected:
   // then calls the parent class implementation.
   bool OnFailedToDispatchPacket(const quic::ReceivedPacketInfo& received_packet_info) override;
 
-private:
+ private:
+  friend class EnvoyQuicDispatcherTest;
+  Http::SessionIdleListInterface* idle_session_list() {
+    return session_idle_list_.get();
+  }
+
   Network::ConnectionHandler& connection_handler_;
   Network::ListenerConfig* listener_config_{nullptr};
   Server::ListenerStats& listener_stats_;
@@ -109,6 +127,10 @@ private:
   QuicConnectionStats connection_stats_;
   bool current_packet_dispatch_success_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory_;
+  // session_idle_list_, when non-null, tracks and kills sessions which are not
+  // doing any work. Session is added to this list when it has no active
+  // streams, and it is removed from this list when a new stream is created.
+  std::unique_ptr<Http::SessionIdleListInterface> session_idle_list_;
 };
 
 } // namespace Quic

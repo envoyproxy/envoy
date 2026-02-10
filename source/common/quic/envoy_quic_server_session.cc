@@ -3,16 +3,25 @@
 #include <iterator>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
+#include "absl/types/optional.h"
+#include "envoy/event/dispatcher.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/scope_tracker.h"
+#include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 
-#include "absl/types/optional.h"
+#include "quiche/quic/core/quic_config.h"
+#include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_stream.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/core/quic_versions.h"
 
 namespace Envoy {
 namespace Quic {
@@ -31,26 +40,34 @@ private:
   Event::ScopeTracker& tracker_;
   absl::optional<ScopeTrackerScopeState> state_;
 };
-} // namespace
+}  // namespace
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
-    const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
-    quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
-    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+    const quic::QuicConfig& config,
+    const quic::ParsedQuicVersionVector& supported_versions,
+    std::unique_ptr<EnvoyQuicServerConnection> connection,
+    quic::QuicSession::Visitor* visitor,
+    quic::QuicCryptoServerStream::Helper* helper,
+    const quic::QuicCryptoServerConfig* crypto_config,
+    quic::QuicCompressedCertsCache* compressed_certs_cache,
+    Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+    QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
-    : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
-                                  crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit,
-                                      std::make_shared<QuicSslConnectionInfo>(*this),
-                                      std::move(stream_info), quic_stat_names, listener_scope),
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
+    QuicConnectionStats& connection_stats,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    Http::SessionIdleListInterface* session_idle_list)
+    : quic::QuicServerSessionBase(config, supported_versions, connection.get(),
+                                  visitor, helper, crypto_config,
+                                  compressed_certs_cache),
+      QuicFilterManagerConnectionImpl(
+          *connection, connection->connection_id(), dispatcher,
+          send_buffer_limit, std::make_shared<QuicSslConnectionInfo>(*this),
+          std::move(stream_info), quic_stat_names, listener_scope),
       quic_connection_(std::move(connection)),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      connection_stats_(connection_stats) {
+      connection_stats_(connection_stats),
+      session_idle_list_(session_idle_list) {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
@@ -66,6 +83,8 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
+  // Session is destroyed, remove from idle list.
+  MaybeRemoveSessionFromIdleList();
   QuicFilterManagerConnectionImpl::network_connection_ = nullptr;
 }
 
@@ -125,6 +144,7 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
+  MaybeRemoveSessionFromIdleList();
   if (source == quic::ConnectionCloseSource::FROM_SELF) {
     setLocalCloseReason(frame.error_details);
   }
@@ -140,11 +160,13 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
     }
     position_.reset();
   }
+  on_connection_closed_called_ = true;
 }
 
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
   initialized_ = true;
+  MaybeAddSessionToIdleList();
   quic_connection_->setEnvoyConnection(*this, *this);
 }
 
@@ -273,5 +295,55 @@ EnvoyQuicServerSession::SelectAlpn(const std::vector<absl::string_view>& alpns) 
   return alpns.end();
 }
 
-} // namespace Quic
-} // namespace Envoy
+void EnvoyQuicServerSession::ActivateStream(
+    std::unique_ptr<quic::QuicStream> stream) {
+  bool streams_was_empty = !HasActiveRequestStreams();
+  QuicServerSessionBase::ActivateStream(std::move(stream));
+  if (streams_was_empty && HasActiveRequestStreams()) {
+    MaybeRemoveSessionFromIdleList();
+  }
+}
+
+void EnvoyQuicServerSession::OnStreamClosed(quic::QuicStreamId id) {
+  bool streams_was_empty = !HasActiveRequestStreams();
+
+  QuicServerSessionBase::OnStreamClosed(id);
+  if (on_connection_closed_called_) {
+    return;
+  }
+
+  if (!streams_was_empty && !HasActiveRequestStreams()) {
+    OnLastActiveStreamClosed();
+  }
+}
+
+void EnvoyQuicServerSession::TerminateIdleSession() {
+  ENVOY_BUG(!on_connection_closed_called_,
+            "TerminateIdleSession called after session on close called.");
+  connection()->CloseConnection(
+      quic::QUIC_NETWORK_IDLE_TIMEOUT, "Server overload",
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+}
+
+void EnvoyQuicServerSession::OnLastActiveStreamClosed() {
+  MaybeAddSessionToIdleList();
+}
+
+void EnvoyQuicServerSession::MaybeAddSessionToIdleList() {
+  if (session_idle_list_ == nullptr || is_in_idle_list_) {
+    return;
+  }
+  is_in_idle_list_ = true;
+  session_idle_list_->AddSession(*this);
+}
+
+void EnvoyQuicServerSession::MaybeRemoveSessionFromIdleList() {
+  if (session_idle_list_ == nullptr || !is_in_idle_list_) {
+    return;
+  }
+  is_in_idle_list_ = false;
+  session_idle_list_->RemoveSession(*this);
+}
+
+}  // namespace Quic
+}  // namespace Envoy
