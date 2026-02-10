@@ -136,6 +136,7 @@ private:
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback,
                                bool streaming_enabled);
+
   // Stream data to established connection(s).
   void streamData(Buffer::Instance& data, bool end_stream);
 
