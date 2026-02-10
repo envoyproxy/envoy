@@ -660,5 +660,82 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   EXPECT_EQ("greetings", response->body());
 }
 
+class AccessLogHandlerTestFilter : public Network::ReadFilter, public AccessLog::Instance {
+public:
+  AccessLogHandlerTestFilter(Stats::Scope& scope) : scope_(scope) {}
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) override {}
+
+  // AccessLog::Instance
+  void log(const AccessLog::LogContext&, const StreamInfo::StreamInfo&) override {
+    scope_.counterFromString("test_access_log_filter.log_called").inc();
+  }
+
+  Stats::Scope& scope_;
+};
+
+class AccessLogHandlerTestFilterFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext& context) override {
+    Stats::Scope& scope = context.scope();
+    return [&scope](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<AccessLogHandlerTestFilter>(scope);
+      filter_manager.addReadFilter(filter);
+      filter_manager.addAccessLogHandler(filter);
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
+  }
+
+  std::string name() const override { return "envoy.test.access_log_handler_filter"; }
+};
+
+class NetworkFilterAccessLogIntegrationTest : public BaseIntegrationTest, public testing::Test {
+public:
+  NetworkFilterAccessLogIntegrationTest()
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, ConfigHelper::tcpProxyConfig()) {}
+};
+
+TEST_F(NetworkFilterAccessLogIntegrationTest, AccessLogHandlerCalled) {
+  AccessLogHandlerTestFilterFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_factory(
+      factory);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    auto* filter = filter_chain->add_filters();
+    filter->set_name("envoy.test.access_log_handler_filter");
+    filter->mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
+    // Move to front
+    for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
+      filter_chain->mutable_filters()->SwapElements(i, i - 1);
+    }
+  });
+
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  test_server_->waitForCounterGe("test_access_log_filter.log_called", 1);
+}
+
 } // namespace
 } // namespace Envoy

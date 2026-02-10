@@ -17,7 +17,7 @@ envoy_cc_library(
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/compression/brotli/common:brotli_base_lib",
-        "@org_brotli//:brotlienc",
+        "@brotli//:brotlienc",
     ],
 )
 

@@ -57,9 +57,11 @@ jobs:
     with:
       arch: ${{ matrix.arch || 'x64' }}
       caches: ${{ inputs.caches }}
+      output-base: ${{ matrix.output-base || 'base' }}
       request: ${{ inputs.env }}
       runs-on: ${{ matrix.runs-on }}
       targets: ${{ matrix.targets || '...' }}
+      working-dir: ${{ matrix.working-dir || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -72,3 +74,13 @@ jobs:
             //test/...
             //contrib/...
             //source/...
+        - name: Bazel docs (x64/cache)
+          output-base: docs
+          targets: //:envoy-docs
+          working-dir: docs
+        - name: Bazel external (x64/cache)
+          output-base: external
+          targets: >-
+            @envoy//source/common/common:assert_lib
+            @envoy-docs
+          working-dir: bazel/tests/external

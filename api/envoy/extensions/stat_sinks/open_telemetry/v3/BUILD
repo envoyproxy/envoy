@@ -7,7 +7,7 @@ licenses(["notice"])  # Apache 2
 api_proto_package(
     deps = [
         "//envoy/config/core/v3:pkg",
-        "@opentelemetry_proto//:common_proto",
+        "@opentelemetry-proto//:common_proto",
         "@xds//udpa/annotations:pkg",
         "@xds//xds/type/matcher/v3:pkg",
     ],

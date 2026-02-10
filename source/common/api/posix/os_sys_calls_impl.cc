@@ -1,3 +1,5 @@
+#include "source/common/api/os_sys_calls_impl.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -7,7 +9,6 @@
 
 #include "envoy/network/socket.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24

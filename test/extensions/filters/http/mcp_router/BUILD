@@ -38,6 +38,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "mcp_router_sse_test",
+    srcs = ["mcp_router_sse_test.cc"],
+    extension_names = ["envoy.filters.http.mcp_router"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http/sse:sse_parser_lib",
+        "//source/extensions/filters/http/mcp_router:mcp_router_lib",
+        "//test/mocks/http:http_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mcp_router_integration_test",
     size = "large",
     srcs = ["mcp_router_integration_test.cc"],

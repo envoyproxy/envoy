@@ -109,7 +109,7 @@ envoy_cc_library(
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-            "@envoy//bazel:boringssl",
+            "@envoy//bazel:ssl",
         ],
         "//conditions:default": [],
     }),
