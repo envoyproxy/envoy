@@ -10,6 +10,14 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "transport_socket_abi_lib",
+    hdrs = ["transport_socket_abi.h"],
+    deps = [
+        "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
+envoy_cc_library(
     name = "dynamic_modules_lib",
     srcs = ["dynamic_modules.cc"],
     hdrs = [
