@@ -249,6 +249,19 @@ index 3fb5d68146..583a2f9553 100644
      return PromiseFactoryImpl(RepeatableToken{}, f_);
    }
  };
+diff --git a/src/core/load_balancing/health_check_client.cc b/src/core/load_balancing/health_check_client.cc
+index c84f6d0a48..9f8bee2c53 100644
+--- a/src/core/load_balancing/health_check_client.cc
++++ b/src/core/load_balancing/health_check_client.cc
+@@ -57,7 +57,7 @@
+ #include "src/core/util/ref_counted_ptr.h"
+ #include "src/core/util/sync.h"
+ #include "src/core/util/work_serializer.h"
+-#include "src/proto/grpc/health/v1/health.upb.h"
++#include "grpc/health/v1/health.upb.h"
+ #include "upb/base/string_view.h"
+ #include "upb/mem/arena.hpp"
+ 
 diff --git a/src/core/util/glob.cc b/src/core/util/glob.cc
 index 1b1c16e23d..22e54259f0 100644
 --- a/src/core/util/glob.cc
@@ -263,14 +276,14 @@ index 1b1c16e23d..22e54259f0 100644
  
  namespace grpc_core {
 diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
-index f6165e0392..120505f128 100644
+index f6165e0392..90e86a5c50 100644
 --- a/src/proto/grpc/health/v1/BUILD
 +++ b/src/proto/grpc/health/v1/BUILD
 @@ -24,6 +24,7 @@ grpc_package(
  grpc_internal_proto_library(
      name = "health_proto",
      srcs = ["health.proto"],
-+    strip_import_prefix = "/src/proto/",
++    strip_import_prefix = "/src/proto",
      has_services = True,
  )
  
