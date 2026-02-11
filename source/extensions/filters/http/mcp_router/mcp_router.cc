@@ -123,7 +123,10 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
 Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   // Initialize on first data chunk - mcp_filter has already parsed metadata
   if (!initialized_) {
+    config_->stats().rq_total_.inc();
+
     if (!readMetadataFromMcpFilter()) {
+      config_->stats().rq_invalid_.inc();
       sendHttpError(400, "Invalid or missing MCP request");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -132,7 +135,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
               request_id_);
 
     if (!encoded_session_id_.empty() && !decodeAndParseSession()) {
-      // decodeAndParseSession already sent the appropriate error response
+      // decodeAndParseSession already sent the appropriate error response.
+      // Stats are incremented inside decodeAndParseSession.
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -199,6 +203,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       break;
 
     default:
+      config_->stats().rq_invalid_.inc();
       sendHttpError(400, "Unsupported method");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -208,6 +213,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
     // Perform body rewriting if needed (e.g., tool/prompt name or URI prefix stripping).
     // This is done once on the first data chunk after initialization.
     if (needs_body_rewrite_) {
+      config_->stats().rq_body_rewrite_.inc();
       if (method_ == McpMethod::ToolsCall) {
         rewriteToolCallBody(data);
       } else if (method_ == McpMethod::ResourcesRead || method_ == McpMethod::ResourcesSubscribe ||
@@ -315,6 +321,7 @@ bool McpRouterFilter::decodeAndParseSession() {
   std::string decoded = SessionCodec::decode(encoded_session_id_);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
+    config_->stats().rq_session_invalid_.inc();
     sendHttpError(400, "Invalid session ID");
     return false;
   }
@@ -322,6 +329,7 @@ bool McpRouterFilter::decodeAndParseSession() {
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
   if (!parsed.ok()) {
     ENVOY_LOG(warn, "Failed to parse session: {}", parsed.status().message());
+    config_->stats().rq_session_invalid_.inc();
     sendHttpError(400, "Invalid session ID");
     return false;
   }
@@ -380,12 +388,14 @@ bool McpRouterFilter::validateSubjectIfRequired() {
   auto auth_subject = getAuthenticatedSubject();
   if (!auth_subject.ok()) {
     ENVOY_LOG(warn, "Failed to get authenticated subject: {}", auth_subject.status().message());
+    config_->stats().rq_auth_failure_.inc();
     sendHttpError(403, "Unable to verify session identity");
     return false;
   }
 
   if (session_subject_ != *auth_subject) {
     ENVOY_LOG(warn, "Session subject mismatch: session='{}'", session_subject_);
+    config_->stats().rq_auth_failure_.inc();
     sendHttpError(403, "Session identity mismatch");
     return false;
   }
@@ -562,6 +572,7 @@ ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos
 }
 
 void McpRouterFilter::initializeFanout(AggregationCallback callback) {
+  config_->stats().rq_fanout_.inc();
   if (config_->backends().empty()) {
     sendHttpError(500, "No backends configured");
     return;
@@ -835,12 +846,14 @@ void McpRouterFilter::handleToolsCall() {
   auto [backend_name, actual_tool] = parseToolName(tool_name_);
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Invalid tool name '{}': cannot determine backend", tool_name_));
     return;
   }
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in tool name", backend_name));
     return;
   }
@@ -871,6 +884,7 @@ void McpRouterFilter::handleToolsCall() {
             self->sendJsonResponse(resp.body, self->encoded_session_id_);
           }
         } else {
+          self->config_->stats().rq_backend_failure_.inc();
           self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
         }
       },
@@ -878,6 +892,7 @@ void McpRouterFilter::handleToolsCall() {
 }
 
 void McpRouterFilter::handlePing() {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "Ping: responding immediately with empty result");
 
   // Ping is a request/response pattern - respond immediately with empty result.
@@ -888,6 +903,7 @@ void McpRouterFilter::handlePing() {
 }
 
 void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
 
   // Forward notification to all backends and wait for responses.
@@ -927,6 +943,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
   auto [backend_name, actual_uri] = parseResourceUri(resource_uri_);
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(
         400, fmt::format("Invalid resource URI '{}': cannot determine backend", resource_uri_));
     return;
@@ -934,6 +951,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in resource URI", backend_name));
     return;
   }
@@ -948,6 +966,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
@@ -977,6 +996,7 @@ void McpRouterFilter::handlePromptsGet() {
   auto [backend_name, actual_prompt] = parsePromptName(prompt_name_);
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400,
                   fmt::format("Invalid prompt name '{}': cannot determine backend", prompt_name_));
     return;
@@ -984,6 +1004,7 @@ void McpRouterFilter::handlePromptsGet() {
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in prompt name", backend_name));
     return;
   }
@@ -998,6 +1019,7 @@ void McpRouterFilter::handlePromptsGet() {
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
@@ -1019,6 +1041,7 @@ void McpRouterFilter::handleLoggingSetLevel() {
     }
 
     if (!any_success) {
+      config_->stats().rq_fanout_failure_.inc();
       sendHttpError(500, "All backends failed to set logging level");
       return;
     }
@@ -1060,12 +1083,14 @@ void McpRouterFilter::handleCompletionComplete() {
   }
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, "Cannot determine backend for completion request");
     return;
   }
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in completion ref", backend_name));
     return;
   }
@@ -1074,6 +1099,7 @@ void McpRouterFilter::handleCompletionComplete() {
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
@@ -1085,6 +1111,7 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
                                        [](const BackendResponse& resp) { return resp.success; });
 
   if (!any_success) {
+    config_->stats().rq_fanout_failure_.inc();
     return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
                         R"(,"error":{"code":-32603,"message":"All backends failed"}})");
   }
