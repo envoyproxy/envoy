@@ -1,7 +1,15 @@
+#include "envoy/stats/sink.h"
+
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -12,6 +20,16 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
+
+class MockScopeWithGauge : public Stats::MockScope {
+public:
+  using Stats::MockScope::MockScope;
+
+  MOCK_METHOD(Stats::Gauge&, gaugeFromStatNameWithTags,
+              (const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+               Stats::Gauge::ImportMode import_mode),
+              (override));
+};
 
 class StatsAccessLoggerTest : public testing::Test {
 public:
@@ -54,7 +72,16 @@ public:
     EXPECT_CALL(store_.mockScope(), createScope_(_))
         .WillOnce(Invoke([this](const std::string& name) {
           Stats::StatNameDynamicStorage storage(name, context_.store_.symbolTable());
-          scope_ = std::make_shared<NiceMock<Stats::MockScope>>(storage.statName(), store_);
+          auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(storage.statName(), store_);
+          ON_CALL(*scope, gaugeFromStatNameWithTags(_, _, _))
+              .WillByDefault(Invoke(
+                  [scope_ptr = scope.get()](const Stats::StatName& name,
+                                            Stats::StatNameTagVectorOptConstRef tags,
+                                            Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
+                    return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
+                                                                                  import_mode);
+                  }));
+          scope_ = scope;
           return scope_;
         }));
 
@@ -594,18 +621,41 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
 )EOF";
   initialize(yaml);
 
+  auto* mock_scope = dynamic_cast<MockScopeWithGauge*>(scope_.get());
+  ASSERT_TRUE(mock_scope != nullptr);
+
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
 
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
 
+  Stats::StatName saved_name;
+  Stats::StatNameTagVector saved_tags;
+
   // Initial lookup and add
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
+      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
+        saved_name = name;
+        if (tags) {
+          saved_tags = tags->get();
+        }
+        return *gauge_;
+      }));
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
   // Simulate eviction from scope (or just verify lookup happens again)
   // The destructor of AccessLogState should call gaugeFromStatNameWithTags again.
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*mock_scope,
+              gaugeFromStatNameWithTags(saved_name, _, Stats::Gauge::ImportMode::Accumulate))
+      .WillOnce(Invoke([&](const Stats::StatName&, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
+        EXPECT_TRUE(tags.has_value());
+        if (tags) {
+          EXPECT_EQ(tags->get().size(), saved_tags.size());
+        }
+        return *gauge_;
+      }));
   EXPECT_CALL(*gauge_, sub(10));
 
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.

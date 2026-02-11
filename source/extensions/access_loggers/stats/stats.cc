@@ -23,22 +23,14 @@ public:
   // name and tags to re-lookup/re-create it in the scope.
   ~AccessLogState() override {
     for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      auto tags = state.gauge_->tags();
+      // TODO(taoxuy):  make this as an accessor of the
+      // Stat class.
       Stats::StatNameTagVector tag_names;
-      tag_names.reserve(tags.size());
-
-      std::vector<Stats::StatNameManagedStorage> storage;
-      storage.reserve(tags.size() * 2);
-
-      Stats::SymbolTable& symbol_table = scope_->symbolTable();
-
-      for (const auto& tag : tags) {
-        storage.emplace_back(tag.name_, symbol_table);
-        Stats::StatName name = storage.back().statName();
-        storage.emplace_back(tag.value_, symbol_table);
-        Stats::StatName value = storage.back().statName();
-        tag_names.emplace_back(name, value);
-      }
+      state.gauge_->iterateTagStatNames(
+          [&tag_names](Stats::StatName name, Stats::StatName value) -> bool {
+            tag_names.emplace_back(name, value);
+            return true;
+          });
 
       auto& gauge = scope_->gaugeFromStatNameWithTags(
           state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
