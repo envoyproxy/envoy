@@ -24,7 +24,7 @@
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "src/proto/grpc/health/v1/health.pb.h"
+#include "grpc/health/v1/health.pb.h"
 
 namespace Envoy {
 namespace Upstream {
