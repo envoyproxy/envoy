@@ -6,6 +6,7 @@
 
 pub mod access_log;
 pub mod buffer;
+pub mod cert_validator;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
@@ -3935,7 +3936,7 @@ macro_rules! declare_network_filter_init_functions {
 /// Declare the init functions for the dynamic module with any combination of filter types.
 ///
 /// This macro allows a single module to provide any combination of HTTP, Network, Listener,
-/// UDP Listener, and Bootstrap filters.
+/// UDP Listener, Bootstrap filters, and Certificate Validators.
 ///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
@@ -3948,6 +3949,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
+/// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 ///
 /// # Examples
 ///
@@ -4000,6 +4002,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register bootstrap : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register cert_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -8338,6 +8344,179 @@ macro_rules! declare_load_balancer_init_functions {
         .get_or_init(|| $new_lb_config_fn);
       if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =============================================================================
+// Certificate Validator
+// =============================================================================
+
+use cert_validator::CertValidatorConfig;
+
+/// The function signature for creating a new cert validator configuration.
+pub type NewCertValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn cert_validator::CertValidatorConfig>>;
+
+/// Global function for creating cert validator configurations.
+pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFunction> =
+  OnceLock::new();
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let new_config_fn = NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
+}
+
+// Thread-local storage for the last cert validation error string. This keeps the error string
+// alive across the FFI boundary so the C++ caller can safely read the pointer in the returned
+// ABI struct before it is overwritten by the next call.
+thread_local! {
+  static CERT_VALIDATOR_LAST_ERROR: std::cell::RefCell<Option<String>> =
+    const { std::cell::RefCell::new(None) };
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  certs_count: usize,
+  host_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  is_server: bool,
+) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+
+  let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
+  let cert_slices: Vec<&[u8]> = cert_buffers
+    .iter()
+    .map(|buf| std::slice::from_raw_parts(buf.ptr as *const u8, buf.length))
+    .collect();
+
+  let host_name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    host_name.ptr as *const _,
+    host_name.length,
+  ));
+
+  let result = config.do_verify_cert_chain(&cert_slices, host_name_str, is_server);
+
+  // Store error details in thread-local to keep the string alive across the FFI boundary.
+  // The returned ABI struct contains a pointer to this data which must remain valid until
+  // the C++ caller copies it.
+  CERT_VALIDATOR_LAST_ERROR.with(|cell| {
+    *cell.borrow_mut() = result.error_details.clone();
+    let error_ref = cell.borrow();
+    result.to_abi(&error_ref)
+  })
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  handshaker_provides_certificates: bool,
+) -> std::os::raw::c_int {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+  config.get_ssl_verify_mode(handshaker_provides_certificates)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  out_data: *mut abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+  let digest = config.update_digest();
+  (*out_data).ptr = digest.as_ptr() as *const _;
+  (*out_data).length = digest.len();
+}
+
+/// Declare the init functions for a cert validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the cert validator module.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_cert_validator_config(
+///   name: &str,
+///   config: &[u8],
+/// ) -> Option<Box<dyn CertValidatorConfig>> {
+///   Some(Box::new(MyCertValidatorConfig {}))
+/// }
+///
+/// declare_cert_validator_init_functions!(program_init, new_cert_validator_config);
+///
+/// struct MyCertValidatorConfig {}
+///
+/// impl CertValidatorConfig for MyCertValidatorConfig {
+///   fn do_verify_cert_chain(
+///     &self,
+///     certs: &[&[u8]],
+///     host_name: &str,
+///     is_server: bool,
+///   ) -> ValidationResult {
+///     ValidationResult::successful()
+///   }
+///
+///   fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+///     0x03
+///   }
+///
+///   fn update_digest(&self) -> &[u8] {
+///     b"my_cert_validator"
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_cert_validator_init_functions {
+  ($f:ident, $new_cert_validator_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+        .get_or_init(|| $new_cert_validator_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
