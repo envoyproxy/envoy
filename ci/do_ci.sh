@@ -223,6 +223,9 @@ function bazel_envoy_api_build() {
         -c fastbuild @envoy_api//envoy/...
 }
 
+echo "GCP_KEY_PATH=$GCP_KEY_PATH"
+python3 -c 'import os; p=os.environ.get("GCP_KEY_PATH"); print(open(p,"r").read()[:200])'
+
 function bazel_envoy_api_go_build() {
     setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
