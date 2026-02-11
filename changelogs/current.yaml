@@ -264,5 +264,9 @@ new_features:
     Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
     regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
     text and JSON output (e.g., ``/clusters?filter=service&format=json``).
+- area: mcp_router
+  change: |
+    Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
+    observability into request routing, fanout operations, and error conditions.
 
 deprecated:

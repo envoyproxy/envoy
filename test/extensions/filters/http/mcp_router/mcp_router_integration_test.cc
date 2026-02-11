@@ -145,6 +145,10 @@ TEST_P(McpRouterIntegrationTest, PingReturnsEmptyResult) {
   EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"id\":3"));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"result\":{}"));
+
+  // Verify stats: ping is a direct response
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
 }
 
 // Test notifications/initialized request returns 202 Accepted
@@ -171,6 +175,11 @@ TEST_P(McpRouterIntegrationTest, NotificationInitializedReturns202) {
   // Notification should return 202 Accepted immediately
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("202", response->headers().getStatusValue());
+
+  // Verify stats: notification is a direct response with fanout
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
 }
 
 // Test invalid JSON returns 400
@@ -296,6 +305,10 @@ TEST_P(McpRouterIntegrationTest, InitializeFanoutToBothBackends) {
 
   EXPECT_THAT(response->body(), testing::HasSubstr("protocolVersion"));
   EXPECT_THAT(response->body(), testing::HasSubstr("envoy-mcp-gateway"));
+
+  // Verify stats: initialize is a fanout operation
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
 }
 
 // Test tools/list request fans out to both backends and aggregates tools with prefixes
@@ -422,6 +435,10 @@ TEST_P(McpRouterIntegrationTest, ToolCallRoutesToCorrectBackend) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("2023-10-27T10:00:00Z"));
+
+  // Verify stats: tool call with body rewrite
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_body_rewrite", 1);
 }
 
 // Test tools/call routes to the second backend (tools) based on prefix
@@ -847,9 +864,12 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Unknown backend prefix should return 400 Bad Request
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
+
+  // Verify stats: unknown backend
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_unknown_backend", 1);
 }
 
 // Test tools/call with SSE response from backend returns SSE to client
@@ -1980,6 +2000,10 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMismatchReturns403) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
+
+  // Verify stats: auth failure (subject mismatch)
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_auth_failure", 1);
 }
 
 // Missing auth header returns 403
