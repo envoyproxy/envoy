@@ -303,6 +303,17 @@ TEST_P(AdminInstanceTest, TestClusterFilter) {
   EXPECT_EQ(0, output_proto.cluster_statuses_size());
   response.drain(response.length());
 
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json&filter=", header_map, response));
+  output_json = response.toString();
+  TestUtility::loadFromJson(output_json, output_proto);
+  for (const auto& cluster_status : output_proto.cluster_statuses()) {
+    cluster_names.push_back(cluster_status.name());
+  }
+  EXPECT_THAT(cluster_names, testing::UnorderedElementsAre("test-bar-1", "test-foo-2", "test-baz-3",
+                                                           "test-bar-4"));
+  response.drain(response.length());
+  cluster_names.clear();
+
   EXPECT_EQ(Http::Code::OK,
             getCallback("/clusters?filter=^(test-bar-1|test-baz-3)$", header_map, response));
   std::string output_text = response.toString();
