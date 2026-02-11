@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   large numbers of stats in Envoy, which can cause excessive memory or CPU use
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
-//
+
 // [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
