@@ -12,7 +12,7 @@ index 9e067aa29e..089a447ec4 100644
  )
  
 diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
-index a3b8923b6e..5c11639f38 100644
+index a3b8923b6e..87c59a932a 100644
 --- a/bazel/grpc_build_system.bzl
 +++ b/bazel/grpc_build_system.bzl
 @@ -27,7 +27,6 @@
@@ -44,7 +44,7 @@ index a3b8923b6e..5c11639f38 100644
          srcs = [],
          deps = [],
          visibility = None,
-+	strip_import_prefix = None,
++        strip_import_prefix = None,
          has_services = False):  # buildifier: disable=unused-variable
      proto_library(
          name = name,
