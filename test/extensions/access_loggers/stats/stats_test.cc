@@ -31,6 +31,15 @@ public:
               (override));
 };
 
+// MockGaugeWithTags is introduced to support iterateTagStatNames which is used in
+// AccessLogState destructor to reconstruct the gauge with tags.
+//
+// It uses StatNameDynamicStorage to own the storage for tag names and values.
+// This is necessary because the tags passed to gaugeFromStatNameWithTags during
+// logging are often backed by temporary storage (stack-allocated in emitLogConst)
+// which is destroyed after the log call returns. By making a copy into
+// tags_storage_, we ensure that iterateTagStatNames returns valid StatNames even
+// if called later (e.g. in AccessLogState::~AccessLogState).
 class MockGaugeWithTags : public Stats::MockGauge {
 public:
   using Stats::MockGauge::MockGauge;
@@ -99,8 +108,10 @@ public:
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
     EXPECT_CALL(store_.mockScope(), createScope_(_))
         .WillOnce(Invoke([this](const std::string& name) {
-          Stats::StatNameDynamicStorage storage(name, context_.store_.symbolTable());
-          auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(storage.statName(), store_);
+          scope_name_storage_ =
+              std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
+          auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
+              scope_name_storage_->statName(), store_);
           ON_CALL(*scope, gaugeFromStatNameWithTags(_, _, _))
               .WillByDefault(Invoke(
                   [scope_ptr = scope.get()](const Stats::StatName& name,
@@ -121,6 +132,7 @@ public:
   NiceMock<Stats::MockStore> store_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::shared_ptr<Stats::MockScope> scope_;
+  std::unique_ptr<Stats::StatNameDynamicStorage> scope_name_storage_;
   std::unique_ptr<StatsAccessLog> logger_;
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
