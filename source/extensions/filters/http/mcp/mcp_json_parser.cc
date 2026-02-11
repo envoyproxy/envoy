@@ -310,9 +310,12 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
   }
 
-  // When we finish the root object, do selective extraction
+  // When we finish the root object, do selective extraction.
+  // Also set can_stop_parsing_ to avoid buffering more data — the root object
+  // is complete, so no more top-level fields (jsonrpc, method, id) can appear.
   if (depth_ == 0 && !can_stop_parsing_) {
     finalizeExtraction();
+    can_stop_parsing_ = true;
   }
 
   return this;
