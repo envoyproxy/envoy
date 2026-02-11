@@ -90,7 +90,7 @@ static_resources:
           #       envoy_grpc:
           #         cluster_name: ext-authz
           #     metadata_context_namespaces:
-          #     - envoy.filters.http.mcp
+          #       - envoy.filters.http.mcp
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
