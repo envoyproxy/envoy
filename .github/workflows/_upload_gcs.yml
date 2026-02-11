@@ -21,33 +21,28 @@ jobs:
     permissions:
       contents: read
     strategy:
+      fail-fast: false
       matrix:
         artifact: ${{ fromJSON(inputs.artifacts) }}
     steps:
     - uses: actions/download-artifact@v4.1.3
-      id: download
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-      continue-on-error: true
     - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: steps.download.outcome == 'success'
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
         input-format: json-path
-    - if: steps.download.outcome == 'success'
-      run: |
+    - run: |
         rm -rf ${{ matrix.artifact }}/gcs-metadata.json
     - uses: envoyproxy/toolshed/actions/gcp/setup@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: steps.download.outcome == 'success'
       with:
         key: ${{ secrets.gcp-key }}
     - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: steps.download.outcome == 'success'
       with:
-        bucket: ${{ steps.metadata.outputs.bucket }}
+        bucket: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
         path: ${{ matrix.artifact }}
-        path-upload: ${{ matrix.target }}
-        sha: ${{ steps.metadata.outputs.sha }}
-        redirect: ${{ steps.metadata.outputs.redirect }}
+        path-upload: ${{ matrix.artifact }}
+        sha: ${{ fromJSON(steps.metadata.outputs.value).sha }}
+        redirect: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
