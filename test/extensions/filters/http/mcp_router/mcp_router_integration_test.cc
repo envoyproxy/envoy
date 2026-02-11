@@ -1092,6 +1092,151 @@ TEST_P(McpRouterIntegrationTest, ResourcesListFanoutAggregation) {
   EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://data"));
 }
 
+// Test resources/list aggregates SSE responses from backends into JSON.
+TEST_P(McpRouterIntegrationTest, ResourcesListAggregatesSseResponses) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 25
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend responds with SSE.
+  const std::string time_json =
+      R"({"jsonrpc":"2.0","id":25,"result":{"resources":[{"uri":"file://current_time","name":"Current Time","mimeType":"text/plain"}]}})";
+  const std::string time_sse = "data: " + time_json + "\n\n";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl time_body(time_sse);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend responds with regular JSON.
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 25,
+    "result": {
+      "resources": [
+        {"uri": "file://config", "name": "Config File", "description": "Configuration settings"},
+        {"uri": "file://data", "name": "Data File"}
+      ]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  // Wait for aggregated response.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Aggregated response should contain resources from both backends with correct URI prefixes.
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("time+file://current_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://config"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://data"));
+}
+
+// Test resources/list aggregation when a backend sends SSE with intermediate notifications
+// before the final response. The client should receive an SSE response with the notification
+// forwarded and the aggregated result as the final event.
+TEST_P(McpRouterIntegrationTest, ResourcesListSseWithIntermediateNotifications) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 26
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend sends SSE with a notification event followed by the final response.
+  const std::string notification_event =
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\","
+      "\"params\":{\"progressToken\":\"abc\",\"progress\":50,\"total\":100}}\n\n";
+  const std::string response_event =
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"id\":26,\"result\":{\"resources\":"
+      "[{\"uri\":\"file://current_time\",\"name\":\"Current Time\"}]}}\n\n";
+  const std::string time_sse = notification_event + response_event;
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl time_body(time_sse);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend responds with regular JSON.
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 26,
+    "result": {
+      "resources": [
+        {"uri": "file://config", "name": "Config File"}
+      ]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Because intermediate notifications were forwarded, response should be SSE.
+  EXPECT_EQ("text/event-stream", response->headers().getContentTypeValue());
+  // The notification should be forwarded to client.
+  EXPECT_THAT(response->body(), testing::HasSubstr("notifications/progress"));
+  // The aggregated result should contain resources from both backends.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time+file://current_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://config"));
+}
+
 // Test resources/read routes to correct backend based on URI scheme.
 TEST_P(McpRouterIntegrationTest, ResourcesReadRoutesToCorrectBackend) {
   initializeFilter();
