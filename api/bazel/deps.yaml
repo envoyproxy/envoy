@@ -128,5 +128,6 @@ rules_proto:
   release_date: "2024-12-18"
   use_category:
   - api
+  - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_proto/blob/{version}/LICENSE"

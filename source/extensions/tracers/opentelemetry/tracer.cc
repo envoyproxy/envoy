@@ -183,6 +183,19 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   setAttribute(name, value);
 }
 
+void Span::log(SystemTime timestamp, const std::string& event) {
+  if (event.empty()) {
+    return;
+  }
+
+  ::opentelemetry::proto::trace::v1::Span::Event span_event =
+      ::opentelemetry::proto::trace::v1::Span::Event();
+  span_event.set_time_unix_nano(std::chrono::nanoseconds(timestamp.time_since_epoch()).count());
+  span_event.set_name(std::string{event});
+
+  *span_.add_events() = span_event;
+}
+
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,

@@ -115,13 +115,11 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
+  // We expect a warning log for ABI version mismatch but still load the module successfully.
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {

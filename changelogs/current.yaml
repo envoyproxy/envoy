@@ -111,6 +111,9 @@ bug_fixes:
     Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
     server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
     returned 403 Forbidden regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -130,12 +133,25 @@ new_features:
     The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
     use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
     set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
-    the protobuf format.
+    the protobuf format. Additionally, when using the protobuf exposition format, the admin prometheus stats
+    endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
+    when using the prometheus protobuf exposition format, using query
+    ``/stats/prometheus?histogram_buckets=prometheusnative``.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: dynamic modules
+  change: |
+    Introduced the extended ABI forward compatibility mechanism for dynamic modules
+    where modules built with a SDK version can be loaded by Envoy
+    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
+    can now be loaded by an Envoy binary of v1.39.
+- area: dynamic modules
+  change: |
+    Added support for dynamic modules authors to register any combination of http, network, listener,
+    udp listener, and bootstrap filters in the rust SDK.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
@@ -193,6 +209,16 @@ new_features:
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
+- area: mcp_router
+  change: |
+    Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
+    SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
+    aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+- area: dynamic_modules
+  change: |
+    Added :ref:`load balancing policies
+    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
@@ -213,9 +239,18 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: dynamic_modules
+  change: |
+    Added a process-wide function registry to the dynamic modules ABI. Modules can register
+    functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
+    can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
+    cross-module interactions analogous to ``dlsym``.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: tracers
+  change: |
+    Add log events to spans created by OpenTelemetry tracer.
 
 deprecated:

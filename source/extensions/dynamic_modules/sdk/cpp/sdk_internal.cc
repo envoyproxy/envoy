@@ -2,7 +2,6 @@
 #include <cstdint>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 #include "absl/synchronization/mutex.h"
 #include "sdk.h"
@@ -590,7 +589,7 @@ struct HttpFilterFactoryWrapper {
 extern "C" {
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return Envoy::Extensions::DynamicModules::kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 envoy_dynamic_module_type_http_filter_config_module_ptr
