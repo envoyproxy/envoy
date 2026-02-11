@@ -828,6 +828,7 @@ void McpRouterFilter::handleInitialize() {
 }
 
 void McpRouterFilter::handlePing() {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "Ping: responding immediately with empty result");
 
   // Ping is a request/response pattern - respond immediately with empty result.
@@ -838,6 +839,7 @@ void McpRouterFilter::handlePing() {
 }
 
 void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
 
   // Forward notification to all backends and wait for responses.
@@ -1087,6 +1089,7 @@ void McpRouterFilter::handleLoggingSetLevel() {
     }
 
     if (!any_success) {
+      config_->stats().rq_fanout_failure_.inc();
       sendHttpError(500, "All backends failed to set logging level");
       return;
     }
