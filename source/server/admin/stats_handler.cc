@@ -117,6 +117,11 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     return std::make_unique<PrometheusRequest>(*this, params, admin_stream);
   }
 
+  if (params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::PrometheusNative) {
+    return Admin::makeStaticTextRequest(
+        "Invalid histogram_buckets type for non prometheus stats type", Http::Code::BadRequest);
+  }
+
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
@@ -160,7 +165,7 @@ Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
                                                   const Http::RequestHeaderMap& request_headers,
                                                   Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance& response) {
-  absl::Status paramsStatus = PrometheusStatsFormatter::validateParams(params);
+  absl::Status paramsStatus = PrometheusStatsFormatter::validateParams(params, request_headers);
   if (!paramsStatus.ok()) {
     response.add(paramsStatus.message());
     return Http::Code::BadRequest;

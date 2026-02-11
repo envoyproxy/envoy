@@ -557,7 +557,9 @@ envoy_cc_library(
     srcs = ["filter_state_proxy_info.cc"],
     hdrs = ["filter_state_proxy_info.h"],
     deps = [
+        ":utility_lib",
         "//envoy/network:address_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
     ],
