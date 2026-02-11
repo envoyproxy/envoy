@@ -146,10 +146,11 @@ public:
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
         quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
-        quic_connection_(new MockEnvoyQuicServerConnection(
+        quic_connection_(new testing::NiceMock<MockEnvoyQuicServerConnection>(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_,
             connection_id_generator_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
+
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         connection_stats_({QUIC_CONNECTION_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "quic.connection"))}),
@@ -184,7 +185,11 @@ public:
                           const quic::QuicPacketWriterParams&) {
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         });
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+        .WillRepeatedly(Invoke([](const quic::QuicFrame& frame) {
+          quic::DeleteFrame(&const_cast<quic::QuicFrame&>(frame));
+          return true;
+        }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
     EXPECT_CALL(write_total_, add(_)).Times(AnyNumber());
     EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionClosed(_, _));
@@ -262,6 +267,7 @@ public:
           .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
 protected:
@@ -287,7 +293,7 @@ protected:
   TestEnvoyQuicServerSession envoy_quic_session_;
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   std::shared_ptr<Network::MockReadFilter> read_filter_;
-  Network::MockConnectionCallbacks network_connection_callbacks_;
+  testing::NiceMock<Network::MockConnectionCallbacks> network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
