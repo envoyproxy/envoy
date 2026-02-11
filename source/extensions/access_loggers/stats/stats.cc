@@ -32,6 +32,12 @@ public:
             return true;
           });
 
+      // Using state.gauge_->statName() directly would be incorrect because it returns the fully
+      // qualified name (including tags). Passing this full name to scope_->gaugeFromStatName(...)
+      // would cause the scope to attempt tag extraction on the full name. Since the tags in
+      // AccessLogState are often dynamic and not configured in the global tag extractors, this
+      // extraction would likely fail to identify the tags correctly, resulting in a gauge with a
+      // different identity (the full name as the stat name and no tags).
       auto& gauge = scope_->gaugeFromStatNameWithTags(
           state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
       gauge.sub(state.value_);

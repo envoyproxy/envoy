@@ -31,6 +31,33 @@ public:
               (override));
 };
 
+class MockGaugeWithTags : public Stats::MockGauge {
+public:
+  using Stats::MockGauge::MockGauge;
+
+  void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
+    for (const auto& tag : tags_storage_) {
+      if (!fn(tag.first->statName(), tag.second->statName()))
+        return;
+    }
+  }
+
+  void setTags(const Stats::StatNameTagVector& tags, Stats::SymbolTable& symbol_table) {
+    tags_storage_.clear();
+    tags_storage_.reserve(tags.size());
+    for (const auto& tag : tags) {
+      tags_storage_.emplace_back(std::make_unique<Stats::StatNameDynamicStorage>(
+                                     symbol_table.toString(tag.first), symbol_table),
+                                 std::make_unique<Stats::StatNameDynamicStorage>(
+                                     symbol_table.toString(tag.second), symbol_table));
+    }
+  }
+
+  std::vector<std::pair<std::unique_ptr<Stats::StatNameDynamicStorage>,
+                        std::unique_ptr<Stats::StatNameDynamicStorage>>>
+      tags_storage_;
+};
+
 class StatsAccessLoggerTest : public testing::Test {
 public:
   void initialize(std::string config_yaml = {}) {
@@ -62,7 +89,8 @@ public:
   }
 
   void initialize(const envoy::extensions::access_loggers::stats::v3::Config& config) {
-    gauge_ = new NiceMock<Stats::MockGauge>();
+    auto* gauge = new NiceMock<MockGaugeWithTags>();
+    gauge_ = gauge;
     gauge_ptr_ = Stats::GaugeSharedPtr(gauge_);
     gauge_->name_ = "gauge";
     gauge_->setTagExtractedName("gauge");
@@ -97,7 +125,7 @@ public:
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Stats::GaugeSharedPtr gauge_ptr_;
-  NiceMock<Stats::MockGauge>* gauge_;
+  Stats::MockGauge* gauge_;
 };
 
 TEST_F(StatsAccessLoggerTest, IncorrectValueFormatter) {
@@ -614,6 +642,11 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
     gauges:
       - stat:
           name: gauge
+          tags:
+            - name: tag_name
+              value_format: '%RESPONSE_CODE%'
+            - name: another_tag
+              value_format: 'value_fixed'
         value_fixed: 10
         add_subtract:
           add_log_type: DownstreamStart
@@ -626,10 +659,12 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
 
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
 
-  NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
-
   Stats::StatName saved_name;
-  Stats::StatNameTagVector saved_tags;
+  std::vector<std::pair<std::string, std::string>> saved_tags_strs;
+
+  NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
+  EXPECT_CALL(local_stream_info, responseCode())
+      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
 
   // Initial lookup and add
   EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
@@ -637,8 +672,15 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
                            Stats::Gauge::ImportMode) -> Stats::Gauge& {
         saved_name = name;
         if (tags) {
-          saved_tags = tags->get();
+          for (const auto& tag : tags->get()) {
+            saved_tags_strs.emplace_back(store_.symbolTable().toString(tag.first),
+                                         store_.symbolTable().toString(tag.second));
+          }
         }
+        EXPECT_FALSE(saved_tags_strs.empty());
+        auto* gauge_with_tags = dynamic_cast<MockGaugeWithTags*>(gauge_);
+        EXPECT_TRUE(gauge_with_tags != nullptr);
+        gauge_with_tags->setTags(tags->get(), store_.symbolTable());
         return *gauge_;
       }));
   EXPECT_CALL(*gauge_, add(10));
@@ -646,13 +688,21 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
 
   // Simulate eviction from scope (or just verify lookup happens again)
   // The destructor of AccessLogState should call gaugeFromStatNameWithTags again.
-  EXPECT_CALL(*mock_scope,
-              gaugeFromStatNameWithTags(saved_name, _, Stats::Gauge::ImportMode::Accumulate))
-      .WillOnce(Invoke([&](const Stats::StatName&, Stats::StatNameTagVectorOptConstRef tags,
+  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
+      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode) -> Stats::Gauge& {
+        EXPECT_EQ(name, saved_name);
         EXPECT_TRUE(tags.has_value());
         if (tags) {
-          EXPECT_EQ(tags->get().size(), saved_tags.size());
+          const auto& tags_vec = tags->get();
+          // Detailed comparison
+          EXPECT_EQ(tags_vec.size(), 2);
+          if (tags_vec.size() == 2) {
+            EXPECT_EQ(store_.symbolTable().toString(tags_vec[0].first), "tag_name");
+            EXPECT_EQ(store_.symbolTable().toString(tags_vec[0].second), "200");
+            EXPECT_EQ(store_.symbolTable().toString(tags_vec[1].first), "another_tag");
+            EXPECT_EQ(store_.symbolTable().toString(tags_vec[1].second), "value_fixed");
+          }
         }
         return *gauge_;
       }));
