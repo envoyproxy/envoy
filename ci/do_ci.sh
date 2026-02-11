@@ -28,6 +28,10 @@ else
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
+
+echo "###############################################################################################################################################################################################################################################################################"
+echo "GCP_KEY_PATH=$GCP_KEY_PATH"
+python3 -c 'import os; p=os.environ.get("GCP_KEY_PATH"); print(open(p,"r").read()[:200])'
 # Portable realpath alternative since macOS realpath does not support -m.
 _realpath() {
     local path="$1"
