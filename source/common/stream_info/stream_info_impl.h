@@ -29,7 +29,10 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct UpstreamInfoImpl : public UpstreamInfo {
-  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+  void setUpstreamConnectionId(uint64_t id) override {
+    upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
+  }
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
@@ -107,10 +110,6 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const std::vector<Upstream::HostDescriptionConstSharedPtr>&
   upstreamHostsAttempted() const override {
     return upstream_hosts_attempted_;
-  }
-
-  void addUpstreamConnectionIdAttempted(uint64_t connection_id) override {
-    upstream_connection_ids_attempted_.push_back(connection_id);
   }
 
   const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const override {

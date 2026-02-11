@@ -1025,8 +1025,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
     stream_info.setUpstreamInfo(upstream_info);
-    upstream_info->addUpstreamConnectionIdAttempted(123);
-    upstream_info->addUpstreamConnectionIdAttempted(456);
+    upstream_info->setUpstreamConnectionId(123);
+    upstream_info->setUpstreamConnectionId(456);
 
     StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_IDS_ATTEMPTED");
     EXPECT_EQ("123,456", upstream_format.format({}, stream_info));

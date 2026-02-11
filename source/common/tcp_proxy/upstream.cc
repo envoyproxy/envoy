@@ -324,8 +324,6 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   if (downstream_info_.downstreamAddressProvider().connectionID()) {
     uint64_t connection_id = conn_data->connection().id();
     downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
-    // Also track this connection ID as attempted for access logging purposes
-    downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
               connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
@@ -446,8 +444,6 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
     // because the StreamInfo object here is of the upstream connection.
     uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
     downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
-    // Also track this connection ID as attempted for access logging purposes
-    downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
               connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }

@@ -986,7 +986,6 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);
-  downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(upstream_connection_id);
   callbacks_->resetIdleTimer();
 }
 

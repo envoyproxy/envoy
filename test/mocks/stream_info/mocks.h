@@ -79,7 +79,6 @@ public:
   MOCK_METHOD(void, addUpstreamHostAttempted, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(const std::vector<Upstream::HostDescriptionConstSharedPtr>&, upstreamHostsAttempted,
               (), (const));
-  MOCK_METHOD(void, addUpstreamConnectionIdAttempted, (uint64_t connection_id));
   MOCK_METHOD(const std::vector<uint64_t>&, upstreamConnectionIdsAttempted, (), (const));
 
   std::vector<Upstream::HostDescriptionConstSharedPtr> upstream_hosts_attempted_;

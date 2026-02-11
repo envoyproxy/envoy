@@ -692,13 +692,6 @@ public:
   upstreamHostsAttempted() const PURE;
 
   /**
-   * Add a connection ID to the list of upstream connection IDs that were attempted for this
-   * request. This is useful for tracking connection reuse behavior in access logs.
-   * @param connection_id the connection ID that was attempted.
-   */
-  virtual void addUpstreamConnectionIdAttempted(uint64_t connection_id) PURE;
-
-  /**
    * @return the list of all upstream connection IDs that were attempted for this request,
    * in the order they were attempted. This helps identify connection reuse patterns.
    */
