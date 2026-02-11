@@ -8,13 +8,12 @@
 #include "envoy/common/pure.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
-
 #include "source/common/json/json_rpc_field_extractor.h"
 #include "source/common/json/json_rpc_parser_config.h"
+#include "source/common/protobuf/protobuf.h"
 
-#include "absl/strings/string_view.h"
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
