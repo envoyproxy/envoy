@@ -65,12 +65,13 @@ export CXX="$$(realpath $(CC))"
 export AR="$$(realpath $(AR))"
 SYSROOT="$$(realpath $$(dirname "$(location %s)"))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
+# Static link C++ stdlib to avoid runtime dependency issues with hermetic sysroot
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread --sysroot=$${SYSROOT}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ --sysroot=$${SYSROOT} -Wl,-Bstatic -lc++ -lc++abi -Wl,-Bdynamic -lm -pthread"
 else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
+    export LDFLAGS="-fuse-ld=lld --sysroot=$${SYSROOT} -static-libstdc++ -static-libgcc -lstdc++ -lm -pthread"
 fi
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)
