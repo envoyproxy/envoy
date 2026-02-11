@@ -7875,6 +7875,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   updateFilterChain(server_tls_context, *filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
 
   // Disable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
@@ -7906,8 +7907,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
 
-  // Enable the rsa_key_usage enforcement.
-  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
+
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
                                  /*skip_server_failure_reason_check=*/true);
   // Client connection is failed with key_usage_mismatch.
