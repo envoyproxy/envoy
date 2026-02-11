@@ -19,6 +19,17 @@ export CGO_CFLAGS="--sysroot=$${SYSROOT}"
 export CGO_CXXFLAGS="$${CXXFLAGS}"
 export CGO_LDFLAGS="$${LDFLAGS}"
 
+ARCH=$$(uname -m)
+if [[ "$$ARCH" == "x86_64" ]]; then
+    SYSROOT_LIB_PATH="${SYSROOT}/usr/lib/x86_64-linux-gnu:${SYSROOT}/lib/x86_64-linux-gnu"
+elif [[ "$$ARCH" == "aarch64" ]]; then
+    SYSROOT_LIB_PATH="${SYSROOT}/usr/lib/aarch64-linux-gnu:${SYSROOT}/lib/aarch64-linux-gnu"
+else
+    echo "ERROR: Unsupported architecture: $$ARCH" >&2
+    exit 1
+fi
+export LD_LIBRARY_PATH="$${SYSROOT_LIB_PATH}:$${LD_LIBRARY_PATH:-}"
+
 # ninja
 NINJA_BINDIR=$$(realpath $$(dirname $(location :ninja_bin)))
 export PATH="$${NINJA_BINDIR}:$${PATH}"
