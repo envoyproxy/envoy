@@ -243,6 +243,11 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: oauth2
+  change: |
+    Added ``TLS_CLIENT_AUTH`` for the OAuth2 HTTP filter to support RFC 8705 mutual TLS client
+    authentication. In this mode ``token_secret`` is optional and ignored, and the token endpoint
+    cluster must be configured with mTLS.
 - area: dynamic_modules
   change: |
     Added a process-wide function registry to the dynamic modules ABI. Modules can register
