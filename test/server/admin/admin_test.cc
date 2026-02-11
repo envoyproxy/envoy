@@ -146,6 +146,7 @@ TEST_P(AdminInstanceTest, Help) {
       enable: enable/disable the allocation profiler; One of (y, n)
   /certs: print certs on machine
   /clusters: upstream cluster status
+      filter: Regular expression (Google re2) for filtering clusters by name
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
       mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a Protobuf::FieldMask
