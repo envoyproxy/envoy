@@ -7875,7 +7875,6 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   updateFilterChain(server_tls_context, *filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
-  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
 
   // Disable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
