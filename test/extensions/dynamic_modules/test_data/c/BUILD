@@ -11,6 +11,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -130,3 +131,13 @@ test_program(name = "lb_new_fail")
 test_program(name = "lb_no_choose_host")
 
 test_program(name = "lb_invalid_host_index")
+
+test_program(
+    name = "transport_socket_no_op",
+    extra_deps = ["//source/extensions/dynamic_modules:transport_socket_abi_lib"],
+)
+
+test_program(
+    name = "transport_socket_passthrough",
+    extra_deps = ["//source/extensions/dynamic_modules:transport_socket_abi_lib"],
+)

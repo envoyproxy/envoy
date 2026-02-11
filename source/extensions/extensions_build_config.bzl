@@ -340,6 +340,7 @@ EXTENSIONS = {
     # Transport sockets
     #
 
+    "envoy.transport_sockets.dynamic_modules":           "//source/extensions/transport_sockets/dynamic_modules:config",
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",

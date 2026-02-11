@@ -1501,6 +1501,15 @@ envoy.tracers.zipkin:
   status: stable
   type_urls:
   - envoy.config.trace.v3.ZipkinConfig
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleUpstreamTransportSocket
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleDownstreamTransportSocket
 envoy.transport_sockets.alts:
   categories:
   - envoy.transport_sockets.downstream

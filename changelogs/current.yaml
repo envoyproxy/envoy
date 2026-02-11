@@ -249,6 +249,12 @@ new_features:
     functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
     can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
     cross-module interactions analogous to ``dlsym``.
+- area: dynamic_modules
+  change: |
+    Added :ref:`transport socket
+    <envoy_v3_api_msg_extensions.transport_sockets.dynamic_modules.v3.DynamicModuleUpstreamTransportSocket>`
+    support for dynamic modules, enabling custom transport socket implementations (e.g., TLS) to be
+    loaded from dynamic libraries.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.

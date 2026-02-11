@@ -11,11 +11,13 @@ fn main() {
   // In any case, clang must be found to build the bindings.
 
   println!("cargo:rerun-if-changed=../../abi/abi.h");
+  println!("cargo:rerun-if-changed=../../transport_socket_abi.h");
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
   let bindings = bindgen::Builder::default()
     .header("../../abi/abi.h")
+    .header("../../transport_socket_abi.h")
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,

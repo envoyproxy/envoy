@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Module Transport Socket]
+// [#extension: envoy.transport_sockets.dynamic_modules]
+//
+// Configuration for dynamic module-based transport sockets. This allows loading
+// transport socket implementations from dynamic libraries (e.g., Rust for TLS).
+
+// Configuration for upstream dynamic module transport socket.
+// [#next-free-field: 6]
+message DynamicModuleUpstreamTransportSocket {
+  // Configuration for the dynamic module to load.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name of the transport socket implementation within the module.
+  // This is passed to the module to identify which transport socket to create.
+  string socket_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Optional configuration specific to the transport socket implementation.
+  // The format and content of this configuration is determined by the
+  // transport socket implementation in the dynamic module.
+  //
+  // For example, a TLS implementation might expect certificate and key
+  // configuration, cipher suites, TLS version settings, etc.
+  google.protobuf.Any socket_config = 3;
+
+  // SNI string to use when creating TLS backend connections.
+  // This overrides any SNI specified in the socket_config.
+  string sni = 4 [(validate.rules).string = {max_bytes: 255}];
+
+  // ALPN protocols to advertise. If not specified, the transport socket
+  // implementation's default ALPN settings will be used.
+  //
+  // Examples:
+  //
+  // * ["h2", "http/1.1"] for HTTP/2 with HTTP/1.1 fallback.
+  // * ["http/1.1"] for HTTP/1.1 only.
+  repeated string alpn_protocols = 5;
+}
+
+// Configuration for downstream dynamic module transport socket.
+// [#next-free-field: 6]
+message DynamicModuleDownstreamTransportSocket {
+  // Configuration for the dynamic module to load.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name of the transport socket implementation within the module.
+  // This is passed to the module to identify which transport socket to create.
+  string socket_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Optional configuration specific to the transport socket implementation.
+  // The format and content of this configuration is determined by the
+  // transport socket implementation in the dynamic module.
+  //
+  // For example, a TLS implementation might expect certificate and key
+  // configuration, cipher suites, TLS version settings, client authentication
+  // requirements, etc.
+  google.protobuf.Any socket_config = 3;
+
+  // If true, the TLS connection will require a valid client certificate.
+  // This provides a convenient way to enable mutual TLS without having to
+  // configure it in the socket_config.
+  google.protobuf.BoolValue require_client_certificate = 4;
+
+  // ALPN protocols to advertise. If not specified, the transport socket
+  // implementation's default ALPN settings will be used.
+  //
+  // Examples:
+  //
+  // * ["h2", "http/1.1"] for HTTP/2 with HTTP/1.1 fallback.
+  // * ["http/1.1"] for HTTP/1.1 only.
+  repeated string alpn_protocols = 5;
+}
+

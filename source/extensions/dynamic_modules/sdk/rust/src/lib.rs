@@ -6,6 +6,7 @@
 
 pub mod access_log;
 pub mod buffer;
+pub mod transport_socket;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
@@ -3948,6 +3949,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
+/// - `transport_socket:` — [`transport_socket::NewTransportSocketFactoryConfigFunction`] for Transport Sockets
 ///
 /// # Examples
 ///
@@ -4000,6 +4002,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register bootstrap : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register transport_socket : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -8219,6 +8225,13 @@ pub type NewLoadBalancerConfigFunction =
 /// Global function for creating load balancer configurations.
 pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunction> =
   OnceLock::new();
+
+/// Global function for creating transport socket factory configurations.
+pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
+  transport_socket::NewTransportSocketFactoryConfigFunction<
+    transport_socket::EnvoyTransportSocketImpl,
+  >,
+> = OnceLock::new();
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
