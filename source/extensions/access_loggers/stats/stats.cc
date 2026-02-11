@@ -15,14 +15,39 @@ namespace {
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
+  AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
+
+  // When the request is destroyed, we need to subtract the value from the gauge.
+  // We need to look up the gauge again in the scope because it might have been evicted.
+  // The gauge object itself is kept alive by the shared_ptr in the state, so we can access its
+  // name and tags to re-lookup/re-create it in the scope.
   ~AccessLogState() override {
-    for (const auto& [gauge, state] : inflight_gauges_) {
-      state.first->sub(state.second);
+    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
+      auto tags = state.gauge_->tags();
+      Stats::StatNameTagVector tag_names;
+      tag_names.reserve(tags.size());
+
+      std::vector<Stats::StatNameManagedStorage> storage;
+      storage.reserve(tags.size() * 2);
+
+      Stats::SymbolTable& symbol_table = scope_->symbolTable();
+
+      for (const auto& tag : tags) {
+        storage.emplace_back(tag.name_, symbol_table);
+        Stats::StatName name = storage.back().statName();
+        storage.emplace_back(tag.value_, symbol_table);
+        Stats::StatName value = storage.back().statName();
+        tag_names.emplace_back(name, value);
+      }
+
+      auto& gauge = scope_->gaugeFromStatNameWithTags(
+          state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
+      gauge.sub(state.value_);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_[gauge] = {Stats::GaugeSharedPtr(gauge), value};
+    inflight_gauges_.try_emplace(gauge, Stats::GaugeSharedPtr(gauge), value);
   }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
@@ -30,7 +55,7 @@ public:
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.second;
+    uint64_t value = it->second.value_;
     inflight_gauges_.erase(it);
     return value;
   }
@@ -38,9 +63,18 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
+  struct State {
+    State(Stats::GaugeSharedPtr gauge, uint64_t value) : gauge_(std::move(gauge)), value_(value) {}
+
+    Stats::GaugeSharedPtr gauge_;
+    uint64_t value_;
+  };
+
+  Stats::ScopeSharedPtr scope_;
+
   // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure
   // the gauge is not destroyed if it is evicted from the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, std::pair<Stats::GaugeSharedPtr, uint64_t>> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -131,6 +165,13 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 
           if (gauge_cfg.has_add_subtract()) {
             if (gauge_cfg.add_subtract().add_log_type() ==
+                    envoy::data::accesslog::v3::AccessLogType::NotSet ||
+                gauge_cfg.add_subtract().sub_log_type() ==
+                    envoy::data::accesslog::v3::AccessLogType::NotSet) {
+              throw EnvoyException(
+                  "Stats logger gauge add/subtract operation must have a valid log type.");
+            }
+            if (gauge_cfg.add_subtract().add_log_type() ==
                 gauge_cfg.add_subtract().sub_log_type()) {
               throw EnvoyException(
                   fmt::format("Duplicate access log type '{}' in gauge operations.",
@@ -141,6 +182,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             operations.emplace_back(gauge_cfg.add_subtract().sub_log_type(),
                                     Gauge::OperationType::PAIRED_SUBTRACT);
           } else {
+            if (gauge_cfg.set().log_type() == envoy::data::accesslog::v3::AccessLogType::NotSet) {
+              throw EnvoyException("Stats logger gauge set operation must have a valid log type.");
+            }
             operations.emplace_back(gauge_cfg.set().log_type(), Gauge::OperationType::SET);
           }
 
@@ -306,7 +350,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }
@@ -324,12 +368,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     return;
   }
 
-  switch (op) {
-  case Gauge::OperationType::SET:
+  if (op == Gauge::OperationType::SET) {
     gauge_stat.set(value);
-    break;
-  default:
-    break;
   }
 }
 

@@ -30,11 +30,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
 //
-//   It is required to use a delta stat sink (e.g. OpenTelemetry) because this
-//   extension sets the ``Counter`` and the ``Histogram`` as evictable in the
-//   stats scope. They will be evicted periodically and only the delta values
-//   are effective.
-//
 // [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;

@@ -44,11 +44,12 @@ public:
   }
 
   void initialize(const envoy::extensions::access_loggers::stats::v3::Config& config) {
-    // The gauge is a member of store_, so we need to increment the ref count to prevent it from
-    // being deleted when the shared_ptr in AccessLogState is destroyed.
-    store_.gauge_.incRefCount();
-    store_.gauge_.name_ = "gauge";
-    store_.gauge_.setTagExtractedName("gauge");
+    gauge_ = new NiceMock<Stats::MockGauge>();
+    gauge_ptr_ = Stats::GaugeSharedPtr(gauge_);
+    gauge_->name_ = "gauge";
+    gauge_->setTagExtractedName("gauge");
+    ON_CALL(store_, gauge(_, _)).WillByDefault(testing::ReturnRef(*gauge_));
+
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
     EXPECT_CALL(store_.mockScope(), createScope_(_))
         .WillOnce(Invoke([this](const std::string& name) {
@@ -68,6 +69,8 @@ public:
   std::unique_ptr<StatsAccessLog> logger_;
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  Stats::GaugeSharedPtr gauge_ptr_;
+  NiceMock<Stats::MockGauge>* gauge_;
 };
 
 TEST_F(StatsAccessLoggerTest, IncorrectValueFormatter) {
@@ -311,12 +314,12 @@ TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
           name: gauge
         value_format: '%RESPONSE_CODE_DETAILS%'
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
 
   initialize(yaml);
 
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::NotSet);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
   absl::optional<std::string> not_a_number{"hello"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
@@ -335,16 +338,16 @@ TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
           name: gauge
         value_format: '%BYTES_RECEIVED%'
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
 
   initialize(yaml);
 
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::NotSet);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
   EXPECT_CALL(stream_info_, bytesReceived()).WillRepeatedly(testing::Return(42));
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
-  EXPECT_CALL(store_.gauge_, set(42));
+  EXPECT_CALL(*gauge_, set(42));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -361,17 +364,17 @@ TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
               value_format: '%RESPONSE_CODE%'
         value_fixed: 42
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
 
   initialize(yaml);
 
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::NotSet);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
   absl::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
-  EXPECT_CALL(store_.gauge_, set(42));
+  EXPECT_CALL(*gauge_, set(42));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -383,16 +386,16 @@ TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
           name: gauge
         value_fixed: 42
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
   initialize(yaml);
 
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::NotSet);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
 
   absl::optional<std::string> a_number{"42"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
-  EXPECT_CALL(store_.gauge_, set(42));
+  EXPECT_CALL(*gauge_, set(42));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -405,7 +408,7 @@ TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
         value_format: '%BYTES_RECEIVED%'
         value_fixed: 1
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -420,7 +423,7 @@ TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
       - stat:
           name: gauge
         set:
-          log_type: NotSet
+          log_type: DownstreamEnd
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
                             "Stats logger gauge must have either `value_format` or `value_fixed`.");
@@ -489,37 +492,37 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   EXPECT_CALL(store_, gauge(_, _)).Times(0);
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
-  testing::Mock::VerifyAndClearExpectations(&store_.gauge_);
+  testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 2: AccessLogType matches subtract_at but no prior add -> no change
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(_)).Times(0);
-  EXPECT_CALL(store_.gauge_, sub(_)).Times(0);
+  EXPECT_CALL(*gauge_, add(_)).Times(0);
+  EXPECT_CALL(*gauge_, sub(_)).Times(0);
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
-  testing::Mock::VerifyAndClearExpectations(&store_.gauge_);
+  testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 3: AccessLogType matches add_at -> add
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(1));
+  EXPECT_CALL(*gauge_, add(1));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
-  testing::Mock::VerifyAndClearExpectations(&store_.gauge_);
+  testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 4: AccessLogType matches subtract_at after add -> subtract
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, sub(1));
+  EXPECT_CALL(*gauge_, sub(1));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
-  testing::Mock::VerifyAndClearExpectations(&store_.gauge_);
+  testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 5: AccessLogType matches subtract_at again -> no change (already removed from inflight)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, sub(1)).Times(0);
+  EXPECT_CALL(*gauge_, sub(1)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -539,13 +542,13 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   // Trigger ADD with value 10
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(10));
+  EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, stream_info_);
 
   // Trigger SUBTRACT. Should still subtract 10.
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, sub(10));
+  EXPECT_CALL(*gauge_, sub(10));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -567,14 +570,59 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
 
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
 
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(10));
+  // Called once on log() and once on destruction.
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
   // Expect subtraction on destruction
-  EXPECT_CALL(store_.gauge_, sub(10));
+  EXPECT_CALL(*gauge_, sub(10));
 
   // local_stream_info goes out of scope here.
+}
+
+TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+
+  NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
+
+  // Initial lookup and add
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*gauge_, add(10));
+  logger_->log(formatter_context_, local_stream_info);
+
+  // Simulate eviction from scope (or just verify lookup happens again)
+  // The destructor of AccessLogState should call gaugeFromStatNameWithTags again.
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*gauge_, sub(10));
+
+  // local_stream_info goes out of scope here, triggering AccessLogState destructor.
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 42
+        set:
+          log_type: NotSet
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
+                            "Stats logger gauge set operation must have a valid log type.");
 }
 
 } // namespace StatsAccessLog
