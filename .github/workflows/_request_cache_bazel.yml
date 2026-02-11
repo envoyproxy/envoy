@@ -55,7 +55,8 @@ jobs:
       ${{
         (inputs.output-base == 'base'
          && ! fromJSON(inputs.caches).bazel[inputs.arch])
-        || ! fromJSON(inputs.caches).bazel[format('{0}-{1}', inputs.output-base, inputs.arch)]
+        || (inputs.output-base != 'base'
+            && ! fromJSON(inputs.caches).bazel[format('{0}-{1}', inputs.output-base, inputs.arch)])
       }}
     steps:
     - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
