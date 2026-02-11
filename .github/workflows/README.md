@@ -143,15 +143,9 @@ in current `main` or backport any required changes.
 
 ## CI caching
 
-Currently only x86 Docker images are cached.
+Both x64 and arm64 Docker images are cached, as well as Bazel cache for both architectures.
 
 Github has a hard per-repo limit of 10GB cache for CI which is LRU cycled when exceeded.
-
-This should just be enough to store x86 and arm Docker images for most of our release branches
-but will not leave anything to spare.
-
-We can probably set up a bucket cache for bazel and other caching but this will need to be
-done separately for un/trusted CI.
 
 ### Cache mutex
 
@@ -173,23 +167,9 @@ This means that changes to CI must be tested/verified in the (private) staging r
 The CI workflows and actions are receptive to certain environment variables being set.
 
 `ENVOY_CI`: this allows CI to run in non-`envoyproxy/envoy` repos
-`ENVOY_MOBILE_CI`: this allows mobile CI to be run in non-`envoyproxy/envoy` repos
-`ENVOY_MACOS_CI`: this allows macOS CI to be run in non-`envoyproxy/envoy` repos
-`ENVOY_WINDOWS_CI`: this allows Windows CI to be run in non-`envoyproxy/envoy` repos
+`ENVOY_SCHEDULED_CI`: this allows scheduled CI to run in non-`envoyproxy/envoy` repos
 
 With these flags activated the CI runs will respect the normal conditions for running.
-
-### CI override vars
-
-The CI workflows will also trigger for specific run settings.
-
-For example:
-
-`ENVOY_CI_RUN_MOBILE_ANDROID` would trigger the android CI irrespective of files changed, etc.
-
-These correspond to the run names as configured in config.yml - for example:
-
-`ENVOY_CI_RUN_BUILD_MACOS` would ensure the `build-macos` run is triggered.
 
 ### Debugging CI
 
