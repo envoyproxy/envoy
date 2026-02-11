@@ -35,7 +35,7 @@ configure_make(
         },
         "//conditions:default": {},
     }),
-    lib_source = "@com_github_axboe_liburing//:all",
+    lib_source = "@liburing//:all",
     tags = [
         "nocompdb",
         "skip_on_windows",
@@ -58,7 +58,7 @@ make(
         "MOREFLAGS='-fPIC'",
         "BUILD_SHARED=no",
     ],
-    lib_source = "@com_github_lz4_lz4//:all",
+    lib_source = "@lz4//:all",
     out_static_libs = [
         "liblz4.a",
     ],
@@ -113,7 +113,7 @@ configure_make(
         "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
-    lib_source = "@com_github_luajit_luajit//:all",
+    lib_source = "@luajit",
     out_include_dir = "include/luajit-2.1",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["lua51.lib"],
@@ -132,7 +132,7 @@ configure_make(
         "--disable-shared",
         "--enable-static",
     ],
-    lib_source = "@net_colm_open_source_colm//:all",
+    lib_source = "@colm//:all",
     out_binaries = ["colm"],
     tags = ["skip_on_windows"],
 )
@@ -149,7 +149,7 @@ configure_make(
         "--enable-static",
         "--with-colm=$$EXT_BUILD_DEPS/colm",
     ],
-    lib_source = "@net_colm_open_source_ragel//:all",
+    lib_source = "@ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
     deps = [":colm"],
@@ -161,7 +161,7 @@ configure_make(
 configure_make(
     name = "unicode_icu_build",
     build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
-    configure_command = "icu4c/source/configure",
+    configure_command = "source/configure",
     configure_options = [
         "--enable-option-checking",
         "--enable-static",
@@ -176,7 +176,7 @@ configure_make(
         "--disable-tests",
         "--with-data-packaging=static",
     ],
-    data = ["@com_github_unicode_org_icu//:all"],
+    data = ["@icu//:all"],
     env = {
         "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
@@ -201,7 +201,7 @@ configure_make(
         },
         "//conditions:default": {},
     }),
-    lib_source = "@com_github_unicode_org_icu//:all",
+    lib_source = "@icu//:all",
     out_static_libs = [
         "libicuuc.a",
         "libicudata.a",
@@ -251,53 +251,11 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_google_libsxg//:all",
+    lib_source = "@libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
     # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
-)
-
-envoy_cmake(
-    name = "ares",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    cache_entries = {
-        "CARES_BUILD_TOOLS": "no",
-        "CARES_SHARED": "no",
-        "CARES_STATIC": "on",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-    },
-    defines = ["CARES_STATICLIB"],
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_c_ares_c_ares//:all",
-    linkopts = select({
-        "//bazel:apple": ["-lresolv"],
-        "//conditions:default": [],
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["cares.lib"],
-        "//conditions:default": ["libcares.a"],
-    }),
-    postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $$INSTALLDIR/include/ares_nameser.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "rm -f $$INSTALLDIR/include/ares_dns.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-    }),
+    deps = ["//bazel:ssl"],
 )
 
 envoy_cmake(
@@ -333,7 +291,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_libevent_libevent//:all",
+    lib_source = "@libevent",
     out_static_libs = select({
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
@@ -384,7 +342,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_nghttp2_nghttp2//:all",
+    lib_source = "@nghttp2//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
         "//conditions:default": ["libnghttp2.a"],
@@ -441,8 +399,8 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_wamr//:all",
-    out_static_libs = ["libvmlib.a"],
+    lib_source = "@wamr//:all",
+    out_static_libs = ["libiwasm.a"],
     tags = ["skip_on_windows"],
 )
 
@@ -473,7 +431,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_maxmind_libmaxminddb//:all",
+    lib_source = "@libmaxminddb//:all",
     out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
 )

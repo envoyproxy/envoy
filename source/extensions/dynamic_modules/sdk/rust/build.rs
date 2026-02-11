@@ -9,16 +9,13 @@ fn main() {
   // "/opt/llvm/bin/clang" exists in Envoy CI containers. If the clang doesn't exist there, bindgen
   // will try to use the system clang from PATH. So, this doesn't affect the local builds.
   // In any case, clang must be found to build the bindings.
-  //
-  // TODO: add /opt/llvm/bin to PATH in the CI containers. That would be a better solution.
-  if std::fs::metadata("/opt/llvm/bin/clang").is_ok() {
-    env::set_var("CLANG_PATH", "/opt/llvm/bin/clang");
-  }
 
-  println!("cargo:rerun-if-changed=abi.h");
+  println!("cargo:rerun-if-changed=../../abi/abi.h");
+
+  let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
   let bindings = bindgen::Builder::default()
-    .header("../../abi.h")
-    .header("../../abi_version.h")
+    .header("../../abi/abi.h")
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,
@@ -28,7 +25,6 @@ fn main() {
     .generate()
     .expect("Unable to generate bindings");
 
-  let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
   bindings
     .write_to_file(out_path.join("bindings.rs"))
     .expect("Couldn't write bindings");

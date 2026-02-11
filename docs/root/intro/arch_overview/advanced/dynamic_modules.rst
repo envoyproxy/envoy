@@ -10,7 +10,7 @@ Dynamic modules
    We are looking for feedback from the community to improve the feature.
 
 Envoy has support for loading shared libraries at runtime to extend its functionality. In Envoy, these are known as "dynamic modules." More specifically, dynamic modules are shared libraries that implement the
-:repo:`ABI <source/extensions/dynamic_modules/abi.h>` written in a pure C header file. The ABI defines a set of functions
+:repo:`ABI <source/extensions/dynamic_modules/abi/abi.h>` written in a pure C header file. The ABI defines a set of functions
 that the dynamic module must implement to be loaded by Envoy. Also, it specifies the functions implemented by Envoy
 that the dynamic module can call to interact with Envoy.
 
@@ -19,9 +19,14 @@ official SDK that abstracts these details and provides a high-level API to imple
 available in Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
 Future development may include support for other languages.
 
-Currently, dynamic modules are only supported at the following extension points:
+Currently, dynamic modules are supported at the following extension points:
 
-* As an :ref:`HTTP filter  <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
+* As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`.
+* As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
+* As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`.
+* As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
+* As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
+* As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
 
 There are a few design goals for the dynamic modules:
 
@@ -32,27 +37,28 @@ There are a few design goals for the dynamic modules:
 Compatibility
 --------------------------
 
-Since a dynamic modules is loaded at runtime, it must be abi-compatible with the
+Since a dynamic module is loaded at runtime, it must be ABI-compatible with the
 Envoy binary that loads it.
 
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
-Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals. Even though
-our ultimate goal is to have a stable ABI that can be used across different versions of Envoy, we currently do not guarantee any compatibility
-between different versions.
+Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
-In other words, the dynamic modules must be built with the SDK of the same version as the Envoy binary that loads the dynamic module.
-Since the SDK lives inside the Envoy repository, using the same commit hash or release tag of the Envoy version is the best way to ensure
-the compatibility.
+Currently, we guarantee **forward compatibility within one version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
+Breaking changes to the ABI may occur in later versions.
+
+To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.
 
 Module discovery
 --------------------------
 
 A dynamic module is referenced by its name as in the :ref:`configuration API  <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`.
 The name is used to search for the shared library file in the search path. The search path is configured by the environment variable
-``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``.
+``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. If
+the environment variable is not set, the current working directory is used instead. After searching in the specified search path,
+the standard library paths such as ``LD_LIBRARY_PATH`` and ``/usr/lib`` are searched as well following the behavior of ``dlopen(3)``.
 
-For example, when the name ``my_module`` is referenced in the configuration and the search path is set to ``/path/to/modules``, Envoy will look for
-``/path/to/modules/libmy_module.so``.
+For example, when the name ``my_module`` is referenced in the configuration and ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH`` is set to ``/path/to/modules``,
+Envoy will first look for ``/path/to/modules/libmy_module.so``, then ``$LD_LIBRARY_PATH/libmy_module.so``, and finally ``/usr/lib/libmy_module.so``, etc.
 
 Safety
 --------------------------

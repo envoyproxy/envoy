@@ -115,6 +115,7 @@ public:
   std::vector<Bucket> detailedIntervalBuckets() const override {
     return detailedlBucketsHelper(*interval_histogram_);
   }
+  uint64_t cumulativeCountLessThanOrEqualToValue(double value) const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -134,8 +135,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
-  static std::vector<Stats::ParentHistogram::Bucket>
-  detailedlBucketsHelper(const histogram_t& histogram);
+  std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
   const absl::optional<uint32_t> bins_;
@@ -234,6 +235,8 @@ public:
                             StatNameTagVector& tags) override;
   const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
+  void ensureOverflowStats(const ScopeStatsLimitSettings& limits);
+
 private:
   friend class ThreadLocalStoreTestingPeer;
 
@@ -285,7 +288,8 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
+              const ScopeStatsLimitSettings& limits = {});
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -298,8 +302,10 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictale) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
+    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+                               const ScopeStatsLimitSettings& limits = {}) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                     const ScopeStatsLimitSettings& limits = {}) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -456,6 +462,8 @@ private:
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
 
+    const ScopeStatsLimitSettings limits_;
+
   private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
@@ -593,6 +601,10 @@ private:
   // (e.g. when a scope is deleted), it is likely more efficient to batch their
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
+
+  CounterSharedPtr counters_overflow_;
+  CounterSharedPtr gauges_overflow_;
+  CounterSharedPtr histograms_overflow_;
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

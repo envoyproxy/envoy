@@ -10,12 +10,12 @@ namespace OpenTelemetry {
 class DynatraceTagTest : public ::testing::Test {};
 
 TEST(DynatraceTagTest, ValidTag) {
-  DynatraceTag new_tag = DynatraceTag::create("fw4;0;0;0;0;0;10;7b");
+  DynatraceTag new_tag = DynatraceTag::create("fw4;0;0;0;0;0;10;7b;3b1a;8h0101");
 
   EXPECT_EQ(new_tag.isValid(), true);
   EXPECT_EQ(new_tag.isIgnored(), false);
   EXPECT_EQ(new_tag.getSamplingExponent(), 10);
-  EXPECT_EQ(new_tag.asString(), "fw4;0;0;0;0;0;10;7b");
+  EXPECT_EQ(new_tag.asString(), "fw4;0;0;0;0;0;10;7b;3b1a;8h0101");
 }
 
 TEST(DynatraceTagTest, IgnoredFieldSet) {
@@ -25,6 +25,29 @@ TEST(DynatraceTagTest, IgnoredFieldSet) {
   EXPECT_EQ(new_tag.isIgnored(), true);
   EXPECT_EQ(new_tag.getSamplingExponent(), 10);
   EXPECT_EQ(new_tag.asString(), "fw4;0;0;0;0;1;10;7b");
+}
+
+TEST(DynatraceTagTest, AtmTcrExtension) {
+  DynatraceTag new_tag =
+      DynatraceTag::create(0, 1, 0, TraceCaptureReason::create(TraceCaptureReason::Reason::Atm));
+
+  EXPECT_EQ(new_tag.isValid(), true);
+  EXPECT_EQ(new_tag.isIgnored(), false);
+  EXPECT_EQ(new_tag.getSamplingExponent(), 1);
+  EXPECT_EQ(new_tag.asString(), "fw4;0;0;0;0;0;1;0;3b1a;8h0101");
+}
+
+TEST(DynatraceTagTest, MultipleTcrExtensions) {
+  DynatraceTag new_tag =
+      DynatraceTag::create(0, 1, 0,
+                           TraceCaptureReason::create(TraceCaptureReason::Reason::Atm |
+                                                      TraceCaptureReason::Reason::Fixed |
+                                                      TraceCaptureReason::Reason::Custom));
+
+  EXPECT_EQ(new_tag.isValid(), true);
+  EXPECT_EQ(new_tag.isIgnored(), false);
+  EXPECT_EQ(new_tag.getSamplingExponent(), 1);
+  EXPECT_EQ(new_tag.asString(), "fw4;0;0;0;0;0;1;0;e72f;8h0107");
 }
 
 class DynatraceTagInvalidTest : public ::testing::TestWithParam<std::string> {};

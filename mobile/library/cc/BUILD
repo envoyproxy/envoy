@@ -24,7 +24,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/protobuf",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -48,6 +48,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
+        "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:platform_packet_writer_proto_cc_proto",
         "@envoy_mobile//library/common/types:matcher_data_lib",
     ] + select({
         "@envoy//bazel:apple": [
@@ -84,7 +85,7 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/bridge:utility_lib",
         "//library/common/extensions/key_value/platform:config",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",

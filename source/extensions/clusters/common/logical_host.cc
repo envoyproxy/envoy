@@ -87,10 +87,24 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     address = address_;
     address_list_or_null = address_list_or_null_;
   }
+
+  // Use override_transport_socket_options if set, otherwise use the passed options.
+  const auto& effective_options = override_transport_socket_options_ != nullptr
+                                      ? override_transport_socket_options_
+                                      : transport_socket_options;
+
+  // Per-connection resolution for filter state-based transport socket matching.
+  const bool needs_per_connection_resolution =
+      cluster().transportSocketMatcher().usesFilterState() && effective_options &&
+      !effective_options->downstreamSharedFilterStateObjects().empty();
+
+  Network::UpstreamTransportSocketFactory& factory =
+      needs_per_connection_resolution
+          ? resolveTransportSocketFactory(address, metadata().get(), effective_options)
+          : transportSocketFactory();
+
   return HostImplBase::createConnection(
-      dispatcher, cluster(), address, address_list_or_null, transportSocketFactory(), options,
-      override_transport_socket_options_ != nullptr ? override_transport_socket_options_
-                                                    : transport_socket_options,
+      dispatcher, cluster(), address, address_list_or_null, factory, options, effective_options,
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 

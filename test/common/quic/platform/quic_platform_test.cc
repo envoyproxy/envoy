@@ -166,13 +166,13 @@ TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
 
     void waitForRun() {
       // Wait for Run() to finish.
-      absl::MutexLock lk(&m_);
+      absl::MutexLock lk(m_);
       cv_.Wait(&m_);
     }
 
   protected:
     void Run() override {
-      absl::MutexLock lk(&m_);
+      absl::MutexLock lk(m_);
       *value_ += increment_;
       cv_.Signal();
     }

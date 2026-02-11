@@ -10,11 +10,11 @@
 #include "eval/public/cel_expr_builder_factory.h"
 #include "parser/parser.h"
 #endif
-#include "zlib.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
 #include "absl/types/span.h"
+#include "zlib.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
@@ -135,7 +135,7 @@ RegisterForeignFunction registerSignForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       envoy::source::extensions::common::wasm::SignArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         const auto& hash = args.hash_function();
         auto text_str = args.text();
 

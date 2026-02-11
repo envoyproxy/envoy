@@ -52,6 +52,7 @@ struct GrpcInitializeConfigOpts {
   // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
   bool enforce_response_header_limits = false;
+  uint32_t status_on_error_code = 0;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -151,6 +152,11 @@ public:
 
       if (opts.enforce_response_header_limits) {
         proto_config_.set_enforce_response_header_limits(true);
+      }
+
+      if (opts.status_on_error_code > 0) {
+        proto_config_.mutable_status_on_error()->set_code(
+            static_cast<envoy::type::v3::StatusCode>(opts.status_on_error_code));
       }
 
       // Add labels and verify they are passed.
@@ -472,14 +478,17 @@ public:
                             const Headers& response_headers_to_set,
                             const Headers& response_headers_to_append_if_absent,
                             const Headers& response_headers_to_set_if_exists = {},
-                            bool add_sentinel_header_append_action = false) {
+                            bool add_sentinel_header_append_action = false,
+                            const Headers& headers_to_add_if_absent = {},
+                            const Headers& headers_to_overwrite_if_exists = {},
+                            const Headers& headers_to_overwrite_if_exists_or_add = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
 
     for (const auto& header_to_add : headers_to_add) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      entry->mutable_append()->set_value(false);
+      entry->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
       entry->mutable_header()->set_key(header_to_add.first);
       entry->mutable_header()->set_value(header_to_add.second);
     }
@@ -489,6 +498,27 @@ public:
       entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(header_to_append.first);
       entry->mutable_header()->set_value(header_to_append.second);
+    }
+
+    for (const auto& header : headers_to_add_if_absent) {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+      entry->set_append_action(Router::HeaderValueOption::ADD_IF_ABSENT);
+      entry->mutable_header()->set_key(header.first);
+      entry->mutable_header()->set_value(header.second);
+    }
+
+    for (const auto& header : headers_to_overwrite_if_exists) {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+      entry->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      entry->mutable_header()->set_key(header.first);
+      entry->mutable_header()->set_value(header.second);
+    }
+
+    for (const auto& header : headers_to_overwrite_if_exists_or_add) {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+      entry->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      entry->mutable_header()->set_key(header.first);
+      entry->mutable_header()->set_value(header.second);
     }
 
     for (const auto& header_to_remove : headers_to_remove) {
@@ -663,6 +693,82 @@ attributes:
         new_headers_from_upstream, headers_to_append_multiple,
     };
     waitForSuccessfulUpstreamResponse("200", opts);
+
+    cleanup();
+  }
+
+  void expectCheckRequestWithBodyWithAppendActions(
+      Http::CodecType downstream_protocol, uint64_t request_size, const Headers& headers_to_add,
+      const Headers& headers_to_append, const Headers& headers_to_add_if_absent,
+      const Headers& headers_to_overwrite_if_exists,
+      const Headers& headers_to_overwrite_if_exists_or_add) {
+    initializeConfig();
+    setDownstreamProtocol(downstream_protocol);
+    HttpIntegrationTest::initialize();
+
+    // Headers that we will send in the request to test overwrite/append logic.
+    Headers request_headers;
+    request_headers.reserve(headers_to_add.size() + headers_to_append.size());
+    for (const auto& h : headers_to_add) {
+      request_headers.push_back(h);
+    }
+    for (const auto& h : headers_to_append) {
+      request_headers.push_back(h);
+    }
+
+    // We initiate connection with headers_to_add and headers_to_append as initial headers.
+    initiateClientConnection(request_size, request_headers, Headers{}, Headers{});
+    waitForExtAuthzRequest(expectedCheckRequest(downstream_protocol));
+
+    // Send response with new append actions.
+    sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {}, {}, false, headers_to_add_if_absent,
+                         headers_to_overwrite_if_exists, headers_to_overwrite_if_exists_or_add);
+
+    waitForSuccessfulUpstreamResponse("200");
+
+    // Verify headers manually.
+    for (const auto& h : headers_to_add_if_absent) {
+      // Check if it existed in the original request.
+      bool existed = false;
+      std::string original_value;
+      for (const auto& req_h : request_headers) {
+        if (req_h.first == h.first) {
+          existed = true;
+          original_value = req_h.second;
+          break;
+        }
+      }
+
+      if (existed) {
+        // If it existed, it should NOT be changed.
+        EXPECT_THAT(upstream_request_->headers(), ContainsHeader(h.first, original_value));
+      } else {
+        // If it didn't exist, it SHOULD be added.
+        EXPECT_THAT(upstream_request_->headers(), ContainsHeader(h.first, h.second));
+      }
+    }
+    for (const auto& h : headers_to_overwrite_if_exists) {
+      // If the header existed, it should be overwritten. If not, it shouldn't exist unless
+      // it was added by other means. In this test helper we assume simple cases.
+      // We need to check if it was in the initial request to know expectation.
+      bool existed = false;
+      for (const auto& req_h : request_headers) {
+        if (req_h.first == h.first)
+          existed = true;
+      }
+
+      if (existed) {
+        // Header existed, so it should be overwritten with the new value.
+        EXPECT_THAT(upstream_request_->headers(), ContainsHeader(h.first, h.second));
+      } else {
+        // Header did not exist, so OverwriteIfExists should NOT add it.
+        EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString{h.first}).empty())
+            << "Header '" << h.first << "' should not have been added by OverwriteIfExists";
+      }
+    }
+    for (const auto& h : headers_to_overwrite_if_exists_or_add) {
+      EXPECT_THAT(upstream_request_->headers(), ContainsHeader(h.first, h.second));
+    }
 
     cleanup();
   }
@@ -843,8 +949,9 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true, bool failure_mode_allow = true,
-                        uint64_t timeout_ms = 300) {
-    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms](
+                        uint64_t timeout_ms = 300, uint32_t status_on_error_code = 0) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms,
+                                      status_on_error_code](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -860,6 +967,11 @@ public:
       proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+      if (status_on_error_code > 0) {
+        proto_config_.mutable_status_on_error()->set_code(
+            static_cast<envoy::type::v3::StatusCode>(status_on_error_code));
+      }
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -1078,6 +1190,21 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
                                      {"multiple", "multiple-second"}});
 }
 
+TEST_P(ExtAuthzGrpcIntegrationTest, UpstreamHeadersAppendActions) {
+  expectCheckRequestWithBodyWithAppendActions(
+      Http::CodecType::HTTP1, 4,
+      /*headers_to_add=*/
+      Headers{{"header-to-add-if-absent", "original-value"},
+              {"header-to-overwrite-if-exists", "original-value"}}, // Initial headers
+      /*headers_to_append=*/Headers{},
+      /*headers_to_add_if_absent=*/
+      Headers{{"header-to-add-if-absent", "new-value"}, {"new-header-if-absent", "new-value"}},
+      /*headers_to_overwrite_if_exists=*/
+      Headers{{"header-to-overwrite-if-exists", "new-value"},
+              {"non-existent-header", "should-not-be-added"}},
+      /*headers_to_overwrite_if_exists_or_add=*/Headers{{"header-to-set", "set-value"}});
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
 }
@@ -1263,6 +1390,30 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test that gRPC call failure respects status_on_error configuration.
+// When the gRPC call fails (e.g., timeout), the filter should use the configured
+// status_on_error (503) instead of the default (403).
+TEST_P(ExtAuthzGrpcIntegrationTest, GrpcCallFailureUsesStatusOnError) {
+  GrpcInitializeConfigOpts opts;
+  opts.stats_expect_response_bytes = false;
+  opts.failure_mode_allow = false;
+  opts.timeout_ms = 1;
+  opts.status_on_error_code = 503;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
 
   cleanup();
 }
@@ -1688,6 +1839,670 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz call failure respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, HttpCallFailureUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/1,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+
+  // Do not sendExtAuthzResponse(). Envoy should reject with configured status_on_error.
+  ASSERT_TRUE(response_->waitForEndStream(Envoy::Seconds(10)));
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz 5xx response respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, Http5xxResponseUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/300000,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  // Send a 5xx response from ext_authz server.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  ext_authz_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Verifies that headers from a denied authorization response (non-200s) are properly
+// forwarded to the client when allowed_client_headers is configured.
+TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseHeadersForwarding) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_client_headers:
+          patterns:
+          - exact: "location"
+            ignore_case: true
+          - exact: "set-cookie"
+            ignore_case: true
+          - exact: "cache-control"
+            ignore_case: true
+          - exact: "x-custom-denied-header"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 302 redirect response with headers that should be forwarded to the client.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "302"},
+      {"location", "https://auth.example.com/login?redirect=https://app.example.com/"},
+      {"set-cookie", "session=abc123; Path=/; HttpOnly; Secure"},
+      {"cache-control", "no-cache, no-store"},
+      {"x-custom-denied-header", "custom-value"},
+      {"x-should-not-forward", "this-header-should-not-appear"},
+  };
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, false);
+  ext_authz_request_->encodeData("Found", true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 302.
+  EXPECT_EQ("302", response_->headers().getStatusValue());
+
+  // Verify that allowed_client_headers are forwarded to the client.
+  EXPECT_EQ("https://auth.example.com/login?redirect=https://app.example.com/",
+            response_->headers().getLocationValue());
+  EXPECT_EQ(
+      "session=abc123; Path=/; HttpOnly; Secure",
+      response_->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "no-cache, no-store",
+      response_->headers().get(Http::LowerCaseString("cache-control"))[0]->value().getStringView());
+  EXPECT_EQ("custom-value", response_->headers()
+                                .get(Http::LowerCaseString("x-custom-denied-header"))[0]
+                                ->value()
+                                .getStringView());
+
+  // Verify that headers not in allowed_client_headers are not forwarded.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-should-not-forward")).empty());
+
+  // Verify the body is forwarded.
+  EXPECT_EQ("Found", response_->body());
+
+  cleanup();
+}
+
+// Verifies that multiple set-cookie headers from a denied authorization response are properly
+// forwarded to the client.
+TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseMultipleSetCookieHeaders) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_client_headers:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 401 response with multiple set-cookie headers.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{{":status", "401"}};
+  ext_authz_response_headers.addCopy(Http::LowerCaseString("set-cookie"),
+                                     "csrf_token=xyz789; Path=/; Secure");
+  ext_authz_response_headers.addCopy(Http::LowerCaseString("set-cookie"),
+                                     "session_hint=expired; Path=/; Max-Age=0");
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 401.
+  EXPECT_EQ("401", response_->headers().getStatusValue());
+
+  // Verify that multiple set-cookie headers are forwarded.
+  const auto set_cookie_headers = response_->headers().get(Http::LowerCaseString("set-cookie"));
+  EXPECT_EQ(2, set_cookie_headers.size());
+
+  cleanup();
+}
+
+// Verifies that headers from a successful authorization response are properly
+// forwarded to the client when allowed_client_headers_on_success is configured.
+TEST_P(ExtAuthzHttpIntegrationTest, SuccessResponseHeadersForwarding) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_client_headers_on_success:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+          - exact: "x-custom-success-header"
+            ignore_case: true
+          - exact: "cache-control"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 200 OK response with headers that should be forwarded to the client.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "200"},
+      {"set-cookie", "session=abc123; Path=/; HttpOnly; Secure"},
+      {"x-custom-success-header", "custom-value"},
+      {"cache-control", "private, max-age=3600"},
+      {"x-should-not-forward", "this-header-should-not-appear"},
+  };
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  // Wait for the request to be forwarded to upstream.
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send upstream response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 200.
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Verify that allowed_client_headers_on_success are forwarded to the client.
+  EXPECT_EQ(
+      "session=abc123; Path=/; HttpOnly; Secure",
+      response_->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+  EXPECT_EQ("custom-value", response_->headers()
+                                .get(Http::LowerCaseString("x-custom-success-header"))[0]
+                                ->value()
+                                .getStringView());
+  EXPECT_EQ(
+      "private, max-age=3600",
+      response_->headers().get(Http::LowerCaseString("cache-control"))[0]->value().getStringView());
+
+  // Verify that headers not in allowed_client_headers_on_success are not forwarded.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-should-not-forward")).empty());
+
+  cleanup();
+}
+
+// Verifies that multiple set-cookie headers from a successful authorization response are properly
+// forwarded to the client.
+TEST_P(ExtAuthzHttpIntegrationTest, SuccessResponseMultipleSetCookieHeaders) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_client_headers_on_success:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 200 OK response with multiple set-cookie headers.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{{":status", "200"}};
+  ext_authz_response_headers.addCopy(Http::LowerCaseString("set-cookie"),
+                                     "session=abc123; Path=/; HttpOnly; Secure");
+  ext_authz_response_headers.addCopy(Http::LowerCaseString("set-cookie"),
+                                     "user=john; Path=/; Max-Age=3600");
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  // Wait for the request to be forwarded to upstream.
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send upstream response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 200.
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Verify that multiple set-cookie headers are forwarded.
+  const auto set_cookie_headers = response_->headers().get(Http::LowerCaseString("set-cookie"));
+  EXPECT_EQ(2, set_cookie_headers.size());
+
+  cleanup();
+}
+
+// Verifies that allowed_client_headers_on_success works independently of allowed_upstream_headers.
+// Headers can be forwarded to the client without being forwarded to the upstream.
+TEST_P(ExtAuthzHttpIntegrationTest, SuccessClientHeadersIndependentOfUpstreamHeaders) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    // Configure allowed_client_headers_on_success with set-cookie, but do NOT include it
+    // in allowed_upstream_headers. The header should still reach the client.
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_upstream_headers:
+          patterns:
+          - exact: "x-upstream-only"
+            ignore_case: true
+        allowed_client_headers_on_success:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+          - exact: "x-client-only"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 200 OK response with headers for both upstream and client.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "200"},
+      {"set-cookie", "session=abc123"},
+      {"x-client-only", "client-value"},
+      {"x-upstream-only", "upstream-value"},
+  };
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  // Wait for the request to be forwarded to upstream.
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Verify upstream receives x-upstream-only but NOT set-cookie or x-client-only.
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-upstream-only", "upstream-value"));
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("set-cookie")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-client-only")).empty());
+
+  // Send upstream response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 200.
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Verify that allowed_client_headers_on_success are forwarded to the client,
+  // independent of allowed_upstream_headers.
+  EXPECT_EQ(
+      "session=abc123",
+      response_->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "client-value",
+      response_->headers().get(Http::LowerCaseString("x-client-only"))[0]->value().getStringView());
+
+  // Verify x-upstream-only is NOT forwarded to client since it's not in
+  // allowed_client_headers_on_success.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-upstream-only")).empty());
+
+  cleanup();
+}
+
+// Verifies that when allowed_client_headers_on_success is not set, no headers from the
+// authorization response are forwarded to the client on success.
+TEST_P(ExtAuthzHttpIntegrationTest, SuccessNoClientHeadersWhenNotConfigured) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    // Do NOT configure allowed_client_headers_on_success.
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_upstream_headers:
+          patterns:
+          - exact: "x-upstream-header"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 200 OK response with headers.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "200"},
+      {"set-cookie", "session=abc123"},
+      {"x-upstream-header", "upstream-value"},
+  };
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  // Wait for the request to be forwarded to upstream.
+  result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Verify upstream receives x-upstream-header.
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-upstream-header", "upstream-value"));
+
+  // Send upstream response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 200.
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  // Verify that NO headers from authorization response are forwarded to the client
+  // since allowed_client_headers_on_success is not configured.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("set-cookie")).empty());
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-upstream-header")).empty());
+
+  cleanup();
+}
+
+// Verifies that when allowed_client_headers is configured with any header, the default headers
+// are automatically forwarded to the client on denied responses, as documented in the proto.
+TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseDefaultHeadersAutoIncluded) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    // Only configure set-cookie in allowed_client_headers. Per documentation, Location,
+    // Status, Content-Length, and WWW-Authenticate should be automatically included.
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      authorization_response:
+        allowed_client_headers:
+          patterns:
+          - exact: "set-cookie"
+            ignore_case: true
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send a 302 redirect response. Location is NOT explicitly in allowed_client_headers,
+  // but should be automatically included per documentation.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "302"},
+      {"location", "https://auth.example.com/login"},
+      {"set-cookie", "session=abc123"},
+      {"www-authenticate", "Bearer realm=\"example\""},
+      {"x-should-not-forward", "this-header-should-not-appear"},
+  };
+  ext_authz_request_->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+
+  // Verify the response status is 302.
+  EXPECT_EQ("302", response_->headers().getStatusValue());
+
+  // Verify that set-cookie (explicitly configured) is forwarded.
+  EXPECT_EQ(
+      "session=abc123",
+      response_->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+
+  // Verify that Location is automatically forwarded even though it's not explicitly configured.
+  EXPECT_EQ("https://auth.example.com/login", response_->headers().getLocationValue());
+
+  // Verify that WWW-Authenticate is automatically forwarded.
+  EXPECT_EQ("Bearer realm=\"example\"", response_->headers()
+                                            .get(Http::LowerCaseString("www-authenticate"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  // Verify that headers not in allowed_client_headers (and not auto-included) are NOT forwarded.
+  EXPECT_TRUE(response_->headers().get(Http::LowerCaseString("x-should-not-forward")).empty());
 
   cleanup();
 }

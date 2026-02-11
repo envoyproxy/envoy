@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <tuple>
 
@@ -41,6 +42,7 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::ElementsAre;
 using testing::EndsWith;
+using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -218,6 +220,7 @@ public:
   }
 
   void setupHttp2Overrides() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.reset_with_error", "true"}});
     switch (http2_implementation_) {
     case Http2Impl::Nghttp2:
       scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
@@ -654,6 +657,29 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ProtocolStreamId) {
+  allow_metadata_ = true;
+  initialize();
+
+  std::vector<uint32_t> expected_stream_ids;
+  uint32_t expected_stream_id = 1;
+  for (int i = 0; i < 10; ++i) {
+    RequestEncoder* request_encoder =
+        i == 0 ? request_encoder_ : &client_->newStream(response_decoder_);
+    TestRequestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+    EXPECT_TRUE(request_encoder->encodeHeaders(request_headers, false).ok());
+    driveToCompletion();
+
+    expected_stream_ids.insert(expected_stream_ids.begin(), expected_stream_id);
+    EXPECT_THAT(request_encoder->getStream().codecStreamId(), Eq(expected_stream_id));
+    EXPECT_THAT(getActiveStreamsIds(*client_), Eq(expected_stream_ids));
+    EXPECT_THAT(getActiveStreamsIds(*server_), Eq(expected_stream_ids));
+    expected_stream_id += 2;
+  }
 }
 
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
@@ -3179,6 +3205,100 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
     EXPECT_EQ(0, getHpackEncoderDynamicTableSize(client_));
     EXPECT_EQ(0, getHpackEncoderDynamicTableSize(server_));
   }
+}
+
+TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.addCopy("x-well-compressable-header", std::string(1000, 'a'));
+
+  // Create a connection with huffman disabled.
+  client_http2_options_.mutable_enable_huffman_encoding()->set_value(false);
+  initialize();
+
+  std::string buffer_without_huffman;
+  ON_CALL(client_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer_without_huffman, this](Buffer::Instance& data, bool) -> void {
+        buffer_without_huffman.append(data.toString());
+        server_wrapper_->buffer_.add(data);
+      }));
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  ASSERT_EQ(client_wrapper_->buffer_.length(), 0);
+  ASSERT_EQ(server_wrapper_->buffer_.length(), 0);
+
+  // Create a connection with huffman enabled.
+  client_http2_options_.mutable_enable_huffman_encoding()->set_value(true);
+  NiceMock<Network::MockConnection> client_connection2;
+  MockConnectionCallbacks client_callbacks2;
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection2, client_callbacks2, *client_stats_store_.rootScope(),
+      client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+      ProdNghttp2SessionFactory::get());
+  client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
+
+  NiceMock<Network::MockConnection> server_connection2;
+  MockServerConnectionCallbacks server_callbacks2;
+
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection2, server_callbacks2, *server_stats_store_.rootScope(),
+      server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+      headers_with_underscores_action_);
+  server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
+
+  // Setup connection mocks for the second connection
+  ON_CALL(server_connection2, write(_, _))
+      .WillByDefault(Invoke(
+          [this](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
+  ON_CALL(client_connection2, write(_, _))
+      .WillByDefault(Invoke(
+          [this](Buffer::Instance& data, bool) -> void { server_wrapper_->buffer_.add(data); }));
+
+  driveToCompletion();
+
+  // Set up stream for the second connection
+  MockResponseDecoder response_decoder2;
+  auto request_encoder2 = &client_->newStream(response_decoder2);
+  ResponseEncoder* response_encoder2 = nullptr;
+  MockStreamCallbacks server_stream_callbacks2;
+  MockCodecEventCallbacks server_codec_event_callbacks2;
+  MockRequestDecoder request_decoder2;
+  setupRequestDecoderMock(request_decoder2);
+
+  EXPECT_CALL(server_callbacks2, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder2 = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks2);
+        encoder.getStream().registerCodecEventCallbacks(&server_codec_event_callbacks2);
+        encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+        return request_decoder2;
+      }));
+
+  // Capture the header frame encoded.
+  std::string buffer_with_huffman;
+  ON_CALL(client_connection2, write(_, _))
+      .WillByDefault(Invoke([this, &buffer_with_huffman](Buffer::Instance& data, bool) -> void {
+        server_wrapper_->buffer_.add(data);
+        buffer_with_huffman.append(data.toString());
+      }));
+
+  // Encode headers with Huffman encoding
+  EXPECT_CALL(request_decoder2, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, true).ok());
+
+  // Drive to completion
+  driveToCompletion();
+
+  // Verify that the two encoded buffers are different
+  EXPECT_NE(buffer_without_huffman, buffer_with_huffman);
+
+  // Huffman encoding is smaller with these particular headers.
+  EXPECT_GT(buffer_without_huffman.length(), 0);
+  EXPECT_GT(buffer_with_huffman.length(), 0);
+  EXPECT_GT(buffer_without_huffman.length(), buffer_with_huffman.length());
 }
 
 // Verify that codec detects PING flood

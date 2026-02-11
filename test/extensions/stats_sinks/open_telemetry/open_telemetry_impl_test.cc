@@ -112,7 +112,8 @@ public:
   }
 
   void addHistogramToSnapshot(const std::string& name, bool is_delta = false, bool used = true,
-                              const Stats::TagVector& tags = {{"hist_key", "hist_val"}}) {
+                              const Stats::TagVector& tags = {{"hist_key", "hist_val"}},
+                              bool add_values = true) {
     auto histogram = std::make_unique<NiceMock<Stats::MockParentHistogram>>();
 
     histogram_t* hist = hist_alloc();
@@ -130,8 +131,10 @@ public:
       values = {0.7, 7, 35, 200, 750, 4000, 20000, 200000, 1500000, 4000000};
     }
 
-    for (auto value : values) {
-      hist_insert(hist, value, 1);
+    if (add_values) {
+      for (auto value : values) {
+        hist_insert(hist, value, 1);
+      }
     }
 
     histogram_ptrs_.push_back(hist);
@@ -554,6 +557,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
+  addCounterToSnapshot("test_counter3", 0, 4);
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
@@ -591,6 +595,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 
   addHistogramToSnapshot("test_histogram1", true);
   addHistogramToSnapshot("test_histogram2", true);
+  addHistogramToSnapshot("test_histogram3", true, true, {}, false);
 
   MetricsExportRequestSharedPtr metrics =
       flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
@@ -877,7 +882,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
   auto data_point1 = metric.histogram().data_points()[0];
   EXPECT_EQ(20, data_point1.count()); // Each original hist has count 10
   // The sum should be double the sum of a single cumulative histogram.
-  EXPECT_NEAR(data_point1.sum(), 11661106.51, 0.1);
+  EXPECT_NEAR(data_point1.sum(), 11656376.283404071, 0.1);
   expectAttributes(data_point1.attributes(), "key", "hist1");
   // Check bucket counts are doubled.
   const int default_buckets_count = 19;
@@ -1216,9 +1221,9 @@ public:
               (const, override));
 };
 
-class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
+class OpenTelemetrySinkTests : public OpenTelemetryStatsSinkTests {
 public:
-  OpenTelemetryGrpcSinkTests()
+  OpenTelemetrySinkTests()
       : flusher_(std::make_shared<MockOtlpMetricsFlusher>()),
         exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {}
 
@@ -1226,9 +1231,9 @@ public:
   std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
 };
 
-TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
+TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   // Initialize the sink with a created_at time of 1000.
-  OpenTelemetryGrpcSink sink(flusher_, exporter_, /*create_time_ns=*/1000);
+  OpenTelemetrySink sink(flusher_, exporter_, /*create_time_ns=*/1000);
 
   // First flush: last_flush_time_ns should be the created_at value (1000).
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();

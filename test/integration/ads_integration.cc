@@ -133,9 +133,31 @@ AdsIntegrationTestBase::buildRouteConfig(const std::string& name, const std::str
   return ConfigHelper::buildRouteConfig(name, cluster);
 }
 
+envoy::config::route::v3::RouteConfiguration
+AdsIntegrationTestBase::buildRouteConfigWithVhds(const std::string& name) {
+  return ConfigHelper::buildRouteConfigWithVhdsOverAds(name);
+}
+
+envoy::config::route::v3::VirtualHost
+AdsIntegrationTestBase::buildVirtualHost(const std::string& name, const std::string& domain,
+                                         const std::string& prefix, const std::string& cluster) {
+  return ConfigHelper::buildVirtualHost(name, domain, prefix, cluster);
+}
+
 void AdsIntegrationTestBase::makeSingleRequest() {
   registerTestServerPorts({"http"});
   testRouterHeaderOnlyRequestAndResponse();
+  cleanupUpstreamAndDownstream();
+}
+
+void AdsIntegrationTestBase::makeSingleRequestWithDropOverload() {
+  registerTestServerPorts({"http"});
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(response->headers(), ContainsHeader("x-envoy-unconditional-drop-overload", "true"));
+
   cleanupUpstreamAndDownstream();
 }
 

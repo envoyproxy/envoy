@@ -225,7 +225,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[4].0.as_slice(), b"multi");
     assert_eq!(all_headers[4].1.as_slice(), b"value3");
 
-
     let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
     assert_eq!(downstream_port, Some(1234));
@@ -236,6 +235,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
+    let worker_index = envoy_filter.get_worker_index();
+    assert_eq!(worker_index, 0);
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
@@ -295,7 +296,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
     assert_eq!(all_trailers[4].0.as_slice(), b"multi");
     assert_eq!(all_trailers[4].1.as_slice(), b"value3");
-
 
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -407,7 +407,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
     assert_eq!(all_trailers[4].0.as_slice(), b"multi");
     assert_eq!(all_trailers[4].1.as_slice(), b"value3");
-
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
@@ -521,7 +520,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_req_body",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -552,7 +551,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_header",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -582,7 +581,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_body",
       "key",
     );
     assert!(no_namespace.is_none());

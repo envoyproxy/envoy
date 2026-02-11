@@ -109,6 +109,9 @@ protected:
       void removeReadFilter(Network::ReadFilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
+      void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
@@ -133,8 +136,8 @@ protected:
       }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
-      Network::DetectedCloseType detectedCloseType() const override {
-        return Network::DetectedCloseType::Normal;
+      StreamInfo::DetectedCloseType detectedCloseType() const override {
+        return StreamInfo::DetectedCloseType::Normal;
       };
       Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }

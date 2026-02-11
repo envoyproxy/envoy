@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 cc_library(
@@ -11,5 +13,5 @@ cc_library(
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
-    deps = ["@com_github_fmtlib_fmt//:fmt"],
+    deps = ["@fmt"],
 )

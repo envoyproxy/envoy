@@ -29,17 +29,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
-#ifdef ENVOY_ENABLE_YAML
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config, bootstrap);
-  return bootstrap;
-#else
-  UNREFERENCED_PARAMETER(config);
-  PANIC("YAML support compiled out: can't parse YAML");
-#endif
-}
-
 using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
@@ -154,21 +143,18 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
 
-    std::vector<std::string> server_names;
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return *config_factory.createTransportSocketFactory(quic_config, factory_context_,
-                                                        server_names);
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_, {});
   }
 }
 
@@ -578,6 +564,13 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
   return entries[entry];
 }
 
+std::string BaseIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return "listener.127.0.0.1_0." + stat_name;
+  }
+  return "listener.[__1]_0." + stat_name;
+}
+
 void BaseIntegrationTest::createXdsUpstream() {
   if (create_xds_upstream_ == false) {
     return;
@@ -594,12 +587,11 @@ void BaseIntegrationTest::createXdsUpstream() {
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
@@ -886,5 +878,17 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   test_server_->statStore().forEachCounter(nullptr, check_metric);
   test_server_->statStore().forEachGauge(nullptr, check_metric);
   test_server_->statStore().forEachHistogram(nullptr, check_metric);
+}
+
+envoy::config::bootstrap::v3::Bootstrap
+BaseIntegrationTest::configToBootstrap(const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+#else
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out: can't parse YAML");
+#endif
 }
 } // namespace Envoy

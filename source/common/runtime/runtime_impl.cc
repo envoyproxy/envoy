@@ -30,8 +30,8 @@
 #include "re2/re2.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "quiche_platform_impl/quiche_flags_impl.h"
 #include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche_platform_impl/quiche_flags_impl.h"
 #endif
 
 namespace Envoy {
@@ -656,7 +656,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   refreshReloadableFlags(ptr->values());
 
   {
-    absl::MutexLock lock(&snapshot_mutex_);
+    absl::MutexLock lock(snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
   }
   return absl::OkStatus();
@@ -674,7 +674,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 
   {
-    absl::ReaderMutexLock lock(&snapshot_mutex_);
+    absl::ReaderMutexLock lock(snapshot_mutex_);
     return thread_safe_snapshot_;
   }
 }

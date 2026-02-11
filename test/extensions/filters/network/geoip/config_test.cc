@@ -75,6 +75,31 @@ TEST_F(GeoipConfigTest, FilterIsNotTerminal) {
   EXPECT_FALSE(factory.isTerminalFilterByProto(proto_config, context_.serverFactoryContext()));
 }
 
+TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIp) {
+  initializeProviderFactory();
+  // Use a static IP address in the client_ip field.
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip: "192.168.1.100"
+)EOF";
+
+  envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+
+  GeoipFilterFactory factory;
+  auto status_or_cb = factory.createFilterFactoryFromProto(proto_config, context_);
+  ASSERT_TRUE(status_or_cb.ok());
+  Network::FilterFactoryCb cb = status_or_cb.value();
+  EXPECT_NE(nullptr, cb);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
 } // namespace
 } // namespace Geoip
 } // namespace NetworkFilters

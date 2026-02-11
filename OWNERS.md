@@ -46,7 +46,7 @@ routing PRs, questions, etc. to the right place.
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
-* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
   * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
@@ -56,6 +56,8 @@ routing PRs, questions, etc. to the right place.
   * Build, tooling.
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
   * CI, Build.
+* Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
+  * ext_proc, dataplane, security.
 
 # Envoy mobile maintainers
 
@@ -88,7 +90,6 @@ without further review.
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
-* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
@@ -98,6 +99,7 @@ without further review.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
 * Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
+* Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 
 # Emeritus maintainers
 
@@ -139,8 +141,9 @@ matter expert reviews. Feel free to loop them in as needed.
 # Emeritus code owners
 
 This section lists emeritus code owners who have contributed or maintained some extensions and
-now have left Envoy community. When we add this section, some of code owners have left for a
-while. So, feel free to ping the maintainers if you find any emeritus code owners missing and
-would like to be added to this list.
+now have left Envoy community or become inactive because of various reasons. When we add this
+section, some of code owners have left for a while. So, feel free to ping the maintainers if
+you find any emeritus code owners missing and would like to be added to this list.
 
 * Derek Argueta ([derekargueta](https://github.com/derekargueta))
+* marc-barry ([marc-barry](https://github.com/marc-barry))

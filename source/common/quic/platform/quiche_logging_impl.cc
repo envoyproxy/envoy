@@ -4,12 +4,12 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche_platform_impl/quiche_logging_impl.h"
+
 #include <atomic>
 #include <cstdlib>
 
 #include "source/common/common/utility.h"
-
-#include "quiche_platform_impl/quiche_logging_impl.h"
 
 namespace quiche {
 
@@ -82,7 +82,7 @@ QuicheLogEmitter::~QuicheLogEmitter() {
 
   // Normally there is no log sink and we can avoid acquiring the lock.
   if (q_quiche_log_sink.load(std::memory_order_relaxed) != nullptr) {
-    absl::MutexLock lock(&q_quiche_log_sink_mutex);
+    absl::MutexLock lock(q_quiche_log_sink_mutex);
     QuicheLogSink* sink = q_quiche_log_sink.load(std::memory_order_relaxed);
     if (sink != nullptr) {
       sink->Log(level_, content);
@@ -110,7 +110,7 @@ void setDFatalExitDisabled(bool is_disabled) {
 }
 
 QuicheLogSink* SetLogSink(QuicheLogSink* new_sink) {
-  absl::MutexLock lock(&q_quiche_log_sink_mutex);
+  absl::MutexLock lock(q_quiche_log_sink_mutex);
   QuicheLogSink* old_sink = q_quiche_log_sink.load(std::memory_order_relaxed);
   q_quiche_log_sink.store(new_sink, std::memory_order_relaxed);
   return old_sink;

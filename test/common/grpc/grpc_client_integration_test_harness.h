@@ -25,7 +25,6 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
-
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
@@ -37,9 +36,9 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
@@ -752,12 +751,11 @@ public:
     }
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
 
     static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
   }
 
   bool use_client_cert_{};

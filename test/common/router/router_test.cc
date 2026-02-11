@@ -223,8 +223,8 @@ public:
 
 TEST_F(RouterTest, SenselessTestForCoverage) {
   config_->timeSource();
-  Http::MockFilterChainManager mock_manager;
-  config_->createUpgradeFilterChain("", nullptr, mock_manager, Http::EmptyFilterChainOptions{});
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  config_->createUpgradeFilterChain("", nullptr, callbacks);
 
   router_->route();
   router_->timeSource();
@@ -1493,6 +1493,22 @@ TEST_F(RouterTest, AllDebugConfig) {
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, DebugConfigFactory) {
+  // Test creating DebugConfig with "true"
+  auto debug_config_true = DebugConfigFactory().createFromBytes("true");
+  EXPECT_NE(debug_config_true, nullptr);
+  EXPECT_TRUE(dynamic_cast<DebugConfig*>(debug_config_true.get())->do_not_forward_);
+
+  // Test creating DebugConfig with "false"
+  auto debug_config_false = DebugConfigFactory().createFromBytes("false");
+  EXPECT_NE(debug_config_false, nullptr);
+  EXPECT_FALSE(dynamic_cast<DebugConfig*>(debug_config_false.get())->do_not_forward_);
+
+  // Test factory name
+  DebugConfigFactory factory;
+  EXPECT_EQ(factory.name(), "envoy.router.debug_config");
 }
 
 TEST_F(RouterTest, NoRetriesOverflow) {
@@ -3345,7 +3361,7 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
   // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
@@ -3389,7 +3405,7 @@ TEST_F(RouterTest, BufferLimitLogicCase2ConnectionLimitSmaller) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 2: per_request_buffer_limit_bytes=50, request_body_buffer_limit=not set
   // Should use min(50, connection_limit) = min(50, 40) = 40
@@ -3433,7 +3449,7 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 3: both fields not set
   // Should use connection_limit = 40 (default from RouterTestBase)
@@ -3513,7 +3529,7 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Buffer limit that should allow multiple small chunks but fail on larger ones
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(25));
@@ -3561,7 +3577,7 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Test exactly at uint32_t max boundary
   const uint64_t large_limit = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 100;
@@ -4682,6 +4698,9 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
               putResult(_, absl::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
 
   // We expect the 5xx response to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
@@ -4715,6 +4734,114 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
                 .value());
+  // General upstream_rq_503 should be 0 because the 503 was retried (not a final response)
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_2xx")
+                    .value());
+}
+
+// Test retry with 2 attempts before success: 503 -> 503 -> 200
+TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
+
+  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
+  router_->decodeTrailers(trailers);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // First 503 response - triggers retry #1
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(encoder1.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers1), false);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Retry attempt #1
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
+  EXPECT_CALL(encoder2, encodeHeaders(_, false));
+  EXPECT_CALL(encoder2, encodeData(_, false));
+  EXPECT_CALL(encoder2, encodeTrailers(_));
+  router_->retry_state_->callback_();
+  EXPECT_EQ(2U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // Second 503 response - triggers retry #2
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers2), false);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+
+  // Retry attempt #2
+  NiceMock<Http::MockRequestEncoder> encoder3;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder3, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(encoder3, encodeHeaders(_, false));
+  EXPECT_CALL(encoder3, encodeData(_, false));
+  EXPECT_CALL(encoder3, encodeTrailers(_));
+  router_->retry_state_->callback_();
+  EXPECT_EQ(3U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // Final successful response - 200
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
+  Http::ResponseHeaderMapPtr response_headers3(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers3), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 2));
+
+  // Verify retry counters
+  EXPECT_EQ(2U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
+                .value());
+  // General upstream_rq_503 should be 0 because both 503s were retried (not final responses)
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_503").value());
+  // Only the final 200 response should be counted
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());

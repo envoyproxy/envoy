@@ -73,6 +73,7 @@ else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
     export LDFLAGS="-fuse-ld=lld --sysroot=$${SYSROOT} -static-libstdc++ -static-libgcc -lstdc++ -lm -pthread"
 fi
+export LD_LIBRARY_PATH="$${SYSROOT}/lib:$${SYSROOT}/usr/lib:$${LD_LIBRARY_PATH:-}"
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)
 if ! $${PYTHON_BIN} ./configure.py --bootstrap --with-python=$${PYTHON_BIN} > $$OUTPUT 2>&1; then

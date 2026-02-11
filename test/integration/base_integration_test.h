@@ -172,6 +172,9 @@ public:
 
   std::string listener_access_log_name_;
 
+  // Prefix listener stat with IP:port, including IP version dependent loopback address.
+  std::string listenerStatPrefix(const std::string& stat_name);
+
   // Last node received on an xDS stream from the server.
   envoy::config::core::v3::Node last_node_;
 
@@ -549,6 +552,7 @@ public:
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
+  static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
   void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
