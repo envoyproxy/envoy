@@ -32,7 +32,10 @@ configure_make(
     # numa_archive genrule. The cc_library doesn't produce a file that can be
     # found with -lnuma, so we need to use the genrule output.
     env = {
-        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+        "LDFLAGS": " ".join([
+            "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+            "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/envoy/bazel/external/lib",
+        ]),
     },
     lib_source = "@qatlib//:all",
     out_static_libs = [
