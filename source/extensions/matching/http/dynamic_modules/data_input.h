@@ -35,22 +35,9 @@ public:
   ::Envoy::Matcher::DataInputGetResult
   get(const ::Envoy::Http::HttpMatchingData& data) const override {
     auto match_data = std::make_shared<DynamicModuleMatchData>();
-
-    auto maybe_request_headers = data.requestHeaders();
-    if (maybe_request_headers.has_value()) {
-      match_data->request_headers_ = &maybe_request_headers.ref();
-    }
-
-    auto maybe_response_headers = data.responseHeaders();
-    if (maybe_response_headers.has_value()) {
-      match_data->response_headers_ = &maybe_response_headers.ref();
-    }
-
-    auto maybe_response_trailers = data.responseTrailers();
-    if (maybe_response_trailers.has_value()) {
-      match_data->response_trailers_ = &maybe_response_trailers.ref();
-    }
-
+    match_data->request_headers_ = data.requestHeaders().ptr();
+    match_data->response_headers_ = data.responseHeaders().ptr();
+    match_data->response_trailers_ = data.responseTrailers().ptr();
     return {::Envoy::Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
             std::move(match_data)};
   }

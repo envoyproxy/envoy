@@ -48,7 +48,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfig) {
 dynamic_module_config:
   name: matcher_no_op
   do_not_close: true
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
@@ -66,7 +66,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, ValidConfigWithMatcherConfig) {
 dynamic_module_config:
   name: matcher_check_headers
   do_not_close: true
-matcher_config_name: header_matcher
+matcher_name: header_matcher
 matcher_config:
   "@type": type.googleapis.com/google.protobuf.StringValue
   value: x-test-header
@@ -86,7 +86,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, InvalidModule) {
   const std::string yaml = R"EOF(
 dynamic_module_config:
   name: nonexistent_module
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
@@ -102,7 +102,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, MissingConfigNew) {
 dynamic_module_config:
   name: matcher_missing_config_new
   do_not_close: true
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
@@ -118,7 +118,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, MissingConfigDestroy) {
 dynamic_module_config:
   name: matcher_missing_config_destroy
   do_not_close: true
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
@@ -134,7 +134,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, MissingMatch) {
 dynamic_module_config:
   name: matcher_missing_match
   do_not_close: true
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher
@@ -150,7 +150,7 @@ TEST_F(DynamicModuleInputMatcherFactoryTest, ConfigNewReturnsNull) {
 dynamic_module_config:
   name: matcher_config_new_fail
   do_not_close: true
-matcher_config_name: test_matcher
+matcher_name: test_matcher
 )EOF";
 
   envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher

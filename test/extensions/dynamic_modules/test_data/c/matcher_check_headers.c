@@ -40,8 +40,8 @@ void envoy_dynamic_module_on_matcher_config_destroy(
 }
 
 bool envoy_dynamic_module_on_matcher_match(
-    envoy_dynamic_module_type_matcher_envoy_ptr matcher_envoy_ptr,
-    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr) {
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr) {
   matcher_config_t* config = (matcher_config_t*)config_module_ptr;
   if (config == NULL) {
     return false;
@@ -49,7 +49,7 @@ bool envoy_dynamic_module_on_matcher_match(
 
   // Get the number of request headers.
   size_t num_headers = envoy_dynamic_module_callback_matcher_get_headers_size(
-      matcher_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader);
+      matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader);
 
   if (num_headers == 0) {
     return false;
@@ -61,7 +61,7 @@ bool envoy_dynamic_module_on_matcher_match(
           num_headers, sizeof(envoy_dynamic_module_type_envoy_http_header));
 
   bool result = envoy_dynamic_module_callback_matcher_get_headers(
-      matcher_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers);
+      matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers);
 
   if (!result) {
     free(headers);

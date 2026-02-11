@@ -35,17 +35,17 @@ message DynamicModuleMatcher {
   // This can be used to distinguish between different matcher implementations inside a dynamic
   // module. For example, a module can have completely different matcher implementations (e.g.,
   // OAuth token matcher, geo-IP matcher). When Envoy receives this configuration, it passes
-  // the ``matcher_config_name`` to the dynamic module's matcher config init function together
-  // with the ``matcher_config``. That way a module can decide which in-module matcher
-  // implementation to use based on the name at load time.
-  string matcher_config_name = 2;
+  // the ``matcher_name`` to the dynamic module's matcher config init function together with the
+  // ``matcher_config``. That way a module can decide which in-module matcher implementation to
+  // use based on the name at load time.
+  string matcher_name = 2;
 
-  // The configuration for the matcher chosen by ``matcher_config_name``. If not specified, an
-  // empty configuration is passed to the module.
+  // The configuration for the matcher chosen by ``matcher_name``. If not specified, an empty
+  // configuration is passed to the module.
   //
   // This is passed to the module's matcher initialization function. Together with the
-  // ``matcher_config_name``, the module can decide which in-module matcher implementation to
-  // use and fine-tune the behavior of the matcher.
+  // ``matcher_name``, the module can decide which in-module matcher implementation to use and
+  // fine-tune the behavior of the matcher.
   //
   // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
   // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly

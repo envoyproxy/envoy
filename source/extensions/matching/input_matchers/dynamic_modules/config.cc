@@ -63,9 +63,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   }
 
   // Create the in-module configuration.
-  envoy_dynamic_module_type_envoy_buffer name_buf = {
-      .ptr = proto_config.matcher_config_name().data(),
-      .length = proto_config.matcher_config_name().size()};
+  envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = proto_config.matcher_name().data(),
+                                                     .length = proto_config.matcher_name().size()};
   envoy_dynamic_module_type_envoy_buffer config_buf = {.ptr = matcher_config_str.data(),
                                                        .length = matcher_config_str.size()};
 

@@ -36,7 +36,7 @@ bool DynamicModuleInputMatcher::match(const ::Envoy::Matcher::MatchingDataType& 
     context.response_headers = dynamic_module_data->response_headers_;
     context.response_trailers = dynamic_module_data->response_trailers_;
 
-    return on_match_(static_cast<void*>(&context), in_module_config_);
+    return on_match_(in_module_config_, static_cast<void*>(&context));
   }
 
   return false;

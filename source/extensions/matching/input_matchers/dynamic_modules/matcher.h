@@ -24,7 +24,7 @@ using OnMatcherMatchType = decltype(&envoy_dynamic_module_on_matcher_match);
 using DynamicModuleSharedPtr = std::shared_ptr<Extensions::DynamicModules::DynamicModule>;
 
 /**
- * Context passed to the dynamic module during a match evaluation. The matcher_envoy_ptr
+ * Context passed to the dynamic module during a match evaluation. The matcher_input_envoy_ptr
  * points to this struct, and the module accesses the matching data via ABI callbacks.
  *
  * This struct is only valid during the envoy_dynamic_module_on_matcher_match callback.

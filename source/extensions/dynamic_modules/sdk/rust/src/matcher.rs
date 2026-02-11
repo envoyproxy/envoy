@@ -228,11 +228,11 @@ macro_rules! declare_matcher {
 
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_matcher_match(
-      matcher_envoy_ptr: *mut ::std::ffi::c_void,
       config_ptr: *const ::std::ffi::c_void,
+      matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
     ) -> bool {
       let config = unsafe { &*(config_ptr as *const $config_type) };
-      let ctx = $crate::matcher::MatchContext::new(matcher_envoy_ptr);
+      let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
       config.on_matcher_match(&ctx)
     }
   };

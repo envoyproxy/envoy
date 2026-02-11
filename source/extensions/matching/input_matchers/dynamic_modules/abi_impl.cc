@@ -83,31 +83,31 @@ bool getHeadersImpl(HeadersMapOptConstRef map,
 extern "C" {
 
 size_t envoy_dynamic_module_callback_matcher_get_headers_size(
-    envoy_dynamic_module_type_matcher_envoy_ptr matcher_envoy_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type) {
   using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
-  auto* context = static_cast<MatchContext*>(matcher_envoy_ptr);
+  auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
   auto map = getHeaderMapByType(context, header_type);
   return map.has_value() ? map->size() : 0;
 }
 
 bool envoy_dynamic_module_callback_matcher_get_headers(
-    envoy_dynamic_module_type_matcher_envoy_ptr matcher_envoy_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
   using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
-  auto* context = static_cast<MatchContext*>(matcher_envoy_ptr);
+  auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
   auto map = getHeaderMapByType(context, header_type);
   return getHeadersImpl(map, result_headers);
 }
 
 bool envoy_dynamic_module_callback_matcher_get_header_value(
-    envoy_dynamic_module_type_matcher_envoy_ptr matcher_envoy_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
   using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
-  auto* context = static_cast<MatchContext*>(matcher_envoy_ptr);
+  auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
   auto map = getHeaderMapByType(context, header_type);
   return getHeaderValueImpl(map, key, result, index, total_count_out);
 }

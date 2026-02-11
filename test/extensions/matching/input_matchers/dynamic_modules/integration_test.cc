@@ -47,7 +47,7 @@ matcher:
               dynamic_module_config:
                 name: matcher_check_headers
                 do_not_close: true
-              matcher_config_name: header_check
+              matcher_name: header_check
               matcher_config:
                 "@type": type.googleapis.com/google.protobuf.StringValue
                 value: x-match-header
