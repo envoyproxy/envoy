@@ -133,7 +133,10 @@ new_features:
     The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
     use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
     set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
-    the protobuf format.
+    the protobuf format. Additionally, when using the protobuf exposition format, the admin prometheus stats
+    endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
+    when using the prometheus protobuf exposition format, using query
+    ``/stats/prometheus?histogram_buckets=prometheusnative``.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -252,5 +255,10 @@ new_features:
 - area: tracers
   change: |
     Add log events to spans created by OpenTelemetry tracer.
+- area: admin
+  change: |
+    Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
+    regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
+    text and JSON output (e.g., ``/clusters?filter=service&format=json``).
 
 deprecated:
