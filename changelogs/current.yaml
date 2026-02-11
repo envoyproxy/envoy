@@ -252,5 +252,10 @@ new_features:
 - area: tracers
   change: |
     Add log events to spans created by OpenTelemetry tracer.
+- area: admin
+  change: |
+    Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
+    regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
+    text and JSON output (e.g., ``/clusters?filter=service&format=json``).
 
 deprecated:

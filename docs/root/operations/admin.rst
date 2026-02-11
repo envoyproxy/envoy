@@ -145,6 +145,17 @@ modify different aspects of the server:
   Dump the */clusters* output in a JSON-serialized proto. See the
   :ref:`definition <envoy_v3_api_msg_admin.v3.Clusters>` for more information.
 
+.. http:get:: /clusters?filter=regex
+
+  Filters the returned clusters to those with names matching the regular
+  expression ``regex``. Compatible with ``format``. Performs partial
+  matching by default, so ``/clusters?filter=service`` will return all clusters
+  containing the word ``service``.  Full-string matching can be specified
+  with begin- and end-line anchors. (i.e.  ``/clusters?filter=^my-service-cluster$``)
+
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>`_ engine.
+
 .. _operations_admin_interface_config_dump:
 
 .. http:get:: /config_dump
