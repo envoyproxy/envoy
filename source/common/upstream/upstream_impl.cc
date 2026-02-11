@@ -574,7 +574,8 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
     const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    HostDescriptionConstSharedPtr host) {
+    HostDescriptionConstSharedPtr host,
+    const Network::UpstreamTransportSocketFactory& socket_factory) {
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     return transport_socket_options->http11ProxyInfo()->proxy_address;
   }
@@ -617,6 +618,11 @@ absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetP
     return resolve_status.value();
   }
 
+  // Proxy address was not found in the metadata. If a default proxy address is set, return that.
+  if (socket_factory.defaultHttp11ProxyInfo().has_value()) {
+    return socket_factory.defaultHttp11ProxyInfo()->proxy_address;
+  }
+
   return absl::nullopt;
 }
 
@@ -631,7 +637,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
   absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
-      maybeGetProxyRedirectAddress(transport_socket_options, host);
+      maybeGetProxyRedirectAddress(transport_socket_options, host, socket_factory);
 
   Network::ClientConnectionPtr connection;
   // If the transport socket options or endpoint/locality metadata indicate the connection should
