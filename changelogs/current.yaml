@@ -175,10 +175,6 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
-- area: mcp_router
-  change: |
-    Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
-    observability into request routing, fanout operations, and failure modes.
 - area: network
   change: |
     Added support access logging in network filters like http filters, by allowing network filters to register as access logger

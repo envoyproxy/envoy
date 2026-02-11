@@ -136,7 +136,6 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     if (!encoded_session_id_.empty() && !decodeAndParseSession()) {
       // decodeAndParseSession already sent the appropriate error response.
-      // Stats are incremented inside decodeAndParseSession.
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
