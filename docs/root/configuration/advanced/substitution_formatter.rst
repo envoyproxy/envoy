@@ -573,12 +573,6 @@ Current supported substitution commands include:
 ``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``
   Same as ``%UPSTREAM_HOST_NAMES_ATTEMPTED%`` but without port components.
 
-.. _config_access_log_format_upstream_connection_ids_attempted:
-
-``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``
-  Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
-  This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.
-
 ``%UPSTREAM_CLUSTER%``
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
@@ -887,6 +881,12 @@ Current supported substitution commands include:
   cross-reference timer-based reports for the same connection. The identifier
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
+
+.. _config_access_log_format_upstream_connection_ids_attempted:
+
+``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``
+  Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
+  This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.
 
 .. _config_access_log_format_stream_id:
 
