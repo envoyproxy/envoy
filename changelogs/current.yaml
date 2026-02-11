@@ -252,6 +252,9 @@ new_features:
 - area: tracers
   change: |
     Add log events to spans created by OpenTelemetry tracer.
+- area: mcp_router
+  change: |
+    Added SSE response support for MCP ``resources/list`` fanout aggregation.
 - area: admin
   change: |
     Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2

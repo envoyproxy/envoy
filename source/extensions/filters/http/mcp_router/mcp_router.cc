@@ -816,6 +816,32 @@ void McpRouterFilter::handleInitialize() {
   });
 }
 
+void McpRouterFilter::handlePing() {
+  ENVOY_LOG(debug, "Ping: responding immediately with empty result");
+
+  // Ping is a request/response pattern - respond immediately with empty result.
+  // Per MCP spec: The receiver MUST respond promptly with an empty response.
+  std::string response_body =
+      absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{}})");
+  sendJsonResponse(response_body, encoded_session_id_);
+}
+
+void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
+
+  // Forward notification to all backends and wait for responses.
+  // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse>) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "notifications/initialized callback ignored: filter destroyed");
+      return;
+    }
+    // All backends have responded (or failed), send 202 to client.
+    self->sendAccepted();
+  });
+}
+
 void McpRouterFilter::handleToolsList() {
   ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
 
@@ -877,49 +903,18 @@ void McpRouterFilter::handleToolsCall() {
       true /* streaming_enabled */);
 }
 
-void McpRouterFilter::handlePing() {
-  ENVOY_LOG(debug, "Ping: responding immediately with empty result");
-
-  // Ping is a request/response pattern - respond immediately with empty result.
-  // Per MCP spec: The receiver MUST respond promptly with an empty response.
-  std::string response_body =
-      absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{}})");
-  sendJsonResponse(response_body, encoded_session_id_);
-}
-
-void McpRouterFilter::handleNotification(absl::string_view notification_name) {
-  ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
-
-  // Forward notification to all backends and wait for responses.
-  // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
-  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse>) {
-    auto self = weak_self.lock();
-    if (!self) {
-      ENVOY_LOG(debug, "notifications/initialized callback ignored: filter destroyed");
-      return;
-    }
-    // All backends have responded (or failed), send 202 to client.
-    self->sendAccepted();
-  });
-}
-
-std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
-  const std::string& result = response.getJsonRpc();
-  ENVOY_LOG(debug,
-            "extractJsonRpcFromResponse: backend='{}', content_type={}, body_size={}, "
-            "extracted_size={}",
-            response.backend_name, static_cast<int>(response.content_type), response.body.size(),
-            result.size());
-  return result;
-}
-
 void McpRouterFilter::handleResourcesList() {
   ENVOY_LOG(debug, "resources/list: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregateResourcesList(responses);
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "resources/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateResourcesList(responses);
     ENVOY_LOG(debug, "resources/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
   });
 }
 
@@ -1003,32 +998,6 @@ void McpRouterFilter::handlePromptsGet() {
   });
 }
 
-void McpRouterFilter::handleLoggingSetLevel() {
-  // Fan out to all backends and return empty result.
-  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
-  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
-
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    // Check if at least one backend succeeded.
-    bool any_success = false;
-    for (const auto& resp : responses) {
-      if (resp.success) {
-        any_success = true;
-        break;
-      }
-    }
-
-    if (!any_success) {
-      sendHttpError(500, "All backends failed to set logging level");
-      return;
-    }
-
-    // Return empty JSON-RPC result.
-    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
-    sendJsonResponse(response, encoded_session_id_);
-  });
-}
-
 void McpRouterFilter::handleCompletionComplete() {
   // Route based on ref type: ref/prompt uses prompt name, ref/resource uses resource URI.
   // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/completion
@@ -1077,6 +1046,44 @@ void McpRouterFilter::handleCompletionComplete() {
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
+}
+
+void McpRouterFilter::handleLoggingSetLevel() {
+  // Fan out to all backends and return empty result.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    // Check if at least one backend succeeded.
+    bool any_success = false;
+    for (const auto& resp : responses) {
+      if (resp.success) {
+        any_success = true;
+        break;
+      }
+    }
+
+    if (!any_success) {
+      sendHttpError(500, "All backends failed to set logging level");
+      return;
+    }
+
+    // Return empty JSON-RPC result.
+    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
+    sendJsonResponse(response, encoded_session_id_);
+  });
+}
+
+// Response aggregation helpers.
+
+std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
+  const std::string& result = response.getJsonRpc();
+  ENVOY_LOG(debug,
+            "extractJsonRpcFromResponse: backend='{}', content_type={}, body_size={}, "
+            "extracted_size={}",
+            response.backend_name, static_cast<int>(response.content_type), response.body.size(),
+            result.size());
+  return result;
 }
 
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
@@ -1217,9 +1224,10 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
           if (!resp.success) {
             continue;
           }
+          std::string json_body = extractJsonRpcFromResponse(resp);
           ENVOY_LOG(debug, "Aggregating resources list from backend '{}': {}", resp.backend_name,
-                    resp.body);
-          auto parsed_or = Json::Factory::loadFromString(resp.body);
+                    json_body);
+          auto parsed_or = Json::Factory::loadFromString(json_body);
           if (!parsed_or.ok()) {
             ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
                       parsed_or.status().message());
