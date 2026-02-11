@@ -111,6 +111,9 @@ bug_fixes:
     Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
     server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
     returned 403 Forbidden regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
 - area: health_check
   change: |
     Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
