@@ -3932,64 +3932,75 @@ macro_rules! declare_network_filter_init_functions {
   };
 }
 
-/// Declare the init functions for the dynamic module with both HTTP and Network filter support.
+/// Declare the init functions for the dynamic module with any combination of filter types.
 ///
-/// This macro allows a single module to provide both HTTP filters and Network filters.
+/// This macro allows a single module to provide any combination of HTTP, Network, Listener,
+/// UDP Listener, and Bootstrap filters.
 ///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
 ///
-/// The second argument has [`NewHttpFilterConfigFunction`] type, and it is called when the new
-/// HTTP filter configuration is created.
+/// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be
+/// registered.
+/// Supported filters:
+/// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters
+/// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters
+/// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
+/// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
+/// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 ///
-/// The third argument has [`NewNetworkFilterConfigFunction`] type, and it is called when the new
-/// Network filter configuration is created.
+/// # Examples
 ///
-/// # Example
-///
+/// HTTP only:
 /// ```ignore
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// declare_all_init_functions!(my_program_init,
+///     http: my_new_http_filter_config_fn,
+/// );
+/// ```
 ///
-/// declare_all_init_functions!(my_program_init, my_new_http_filter_config_fn, my_new_network_filter_config_fn);
-///
-/// fn my_program_init() -> bool {
-///   true
-/// }
-///
-/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-///   _envoy_filter_config: &mut EC,
-///   _name: &str,
-///   _config: &[u8],
-/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
-///   Some(Box::new(MyHttpFilterConfig {}))
-/// }
-///
-/// fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
-///   _envoy_filter_config: &mut EC,
-///   _name: &str,
-///   _config: &[u8],
-/// ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
-///   Some(Box::new(MyNetworkFilterConfig {}))
-/// }
+/// Network + UDP Listener:
+/// ```ignore
+/// declare_all_init_functions!(my_program_init,
+///     network: my_new_network_filter_config_fn,
+///     udp_listener: my_new_udp_listener_filter_config_fn,
+/// );
 /// ```
 #[macro_export]
 macro_rules! declare_all_init_functions {
-  ($f:ident, $new_http_filter_config_fn:expr, $new_network_filter_config_fn:expr) => {
+  ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init(
-      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
-    ) -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_network_filter_config_fn);
-      if ($f(server_factory_context_ptr)) {
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      $(
+        declare_all_init_functions!(@register $filter_type : $filter_fn);
+      )+
+      if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
       }
     }
+  };
+
+  (@register http : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register network : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register udp_listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register bootstrap : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
   };
 }
 
@@ -7440,6 +7451,44 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   }
 }
 
+/// A completion callback that must be invoked exactly once to signal that an asynchronous
+/// operation has finished. Envoy will wait for this callback before proceeding.
+///
+/// The callback is invoked by calling [`CompletionCallback::done`].
+pub struct CompletionCallback {
+  callback: abi::envoy_dynamic_module_type_event_cb,
+  context: *mut std::os::raw::c_void,
+}
+
+// Safety: The completion callback is provided by Envoy and is safe to send across threads.
+unsafe impl Send for CompletionCallback {}
+// Safety: The completion callback function pointer is thread-safe when invoked exactly once.
+unsafe impl Sync for CompletionCallback {}
+
+impl CompletionCallback {
+  /// Signal that the asynchronous operation is complete. This must be called exactly once.
+  pub fn done(self) {
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+    // Prevent Drop from running since we've consumed the callback.
+    std::mem::forget(self);
+  }
+}
+
+impl Drop for CompletionCallback {
+  fn drop(&mut self) {
+    // If the callback is dropped without being called, invoke it to prevent Envoy from hanging.
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+  }
+}
+
 /// BootstrapExtension is the module-side bootstrap extension.
 ///
 /// This trait must be implemented by the module to handle bootstrap extension lifecycle events.
@@ -7458,6 +7507,29 @@ pub trait BootstrapExtension: Send + Sync {
   /// This is called once per worker thread when it starts. You can use this to perform
   /// per-worker-thread initialization like setting up thread-local storage.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy begins draining.
+  ///
+  /// This is called on the main thread before workers are stopped. The module can still make HTTP
+  /// callouts and use timers during drain. This is the appropriate place to close persistent
+  /// connections, stop background tasks, or de-register from service discovery.
+  fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy is about to exit.
+  ///
+  /// This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+  /// signal completion by calling [`CompletionCallback::done`] when it has finished cleanup. Envoy
+  /// will wait for the callback before terminating.
+  ///
+  /// If the [`CompletionCallback`] is dropped without calling `done`, it will automatically signal
+  /// completion to prevent Envoy from hanging.
+  fn on_shutdown(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    completion: CompletionCallback,
+  ) {
+    completion.done();
+  }
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -7901,6 +7973,32 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_init
   let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
   let extension = unsafe { &mut *extension };
   extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  completion_callback: abi::envoy_dynamic_module_type_event_cb,
+  completion_context: *mut std::os::raw::c_void,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  let completion = CompletionCallback {
+    callback: completion_callback,
+    context: completion_context,
+  };
+  extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
 }
 
 #[no_mangle]
