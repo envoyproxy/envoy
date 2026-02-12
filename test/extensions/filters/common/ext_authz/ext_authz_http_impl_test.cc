@@ -97,7 +97,10 @@ public:
     }
 
     cm_.initializeThreadLocalClusters({"ext_authz"});
-    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix, factory_context_);
+    const std::string path_prefix_value =
+        yaml.empty() ? path_prefix : proto_config.http_service().path_prefix();
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix_value,
+                                          factory_context_);
   }
 
   void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
@@ -226,8 +229,21 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
                                             /*timeout_ms=*/123, factory_context_);
   EXPECT_EQ(cfg->cluster(), "ext_authz");
   EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+  EXPECT_TRUE(cfg->pathOverride().empty());
   EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
   EXPECT_TRUE(cfg->encodeRawHeaders());
+}
+
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpServiceWithPathOverride) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+  http_service.mutable_server_uri()->set_cluster("ext_authz");
+  http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+  http_service.set_path_override("/override");
+  auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/false,
+                                            /*timeout_ms=*/456, factory_context_);
+  EXPECT_EQ(cfg->pathPrefix(), "");
+  EXPECT_EQ(cfg->pathOverride(), "/override");
 }
 
 TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
@@ -301,12 +317,71 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
                             "path_prefix should start with \"/\".");
 }
 
-// Verify client response when the authorization server returns a 200 OK and path_prefix is
-// configured.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
+// Verify path_override completely replaces the path (no prefix of original path).
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth");
+}
 
-  EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
+// Same input path /hello but with path_prefix /auth yields /auth/hello.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathPrefixSameInput) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth/hello");
+}
+
+// Verify only one of path_prefix or path_override may be set.
+TEST_F(ExtAuthzHttpClientTest, PathPrefixAndPathOverrideMutuallyExclusive) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/prefix"
+    path_override: "/override"
+  )EOF";
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_shared<ClientConfig>(proto_config, 250, proto_config.http_service().path_prefix(),
+                                     factory_context_),
+      EnvoyException, "Only one of path_prefix or path_override may be set, not both.");
+}
+
+// Verify path_override must start with /.
+TEST_F(ExtAuthzHttpClientTest, PathOverrideMustStartWithSlash) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "no-leading-slash"
+  )EOF";
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_shared<ClientConfig>(proto_config, 250, proto_config.http_service().path_prefix(),
+                                     factory_context_),
+      EnvoyException, "path_override should start with \"/\".");
 }
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
