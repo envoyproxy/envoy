@@ -66,13 +66,6 @@ ClientContextImpl::ClientContextImpl(
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()) {
-
-  if (enforce_rsa_key_usage_) {
-    ENVOY_LOG(warn, "The 'enforce_rsa_key_usage' option is enabled, the handshake will fail if the "
-                    "keyUsage extension is present and incompatible with the TLS usage. BoringSSL "
-                    "will enforce this very soon please update the certificates to be compliant.");
-  }
-
   if (!creation_status.ok()) {
     return;
   }

@@ -416,6 +416,25 @@ ClientContextConfigImpl::ClientContextConfigImpl(
       allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, true)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+
+  if (!config.has_enforce_rsa_key_usage()) {
+    ENVOY_LOG(
+        warn,
+        "The 'enforce_rsa_key_usage' option is not configured, its default value is changed to "
+        "true, and the config option will be deprecated in the next version. The handshake will "
+        "fail "
+        "if the keyUsage extension is present and incompatible with the "
+        "TLS usage. Please update the certificates to be compliant.");
+  } else if (!enforce_rsa_key_usage_) {
+    ENVOY_LOG(
+        warn,
+        "The 'enforce_rsa_key_usage' option is set to false, which disables the enforcement of RSA "
+        "key usage. This option will be deprecated in the next version. The handshake will fail "
+        "if the keyUsage extension is present and incompatible with the "
+        "TLS usage. Please update the certificates to be compliant.");
+    factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
+  }
+
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {

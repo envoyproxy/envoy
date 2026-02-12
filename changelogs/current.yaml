@@ -26,8 +26,8 @@ behavior_changes:
   change: |
     Set
     :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
-    to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. BoringSSL
-    will enforce this very soon, please update the certificates to be compliant.
+    to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
+    the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
