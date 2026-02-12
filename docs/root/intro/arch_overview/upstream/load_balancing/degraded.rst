@@ -30,5 +30,10 @@ as it becomes necessary.
 | 5%/0%/95%                      | 100%                         |   0%                          |
 +--------------------------------+------------------------------+-------------------------------+
 
-Endpoints can be marked as degraded by using active health checking and having the upstream host
-return a :ref:`special header <arch_overview_health_checking_degraded>`.
+Endpoints can be marked as degraded in two ways:
+
+* Using :ref:`active health checking <arch_overview_health_checking>` and having the upstream host
+  return a :ref:`special header <arch_overview_health_checking_degraded>`.
+* Using :ref:`outlier detection <arch_overview_outlier_detection>` (passive health checking) by
+  enabling :ref:`detect_degraded_hosts<envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
+  and having the upstream host return the ``x-envoy-degraded`` header.

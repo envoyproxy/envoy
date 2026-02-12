@@ -46,6 +46,13 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
     break;
   }
 
+  case Host::HealthFlag::DEGRADED_OUTLIER_DETECTION: {
+    if (host.healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
+      health_status += "/degraded_outlier_detection";
+    }
+    break;
+  }
+
   case Host::HealthFlag::PENDING_DYNAMIC_REMOVAL: {
     if (host.healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
       health_status += "/pending_dynamic_removal";
