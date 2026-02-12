@@ -8,11 +8,8 @@ on:
     secrets:
       app-id:
       app-key:
-      dockerhub-password:
-      gcp-key:
       gpg-key:
       gpg-key-password:
-      rbe-key:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -376,12 +373,6 @@ jobs:
       name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/actions/gcp/setup@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      name: Setup GCP (artefacts)
-      id: gcp
-      with:
-        key: ${{ secrets.gcp-key }}
-        key-copy: ${{ inputs.rbe-google && runner.temp || '' }}
     - run: |
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
@@ -423,11 +414,8 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
-        DOCKERHUB_USERNAME: ${{ inputs.dockerhub-username }}
-        DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}/container
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
-        RBE_KEY: ${{ secrets.rbe-key }}
         BAZEL_BUILD_EXTRA_OPTIONS: >-
           ${{ env.BAZEL_BUILD_EXTRA_OPTIONS }}
           --config=remote-ci
