@@ -24,6 +24,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_server_initialized",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_shutdown",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_timer_fired",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_worker_initialized",
     ],
     deps = [
@@ -102,6 +103,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
     ],
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
