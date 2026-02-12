@@ -6648,6 +6648,185 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
+// =============================================================================
+// ============================ Cert Validator ==================================
+// =============================================================================
+//
+// This extension enables custom TLS certificate validation via dynamic modules.
+// It integrates with Envoy's custom_validator_config in CertificateValidationContext,
+// registered under the envoy.tls.cert_validator category.
+//
+// The module receives DER-encoded certificates during validation and returns
+// a result indicating success or failure with optional TLS alert and error details.
+
+// =============================================================================
+// Cert Validator Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is a pointer to the
+ * DynamicModuleCertValidatorConfig object in Envoy. This is passed to the module during config
+ * creation and cert chain verification.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_cert_validator_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr is a pointer to the in-module cert
+ * validator configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cert_validator_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_status represents the status of the
+ * certificate chain validation. This corresponds to ValidationResults::ValidationStatus in
+ * cert_validator.h.
+ *
+ * Note: Pending (asynchronous) validation is not supported.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_validation_status {
+  envoy_dynamic_module_type_cert_validator_validation_status_Successful = 0,
+  envoy_dynamic_module_type_cert_validator_validation_status_Failed = 1,
+} envoy_dynamic_module_type_cert_validator_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_client_validation_status represents the detailed client
+ * validation status. This corresponds to Ssl::ClientValidationStatus in
+ * ssl_socket_extended_info.h.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_client_validation_status {
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NotValidated = 0,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NoClientCertificate = 1,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Validated = 2,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Failed = 3,
+} envoy_dynamic_module_type_cert_validator_client_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_result is the result of a certificate chain
+ * verification. Returned by the envoy_dynamic_module_on_cert_validator_do_verify_cert_chain event
+ * hook.
+ *
+ * Error details, if any, should be set via the
+ * envoy_dynamic_module_callback_cert_validator_set_error_details callback before returning.
+ */
+typedef struct envoy_dynamic_module_type_cert_validator_validation_result {
+  // The overall validation status (Successful or Failed).
+  envoy_dynamic_module_type_cert_validator_validation_status status;
+  // The detailed client validation status.
+  envoy_dynamic_module_type_cert_validator_client_validation_status detailed_status;
+  // The TLS alert code to send on failure (e.g. SSL_AD_BAD_CERTIFICATE).
+  uint8_t tls_alert;
+  // Whether the tls_alert field is set.
+  bool has_tls_alert;
+} envoy_dynamic_module_type_cert_validator_validation_result;
+
+// =============================================================================
+// Cert Validator Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_new is called by the main thread when the cert
+ * validator config is loaded. The function returns a
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr for given name and config.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object for the
+ * corresponding config.
+ * @param name is the name of the validator owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_cert_validator_config_module_ptr is the pointer to the
+ * in-module cert validator configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the cert validator configuration will be rejected.
+ */
+envoy_dynamic_module_type_cert_validator_config_module_ptr
+envoy_dynamic_module_on_cert_validator_config_new(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_destroy is called when the cert validator
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module cert validator configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module cert validator configuration whose
+ * corresponding Envoy cert validator configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_cert_validator_config_destroy(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain is called to verify a certificate
+ * chain during a TLS handshake. The certificates are provided as DER-encoded buffers. The first
+ * certificate (index 0) is the leaf certificate.
+ *
+ * The certs array and its buffer contents are owned by Envoy and are valid only for the duration
+ * of this event hook call.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param certs is an array of DER-encoded certificate buffers.
+ * @param certs_count is the number of certificates in the array.
+ * @param host_name is the SNI host name for validation.
+ * @param is_server is true if the validation is on the server side (validating client certs).
+ * @return envoy_dynamic_module_type_cert_validator_validation_result is the validation result.
+ */
+envoy_dynamic_module_type_cert_validator_validation_result
+envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer* certs, size_t certs_count,
+    envoy_dynamic_module_type_envoy_buffer host_name, bool is_server);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode is called during SSL context
+ * initialization to get the SSL verify mode flags that should be applied to SSL contexts.
+ *
+ * The return value should be a combination of SSL_VERIFY_* flags (e.g. SSL_VERIFY_PEER,
+ * SSL_VERIFY_FAIL_IF_NO_PEER_CERT). Returning 0 means SSL_VERIFY_NONE.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param handshaker_provides_certificates is true if the handshaker provides certificates itself.
+ * @return int the SSL verify mode flags.
+ */
+int envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    bool handshaker_provides_certificates);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_update_digest is called to contribute to the session
+ * context hash. The module should provide bytes that uniquely identify its validation configuration
+ * so that configuration changes invalidate existing TLS sessions. The output buffer must remain
+ * valid until the end of this event hook.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param out_data is a pointer to a buffer that the module should fill with the digest data.
+ * The module should set the ptr and length fields.
+ */
+void envoy_dynamic_module_on_cert_validator_update_digest(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_module_buffer* out_data);
+
+// =============================================================================
+// Cert Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_error_details is called by the module during
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain to set error details for a failed
+ * validation. Envoy copies the provided buffer immediately, so the module does not need to keep
+ * the buffer alive after this call returns.
+ *
+ * This must only be called from within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param error_details is the error details string owned by the module.
+ */
+void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer error_details);
+
 #ifdef __cplusplus
 }
 #endif
