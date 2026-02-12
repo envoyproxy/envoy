@@ -155,6 +155,9 @@ new_features:
     can now be loaded by an Envoy binary of v1.39.
 - area: dynamic modules
   change: |
+    Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
+- area: dynamic modules
+  change: |
     Added support for dynamic modules authors to register any combination of http, network, listener,
     udp listener, and bootstrap filters in the rust SDK.
 - area: mcp_router
@@ -184,6 +187,9 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: access_log
+  change: |
+    Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: network
   change: |
     Added support access logging in network filters like http filters, by allowing network filters to register as access logger
@@ -248,6 +254,11 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: oauth2
+  change: |
+    Added ``TLS_CLIENT_AUTH`` for the OAuth2 HTTP filter to support RFC 8705 mutual TLS client
+    authentication. In this mode ``token_secret`` is optional and ignored, and the token endpoint
+    cluster must be configured with mTLS.
 - area: dynamic_modules
   change: |
     Added a process-wide function registry to the dynamic modules ABI. Modules can register
@@ -269,5 +280,9 @@ new_features:
     Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
     regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
     text and JSON output (e.g., ``/clusters?filter=service&format=json``).
+- area: mcp_router
+  change: |
+    Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
+    observability into request routing, fanout operations, and error conditions.
 
 deprecated:
