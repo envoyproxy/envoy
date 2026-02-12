@@ -34,6 +34,7 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-openssl
     - check-coverage
     - check-runtime
     - check-san
@@ -175,6 +176,9 @@ run:
     - source/**/*
     - test/**/*
   check-build:
+    paths:
+    - "**/*"
+  check-build-openssl:
     paths:
     - "**/*"
   check-coverage:
