@@ -43,7 +43,8 @@ CommonPropertiesConfig::CommonPropertiesConfig(
     : filter_states_to_log(config.filter_state_objects_to_log().begin(),
                            config.filter_state_objects_to_log().end()) {
   for (const auto& custom_tag : config.custom_tags()) {
-    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag, command_parsers);
+    const auto tag_applier =
+        Tracing::CustomTagUtility::createCustomTag(custom_tag, command_parsers);
     custom_tags.push_back(tag_applier);
   }
 }
