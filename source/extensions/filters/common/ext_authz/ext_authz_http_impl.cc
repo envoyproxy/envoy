@@ -117,6 +117,22 @@ absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
   return std::string(path_prefix);
 }
 
+absl::StatusOr<std::string> validatePathOverride(absl::string_view path_override) {
+  if (!path_override.empty() && path_override[0] != '/') {
+    return absl::InvalidArgumentError("path_override should start with \"/\".");
+  }
+  return std::string(path_override);
+}
+
+absl::Status validateOnlyOneOfPathPrefixOrOverride(absl::string_view path_prefix,
+                                                   absl::string_view path_override) {
+  if (!path_prefix.empty() && !path_override.empty()) {
+    return absl::InvalidArgumentError(
+        "Only one of path_prefix or path_override may be set, not both.");
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<Router::RetryPolicyConstSharedPtr>
 createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
                   Server::Configuration::CommonFactoryContext& context) {
@@ -156,6 +172,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
+      path_override_(THROW_OR_RETURN_VALUE(
+          validatePathOverride(config.http_service().path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -167,7 +185,10 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                         ? THROW_OR_RETURN_VALUE(
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
-                        : nullptr) {}
+                        : nullptr) {
+  THROW_IF_NOT_OK(
+      validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
+}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -185,6 +206,8 @@ ClientConfig::ClientConfig(
       cluster_name_(http_service.server_uri().cluster()), timeout_(timeout),
       path_prefix_(
           THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
+      path_override_(
+          THROW_OR_RETURN_VALUE(validatePathOverride(http_service.path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -196,7 +219,10 @@ ClientConfig::ClientConfig(
           http_service.has_retry_policy()
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
-              : nullptr) {}
+              : nullptr) {
+  THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
+                                                        http_service.path_override()));
+}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -294,8 +320,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+        } else {
+          headers->addCopy(key, header.raw_value());
+        }
       } else {
         headers->addCopy(key, header.raw_value());
       }
@@ -309,8 +341,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+        } else {
+          headers->addCopy(key, header.second);
+        }
       } else {
         headers->addCopy(key, header.second);
       }
