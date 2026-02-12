@@ -75,6 +75,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":dns_filter_test_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/udp/dns_filter:config",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",

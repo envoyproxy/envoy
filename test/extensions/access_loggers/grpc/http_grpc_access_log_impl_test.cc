@@ -199,9 +199,9 @@ public:
                                            const StreamInfo::StreamInfo&) const override {
           return "custom_resolved_value";
         }
-        ProtobufWkt::Value formatValue(const Formatter::Context&,
-                                       const StreamInfo::StreamInfo&) const override {
-          ProtobufWkt::Value val;
+        Protobuf::Value formatValue(const Formatter::Context&,
+                                    const StreamInfo::StreamInfo&) const override {
+          Protobuf::Value val;
           val.set_string_value("custom_resolved_value");
           return val;
         }
