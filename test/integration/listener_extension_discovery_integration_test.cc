@@ -769,10 +769,12 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
 
 #ifdef ENVOY_ENABLE_QUIC
 
-#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
+
 #include "test/integration/utility.h"
+
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace {

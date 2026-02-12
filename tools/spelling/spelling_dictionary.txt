@@ -497,6 +497,7 @@ SRDS
 SRV
 SS
 SSD
+SSE
 SSL
 STDSTRING
 STL
@@ -1669,3 +1670,6 @@ UIDs
 configurability
 WDS
 OIDC
+Bredband
+Bevtec
+doublings

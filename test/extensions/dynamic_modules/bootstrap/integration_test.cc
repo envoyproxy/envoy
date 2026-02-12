@@ -52,14 +52,17 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicC) {
 }
 
 // This test verifies that the Rust bootstrap extension can use the common logging callbacks.
-// The integration test module logs messages during on_server_initialized and
-// on_worker_thread_initialized hooks.
+// The integration test module logs messages during on_server_initialized,
+// on_worker_thread_initialized, and on_shutdown hooks.
 TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages(
           {{"info", "Bootstrap extension server initialized from Rust!"},
            {"info", "Bootstrap extension worker thread initialized from Rust!"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_integration_test"));
+
+  // Verify the shutdown hook is called during server teardown.
+  EXPECT_LOG_CONTAINS("info", "Bootstrap extension shutdown from Rust!", { test_server_.reset(); });
 }
 
 // This test verifies that the Rust bootstrap extension can access stats from the stats store.
@@ -70,6 +73,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
                                   {"info", "Correctly returned None for non-existent histogram"},
                                   {"info", "Bootstrap stats access test completed successfully!"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
+}
+
+// This test verifies that the Rust bootstrap extension can register and resolve functions
+// via the process-wide function registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap function registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
 } // namespace DynamicModules

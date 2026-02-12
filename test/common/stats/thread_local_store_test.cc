@@ -759,6 +759,63 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->rootScope()->createScope("scope.", /*evictable=*/true);
+
+  // 1. Create gauge and PAIRED_ADD (add)
+  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  g1.add(10);
+  EXPECT_EQ(10, g1.value());
+  EXPECT_TRUE(g1.used());
+
+  // Hold a reference to prevent destruction upon eviction
+  GaugeSharedPtr g1_ref = TestUtility::findGauge(*store_, "scope.g1");
+  ASSERT_NE(g1_ref, nullptr);
+
+  // 2. MarkUnused / Evict
+  // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
+  // Since we just used it (g1.add(10)), the first call will only mark it as unused.
+  store_->evictUnused();
+  EXPECT_FALSE(g1.used());
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // Second pass evicts from scope cache because it is now unused.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // Verify removed from scope
+  StatNameManagedStorage g1_name("scope.g1", symbol_table_);
+  EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
+
+  // Verify still in store (allocator) due to held ref
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // 3. Interleaved PAIRED_ADD (add) on the held reference
+  g1_ref->add(5);
+  EXPECT_EQ(15, g1_ref->value());
+  EXPECT_TRUE(g1_ref->used());
+
+  // 4. Re-resolve and PAIRED_SUBTRACT (sub)
+  Gauge& g1_resurrected = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+
+  // Should be the same object
+  EXPECT_EQ(g1_ref.get(), &g1_resurrected);
+
+  // Value should be preserved
+  EXPECT_EQ(15, g1_resurrected.value());
+
+  // Perform subtract
+  g1_resurrected.sub(15);
+  EXPECT_EQ(0, g1_resurrected.value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

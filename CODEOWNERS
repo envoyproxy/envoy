@@ -243,6 +243,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/mcp @botengyao @yanavlasov
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
+# HTTP A2A filter
+/*/extensions/filters/http/a2a @tyxia @botengyao @yanavlasov @agrawroh
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
@@ -408,6 +410,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 
