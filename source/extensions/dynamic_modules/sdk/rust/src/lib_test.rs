@@ -1732,3 +1732,290 @@ fn test_network_filter_watermark_callbacks() {
   assert!(ON_ABOVE_HIGH_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_BELOW_LOW_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+// =============================================================================
+// Bootstrap Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _sample_count_ptr: *mut u64,
+  _sample_sum_ptr: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_counter_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_gauge_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+// =============================================================================
+// Bootstrap Extension Tests
+// =============================================================================
+
+#[test]
+fn test_bootstrap_extension_config_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+  impl Drop for TestBootstrapExtensionConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+  impl Drop for TestBootstrapExtension {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_drain_started() {
+  static DRAIN_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+      DRAIN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_drain_started(std::ptr::null_mut(), extension_ptr);
+
+  assert!(DRAIN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown() {
+  static SHUTDOWN_CALLED: AtomicBool = AtomicBool::new(false);
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_shutdown(
+      &mut self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+      completion: CompletionCallback,
+    ) {
+      SHUTDOWN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      completion.done();
+    }
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(SHUTDOWN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown_default_calls_completion() {
+  // Verify that the default on_shutdown implementation calls the completion callback.
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    // Use the default on_shutdown implementation.
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}

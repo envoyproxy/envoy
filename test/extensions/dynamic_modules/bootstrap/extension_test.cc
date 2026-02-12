@@ -105,6 +105,106 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   // Destruction happens when extension goes out of scope.
 }
 
+TEST_F(ExtensionTest, DrainCallbackInvoked) {
+  // Capture the drain callback registered via addOnDrainCloseCb.
+  Server::DrainManager::DrainCloseCb captured_drain_cb;
+  EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
+
+  // Allow the lifecycle notifier registration without crashing.
+  EXPECT_CALL(
+      context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(testing::Return(nullptr));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // This triggers registerLifecycleCallbacks() which registers the drain callback.
+  extension->onServerInitialized();
+
+  // Invoke the captured drain callback to exercise the drain notification path.
+  EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
+}
+
+TEST_F(ExtensionTest, ShutdownCallbackWithCompletion) {
+  // Allow the drain registration without crashing.
+  EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::Return(nullptr));
+
+  // Capture the shutdown callback registered via lifecycleNotifier().registerCallback.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  extension->onServerInitialized();
+
+  // Invoke the captured shutdown callback with a completion callback.
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
+TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {
+  // Allow the drain registration without crashing.
+  EXPECT_CALL(context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::Return(nullptr));
+
+  // Capture the shutdown callback.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+  extension->onServerInitialized();
+
+  // Call destroy() to set in_module_extension_ to nullptr while keeping the extension alive.
+  // This simulates the scenario where the module is torn down before the shutdown callback fires.
+  extension->destroy();
+
+  // Now invoke the shutdown callback. Since in_module_extension_ is nullptr, this should
+  // directly call the completion callback without invoking the module's shutdown hook.
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

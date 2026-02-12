@@ -2034,6 +2034,47 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyTest, RemoteAddressMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "10.0.0.1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, RemoteAddressMatchNoMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
 } // namespace
 } // namespace RateLimit
 } // namespace Common

@@ -497,6 +497,7 @@ SRDS
 SRV
 SS
 SSD
+SSE
 SSL
 STDSTRING
 STL
@@ -1671,3 +1672,4 @@ WDS
 OIDC
 Bredband
 Bevtec
+doublings
