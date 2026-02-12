@@ -112,6 +112,9 @@ jobs:
           source: |
             export NO_BUILD_SETUP=1
           steps-pre: |
+            - shell: bash
+              run: |
+                df -h
             - run: |
                 IMAGES=(
                     envoy-contrib-distroless:contrib-distroless-dev
