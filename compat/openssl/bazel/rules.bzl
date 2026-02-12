@@ -23,8 +23,8 @@ def patched_bssl_filegroup(name, srcs):
                 DST_FILE="$(location {dst_file})"
                 BASENAME="$$(basename $$SRC_FILE)"
                 # Patch files are in the package, so use relative paths from execroot
-                PATCH_SCRIPT="external/bssl-compat/patch/{dst_file}.sh"
-                PATCH_FILE="external/bssl-compat/patch/{dst_file}.patch"
+                PATCH_SCRIPT="external/compat-openssl/patch/{dst_file}.sh"
+                PATCH_FILE="external/compat-openssl/patch/{dst_file}.patch"
 
                 # Create output directory
                 mkdir -p "$$(dirname $$DST_FILE)"

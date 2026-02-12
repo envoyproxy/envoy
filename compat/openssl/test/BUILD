@@ -83,8 +83,8 @@ cc_test(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@bssl-compat//:crypto",
-        "@bssl-compat//:ssl",
+        "@compat-openssl//:crypto",
+        "@compat-openssl//:ssl",
         "@googletest//:gtest",
     ],
 )
