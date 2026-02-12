@@ -28,6 +28,9 @@ concurrency:
 
 
 jobs:
+  # Envoy (and mirror repos) have an environment setup that requires maintainer approval
+  # to use it. This CI checks if the request is from a first-time contributor, and in that
+  # case it uses the environment and requires the permission to proceed.
   authorize:
     if: >-
       ${{ github.repository == 'envoyproxy/envoy'
