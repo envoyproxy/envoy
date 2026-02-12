@@ -150,6 +150,9 @@ new_features:
     can now be loaded by an Envoy binary of v1.39.
 - area: dynamic modules
   change: |
+    Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
+- area: dynamic modules
+  change: |
     Added support for dynamic modules authors to register any combination of http, network, listener,
     udp listener, and bootstrap filters in the rust SDK.
 - area: mcp_router

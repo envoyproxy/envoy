@@ -32,7 +32,9 @@ envoy_cc_library(
     hdrs = ["extension.h"],
     deps = [
         ":extension_config_lib",
+        "//envoy/common:callback",
         "//envoy/server:bootstrap_extension_config_interface",
+        "//envoy/server:lifecycle_notifier_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",

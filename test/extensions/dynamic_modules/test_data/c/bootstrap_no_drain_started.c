@@ -9,7 +9,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
   return envoy_dynamic_modules_abi_version;
 }
 
-// A bootstrap extension where envoy_dynamic_module_on_bootstrap_extension_new returns nullptr.
+// A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_drain_started.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -32,8 +32,7 @@ envoy_dynamic_module_on_bootstrap_extension_new(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr) {
   (void)extension_config_ptr;
   (void)extension_envoy_ptr;
-  // Return nullptr to test null extension handling.
-  return NULL;
+  return (envoy_dynamic_module_type_bootstrap_extension_module_ptr)0x2;
 }
 
 void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
@@ -55,12 +54,7 @@ void envoy_dynamic_module_on_bootstrap_extension_destroy(
   (void)extension_module_ptr;
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_drain_started(
-    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
-  (void)extension_envoy_ptr;
-  (void)extension_module_ptr;
-}
+// envoy_dynamic_module_on_bootstrap_extension_drain_started is intentionally missing.
 
 void envoy_dynamic_module_on_bootstrap_extension_shutdown(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
@@ -95,3 +89,4 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks;
   (void)body_chunks_size;
 }
+
