@@ -1814,6 +1814,39 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gaug
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+  _delay_milliseconds: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================

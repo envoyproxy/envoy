@@ -83,6 +83,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that the Rust bootstrap extension timer API works correctly.
+// A timer is created during config_new, armed with a short delay, and on_timer_fired logs success.
+TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap timer test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_timer_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

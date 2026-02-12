@@ -36,6 +36,8 @@ using OnBootstrapExtensionConfigScheduledType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_scheduled);
 using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
+using OnBootstrapExtensionTimerFiredType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
 
 class DynamicModuleBootstrapExtension;
 
@@ -106,6 +108,7 @@ public:
   OnBootstrapExtensionShutdownType on_bootstrap_extension_shutdown_ = nullptr;
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
+  OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -186,6 +189,36 @@ private:
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
   // The dispatcher is used to post the event to the main thread.
   Event::Dispatcher& dispatcher_;
+};
+
+/**
+ * This class wraps an Envoy timer for use by bootstrap extension dynamic modules. It is created via
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new and deleted via
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete.
+ *
+ * When the timer fires, it invokes the on_bootstrap_extension_timer_fired event hook on the main
+ * thread if the config is still alive.
+ */
+class DynamicModuleBootstrapExtensionTimer {
+public:
+  explicit DynamicModuleBootstrapExtensionTimer(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
+      : config_(std::move(config)) {}
+
+  /**
+   * Set the underlying Envoy timer. This is separated from construction to allow the timer
+   * callback to capture a stable pointer to this object.
+   */
+  void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
+
+  Event::Timer& timer() { return *timer_; }
+
+private:
+  // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily
+  // extending the lifetime of the config.
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
+  // The underlying Envoy timer.
+  Event::TimerPtr timer_;
 };
 
 /**
