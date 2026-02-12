@@ -172,7 +172,7 @@ private:
   std::string http_response_code_details_;
   // True if the stream failed open.
   bool failed_open_{false};
-  // True if the external_processor sends an immeidate response.
+  // True if the external_processor sends an immediate response.
   bool received_immediate_response_{false};
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
