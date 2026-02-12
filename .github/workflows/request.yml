@@ -28,7 +28,27 @@ concurrency:
 
 
 jobs:
+  authorize:
+    if: >-
+      ${{ github.repository == 'envoyproxy/envoy'
+          || (vars.ENVOY_CI && github.event_name != 'schedule')
+          || (vars.ENVOY_SCHEDULED_CI && github.event_name == 'schedule') }}
+    runs-on: ubuntu-24.04
+    environment: >-
+      ${{ github.event_name == 'pull_request_target'
+          && github.event.pull_request.author_association != 'MEMBER'
+          && github.event.pull_request.author_association != 'COLLABORATOR'
+          && github.event.pull_request.author_association != 'OWNER'
+          && 'external-contributors'
+          || '' }}
+    steps:
+    - run: |
+        echo "Authorized"
+        echo "  Event: ${{ github.event_name }}"
+        echo "  Author association: ${{ github.event.pull_request.author_association }}"
+
   request:
+    needs: authorize
     permissions:
       actions: write
       contents: read
