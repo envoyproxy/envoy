@@ -18,10 +18,13 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/stats:stat_match_input_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/stats:stats_lib",
         "//source/extensions/matching/actions/transform_stat:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 

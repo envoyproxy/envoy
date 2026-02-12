@@ -50,6 +50,22 @@ void envoy_dynamic_module_on_bootstrap_extension_destroy(
   (void)extension_module_ptr;
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_drain_started(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_envoy_ptr;
+  (void)extension_module_ptr;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context) {
+  (void)extension_envoy_ptr;
+  (void)extension_module_ptr;
+  completion_callback(completion_context);
+}
+
 void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
