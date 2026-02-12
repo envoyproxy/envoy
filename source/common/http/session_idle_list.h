@@ -20,8 +20,8 @@ namespace Http {
 
 class TestSessionIdleList;
 
-constexpr int kMaxSessionsToTerminateInOneRound = 5;
-constexpr int kMaxSessionsToTerminateInOneRoundWhenSaturated = 50;
+constexpr size_t kMaxSessionsToTerminateInOneRound = 5;
+constexpr size_t kMaxSessionsToTerminateInOneRoundWhenSaturated = 50;
 
 // This class manages a list of idle sessions.
 class SessionIdleList : public SessionIdleListInterface, public Logger::Loggable<Logger::Id::http> {
@@ -65,11 +65,11 @@ private:
   class IdleSessions {
     struct SessionInfo {
       SessionInfo() = default;
-      SessionInfo(IdleSessionInterface& _session, MonotonicTime _enqueue_time)
-          : session(&_session), enqueue_time(_enqueue_time) {}
+      SessionInfo(IdleSessionInterface& session, MonotonicTime enqueue_time)
+          : session(&session), enqueue_time(enqueue_time) {}
       IdleSessionInterface* session = nullptr;
       // The time at which this session was added.
-      MonotonicTime enqueue_time{};
+      MonotonicTime enqueue_time;
 
       // Sort by enqueue time. Used by `IdleSessionSet` for session order.
       friend std::strong_ordering operator<=>(const SessionInfo& lhs, const SessionInfo& rhs) {
@@ -116,7 +116,7 @@ private:
   // If this is > 0 then we do not terminate more than that many
   // sessions in a single attempt. This prevents us from doing too
   // much work in a single round. We want a small constant for this.
-  int MaxSessionsToTerminateInOneRound(bool is_saturated) const;
+  size_t MaxSessionsToTerminateInOneRound(bool is_saturated) const;
 
   // Returns the minimum time before a session can be terminated.
   absl::Duration MinTimeBeforeTerminationAllowed() const;
@@ -126,8 +126,8 @@ private:
   IdleSessions idle_sessions_;
   absl::Duration min_time_before_termination_allowed_ = absl::Minutes(1);
   bool ignore_min_time_before_termination_allowed_ = false;
-  int max_sessions_to_terminate_in_one_round_ = kMaxSessionsToTerminateInOneRound;
-  int max_sessions_to_terminate_in_one_round_when_saturated_ =
+  size_t max_sessions_to_terminate_in_one_round_ = kMaxSessionsToTerminateInOneRound;
+  size_t max_sessions_to_terminate_in_one_round_when_saturated_ =
       kMaxSessionsToTerminateInOneRoundWhenSaturated;
 };
 

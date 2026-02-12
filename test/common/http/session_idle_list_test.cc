@@ -8,6 +8,7 @@
 #include "source/common/http/session_idle_list_interface.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/time/time.h"
@@ -39,6 +40,7 @@ public:
   TestSessionIdleList& operator=(const TestSessionIdleList&) = delete;
 
   using SessionIdleList::idle_sessions;
+  using SessionIdleList::MinTimeBeforeTerminationAllowed;
 };
 
 class SessionIdleListTest : public ::testing::Test {
@@ -148,6 +150,38 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsWhenOverloaded) {
   EXPECT_FALSE(idle_list_.idle_sessions()->ContainsForTest(session2));
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session3));
   EXPECT_EQ(idle_list_.idle_sessions()->size(), 1);
+}
+
+TEST_F(SessionIdleListTest, MinTimeBeforeTerminationAllowed) {
+  EXPECT_EQ(idle_list_.MinTimeBeforeTerminationAllowed(), absl::Minutes(1));
+}
+
+TEST_F(SessionIdleListTest, RemoveNonExistentSession) {
+  TestIdleSession session1, session2;
+  idle_list_.AddSession(session1);
+  // Should not crash or bug.
+  idle_list_.RemoveSession(session2);
+  EXPECT_EQ(idle_list_.idle_sessions()->size(), 1);
+  EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session1));
+}
+
+TEST_F(SessionIdleListTest, MaybeTerminateIdleSessionsEmptyList) {
+  // Should not crash or bug.
+  idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/false);
+  idle_list_.MaybeTerminateIdleSessions(/*is_saturated=*/true);
+  EXPECT_EQ(idle_list_.idle_sessions()->size(), 0);
+}
+
+TEST_F(SessionIdleListTest, DuplicateAddSessionBug) {
+  TestIdleSession session1;
+  idle_list_.AddSession(session1);
+  EXPECT_ENVOY_BUG(idle_list_.AddSession(session1), "Session is already on the idle list.");
+}
+
+TEST_F(SessionIdleListTest, GetEnqueueTimeBug) {
+  TestIdleSession session1;
+  EXPECT_ENVOY_BUG(idle_list_.idle_sessions()->GetEnqueueTime(session1),
+                   "Attempt to get enqueue time for session which is not in the idle set.");
 }
 
 } // namespace Http

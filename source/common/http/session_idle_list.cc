@@ -23,16 +23,16 @@ void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
 }
 
 void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
-  const int max_sessions_to_terminate =
-      std::min<size_t>(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
-  int num_terminated;
+  const size_t max_sessions_to_terminate =
+      std::min(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
+  size_t num_terminated;
   for (num_terminated = 0; num_terminated < max_sessions_to_terminate; ++num_terminated) {
     IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
     absl::Duration time_since_enqueue = absl::FromChrono(
         dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
     // If the resource pressure is scaling but not saturated, we should respect
     // the min_time_before_termination_allowed_ and only terminate connections
-    // that has been idle longer than the threshold.
+    // that have been idle longer than the threshold.
     if (!is_saturated && time_since_enqueue < min_time_before_termination_allowed_) {
       break;
     }
@@ -44,7 +44,7 @@ void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
   ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
 };
 
-int SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) const {
+size_t SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) const {
   return is_saturated ? max_sessions_to_terminate_in_one_round_when_saturated_
                       : max_sessions_to_terminate_in_one_round_;
 };
