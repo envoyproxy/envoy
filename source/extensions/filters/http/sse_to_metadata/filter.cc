@@ -22,9 +22,10 @@ namespace {
 constexpr absl::string_view SseContentType{"text/event-stream"};
 
 // Check if content type is text/event-stream, ignoring parameters like charset.
+// HTTP Content-Type is case-insensitive.
 bool isSseContentType(absl::string_view content_type) {
   absl::string_view normalized = StringUtil::trim(StringUtil::cropRight(content_type, ";"));
-  return normalized == SseContentType;
+  return absl::EqualsIgnoreCase(normalized, SseContentType);
 }
 
 } // namespace
@@ -71,13 +72,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
     return Http::FilterDataStatus::Continue;
   }
 
-  const uint64_t data_length = data.length();
-  if (data_length == 0 && !end_stream) {
-    return Http::FilterDataStatus::Continue;
-  }
-
-  if (data_length > 0) {
-    buffer_.append(data.toString());
+  if (data.length() > 0) {
+    buffer_.add(data);
     processBuffer(end_stream);
   }
 
@@ -98,7 +94,9 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
 }
 
 void Filter::processBuffer(bool end_stream) {
-  absl::string_view buffer_view(buffer_);
+  // Linearize buffer to get contiguous memory for string_view.
+  const uint64_t length = buffer_.length();
+  absl::string_view buffer_view(static_cast<const char*>(buffer_.linearize(length)), length);
 
   while (!buffer_view.empty() && !processing_complete_) {
     auto [event_start, event_end, next_event_start] =
@@ -113,7 +111,7 @@ void Filter::processBuffer(bool end_stream) {
             "SSE event exceeds max_event_size ({} bytes). Discarding {} bytes of buffered data.",
             max_size, buffer_view.size());
         config_->stats().event_too_large_.inc();
-        buffer_.clear();
+        buffer_.drain(buffer_.length());
         return;
       }
       break;
@@ -130,8 +128,8 @@ void Filter::processBuffer(bool end_stream) {
     buffer_view = buffer_view.substr(next_event_start);
   }
 
-  // Keep only the unprocessed tail substring (remove processed bytes from front).
-  buffer_.erase(0, buffer_.size() - buffer_view.size());
+  // Drain processed bytes from the front of the buffer.
+  buffer_.drain(length - buffer_view.size());
 }
 
 bool Filter::processSseEvent(absl::string_view event) {

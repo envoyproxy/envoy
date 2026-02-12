@@ -69,7 +69,7 @@ private:
  * Extracts values from Server-Sent Events (SSE) HTTP response bodies and writes them to dynamic
  * metadata. Uses pluggable content parsers to extract values from SSE data fields.
  */
-class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::sse> {
 public:
   Filter(std::shared_ptr<FilterConfig> config);
   ~Filter() override = default;
@@ -104,14 +104,14 @@ private:
    */
   bool writeMetadata(const ContentParser::MetadataAction& action);
 
-  std::shared_ptr<FilterConfig> config_;
+  const std::shared_ptr<FilterConfig> config_;
   // Parser instance for this stream
   ContentParser::ParserPtr parser_;
   // Set to true if Content-Type header matches allowed types.
   bool content_type_matched_{false};
   // Set to true when all rules have reached their match limits. Stops further processing.
   bool processing_complete_{false};
-  std::string buffer_;
+  Buffer::OwnedImpl buffer_;
 };
 
 } // namespace SseToMetadata

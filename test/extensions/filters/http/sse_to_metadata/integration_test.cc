@@ -200,5 +200,78 @@ TEST_P(SseToMetadataIntegrationTest, VerifyMetadataValues) {
   EXPECT_EQ(1UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
+// Test extraction of prompt_tokens and completion_tokens for input/output token-based rate limiting
+TEST_P(SseToMetadataIntegrationTest, VerifyTokenBreakdown) {
+  const std::string token_breakdown_config = R"EOF(
+name: envoy.filters.http.sse_to_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "prompt_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "input_tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "completion_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "output_tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "total_tokens"
+                type: NUMBER
+)EOF";
+
+  config_helper_.prependFilter(token_breakdown_config);
+  useAccessLog("%DYNAMIC_METADATA(envoy.lb)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Send SSE response
+  upstream_request_->encodeHeaders(response_headers_, false);
+  Buffer::OwnedImpl buffer(sse_response_body_);
+  upstream_request_->encodeData(buffer, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  // Cleanup
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Verify all token metadata was extracted correctly
+  // From event 3: prompt_tokens: 10, completion_tokens: 20, total_tokens: 30
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr(R"("input_tokens":10)"));
+  EXPECT_THAT(log, testing::HasSubstr(R"("output_tokens":20)"));
+  EXPECT_THAT(log, testing::HasSubstr(R"("total_tokens":30)"));
+
+  // Verify stats: 3 token fields extracted from event 3
+  EXPECT_EQ(3UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+}
+
 } // namespace
 } // namespace Envoy
