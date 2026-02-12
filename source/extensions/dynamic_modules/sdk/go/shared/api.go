@@ -145,7 +145,7 @@ type HttpFilterFactory interface {
 	// Create creates a HttpFilter instance.
 	Create(handle HttpFilterHandle) HttpFilter
 
-	// OnDestroy is called when the factory is being destroyed. This is a good place to clean up any
+	// OnDestroy gets called when the factory is being destroyed. This is a good place to clean up any
 	// resources. This usually happens when the configuration is updated and all existing streams
 	// using this factory are closed.
 	OnDestroy()
