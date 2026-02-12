@@ -273,6 +273,9 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added metrics definition and update support for bootstrap dynamic modules.
+- area: dynamic_modules
+  change: |
     Added timer API to the bootstrap extension dynamic modules ABI.
 - area: formatter
   change: |

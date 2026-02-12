@@ -145,6 +145,105 @@ TEST(CommonAbiImplTest, TimerDeleteEnvoyBug) {
 }
 
 // =====================================================================
+// Bootstrap extension stats definition and update weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for define_counter triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, DefineCounterEnvoyBug) {
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"counter", 7};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+            nullptr, name, nullptr, 0, &counter_id);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for increment_counter triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, IncrementCounterEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+            nullptr, 0, nullptr, 0, 1);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for define_gauge triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, DefineGaugeEnvoyBug) {
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"gauge", 5};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+            nullptr, name, nullptr, 0, &gauge_id);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for set_gauge triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, SetGaugeEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+            nullptr, 0, nullptr, 0, 42);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for increment_gauge triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, IncrementGaugeEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+            nullptr, 0, nullptr, 0, 1);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for decrement_gauge triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, DecrementGaugeEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+            nullptr, 0, nullptr, 0, 1);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for define_histogram triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, DefineHistogramEnvoyBug) {
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"histogram", 9};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+            nullptr, name, nullptr, 0, &histogram_id);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for record_histogram_value triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, RecordHistogramValueEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result =
+            envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                nullptr, 0, nullptr, 0, 100);
+        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+      },
+      "not implemented in this context");
+}
+
+// =====================================================================
 // Function registry tests
 // =====================================================================
 

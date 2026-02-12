@@ -7317,6 +7317,7 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyBootstrapExtensionConfig {
   /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
   ///
@@ -7350,6 +7351,120 @@ pub trait EnvoyBootstrapExtensionConfig {
     abi::envoy_dynamic_module_type_http_callout_init_result,
     u64, // callout id
   );
+
+  /// Define a new counter scoped to this bootstrap extension config with the given name.
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new counter vec scoped to this bootstrap extension config with the given name.
+  fn define_counter_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge scoped to this bootstrap extension config with the given name.
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec scoped to this bootstrap extension config with the given name.
+  fn define_gauge_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram scoped to this bootstrap extension config with the given name.
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec scoped to this bootstrap extension config with the given name.
+  fn define_histogram_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Create a new timer on the main thread dispatcher.
   ///
@@ -7741,6 +7856,342 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     };
 
     (result, callout_id)
+  }
+
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterId(id))
+  }
+
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeId(id))
+  }
+
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
   }
 
   fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer> {
