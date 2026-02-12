@@ -42,9 +42,9 @@ TEST_F(ReverseConnectionAddressTest, BasicSetup) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Test that the address string is set correctly.
-  EXPECT_EQ(address.asString(), "127.0.0.1:0");
-  EXPECT_EQ(address.asStringView(), "127.0.0.1:0");
+  // Test that the address string is set correctly with placeholder port.
+  EXPECT_EQ(address.asString(), "127.0.0.1:1");
+  EXPECT_EQ(address.asStringView(), "127.0.0.1:1");
 
   // Test that the logical name is formatted correctly.
   std::string expected_logical_name =
@@ -107,10 +107,23 @@ TEST_F(ReverseConnectionAddressTest, IpAddressProperties) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Should have IP address.
+  // Reverse connection addresses provide a minimal IP implementation with a placeholder port
+  // since reverse connection listeners do not actually bind to port.
   EXPECT_NE(address.ip(), nullptr);
   EXPECT_EQ(address.ip()->addressAsString(), "127.0.0.1");
-  EXPECT_EQ(address.ip()->port(), 0);
+  EXPECT_EQ(address.ip()->port(), 1);
+  EXPECT_EQ(address.ip()->version(), Network::Address::IpVersion::v4);
+  EXPECT_FALSE(address.ip()->isAnyAddress());
+  EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_FALSE(address.ip()->isLinkLocalAddress());
+  EXPECT_FALSE(address.ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(address.ip()->isSiteLocalAddress());
+  EXPECT_FALSE(address.ip()->isTeredoAddress());
+
+  // Should have ipv4() for version v4
+  EXPECT_NE(address.ip()->ipv4(), nullptr);
+  EXPECT_EQ(address.ip()->ipv4()->address(), htonl(INADDR_LOOPBACK));
+  EXPECT_EQ(address.ip()->ipv6(), nullptr);
 
   // Should not have pipe or envoy internal address.
   EXPECT_EQ(address.pipe(), nullptr);
@@ -128,10 +141,11 @@ TEST_F(ReverseConnectionAddressTest, SocketAddressProperties) {
   socklen_t addr_len = address.sockAddrLen();
   EXPECT_EQ(addr_len, sizeof(struct sockaddr_in));
 
-  // Verify the sockaddr structure.
+  // Verify the sockaddr structure with placeholder port.
   const struct sockaddr_in* addr_in = reinterpret_cast<const struct sockaddr_in*>(sock_addr);
   EXPECT_EQ(addr_in->sin_family, AF_INET);
-  EXPECT_EQ(addr_in->sin_port, htons(0));                      // Port 0
+  EXPECT_EQ(addr_in->sin_port,
+            htons(ReverseConnectionAddress::kReverseConnectionListenerPortPlaceholder));
   EXPECT_EQ(addr_in->sin_addr.s_addr, htonl(INADDR_LOOPBACK)); // 127.0.0.1
 }
 
@@ -234,8 +248,8 @@ TEST_F(ReverseConnectionAddressTest, EmptyConfigValues) {
 
   ReverseConnectionAddress address(config);
 
-  // Should still work with empty values.
-  EXPECT_EQ(address.asString(), "127.0.0.1:0");
+  // Should still work with empty values. The placeholder port is always used.
+  EXPECT_EQ(address.asString(), "127.0.0.1:1");
   EXPECT_EQ(address.logicalName(), "rc://::@:0");
 
   const auto& retrieved_config = address.reverseConnectionConfig();
@@ -272,8 +286,9 @@ TEST_F(ReverseConnectionAddressTest, MultipleInstances) {
   // Should have different logical names.
   EXPECT_NE(address1.logicalName(), address2.logicalName());
 
-  // Should have same address string (both use 127.0.0.1:0)
+  // Should have same address string (both use the placeholder port 127.0.0.1:1)
   EXPECT_EQ(address1.asString(), address2.asString());
+  EXPECT_EQ(address1.asString(), "127.0.0.1:1");
 }
 
 // Test copy constructor and assignment (if implemented).

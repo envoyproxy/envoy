@@ -171,6 +171,7 @@ proto_library(
         "//envoy/extensions/compression/zstd/compressor/v3:pkg",
         "//envoy/extensions/compression/zstd/decompressor/v3:pkg",
         "//envoy/extensions/config/validators/minimum_clusters/v3:pkg",
+        "//envoy/extensions/content_parsers/json/v3:pkg",
         "//envoy/extensions/dynamic_modules/v3:pkg",
         "//envoy/extensions/early_data/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
@@ -331,6 +332,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg",
         "//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg",
         "//envoy/extensions/load_balancing_policies/common/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/dynamic_modules/v3:pkg",
         "//envoy/extensions/load_balancing_policies/least_request/v3:pkg",
         "//envoy/extensions/load_balancing_policies/maglev/v3:pkg",
         "//envoy/extensions/load_balancing_policies/override_host/v3:pkg",
@@ -449,10 +451,10 @@ proto_library(
     name = "xds_protos",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_xds//xds/core/v3:pkg",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
-        "@com_github_cncf_xds//xds/type/v3:pkg",
+        "@xds//xds/core/v3:pkg",
+        "@xds//xds/data/orca/v3:pkg",
+        "@xds//xds/type/matcher/v3:pkg",
+        "@xds//xds/type/v3:pkg",
     ],
 )
 

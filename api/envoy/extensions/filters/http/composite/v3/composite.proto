@@ -6,6 +6,8 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -38,6 +40,19 @@ message Composite {
   // This is useful when the same filter chain needs to be applied across many routes,
   // as it avoids duplicating the filter chain configuration.
   map<string, FilterChainConfiguration> named_filter_chains = 1;
+
+  // [#not-implemented-hide:]
+  // The match tree that will be used to select an action to execute. The action type should be
+  // :ref:`ExecuteFilterAction
+  // <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`.
+  xds.type.matcher.v3.Matcher matcher = 2;
+}
+
+// Per-route configuration for the Composite filter.
+// [#not-implemented-hide:]
+message CompositePerRoute {
+  // Override of the match tree for this route.
+  xds.type.matcher.v3.Matcher matcher = 1 [(validate.rules).message = {required: true}];
 }
 
 // A list of filter configurations to be called in order. Note that this can be used as the type

@@ -7,16 +7,21 @@ def test_program(name):
     cc_library(
         name = _name,
         srcs = [name + ".c"],
-        hdrs = [
-            "//source/extensions/dynamic_modules:abi.h",
-        ],
         deps = [
-            "//source/extensions/dynamic_modules:abi_version_lib",
+            "//source/extensions/dynamic_modules/abi",
         ],
-        linkopts = [
-            "-shared",
-            "-fPIC",
-        ],
+        linkopts = select({
+            "@platforms//os:macos": [
+                "-shared",
+                "-fPIC",
+                "-undefined",
+                "dynamic_lookup",
+            ],
+            "//conditions:default": [
+                "-shared",
+                "-fPIC",
+            ],
+        }),
         # All programs here are C, not C++, so we don't need to apply clang-tidy.
         tags = ["notidy"],
         linkstatic = False,

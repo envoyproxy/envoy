@@ -38,7 +38,7 @@ void MetricAggregator::addGauge(
     Metric metric;
     metric.set_name(metric_name);
     NumberDataPoint* data_point = metric.mutable_gauge()->add_data_points();
-    setCommonDataPoint(*data_point, &attributes,
+    setCommonDataPoint(*data_point, attributes,
                        AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
     data_point->set_as_int(value);
     non_aggregated_metrics_.push_back(std::move(metric));
@@ -52,8 +52,6 @@ void MetricAggregator::addGauge(
   if (it != metric_data.gauge_points.end()) {
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
-    setCommonDataPoint(*data_point, nullptr,
-                       AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
 
     // Multiple stats are mapped to the same metric and we
     // aggregate by summing the new value to the existing one.
@@ -64,7 +62,7 @@ void MetricAggregator::addGauge(
   // If the data point does not exist, create a new one.
   NumberDataPoint* data_point = metric_data.metric.mutable_gauge()->add_data_points();
   metric_data.gauge_points[key] = data_point;
-  setCommonDataPoint(*data_point, &attributes,
+  setCommonDataPoint(*data_point, attributes,
                      AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
   data_point->set_as_int(value);
 }
@@ -73,15 +71,19 @@ void MetricAggregator::addCounter(
     absl::string_view metric_name, uint64_t value, uint64_t delta,
     AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+  const uint64_t point_value =
+      (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value;
+  if (point_value == 0 && temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
   if (!enable_metric_aggregation_) {
     Metric metric;
     metric.set_name(metric_name);
     metric.mutable_sum()->set_is_monotonic(true);
     metric.mutable_sum()->set_aggregation_temporality(temporality);
     NumberDataPoint* data_point = metric.mutable_sum()->add_data_points();
-    setCommonDataPoint(*data_point, &attributes, temporality);
-    data_point->set_as_int(
-        (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
+    setCommonDataPoint(*data_point, attributes, temporality);
+    data_point->set_as_int(point_value);
     non_aggregated_metrics_.push_back(std::move(metric));
     return;
   }
@@ -92,14 +94,9 @@ void MetricAggregator::addCounter(
   if (it != metric_data.counter_points.end()) {
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
-    // Update time for the existing data point.
-    setCommonDataPoint(*data_point, nullptr, temporality);
-
     // For DELTA, add the change since the last export. For CUMULATIVE, add the
     // total value.
-    data_point->set_as_int(
-        data_point->as_int() +
-        ((temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value));
+    data_point->set_as_int(data_point->as_int() + point_value);
     return;
   }
 
@@ -108,21 +105,24 @@ void MetricAggregator::addCounter(
   metric_data.metric.mutable_sum()->set_is_monotonic(true);
   metric_data.metric.mutable_sum()->set_aggregation_temporality(temporality);
   metric_data.counter_points[key] = data_point;
-  setCommonDataPoint(*data_point, &attributes, temporality);
-  data_point->set_as_int(
-      (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
+  setCommonDataPoint(*data_point, attributes, temporality);
+  data_point->set_as_int(point_value);
 }
 
 void MetricAggregator::addHistogram(
     absl::string_view stat_name, absl::string_view metric_name,
     const Stats::HistogramStatistics& stats, AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+  if (stats.sampleCount() == 0 &&
+      temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
   if (!enable_metric_aggregation_) {
     Metric metric;
     metric.set_name(metric_name);
     metric.mutable_histogram()->set_aggregation_temporality(temporality);
     HistogramDataPoint* data_point = metric.mutable_histogram()->add_data_points();
-    setCommonDataPoint(*data_point, &attributes, temporality);
+    setCommonDataPoint(*data_point, attributes, temporality);
 
     data_point->set_count(stats.sampleCount());
     data_point->set_sum(stats.sampleSum());
@@ -147,10 +147,6 @@ void MetricAggregator::addHistogram(
     if (static_cast<size_t>(data_point->explicit_bounds_size()) ==
             stats.supportedBuckets().size() &&
         static_cast<size_t>(data_point->bucket_counts_size()) == new_bucket_counts.size() + 1) {
-
-      // Update time.
-      setCommonDataPoint(*data_point, nullptr, temporality);
-
       // Aggregate count and sum.
       data_point->set_count(data_point->count() + stats.sampleCount());
       data_point->set_sum(data_point->sum() + stats.sampleSum());
@@ -174,7 +170,7 @@ void MetricAggregator::addHistogram(
   metric_data.metric.mutable_histogram()->set_aggregation_temporality(temporality);
   metric_data.histogram_points[key] = data_point;
   // Set common fields directly here
-  setCommonDataPoint(*data_point, &attributes, temporality);
+  setCommonDataPoint(*data_point, attributes, temporality);
 
   data_point->set_count(stats.sampleCount());
   data_point->set_sum(stats.sampleSum());

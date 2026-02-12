@@ -37,7 +37,7 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, 
         for f in target[ProtoInfo].direct_sources
         if (f.path.startswith("external/envoy_api") or
             f.path.startswith("tools/testdata/protoxform/envoy") or
-            f.path.startswith("external/com_github_cncf_xds/xds"))
+            f.path.startswith("external/xds/xds"))
     ]
 
     # If this proto_library doesn't actually name any sources, e.g. //api:api,
@@ -114,8 +114,10 @@ def api_proto_plugin_aspect(
             executable = True,
             cfg = "exec",
         ),
+        # Handle both string labels and pre-constructed Label objects.
+        # Use type comparison instead of string check for robustness.
         "_api_proto_plugin": attr.label(
-            default = Label(tool_label),
+            default = tool_label if type(tool_label) == type(Label("//foo:bar")) else Label(tool_label),
             executable = True,
             cfg = "exec",
         ),

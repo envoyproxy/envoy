@@ -77,7 +77,7 @@ envoy_cc_mock(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
-        "@com_github_google_quiche//:quic_platform_socket_address",
+        "@quiche//:quic_platform_socket_address",
     ]),
 )
 
@@ -91,6 +91,6 @@ envoy_cc_mock(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
     ] + envoy_select_enable_http3([
-        "@com_github_google_quiche//:quic_client_crypto_crypto_handshake_lib",
+        "@quiche//:quic_client_crypto_crypto_handshake_lib",
     ]),
 )

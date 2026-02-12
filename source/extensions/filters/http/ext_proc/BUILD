@@ -40,9 +40,9 @@ envoy_cc_library(
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/strings:string_view",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
@@ -55,7 +55,7 @@ envoy_cc_library(
     hdrs = ["allowed_override_modes_set.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -100,7 +100,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -120,12 +120,12 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
+        "@cel-cpp//eval/public:cel_expr_builder_factory",
     ] + select(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
-                "@com_google_cel_cpp//parser",
+                "@cel-cpp//parser",
             ],
         },
     ),

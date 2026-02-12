@@ -9,7 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -28,6 +28,10 @@ using OnBootstrapExtensionWorkerThreadInitializedType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized);
 using OnBootstrapExtensionDestroyType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_destroy);
+using OnBootstrapExtensionDrainStartedType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_drain_started);
+using OnBootstrapExtensionShutdownType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_shutdown);
 using OnBootstrapExtensionConfigScheduledType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_scheduled);
 using OnBootstrapExtensionHttpCalloutDoneType =
@@ -98,6 +102,8 @@ public:
   OnBootstrapExtensionWorkerThreadInitializedType
       on_bootstrap_extension_worker_thread_initialized_ = nullptr;
   OnBootstrapExtensionDestroyType on_bootstrap_extension_destroy_ = nullptr;
+  OnBootstrapExtensionDrainStartedType on_bootstrap_extension_drain_started_ = nullptr;
+  OnBootstrapExtensionShutdownType on_bootstrap_extension_shutdown_ = nullptr;
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
 
