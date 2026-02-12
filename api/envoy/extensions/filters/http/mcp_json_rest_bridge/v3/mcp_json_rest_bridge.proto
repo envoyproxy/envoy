@@ -123,9 +123,8 @@ message ServerToolConfig {
   // Optional configuration to transcode the tools/list requests to a standard HTTP request.
   //
   // - If provided: The extension transcodes the request and forwards it down the filter chain.
-  //   The response (whether from an upstream backend, a configured ``direct_response`` from
-  //   route configuration, or another extension) MUST be a JSON body strictly matching the MCP
-  //   ``ListToolsResult`` schema.
+  //   The response (whether from an upstream backend, a configured ``direct_response``, or another
+  //  extension) MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema.
   //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
   // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
   //   extension or the backend itself to handle the tools/list request if they support it.
