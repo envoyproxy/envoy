@@ -97,6 +97,15 @@ MATCHER_P(HasTimeout, expected_timeout_ms, "") {
   return true;
 }
 
+// Matcher to verify RequestOptions has no timeout set.
+MATCHER(HasNoTimeout, "") {
+  if (arg.timeout.has_value()) {
+    *result_listener << "expected no timeout, but timeout is " << arg.timeout->count() << "ms";
+    return false;
+  }
+  return true;
+}
+
 constexpr char FilterConfigName[] = "ext_authz_filter";
 
 template <class T> class HttpFilterTestBase : public T {
