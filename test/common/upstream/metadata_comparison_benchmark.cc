@@ -143,6 +143,37 @@ BENCHMARK(bmUpdateHostListHash)
     ->Args({5000, 20})
     ->Unit(::benchmark::kMillisecond);
 
+// Simulate updateDynamicHostList with cached hashes (pre-computed at metadata set time).
+// This is the approach used in the actual implementation.
+void bmUpdateHostListCachedHash(::benchmark::State& state) {
+  const int num_hosts = state.range(0);
+  const int num_fields = state.range(1);
+  std::vector<std::size_t> existing_hashes;
+  std::vector<std::size_t> incoming_hashes;
+  existing_hashes.reserve(num_hosts);
+  incoming_hashes.reserve(num_hosts);
+  for (int i = 0; i < num_hosts; i++) {
+    existing_hashes.push_back(MessageUtil::hash(buildMetadata(1, num_fields)));
+    incoming_hashes.push_back(MessageUtil::hash(buildMetadata(1, num_fields)));
+  }
+
+  for (auto _ : state) { // NOLINT
+    int changed = 0;
+    for (int i = 0; i < num_hosts; i++) {
+      if (existing_hashes[i] != incoming_hashes[i]) {
+        changed++;
+      }
+    }
+    ::benchmark::DoNotOptimize(changed);
+  }
+}
+BENCHMARK(bmUpdateHostListCachedHash)
+    ->Args({100, 5})
+    ->Args({1000, 5})
+    ->Args({5000, 5})
+    ->Args({5000, 20})
+    ->Unit(::benchmark::kMillisecond);
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
