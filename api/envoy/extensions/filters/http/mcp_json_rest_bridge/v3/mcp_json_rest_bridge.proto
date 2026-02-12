@@ -89,12 +89,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //     (Only the "payload" field from arguments is used as the body. Other arguments not in the
 //     path, like 'resource_id', become query parameters.)
 message McpJsonRestBridge {
-  // Maps backend service names to their corresponding MCP configuration.
-  map<string, Config> mcp_configs = 1;
-}
-
-// Configuration for a specific backend service acting as an MCP server.
-message Config {
   // General server information.
   ServerInfo server_info = 1;
 
@@ -126,12 +120,14 @@ message ServerToolConfig {
   // Whether this server supports notifications for changes to the tool list.
   bool list_changed = 2;
 
-  // Configuration for the tools/list method. Specifies how to call the
-  // backend to retrieve the list of available tools.
+  // Optional configuration to transcode the tools/list requests to a standard HTTP request.
   //
-  // When provided, the backend MUST return a JSON body strictly matching the MCP ListToolsResult
-  // schema. The extension passes this JSON through directly to the ``result`` field.
-  // Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+  // - If provided: The extension transcodes the request and forwards it down the filter chain.
+  //   The response (whether from an upstream backend, a configured `direct_response` route,
+  //   or another extension) MUST be a JSON body strictly matching the MCP `ListToolsResult` schema.
+  //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+  // - If not provided: The `tools/list` request is passed through. This allows subsequent extension
+  //   or the backend itself to handle the tools/list request if they support it.
   HttpRule tool_list_url_remap = 3;
 }
 
