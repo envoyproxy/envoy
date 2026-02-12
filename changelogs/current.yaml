@@ -284,5 +284,8 @@ new_features:
   change: |
     Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
     observability into request routing, fanout operations, and error conditions.
+- area: a2a
+  change: |
+    Added the parsing support for A2A(Agent2Agent) protocol. It is used ton parse the A2A JSON-RPC messages.
 
 deprecated:
