@@ -160,7 +160,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : AccessLoggers::Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
+      scope_(context.statsScope().createScope(config.stat_prefix(), /* evictable */ true)),
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {

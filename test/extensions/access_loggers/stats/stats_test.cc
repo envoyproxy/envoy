@@ -29,6 +29,10 @@ public:
               (const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
                Stats::Gauge::ImportMode import_mode),
               (override));
+  MOCK_METHOD(Stats::Histogram&, histogramFromStatNameWithTags,
+              (const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+               Stats::Histogram::Unit unit),
+              (override));
 };
 
 // MockGaugeWithTags is introduced to support iterateTagStatNames which is used in
@@ -120,6 +124,13 @@ public:
                     return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
                                                                                   import_mode);
                   }));
+          ON_CALL(*scope, histogramFromStatNameWithTags(_, _, _))
+              .WillByDefault(Invoke([scope_ptr = scope.get()](
+                                        const Stats::StatName& name,
+                                        Stats::StatNameTagVectorOptConstRef tags,
+                                        Stats::Histogram::Unit unit) -> Stats::Histogram& {
+                return scope_ptr->Stats::MockScope::histogramFromStatNameWithTags(name, tags, unit);
+              }));
           scope_ = scope;
           return scope_;
         }));
@@ -1024,6 +1035,177 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
 
             return scope_->counterFromStatNameWithTags_(name, tags);
           }));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+          tags:
+            - name: foo
+              value_format: bar
+          rules:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: generic_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                        drop_stat: {}
+        value_fixed: 1
+        set:
+          log_type: DownstreamEnd
+)EOF";
+
+  initialize(yaml);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+
+  // Case 1: Filter matches (tag foo=bar), so drop action is executed.
+  EXPECT_CALL(store_, gauge(_, _)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+
+  const std::string yaml2 = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+          tags:
+            - name: foo
+              value_format: baz
+          rules:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: generic_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                        drop_stat: {}
+        value_fixed: 1
+        set:
+          log_type: DownstreamEnd
+)EOF";
+  initialize(yaml2);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+
+  // Case 2: Filter does not match (tag foo=baz), so drop action is NOT executed.
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
+  EXPECT_CALL(*gauge_, set(1));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnGauge) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+          tags:
+            - name: foo
+              value_format: bar
+          rules:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: generic_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                        insert_tag:
+                          tag_name: foo
+                          tag_value: baz
+        value_fixed: 1
+        set:
+          log_type: DownstreamEnd
+)EOF";
+
+  initialize(yaml);
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+
+  auto* mock_scope = dynamic_cast<MockScopeWithGauge*>(scope_.get());
+  ASSERT_TRUE(mock_scope != nullptr);
+
+  // Case 1: Filter matches (tag foo=bar), so insert tag action is executed.
+  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, _))
+      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
+        EXPECT_EQ("gauge", scope_->symbolTable().toString(name));
+        EXPECT_EQ(1, tags->get().size());
+        EXPECT_EQ("foo", scope_->symbolTable().toString(tags->get()[0].first));
+        EXPECT_EQ("baz", scope_->symbolTable().toString(tags->get()[0].second));
+        return *gauge_;
+      }));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnHistogram) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    histograms:
+      - stat:
+          name: histogram
+          tags:
+            - name: foo
+              value_format: bar
+          rules:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: generic_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                        insert_tag:
+                          tag_name: foo
+                          tag_value: baz
+        unit: Bytes
+        value_format: '%BYTES_RECEIVED%'
+)EOF";
+
+  initialize(yaml);
+
+  auto* mock_scope = dynamic_cast<MockScopeWithGauge*>(scope_.get());
+  ASSERT_TRUE(mock_scope != nullptr);
+
+  // Case 1: Filter matches (tag foo=bar), so insert tag action is executed.
+  EXPECT_CALL(*mock_scope, histogramFromStatNameWithTags(_, _, _))
+      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Histogram::Unit) -> Stats::Histogram& {
+        EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
+        EXPECT_EQ(1, tags->get().size());
+        EXPECT_EQ("foo", scope_->symbolTable().toString(tags->get()[0].first));
+        EXPECT_EQ("baz", scope_->symbolTable().toString(tags->get()[0].second));
+        return store_.mockScope().histogramFromStatNameWithTags(name, tags,
+                                                                Stats::Histogram::Unit::Bytes);
+      }));
   logger_->log(formatter_context_, stream_info_);
 }
 
