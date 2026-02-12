@@ -45,6 +45,7 @@ jobs:
         ERROR
         error:
         Error:
+      skip: ${{ matrix.skip != false && true || false }}
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
       target-suffix: ${{ matrix.target-suffix }}
@@ -72,6 +73,7 @@ jobs:
           bazel-cache: true
           bazel-cache-output-base: docs
           rbe: true
+          skip: ${{ ! fromJSON(inputs.request).run.precheck-publish-config }}
         - target: docs
           name: Docs
           bazel-cache: true

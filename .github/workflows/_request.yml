@@ -202,6 +202,18 @@ jobs:
           docker:
             x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
             arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}
+          target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
+        filter: |
+          .["target-branch"] as $branch
+          | if ($branch | test("^release/v[0-9]+\\.[0-9]+$")) then
+              ($branch | sub("^release/v"; "") + ".0") as $version_str
+              | ($version_str | utils::version) as $version
+              | if ($version.major < 1 or ($version.major == 1 and $version.minor <= 37)) then
+                  .bazel["docs-x64"] = "skip"
+                  | .bazel["external-x64"] = "skip"
+                else . end
+            else . end
+          | del(.["target-branch"])
 
   cache:
     permissions:
