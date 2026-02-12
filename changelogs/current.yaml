@@ -260,6 +260,9 @@ new_features:
     functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
     can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
     cross-module interactions analogous to ``dlsym``.
+- area: dynamic_modules
+  change: |
+    Added timer API to the bootstrap extension dynamic modules ABI.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
@@ -284,5 +287,8 @@ new_features:
   change: |
     Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
     observability into request routing, fanout operations, and error conditions.
+- area: a2a
+  change: |
+    Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
 
 deprecated:
