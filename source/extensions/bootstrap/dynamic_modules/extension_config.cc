@@ -200,6 +200,18 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_extension_destroy.status();
   }
 
+  auto on_drain_started = dynamic_module->getFunctionPointer<OnBootstrapExtensionDrainStartedType>(
+      "envoy_dynamic_module_on_bootstrap_extension_drain_started");
+  if (!on_drain_started.ok()) {
+    return on_drain_started.status();
+  }
+
+  auto on_shutdown = dynamic_module->getFunctionPointer<OnBootstrapExtensionShutdownType>(
+      "envoy_dynamic_module_on_bootstrap_extension_shutdown");
+  if (!on_shutdown.ok()) {
+    return on_shutdown.status();
+  }
+
   auto on_config_scheduled =
       dynamic_module->getFunctionPointer<OnBootstrapExtensionConfigScheduledType>(
           "envoy_dynamic_module_on_bootstrap_extension_config_scheduled");
@@ -212,6 +224,12 @@ newDynamicModuleBootstrapExtensionConfig(
           "envoy_dynamic_module_on_bootstrap_extension_http_callout_done");
   if (!on_http_callout_done.ok()) {
     return on_http_callout_done.status();
+  }
+
+  auto on_timer_fired = dynamic_module->getFunctionPointer<OnBootstrapExtensionTimerFiredType>(
+      "envoy_dynamic_module_on_bootstrap_extension_timer_fired");
+  if (!on_timer_fired.ok()) {
+    return on_timer_fired.status();
   }
 
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
@@ -231,8 +249,11 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_server_initialized_ = on_server_initialized.value();
   config->on_bootstrap_extension_worker_thread_initialized_ = on_worker_thread_initialized.value();
   config->on_bootstrap_extension_destroy_ = on_extension_destroy.value();
+  config->on_bootstrap_extension_drain_started_ = on_drain_started.value();
+  config->on_bootstrap_extension_shutdown_ = on_shutdown.value();
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
+  config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
 
   return config;
 }

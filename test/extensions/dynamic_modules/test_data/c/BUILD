@@ -101,9 +101,15 @@ test_program(name = "bootstrap_no_extension_destroy")
 
 test_program(name = "bootstrap_extension_new_null")
 
+test_program(name = "bootstrap_no_drain_started")
+
+test_program(name = "bootstrap_no_shutdown")
+
 test_program(name = "bootstrap_no_config_scheduled")
 
 test_program(name = "bootstrap_no_http_callout_done")
+
+test_program(name = "bootstrap_no_timer_fired")
 
 test_program(name = "access_log_no_op")
 

@@ -133,7 +133,10 @@ new_features:
     The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
     use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
     set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
-    the protobuf format.
+    the protobuf format. Additionally, when using the protobuf exposition format, the admin prometheus stats
+    endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
+    when using the prometheus protobuf exposition format, using query
+    ``/stats/prometheus?histogram_buckets=prometheusnative``.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -145,6 +148,13 @@ new_features:
     where modules built with a SDK version can be loaded by Envoy
     binaries of the next Envoy version. For example, A module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
+- area: dynamic modules
+  change: |
+    Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
+- area: dynamic modules
+  change: |
+    Added support for dynamic modules authors to register any combination of http, network, listener,
+    udp listener, and bootstrap filters in the rust SDK.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
@@ -157,6 +167,10 @@ new_features:
     Added per-descriptor ``x-ratelimit-*`` headers support. See the
     :ref:`x_ratelimit_option <envoy_v3_api_field_config.route.v3.RateLimit.x_ratelimit_option>`
     field documentation for more details.
+- area: ratelimit
+  change: |
+    Added ``RemoteAddressMatch`` action to the rate limit filter. This action will generate a descriptor based on the remote address of the
+    downstream connection by matching it against specified CIDR ranges with support for inversion and formatter substitution.
 - area: mcp_router
   change: |
     Added support for MCP client-to-server notification methods ``notifications/cancelled``
@@ -168,6 +182,9 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: access_log
+  change: |
+    Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: network
   change: |
     Added support access logging in network filters like http filters, by allowing network filters to register as access logger
@@ -202,6 +219,11 @@ new_features:
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
+- area: mcp_router
+  change: |
+    Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
+    SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
+    aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
 - area: dynamic_modules
   change: |
     Added :ref:`load balancing policies
@@ -227,6 +249,11 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: oauth2
+  change: |
+    Added ``TLS_CLIENT_AUTH`` for the OAuth2 HTTP filter to support RFC 8705 mutual TLS client
+    authentication. In this mode ``token_secret`` is optional and ignored, and the token endpoint
+    cluster must be configured with mTLS.
 - area: dynamic_modules
   change: |
     Added a process-wide function registry to the dynamic modules ABI. Modules can register
@@ -236,9 +263,35 @@ new_features:
 - area: dynamic_modules
   change: |
     Added metrics definition and update support for bootstrap dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added timer API to the bootstrap extension dynamic modules ABI.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: geoip
+  change: |
+    Added ``asn_org`` field to :ref:`geo_field_keys
+    <envoy_v3_api_msg_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys>`
+    to populate a header with the autonomous system organization name from the MaxMind ASN database.
+- area: tracers
+  change: |
+    Add log events to spans created by OpenTelemetry tracer.
+- area: mcp_router
+  change: |
+    Added SSE response support for MCP ``resources/list`` fanout aggregation.
+- area: admin
+  change: |
+    Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
+    regular expression to filter clusters by name. Compatible with the ``format`` parameter for both
+    text and JSON output (e.g., ``/clusters?filter=service&format=json``).
+- area: mcp_router
+  change: |
+    Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
+    observability into request routing, fanout operations, and error conditions.
+- area: a2a
+  change: |
+    Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
 
 deprecated:

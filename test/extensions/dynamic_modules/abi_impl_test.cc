@@ -103,6 +103,47 @@ TEST(CommonAbiImplTest, IterateGaugesEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for timer_new triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, TimerNewEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_new(nullptr);
+        EXPECT_EQ(result, nullptr);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for timer_enable triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, TimerEnableEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for timer_disable triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, TimerDisableEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for timer_enabled triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, TimerEnabledEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for timer_delete triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, TimerDeleteEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr); },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Bootstrap extension stats definition and update weak symbol stub tests
 // =====================================================================

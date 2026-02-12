@@ -317,7 +317,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
-        "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",

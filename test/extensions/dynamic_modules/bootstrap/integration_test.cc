@@ -52,14 +52,17 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicC) {
 }
 
 // This test verifies that the Rust bootstrap extension can use the common logging callbacks.
-// The integration test module logs messages during on_server_initialized and
-// on_worker_thread_initialized hooks.
+// The integration test module logs messages during on_server_initialized,
+// on_worker_thread_initialized, and on_shutdown hooks.
 TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages(
           {{"info", "Bootstrap extension server initialized from Rust!"},
            {"info", "Bootstrap extension worker thread initialized from Rust!"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_integration_test"));
+
+  // Verify the shutdown hook is called during server teardown.
+  EXPECT_LOG_CONTAINS("info", "Bootstrap extension shutdown from Rust!", { test_server_.reset(); });
 }
 
 // This test verifies that the Rust bootstrap extension can access stats from the stats store
@@ -87,6 +90,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
   EXPECT_LOG_CONTAINS(
       "info", "Bootstrap function registry test completed successfully!",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
+}
+
+// This test verifies that the Rust bootstrap extension timer API works correctly.
+// A timer is created during config_new, armed with a short delay, and on_timer_fired logs success.
+TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap timer test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_timer_test"));
 }
 
 } // namespace DynamicModules
