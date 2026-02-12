@@ -386,6 +386,8 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/_publish_verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*
