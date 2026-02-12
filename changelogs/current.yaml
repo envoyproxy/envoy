@@ -250,6 +250,11 @@ new_features:
     Added :ref:`envoy.filters.http.sse_to_metadata <config_http_filters_sse_to_metadata>` filter for extracting
     values from Server-Sent Events (SSE) streams and writing them to dynamic metadata. Useful for capturing
     token usage metrics from LLM API responses. Supports pluggable content parsers for different SSE data formats.
+- area: content_parsers
+  change: |
+    Added :ref:`envoy.content_parsers.json <extension_envoy.content_parsers.json>` content parser for extracting
+    values from JSON content using JSON path selectors. Can be used by filters that need to parse structured
+    JSON data and extract specific fields into metadata.
 - area: resource_monitors
   change: |
     Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
