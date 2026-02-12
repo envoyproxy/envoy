@@ -37,4 +37,17 @@ impl BootstrapExtension for MyBootstrapExtension {
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
     envoy_log_info!("Bootstrap extension worker thread initialized from Rust!");
   }
+
+  fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+    envoy_log_info!("Bootstrap extension drain started from Rust!");
+  }
+
+  fn on_shutdown(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    completion: CompletionCallback,
+  ) {
+    envoy_log_info!("Bootstrap extension shutdown from Rust!");
+    completion.done();
+  }
 }

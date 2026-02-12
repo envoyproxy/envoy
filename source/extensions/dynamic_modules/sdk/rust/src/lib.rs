@@ -7428,6 +7428,44 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   }
 }
 
+/// A completion callback that must be invoked exactly once to signal that an asynchronous
+/// operation has finished. Envoy will wait for this callback before proceeding.
+///
+/// The callback is invoked by calling [`CompletionCallback::done`].
+pub struct CompletionCallback {
+  callback: abi::envoy_dynamic_module_type_event_cb,
+  context: *mut std::os::raw::c_void,
+}
+
+// Safety: The completion callback is provided by Envoy and is safe to send across threads.
+unsafe impl Send for CompletionCallback {}
+// Safety: The completion callback function pointer is thread-safe when invoked exactly once.
+unsafe impl Sync for CompletionCallback {}
+
+impl CompletionCallback {
+  /// Signal that the asynchronous operation is complete. This must be called exactly once.
+  pub fn done(self) {
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+    // Prevent Drop from running since we've consumed the callback.
+    std::mem::forget(self);
+  }
+}
+
+impl Drop for CompletionCallback {
+  fn drop(&mut self) {
+    // If the callback is dropped without being called, invoke it to prevent Envoy from hanging.
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+  }
+}
+
 /// BootstrapExtension is the module-side bootstrap extension.
 ///
 /// This trait must be implemented by the module to handle bootstrap extension lifecycle events.
@@ -7446,6 +7484,29 @@ pub trait BootstrapExtension: Send + Sync {
   /// This is called once per worker thread when it starts. You can use this to perform
   /// per-worker-thread initialization like setting up thread-local storage.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy begins draining.
+  ///
+  /// This is called on the main thread before workers are stopped. The module can still make HTTP
+  /// callouts and use timers during drain. This is the appropriate place to close persistent
+  /// connections, stop background tasks, or de-register from service discovery.
+  fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy is about to exit.
+  ///
+  /// This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+  /// signal completion by calling [`CompletionCallback::done`] when it has finished cleanup. Envoy
+  /// will wait for the callback before terminating.
+  ///
+  /// If the [`CompletionCallback`] is dropped without calling `done`, it will automatically signal
+  /// completion to prevent Envoy from hanging.
+  fn on_shutdown(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    completion: CompletionCallback,
+  ) {
+    completion.done();
+  }
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -7781,6 +7842,32 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_init
   let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
   let extension = unsafe { &mut *extension };
   extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  completion_callback: abi::envoy_dynamic_module_type_event_cb,
+  completion_context: *mut std::os::raw::c_void,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  let completion = CompletionCallback {
+    callback: completion_callback,
+    context: completion_context,
+  };
+  extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
 }
 
 #[no_mangle]

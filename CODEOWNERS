@@ -3,8 +3,8 @@
 #*       @envoyproxy/maintainers
 
 # ci
-/.github/ @agrawroh @phlax
-/ci/ @agrawroh @phlax
+/.github/ @agrawroh @phlax @jwendell
+/ci/ @agrawroh @phlax @jwendell
 
 # api
 /api/ @envoyproxy/api-shepherds

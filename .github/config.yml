@@ -110,6 +110,7 @@ checks:
     - precheck-external
     - precheck-format
     - precheck-publish
+    - precheck-publish-config
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -356,6 +357,9 @@ run:
     paths:
     - "**/*"
   precheck-publish:
+    paths:
+    - "**/*"
+  precheck-publish-config:
     paths:
     - "**/*"
   release:

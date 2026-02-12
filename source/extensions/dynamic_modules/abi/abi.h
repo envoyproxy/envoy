@@ -5794,6 +5794,50 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
 
 /**
+ * envoy_dynamic_module_on_bootstrap_extension_drain_started is called when Envoy begins draining.
+ *
+ * This is called on the main thread before workers are stopped. The module can still make HTTP
+ * callouts and use timers during drain. This is the appropriate place to close persistent
+ * connections, stop background tasks, or de-register from service discovery.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_drain_started(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_type_event_cb is a function pointer type used for completion callbacks.
+ *
+ * When Envoy passes a completion callback to a module, the module MUST invoke it exactly once
+ * when it has finished its asynchronous work. Envoy will wait for the callback before proceeding.
+ *
+ * @param context is the opaque context pointer that was passed alongside this callback. The module
+ * must pass it back unchanged when invoking the callback.
+ */
+typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_shutdown is called when Envoy is about to exit.
+ *
+ * This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+ * invoke the completion callback exactly once with the provided context when it has finished
+ * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
+ * flush batched data, close connections, or signal external systems that this Envoy instance is
+ * going away.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ * @param completion_callback is the callback that must be invoked when shutdown cleanup is done.
+ * @param completion_context is the opaque context pointer to pass to the completion callback.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
+
+/**
  * envoy_dynamic_module_on_bootstrap_extension_destroy is called when the bootstrap extension is
  * destroyed.
  *

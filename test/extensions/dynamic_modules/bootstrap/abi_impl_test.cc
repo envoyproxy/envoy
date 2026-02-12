@@ -5,6 +5,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
@@ -271,6 +272,10 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
       new Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-type", "text/plain"}}));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
   response->body().add("Hello, World!");
+
+  // Trigger the onBeforeFinalizeUpstreamSpan callback to exercise the no-op override.
+  Envoy::Tracing::MockSpan span;
+  callbacks_captured->onBeforeFinalizeUpstreamSpan(span, nullptr);
 
   // Trigger the success callback.
   callbacks_captured->onSuccess(request, std::move(response));

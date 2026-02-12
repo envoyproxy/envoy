@@ -7,6 +7,8 @@
 
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "absl/types/variant.h"
 
@@ -52,11 +54,36 @@ struct SessionIdentityConfig {
 };
 
 /**
+ * All MCP router filter stats. @see stats_macros.h
+ */
+// clang-format off
+#define MCP_ROUTER_STATS(COUNTER)                                                                  \
+  COUNTER(rq_total)                                                                                \
+  COUNTER(rq_fanout)                                                                               \
+  COUNTER(rq_direct_response)                                                                      \
+  COUNTER(rq_body_rewrite)                                                                         \
+  COUNTER(rq_invalid)                                                                              \
+  COUNTER(rq_unknown_backend)                                                                      \
+  COUNTER(rq_backend_failure)                                                                      \
+  COUNTER(rq_fanout_failure)                                                                       \
+  COUNTER(rq_session_invalid)                                                                      \
+  COUNTER(rq_auth_failure)
+// clang-format on
+
+/**
+ * Struct definition for MCP router filter stats. @see stats_macros.h
+ */
+struct McpRouterStats {
+  MCP_ROUTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Configuration for the MCP router filter, containing backend server definitions.
  */
 class McpRouterConfig {
 public:
   McpRouterConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+                  const std::string& stats_prefix, Stats::Scope& scope,
                   Server::Configuration::FactoryContext& context);
 
   const std::vector<McpBackendConfig>& backends() const { return backends_; }
@@ -75,12 +102,15 @@ public:
   }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
 
+  McpRouterStats& stats() { return stats_; }
+
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
   SessionIdentityConfig session_identity_;
   std::string metadata_namespace_;
+  McpRouterStats stats_;
 };
 
 using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
