@@ -119,6 +119,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls
+  change: |
+    Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
+    and added brotli and zlib to TCP TLS. Controlled by runtime flag
+    ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
+    When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
 - area: ext_authz
   change: |
     Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream

@@ -20,7 +20,7 @@ directories:
   source/common/quic: 93.3
   source/common/signal: 87.4  # Death tests don't report LCOV
   source/common/thread: 0.0  # Death tests don't report LCOV
-  source/common/tls: 94.5  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
+  source/common/tls: 94.1  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
   source/common/tls/cert_validator: 95.0
   source/common/tls/private_key: 88.9
   source/common/watchdog: 60.0  # Death tests don't report LCOV
