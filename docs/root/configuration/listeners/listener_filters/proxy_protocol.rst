@@ -26,15 +26,14 @@ The filter supports two storage locations for TLV values, controlled by the
   in RBAC and other matchers.
 
 **FILTER_STATE**
-  TLV values are stored in filter state. By default, all TLV values are stored in a single
-  object under the key ``envoy.network.proxy_protocol.tlv``, accessible via CEL expressions
-  like ``filter_state["envoy.network.proxy_protocol.tlv"]["my_key"]``.
+  TLV values are stored in filter state as a single map-like object under the key
+  ``envoy.network.proxy_protocol.tlv``. Individual TLV values can be accessed in two ways:
 
-  Alternatively, you can use the
-  :ref:`filter_state_key <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.filter_state_key>`
-  field to store each TLV value as a separate filter state object. This enables direct access
-  via :ref:`FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
-  in RBAC without needing CEL expressions:
+  1. Via CEL expressions: ``filter_state["envoy.network.proxy_protocol.tlv"]["my_key"]``
+
+  2. Via :ref:`FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+     with the ``field`` parameter, which enables direct field-level access in RBAC and other matchers
+     without needing CEL expressions:
 
   .. code-block:: yaml
 
@@ -47,9 +46,9 @@ The filter supports two storage locations for TLV values, controlled by the
             - tlv_type: 0xEA
               on_tlv_present:
                 key: "aws_vpce_id"
-                filter_state_key: "aws_vpce_id"  # Store as separate filter state
 
-  With this configuration, you can match on the TLV value directly in RBAC:
+  With this configuration, you can match on individual TLV values directly in RBAC using
+  the ``field`` parameter on ``FilterStateInput``:
 
   .. code-block:: yaml
 
@@ -59,7 +58,8 @@ The filter supports two storage locations for TLV values, controlled by the
           name: filter_state
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
-            key: "aws_vpce_id"
+            key: "envoy.network.proxy_protocol.tlv"
+            field: "aws_vpce_id"
         exact_match_map:
           map:
             "vpce-12345678":
