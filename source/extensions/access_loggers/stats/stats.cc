@@ -1,10 +1,9 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
-
-#include "envoy/registry/registry.h"
 
 #include "source/common/formatter/substitution_formatter.h"
 
@@ -76,7 +75,6 @@ private:
   // the gauge is not destroyed if it is evicted from the stats scope.
   absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
 };
-
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
@@ -161,8 +159,6 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                Server::Configuration::GenericFactoryContext& context,
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
-    : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix())),
     : AccessLoggers::Common::ImplBase(std::move(filter)),
       scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
@@ -238,8 +234,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           }
 
           Gauge& inserted =
-              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
-                                  0, std::move(operations));
+              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands, context),
+                                  nullptr, 0, std::move(operations));
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
@@ -405,7 +401,10 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
   Gauge::OperationType op = it->second;
 
-  auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
+  auto [tags, storage, dropped] = gauge.stat_.tags(context, stream_info, *scope_);
+  if (dropped) {
+    return;
+  }
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
