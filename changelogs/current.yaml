@@ -286,6 +286,6 @@ new_features:
     observability into request routing, fanout operations, and error conditions.
 - area: a2a
   change: |
-    Added the parsing support for A2A(Agent2Agent) protocol. It is used ton parse the A2A JSON-RPC messages.
+    Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
 
 deprecated:
