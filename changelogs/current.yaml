@@ -22,6 +22,12 @@ behavior_changes:
     The previous flag for specifying FIPS builds (ie ``--define=boringssl=fips``) will no longer work and
     has been replaced by ``--config=boringssl-fips``. This change will allow us to better support custom
     SSL libraries, and will allow FIPS-compliant Envoy to be built with the imminent switch to Bazel bzlmod.
+- area: tls
+  change: |
+    Set
+    :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
+    to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
+    the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
