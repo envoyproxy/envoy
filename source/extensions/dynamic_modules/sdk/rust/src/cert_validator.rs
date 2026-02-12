@@ -52,7 +52,8 @@ pub struct ValidationResult {
   pub detailed_status: ClientValidationStatus,
   /// Optional TLS alert code to send on failure.
   pub tls_alert: Option<u8>,
-  /// Optional error details string.
+  /// Optional error details string. If set, the SDK will pass it to Envoy via a callback so
+  /// that the module does not need to manage the string's lifetime across the FFI boundary.
   pub error_details: Option<String>,
 }
 
@@ -80,13 +81,11 @@ impl ValidationResult {
       error_details,
     }
   }
+}
 
-  /// Convert to the ABI result type.
-  pub(crate) fn to_abi(
-    &self,
-    error_buf: &Option<String>,
-  ) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
-    let status = match self.status {
+impl From<&ValidationResult> for abi::envoy_dynamic_module_type_cert_validator_validation_result {
+  fn from(result: &ValidationResult) -> Self {
+    let status = match result.status {
       ValidationStatus::Successful => {
         abi::envoy_dynamic_module_type_cert_validator_validation_status::Successful
       },
@@ -95,7 +94,7 @@ impl ValidationResult {
       },
     };
 
-    let detailed_status = match self.detailed_status {
+    let detailed_status = match result.detailed_status {
       ClientValidationStatus::NotValidated => {
         abi::envoy_dynamic_module_type_cert_validator_client_validation_status::NotValidated
       },
@@ -110,20 +109,9 @@ impl ValidationResult {
       },
     };
 
-    let (has_tls_alert, tls_alert) = match self.tls_alert {
+    let (has_tls_alert, tls_alert) = match result.tls_alert {
       Some(alert) => (true, alert),
       None => (false, 0),
-    };
-
-    let error_details = match error_buf {
-      Some(s) => abi::envoy_dynamic_module_type_module_buffer {
-        ptr: s.as_ptr() as *const _,
-        length: s.len(),
-      },
-      None => abi::envoy_dynamic_module_type_module_buffer {
-        ptr: std::ptr::null(),
-        length: 0,
-      },
     };
 
     abi::envoy_dynamic_module_type_cert_validator_validation_result {
@@ -131,7 +119,6 @@ impl ValidationResult {
       detailed_status,
       tls_alert,
       has_tls_alert,
-      error_details,
     }
   }
 }
@@ -160,7 +147,7 @@ pub enum ClientValidationStatus {
 ///
 /// An implementation of this trait is created once per validator configuration and shared
 /// across TLS handshakes. All methods must be thread-safe.
-pub trait CertValidatorConfig: Send + Sync + 'static {
+pub trait CertValidatorConfig: Send + Sync {
   /// Verify a certificate chain.
   ///
   /// Called during a TLS handshake to validate the peer's certificate chain.

@@ -8480,17 +8480,9 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
   drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
 }
 
-// Thread-local storage for the last cert validation error string. This keeps the error string
-// alive across the FFI boundary so the C++ caller can safely read the pointer in the returned
-// ABI struct before it is overwritten by the next call.
-thread_local! {
-  static CERT_VALIDATOR_LAST_ERROR: std::cell::RefCell<Option<String>> =
-    const { std::cell::RefCell::new(None) };
-}
-
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
   config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
   certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
   certs_count: usize,
@@ -8515,14 +8507,20 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain
 
   let result = config.do_verify_cert_chain(&cert_slices, host_name_str, is_server);
 
-  // Store error details in thread-local to keep the string alive across the FFI boundary.
-  // The returned ABI struct contains a pointer to this data which must remain valid until
-  // the C++ caller copies it.
-  CERT_VALIDATOR_LAST_ERROR.with(|cell| {
-    *cell.borrow_mut() = result.error_details.clone();
-    let error_ref = cell.borrow();
-    result.to_abi(&error_ref)
-  })
+  // If the module provided error details, pass them to Envoy via the callback.
+  // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
+  if let Some(ref error) = result.error_details {
+    let error_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: error.as_ptr() as *const _,
+      length: error.len(),
+    };
+    abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
+      config_envoy_ptr,
+      error_buf,
+    );
+  }
+
+  abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
 }
 
 #[no_mangle]

@@ -34,12 +34,17 @@ envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
     envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer* certs, size_t certs_count,
     envoy_dynamic_module_type_envoy_buffer host_name, bool is_server) {
-  (void)config_envoy_ptr;
   (void)config_module_ptr;
   (void)certs;
   (void)certs_count;
   (void)host_name;
   (void)is_server;
+
+  // Set error details via the callback.
+  envoy_dynamic_module_type_module_buffer error_buf;
+  error_buf.ptr = error_msg;
+  error_buf.length = sizeof(error_msg) - 1;
+  envoy_dynamic_module_callback_cert_validator_set_error_details(config_envoy_ptr, error_buf);
 
   envoy_dynamic_module_type_cert_validator_validation_result result;
   result.status = envoy_dynamic_module_type_cert_validator_validation_status_Failed;
@@ -48,8 +53,6 @@ envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
   // SSL_AD_BAD_CERTIFICATE = 42.
   result.tls_alert = 42;
   result.has_tls_alert = true;
-  result.error_details.ptr = error_msg;
-  result.error_details.length = sizeof(error_msg) - 1;
   return result;
 }
 

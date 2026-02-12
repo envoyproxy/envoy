@@ -51,6 +51,10 @@ public:
   const std::string& validatorName() const { return validator_name_; }
   const std::string& validatorConfig() const { return validator_config_; }
 
+  // Stores error details set by the module via the set_error_details callback during
+  // do_verify_cert_chain. Reset before each verification call.
+  absl::optional<std::string> last_error_details_;
+
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleCertValidatorConfig>>
   newDynamicModuleCertValidatorConfig(

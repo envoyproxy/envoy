@@ -6430,6 +6430,9 @@ typedef enum envoy_dynamic_module_type_cert_validator_client_validation_status {
  * envoy_dynamic_module_type_cert_validator_validation_result is the result of a certificate chain
  * verification. Returned by the envoy_dynamic_module_on_cert_validator_do_verify_cert_chain event
  * hook.
+ *
+ * Error details, if any, should be set via the
+ * envoy_dynamic_module_callback_cert_validator_set_error_details callback before returning.
  */
 typedef struct envoy_dynamic_module_type_cert_validator_validation_result {
   // The overall validation status (Successful or Failed).
@@ -6440,9 +6443,6 @@ typedef struct envoy_dynamic_module_type_cert_validator_validation_result {
   uint8_t tls_alert;
   // Whether the tls_alert field is set.
   bool has_tls_alert;
-  // Error details string owned by the module. Must remain valid until the end of the
-  // do_verify_cert_chain event hook. Can be empty (length 0) if no details are available.
-  envoy_dynamic_module_type_module_buffer error_details;
 } envoy_dynamic_module_type_cert_validator_validation_result;
 
 // =============================================================================
@@ -6529,6 +6529,25 @@ int envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
 void envoy_dynamic_module_on_cert_validator_update_digest(
     envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_module_buffer* out_data);
+
+// =============================================================================
+// Cert Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_error_details is called by the module during
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain to set error details for a failed
+ * validation. Envoy copies the provided buffer immediately, so the module does not need to keep
+ * the buffer alive after this call returns.
+ *
+ * This must only be called from within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param error_details is the error details string owned by the module.
+ */
+void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer error_details);
 
 #ifdef __cplusplus
 }

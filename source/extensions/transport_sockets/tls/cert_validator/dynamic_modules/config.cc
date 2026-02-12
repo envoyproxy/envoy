@@ -10,6 +10,21 @@
 
 #include "openssl/ssl.h"
 
+// Callback implementation for the cert validator ABI. The module calls this during
+// do_verify_cert_chain to set error details. Envoy copies the buffer immediately.
+extern "C" {
+void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer error_details) {
+  auto* config = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+      config_envoy_ptr);
+  if (error_details.ptr != nullptr && error_details.length > 0) {
+    config->last_error_details_ = std::string(error_details.ptr, error_details.length);
+  }
+}
+} // extern "C"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -128,6 +143,10 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
 
   envoy_dynamic_module_type_envoy_buffer host_name_buffer = {host_name.data(), host_name.size()};
 
+  // Reset error details before calling the module. The module may set them via the
+  // envoy_dynamic_module_callback_cert_validator_set_error_details callback.
+  config_->last_error_details_.reset();
+
   // Call the module's verify function.
   auto result = config_->on_do_verify_cert_chain_(
       static_cast<void*>(config_.get()), config_->in_module_config_, cert_buffers.data(),
@@ -166,13 +185,11 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     tls_alert = result.tls_alert;
   }
 
-  absl::optional<std::string> error_details;
-  if (result.error_details.length > 0 && result.error_details.ptr != nullptr) {
-    error_details = std::string(result.error_details.ptr, result.error_details.length);
-    ENVOY_LOG(debug, "verify cert failed: {}", error_details.value());
+  if (config_->last_error_details_.has_value()) {
+    ENVOY_LOG(debug, "verify cert failed: {}", config_->last_error_details_.value());
   }
 
-  return {status, detailed_status, tls_alert, error_details};
+  return {status, detailed_status, tls_alert, config_->last_error_details_};
 }
 
 absl::StatusOr<int>

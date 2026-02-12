@@ -37,7 +37,12 @@ envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
   (void)host_name;
   (void)is_server;
 
-  envoy_dynamic_module_type_cert_validator_validation_result result = {0};
+  envoy_dynamic_module_type_cert_validator_validation_result result;
+  result.status = envoy_dynamic_module_type_cert_validator_validation_status_Failed;
+  result.detailed_status =
+      envoy_dynamic_module_type_cert_validator_client_validation_status_NotValidated;
+  result.tls_alert = 0;
+  result.has_tls_alert = false;
   return result;
 }
 

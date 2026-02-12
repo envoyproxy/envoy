@@ -45,8 +45,6 @@ envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
       envoy_dynamic_module_type_cert_validator_client_validation_status_NoClientCertificate;
   result.tls_alert = 0;
   result.has_tls_alert = false;
-  result.error_details.ptr = NULL;
-  result.error_details.length = 0;
   return result;
 }
 
