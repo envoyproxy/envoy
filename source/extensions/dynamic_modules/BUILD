@@ -17,7 +17,24 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
         "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
+envoy_cc_library(
+    name = "module_cache_lib",
+    srcs = ["module_cache.cc"],
+    hdrs = [
+        "module_cache.h",
+    ],
+    deps = [
+        "//envoy/event:deferred_deletable",
+        "//source/common/common:logger_lib",
+        "//source/common/config:remote_data_fetcher_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 

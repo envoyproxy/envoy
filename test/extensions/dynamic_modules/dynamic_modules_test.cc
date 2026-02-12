@@ -1,3 +1,8 @@
+#include <fstream>
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -164,6 +169,98 @@ TEST(CreateDynamicModulesByName, ModuleNotFound) {
   EXPECT_THAT(module.status().message(),
               testing::HasSubstr(
                   "Failed to load dynamic module: libno_op.so not found in any search path"));
+}
+
+// Tests for newDynamicModuleFromBytes
+
+TEST(CreateDynamicModulesFromBytes, EmptyBytes) {
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleFromBytes("", "", false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module.status().message(), testing::HasSubstr("Module bytes cannot be empty"));
+}
+
+TEST(CreateDynamicModulesFromBytes, ValidModuleNoHash) {
+  // Read a valid module from disk.
+  std::string module_path = testSharedObjectPath("no_op", "c");
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  // Load the module from bytes without providing a hash.
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, "", false, false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+}
+
+TEST(CreateDynamicModulesFromBytes, ValidModuleWithCorrectHash) {
+  // Read a valid module from disk.
+  std::string module_path = testSharedObjectPath("no_op", "c");
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  // Compute the expected SHA256 hash.
+  auto& crypto_util = Common::Crypto::UtilitySingleton::get();
+  Buffer::OwnedImpl buffer(module_bytes);
+  std::string expected_hash = Hex::encode(crypto_util.getSha256Digest(buffer));
+
+  // Load the module from bytes with the correct hash.
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, expected_hash, false, false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+}
+
+TEST(CreateDynamicModulesFromBytes, ValidModuleWithIncorrectHash) {
+  // Read a valid module from disk.
+  std::string module_path = testSharedObjectPath("no_op", "c");
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  // Try to load the module with an incorrect hash.
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, "incorrect_hash", false, false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module.status().message(), testing::HasSubstr("SHA256 hash mismatch"));
+}
+
+TEST(CreateDynamicModulesFromBytes, TempFileDeduplication) {
+  // Read a valid module from disk.
+  std::string module_path = testSharedObjectPath("no_op", "c");
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  // Load the module twice with the same bytes.
+  absl::StatusOr<DynamicModulePtr> module1 =
+      newDynamicModuleFromBytes(module_bytes, "", false, false);
+  EXPECT_TRUE(module1.ok()) << "Failed to load module1: " << module1.status().message();
+
+  absl::StatusOr<DynamicModulePtr> module2 =
+      newDynamicModuleFromBytes(module_bytes, "", false, false);
+  EXPECT_TRUE(module2.ok()) << "Failed to load module2: " << module2.status().message();
+
+  // Both should succeed and point to the same underlying module (via dlopen deduplication).
+}
+
+TEST(CreateDynamicModulesFromBytes, InvalidModuleBytes) {
+  // Try to load invalid bytes as a module.
+  std::string invalid_bytes = "this is not a valid shared object";
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(invalid_bytes, "", false, false);
+  EXPECT_FALSE(module.ok());
+  // The error should come from dlopen failing to load the invalid file.
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 } // namespace DynamicModules

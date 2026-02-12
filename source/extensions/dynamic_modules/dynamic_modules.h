@@ -86,6 +86,21 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
                                                         const bool load_globally = false);
+
+/**
+ * Creates a new DynamicModule from in-memory bytes. The bytes are written to a SHA256-named
+ * temporary file (for deduplication) before loading via dlopen.
+ * @param module_bytes the raw bytes of the dynamic module (.so file).
+ * @param sha256_hash the expected SHA256 hash for verification. If empty, hash is computed but
+ *                    not verified.
+ * @param do_not_close if true, uses RTLD_NODELETE.
+ * @param load_globally if true, uses RTLD_GLOBAL.
+ */
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view module_bytes,
+                                                           absl::string_view sha256_hash,
+                                                           bool do_not_close,
+                                                           bool load_globally = false);
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

@@ -2,10 +2,14 @@
 
 #include <dlfcn.h>
 
+#include <fstream>
 #include <string>
 
 #include "envoy/common/exception.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 namespace Envoy {
@@ -126,6 +130,76 @@ void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   // avoid unnecessary copy because it is likely that this is only called for a constant string,
   // though this is not a performance critical path.
   return dlsym(handle_, std::string(symbol_ref).c_str());
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view module_bytes,
+                                                           absl::string_view sha256_hash,
+                                                           bool do_not_close, bool load_globally) {
+  if (module_bytes.empty()) {
+    return absl::InvalidArgumentError("Module bytes cannot be empty");
+  }
+
+  // Compute SHA256 hash of the module bytes.
+  auto& crypto_util = Common::Crypto::UtilitySingleton::get();
+  Buffer::OwnedImpl buffer{std::string{module_bytes}};
+  const std::string computed_hash = Hex::encode(crypto_util.getSha256Digest(buffer));
+
+  // Verify SHA256 hash if provided.
+  if (!sha256_hash.empty() && computed_hash != sha256_hash) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("SHA256 hash mismatch: expected ", sha256_hash, ", got ", computed_hash));
+  }
+
+  // Use computed_hash for the temp file name (if sha256_hash was provided and matched,
+  // computed_hash == sha256_hash at this point).
+  const std::filesystem::path temp_dir = std::filesystem::temp_directory_path();
+  const std::filesystem::path temp_file_path =
+      temp_dir / fmt::format("envoy_dynmod_{}.so", computed_hash);
+
+  if (!std::filesystem::exists(temp_file_path)) {
+    // Write to a pid-suffixed temp file first, then atomically rename to avoid partial reads.
+    const std::filesystem::path temp_file_writing =
+        temp_dir / fmt::format("envoy_dynmod_{}.so.tmp.{}", computed_hash, getpid());
+
+    // Write the module bytes to the temp file with secure permissions.
+    std::ofstream ofs(temp_file_writing, std::ios::binary | std::ios::trunc);
+    if (!ofs) {
+      return absl::InternalError(
+          absl::StrCat("Failed to create temp file: ", temp_file_writing.string()));
+    }
+    ofs.write(module_bytes.data(), module_bytes.size());
+    if (!ofs) {
+      std::filesystem::remove(temp_file_writing);
+      return absl::InternalError(
+          absl::StrCat("Failed to write module bytes to temp file: ", temp_file_writing.string()));
+    }
+    ofs.close();
+
+    // Set file permissions to 0600 (owner read/write only).
+    std::error_code ec;
+    std::filesystem::permissions(
+        temp_file_writing, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+        ec);
+    if (ec) {
+      std::filesystem::remove(temp_file_writing);
+      return absl::InternalError(
+          absl::StrCat("Failed to set permissions on temp file: ", ec.message()));
+    }
+
+    // Atomically rename the temp file to the final path.
+    std::filesystem::rename(temp_file_writing, temp_file_path, ec);
+    if (ec) {
+      // If rename fails (e.g., another process created the file), that's OK - use the existing
+      // file.
+      std::filesystem::remove(temp_file_writing);
+      if (!std::filesystem::exists(temp_file_path)) {
+        return absl::InternalError(absl::StrCat("Failed to rename temp file: ", ec.message()));
+      }
+    }
+  }
+
+  // Load the module from the temp file.
+  return newDynamicModule(temp_file_path, do_not_close, load_globally);
 }
 
 } // namespace DynamicModules
