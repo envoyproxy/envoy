@@ -86,7 +86,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  // Finalize rules if not already done (only if we were processing SSE)
+  // Finalize rules if not already done (only if Content-Type matched)
   if (content_type_matched_ && !processing_complete_) {
     finalizeRules();
   }
@@ -99,10 +99,9 @@ void Filter::processBuffer(bool end_stream) {
   absl::string_view buffer_view(static_cast<const char*>(buffer_.linearize(length)), length);
 
   while (!buffer_view.empty() && !processing_complete_) {
-    auto [event_start, event_end, next_event_start] =
-        Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
+    auto result = Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
 
-    if (event_start == absl::string_view::npos) {
+    if (result.event_start == absl::string_view::npos) {
       // No complete event found. Check if buffer exceeds max size.
       const uint32_t max_size = config_->maxEventSize();
       if (max_size > 0 && buffer_view.size() > max_size) {
@@ -117,7 +116,8 @@ void Filter::processBuffer(bool end_stream) {
       break;
     }
 
-    absl::string_view event = buffer_view.substr(event_start, event_end - event_start);
+    absl::string_view event =
+        buffer_view.substr(result.event_start, result.event_end - result.event_start);
     ENVOY_LOG(trace, "Processing SSE event: {}", absl::CEscape(event));
 
     if (processSseEvent(event)) {
@@ -125,7 +125,7 @@ void Filter::processBuffer(bool end_stream) {
       break;
     }
 
-    buffer_view = buffer_view.substr(next_event_start);
+    buffer_view = buffer_view.substr(result.next_start);
   }
 
   // Drain processed bytes from the front of the buffer.
