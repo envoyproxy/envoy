@@ -993,6 +993,93 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
 }
 
 // =============================================================================
+// Cluster Host Count FFI stubs and tests.
+// =============================================================================
+
+struct MockClusterHostCount {
+  total: usize,
+  healthy: usize,
+  degraded: usize,
+}
+
+static MOCK_CLUSTER_HOST_COUNT: std::sync::Mutex<Option<MockClusterHostCount>> =
+  std::sync::Mutex::new(None);
+
+fn reset_cluster_host_count_mock() {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = None;
+}
+
+fn set_cluster_host_count_mock(count: MockClusterHostCount) {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = Some(count);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  let guard = MOCK_CLUSTER_HOST_COUNT.lock().unwrap();
+  match &*guard {
+    Some(count) => {
+      if !total_count.is_null() {
+        unsafe {
+          *total_count = count.total;
+        }
+      }
+      if !healthy_count.is_null() {
+        unsafe {
+          *healthy_count = count.healthy;
+        }
+      }
+      if !degraded_count.is_null() {
+        unsafe {
+          *degraded_count = count.degraded;
+        }
+      }
+      true
+    },
+    None => false,
+  }
+}
+
+#[test]
+fn test_get_cluster_host_count_success() {
+  reset_cluster_host_count_mock();
+  set_cluster_host_count_mock(MockClusterHostCount {
+    total: 10,
+    healthy: 8,
+    degraded: 1,
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("test_cluster", 0);
+  assert!(result.is_some());
+  let count = result.unwrap();
+  assert_eq!(count.total, 10);
+  assert_eq!(count.healthy, 8);
+  assert_eq!(count.degraded, 1);
+}
+
+#[test]
+fn test_get_cluster_host_count_not_found() {
+  reset_cluster_host_count_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("nonexistent_cluster", 0);
+  assert!(result.is_none());
+}
+
+// =============================================================================
 // Upstream Host Access and StartTLS FFI stubs for testing.
 // =============================================================================
 
