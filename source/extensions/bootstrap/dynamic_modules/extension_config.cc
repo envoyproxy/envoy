@@ -2,10 +2,15 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
+
+// The default custom stat namespace which prepends all user-defined bootstrap metrics.
+constexpr absl::string_view DefaultBootstrapMetricsNamespace = "dynamicmodulesbootstrap";
 
 DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
@@ -13,7 +18,9 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store)
     : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
-      context_(context), stats_store_(stats_store) {
+      context_(context), stats_store_(stats_store),
+      stats_scope_(stats_store.createScope(absl::StrCat(DefaultBootstrapMetricsNamespace, "."))),
+      stat_name_pool_(stats_scope_->symbolTable()) {
   ASSERT(dynamic_module_ != nullptr);
   ASSERT(extension_name.data() != nullptr);
   ASSERT(extension_config.data() != nullptr);
@@ -219,6 +226,12 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_http_callout_done.status();
   }
 
+  auto on_timer_fired = dynamic_module->getFunctionPointer<OnBootstrapExtensionTimerFiredType>(
+      "envoy_dynamic_module_on_bootstrap_extension_timer_fired");
+  if (!on_timer_fired.ok()) {
+    return on_timer_fired.status();
+  }
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
       stats_store);
@@ -240,6 +253,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_shutdown_ = on_shutdown.value();
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
+  config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
 
   return config;
 }
