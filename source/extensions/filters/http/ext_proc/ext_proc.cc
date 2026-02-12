@@ -476,7 +476,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
   (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
-  (*struct_msg->mutable_fields())[ReceivedImmediateResponseField].set_bool_value(received_immediate_response_);
+  (*struct_msg->mutable_fields())[ReceivedImmediateResponseField].set_bool_value(
+      received_immediate_response_);
   (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
       static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
@@ -617,7 +618,7 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == FailedOpenField) {
     return failed_open_;
   }
-  if (field_name == ReceivedImmediateResponseField){
+  if (field_name == ReceivedImmediateResponseField) {
     return received_immediate_response_;
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
@@ -1869,7 +1870,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = handleStreamingImmediateResponse(response->streamed_immediate_response());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-     logging_info_->setReceivedImmediateResponse();
+    logging_info_->setReceivedImmediateResponse();
     if (config_->disableImmediateResponse()) {
       ENVOY_STREAM_LOG(debug, "Filter has disable_immediate_response configured. ",
                        *decoder_callbacks_,
