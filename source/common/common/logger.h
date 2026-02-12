@@ -93,6 +93,7 @@ const static bool should_log = true;
   FUNCTION(runtime)                                                                                \
   FUNCTION(stats)                                                                                  \
   FUNCTION(secret)                                                                                 \
+  FUNCTION(sse)                                                                                    \
   FUNCTION(tap)                                                                                    \
   FUNCTION(testing)                                                                                \
   FUNCTION(thrift)                                                                                 \
