@@ -421,15 +421,14 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     ENVOY_LOG(
         warn,
         "The 'enforce_rsa_key_usage' option is not configured, its default value is changed to "
-        "true, and the config option will be deprecated in the next version. The handshake will "
-        "fail "
-        "if the keyUsage extension is present and incompatible with the "
-        "TLS usage. Please update the certificates to be compliant.");
+        "true, and the config option will be removed in the next version. The handshake will "
+        "fail if the keyUsage extension is present and incompatible with the TLS usage. Please "
+        "update the certificates to be compliant.");
   } else if (!enforce_rsa_key_usage_) {
     ENVOY_LOG(
         warn,
         "The 'enforce_rsa_key_usage' option is set to false, which disables the enforcement of RSA "
-        "key usage. This option will be deprecated in the next version. The handshake will fail "
+        "key usage. This option will be removed in the next version. The handshake will fail "
         "if the keyUsage extension is present and incompatible with the "
         "TLS usage. Please update the certificates to be compliant.");
     factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
