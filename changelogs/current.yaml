@@ -119,12 +119,6 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: ext_authz
-  change: |
-    Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
-    request header mutations. Previously, only the deprecated ``append`` boolean was checked. Now
-    ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD``
-    actions are fully supported, providing parity with ``response_headers_to_add`` handling.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
