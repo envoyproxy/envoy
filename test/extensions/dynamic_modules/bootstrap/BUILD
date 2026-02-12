@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["extension_config_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_extension_new_null",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_admin_request",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_new",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_config_scheduled",
@@ -52,6 +53,7 @@ envoy_cc_test(
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -100,6 +102,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_admin_handler_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",

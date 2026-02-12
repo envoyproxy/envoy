@@ -232,6 +232,12 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_timer_fired.status();
   }
 
+  auto on_admin_request = dynamic_module->getFunctionPointer<OnBootstrapExtensionAdminRequestType>(
+      "envoy_dynamic_module_on_bootstrap_extension_admin_request");
+  if (!on_admin_request.ok()) {
+    return on_admin_request.status();
+  }
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
       stats_store);
@@ -254,6 +260,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
   config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
+  config->on_bootstrap_extension_admin_request_ = on_admin_request.value();
 
   return config;
 }

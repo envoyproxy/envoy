@@ -2,6 +2,9 @@
 
 // This file provides host-side implementations for ABI callbacks specific to bootstrap extensions.
 
+#include "envoy/server/admin.h"
+
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
@@ -481,6 +484,78 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
   delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+}
+
+// -------------------- Admin Handler Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  if (!admin.has_value()) {
+    return false;
+  }
+
+  const std::string prefix_str(path_prefix.ptr, path_prefix.length);
+  const std::string help_str(help_text.ptr, help_text.length);
+
+  // Capture a shared_ptr to the config to ensure it stays alive during admin handler callbacks.
+  auto config_shared = config->shared_from_this();
+
+  return admin->addHandler(
+      prefix_str, help_str,
+      [config_shared](Envoy::Http::ResponseHeaderMap& response_headers,
+                      Envoy::Buffer::Instance& response,
+                      Envoy::Server::AdminStream& admin_stream) -> Envoy::Http::Code {
+        const auto& request_headers = admin_stream.getRequestHeaders();
+        const auto method_entry = request_headers.getMethodValue();
+        const auto path_entry = request_headers.getPathValue();
+        const std::string method_str(method_entry.data(), method_entry.size());
+        const std::string path_str(path_entry.data(), path_entry.size());
+
+        std::string body_str;
+        const Envoy::Buffer::Instance* request_body = admin_stream.getRequestBody();
+        if (request_body != nullptr && request_body->length() > 0) {
+          body_str = request_body->toString();
+        }
+
+        envoy_dynamic_module_type_envoy_buffer method_buf{method_str.data(), method_str.size()};
+        envoy_dynamic_module_type_envoy_buffer path_buf{path_str.data(), path_str.size()};
+        envoy_dynamic_module_type_envoy_buffer body_buf{body_str.data(), body_str.size()};
+
+        envoy_dynamic_module_type_module_buffer response_body{nullptr, 0};
+        uint32_t response_body_length = 0;
+
+        uint32_t status_code = config_shared->on_bootstrap_extension_admin_request_(
+            config_shared->thisAsVoidPtr(), config_shared->in_module_config_, method_buf, path_buf,
+            body_buf, &response_body, &response_body_length);
+
+        if (response_body.ptr != nullptr && response_body_length > 0) {
+          response.add(absl::string_view(response_body.ptr, response_body_length));
+        }
+
+        // Set content-type to text/plain by default.
+        response_headers.setReferenceContentType(
+            Envoy::Http::Headers::get().ContentTypeValues.Text);
+
+        return static_cast<Envoy::Http::Code>(status_code);
+      },
+      removable, mutates_server_state);
+}
+
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  Envoy::OptRef<Envoy::Server::Admin> admin = config->context_.admin();
+  if (!admin.has_value()) {
+    return false;
+  }
+
+  const std::string prefix_str(path_prefix.ptr, path_prefix.length);
+  return admin->removeHandler(prefix_str);
 }
 
 } // extern "C"

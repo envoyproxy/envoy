@@ -34,4 +34,6 @@ test_program(name = "bootstrap_function_registry_test")
 
 test_program(name = "bootstrap_timer_test")
 
+test_program(name = "bootstrap_admin_handler_test")
+
 test_program(name = "access_log_integration_test")

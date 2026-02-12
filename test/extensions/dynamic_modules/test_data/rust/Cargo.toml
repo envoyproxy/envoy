@@ -61,3 +61,9 @@ name = "bootstrap_timer_test"
 path = "bootstrap_timer_test.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "bootstrap_admin_handler_test"
+path = "bootstrap_admin_handler_test.rs"
+crate-type = ["cdylib"]
+test = true

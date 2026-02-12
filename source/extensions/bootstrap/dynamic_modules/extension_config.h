@@ -42,6 +42,8 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionAdminRequestType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 
 class DynamicModuleBootstrapExtension;
 
@@ -113,6 +115,7 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;

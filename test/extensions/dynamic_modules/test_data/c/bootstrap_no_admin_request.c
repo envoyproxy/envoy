@@ -9,7 +9,8 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
   return envoy_dynamic_modules_abi_version;
 }
 
-// A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_timer_fired.
+// A bootstrap extension that is missing
+// envoy_dynamic_module_on_bootstrap_extension_admin_request.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -95,21 +96,13 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks_size;
 }
 
-// NOTE: envoy_dynamic_module_on_bootstrap_extension_timer_fired is intentionally missing.
-
-uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
-    envoy_dynamic_module_type_envoy_buffer body,
-    envoy_dynamic_module_type_module_buffer* response_body, uint32_t* response_body_length) {
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
   (void)extension_config_envoy_ptr;
   (void)extension_config_module_ptr;
-  (void)method;
-  (void)path;
-  (void)body;
-  (void)response_body;
-  (void)response_body_length;
-  return 200;
+  (void)timer_ptr;
 }
 
+// NOTE: envoy_dynamic_module_on_bootstrap_extension_admin_request is intentionally missing.

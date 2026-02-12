@@ -1935,6 +1935,25 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+  _help_text: abi::envoy_dynamic_module_type_module_buffer,
+  _removable: bool,
+  _mutates_server_state: bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -2139,4 +2158,174 @@ fn test_bootstrap_extension_shutdown_default_calls_completion() {
   assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 
   envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_admin_request(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      method: &str,
+      path: &str,
+      _body: &[u8],
+    ) -> (u32, String) {
+      (200, format!("method={} path={}", method, path))
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test_admin?key=val";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  let mut response_body = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null_mut(),
+    length: 0,
+  };
+  let mut response_body_length: u32 = 0;
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+      &mut response_body,
+      &mut response_body_length,
+    )
+  };
+
+  assert_eq!(status, 200);
+  assert!(response_body_length > 0);
+  let response_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      response_body.ptr as *const u8,
+      response_body_length as usize,
+    ))
+  };
+  assert_eq!(response_str, "method=GET path=/test_admin?key=val");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request_default() {
+  // Verify that the default on_admin_request returns 404 with empty body.
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  let mut response_body = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null_mut(),
+    length: 0,
+  };
+  let mut response_body_length: u32 = 0;
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+      &mut response_body,
+      &mut response_body_length,
+    )
+  };
+
+  assert_eq!(status, 404);
+  assert_eq!(response_body_length, 0);
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
 }
