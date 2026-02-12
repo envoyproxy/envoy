@@ -445,7 +445,8 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   return Network::FilterStatus::StopIteration;
 }
 
-addrinfo* OsSysCallsWithMockedDns::makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
+addrinfo*
+OsSysCallsWithMockedDns::makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
   addrinfo* ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
   memset(ai, 0, sizeof(addrinfo));
   ai->ai_protocol = IPPROTO_TCP;
@@ -455,8 +456,7 @@ addrinfo* OsSysCallsWithMockedDns::makeAddrInfo(const Network::Address::Instance
   } else {
     ai->ai_family = AF_INET6;
   }
-  sockaddr_storage* storage =
-      reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
+  sockaddr_storage* storage = reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
   ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
   memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
   ai->ai_addrlen = addr->sockAddrLen();
@@ -464,8 +464,10 @@ addrinfo* OsSysCallsWithMockedDns::makeAddrInfo(const Network::Address::Instance
   return ai;
 }
 
-Api::SysCallIntResult OsSysCallsWithMockedDns::getaddrinfo(const char* node, const char* /*service*/,
-                                                  const addrinfo* /*hints*/, addrinfo** res) {
+Api::SysCallIntResult OsSysCallsWithMockedDns::getaddrinfo(const char* node,
+                                                           const char* /*service*/,
+                                                           const addrinfo* /*hints*/,
+                                                           addrinfo** res) {
   *res = nullptr;
   if (absl::string_view{"localhost"} == node || absl::string_view{"127.0.0.1"} == node ||
       absl::string_view{"::1"} == node) {
