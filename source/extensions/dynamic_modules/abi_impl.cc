@@ -177,6 +177,17 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_ite
                "not implemented in this context");
 }
 
+// ---------------------- Cert Validator callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementation
+// is provided in the cert validator config.cc when the cert validator extension is used.
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_set_error_details: "
+               "not implemented in this context");
+}
+
 // ---------------------- Bootstrap extension timer callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
