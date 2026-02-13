@@ -6001,6 +6001,29 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - Init Manager Integration
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete is called by the
+ * module to signal that the bootstrap extension has completed its initialization. Envoy
+ * automatically registers an init target for every bootstrap extension, blocking traffic until
+ * the module signals readiness by calling this function.
+ *
+ * The module must call this exactly once during or after
+ * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
+ * require asynchronous initialization, it should call this immediately during config creation.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
 // -------------------- Bootstrap Extension Callbacks - Stats Access --------------------
 
 /**

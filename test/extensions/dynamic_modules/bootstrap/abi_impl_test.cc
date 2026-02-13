@@ -162,6 +162,30 @@ TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
 }
 
 // -----------------------------------------------------------------------------
+// Init Manager Tests
+// -----------------------------------------------------------------------------
+
+// Test that an init target is automatically registered during config creation. The C no-op module
+// calls signal_init_complete during its constructor. Calling it again here verifies idempotency.
+TEST_F(BootstrapAbiImplTest, InitTargetAutoRegisteredAndSignal) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // The init manager should receive an add call during config creation.
+  EXPECT_CALL(context_.init_manager_, add(_));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // The C no-op module already called signal_init_complete during config creation.
+  // Calling it again verifies that duplicate calls are safe.
+  envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+      config.value()->thisAsVoidPtr());
+}
+
+// -----------------------------------------------------------------------------
 // HTTP Callout Tests
 // -----------------------------------------------------------------------------
 
