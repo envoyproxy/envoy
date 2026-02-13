@@ -12,20 +12,20 @@ namespace TransformStat {
 class TransformStatActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
   Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, ActionContext&,
+  createAction(const Protobuf::Message& config, ActionContext& context,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config =
         MessageUtil::downcastAndValidate<const ProtoTransformStat&>(config, validation_visitor);
 
     if (action_config.has_drop_stat()) {
-      return std::make_shared<DropStat>(action_config.drop_stat());
+      return std::make_shared<DropStat>(action_config.drop_stat(), context.symbol_table_);
     } else if (action_config.has_drop_tag()) {
-      return std::make_shared<DropTag>(action_config.drop_tag());
+      return std::make_shared<DropTag>(action_config.drop_tag(), context.symbol_table_);
     } else if (action_config.has_insert_tag()) {
-      return std::make_shared<InsertTag>(action_config.insert_tag());
+      return std::make_shared<InsertTag>(action_config.insert_tag(), context.symbol_table_);
     }
 
-    return std::make_shared<NoOpAction>();
+    return std::make_shared<NoOpAction>(context.symbol_table_);
   }
 
   std::string name() const override {

@@ -6,6 +6,8 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/stats/stat_matching_data_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,6 +15,8 @@ namespace AccessLoggers {
 namespace StatsAccessLog {
 
 namespace {
+
+using Extensions::Matching::Actions::TransformStat::ActionContext;
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
@@ -76,8 +80,6 @@ private:
   absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
 };
 
-using Extensions::Matching::Actions::TransformStat::ActionContext;
-
 Formatter::FormatterProviderPtr
 parseValueFormat(absl::string_view format,
                  const std::vector<Formatter::CommandParserPtr>& commands) {
@@ -136,12 +138,22 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
 }
 
 struct StatsAccessLogMetric {
-  StatsAccessLogMetric(const Stats::TagVector& tags) : tags_(tags) {}
+  StatsAccessLogMetric(const Stats::StatNameTagVector& tags, Stats::SymbolTable& symbol_table)
+      : tags_(tags), symbol_table_(symbol_table) {}
 
   std::string name() const { return ""; }
-  const Stats::TagVector& tags() const { return tags_; }
+  const Stats::SymbolTable& constSymbolTable() const { return symbol_table_; }
 
-  const Stats::TagVector& tags_;
+  void iterateTagStatNames(const Stats::Metric::TagStatNameIterFn& fn) const {
+    for (const auto& tag : tags_) {
+      if (!fn(tag.first, tag.second)) {
+        return;
+      }
+    }
+  }
+
+  const Stats::StatNameTagVector& tags_;
+  const Stats::SymbolTable& symbol_table_;
 };
 
 class ActionValidationVisitor
@@ -265,7 +277,7 @@ StatsAccessLog::NameAndTags::NameAndTags(
 
   if (cfg.has_rules()) {
     ActionValidationVisitor validation_visitor;
-    ActionContext action_context;
+    ActionContext action_context(context.statsScope().symbolTable());
     Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory(
         action_context, context.serverFactoryContext(), validation_visitor);
     rules_ = factory.create(cfg.rules())();
@@ -286,36 +298,30 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   Stats::Scope& scope) const {
   Stats::StatNameTagVector tags;
-  Stats::TagVector str_tags;
+  std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
+  dynamic_storage.reserve(dynamic_tags_.size());
 
   for (const auto& dynamic_tag : dynamic_tags_) {
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
-    str_tags.emplace_back(dynamic_tag.str_name_, tag_value);
+    auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
+    tags.emplace_back(dynamic_tag.name_, storage_value.statName());
   }
 
   if (rules_) {
-    StatsAccessLogMetric metric(str_tags);
+    StatsAccessLogMetric metric(tags, scope.symbolTable());
     Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
       if (const auto* action = dynamic_cast<
               const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
               result.action().get())) {
-        const auto action_result = action->apply(str_tags);
+        const auto action_result = action->apply(tags);
         if (action_result ==
             Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
           return {std::move(tags), {}, true};
         }
       }
     }
-  }
-
-  std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
-  dynamic_storage.reserve(str_tags.size() * 2);
-  for (const auto& tag : str_tags) {
-    auto& storage_name = dynamic_storage.emplace_back(tag.name_, scope.symbolTable());
-    auto& storage_value = dynamic_storage.emplace_back(tag.value_, scope.symbolTable());
-    tags.emplace_back(storage_name.statName(), storage_value.statName());
   }
 
   return {std::move(tags), std::move(dynamic_storage), false};

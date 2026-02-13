@@ -1,5 +1,6 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
+#include "source/common/stats/stat_matching_data_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 

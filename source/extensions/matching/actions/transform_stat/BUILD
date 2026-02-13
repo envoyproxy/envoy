@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/matching/actions/transform_stat/v3:pkg_cc_proto",
     ],
 )

@@ -19,6 +19,5 @@ envoy_cc_test(
         "//source/extensions/matching/actions/transform_stat:transform_stat_lib",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/matching/actions/transform_stat/v3:pkg_cc_proto",
     ],
 )

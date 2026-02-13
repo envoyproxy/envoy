@@ -292,30 +292,10 @@ public:
 
   virtual std::string fullName() const PURE;
 
-  virtual std::string tagValue(const std::string&) const PURE;
+  virtual absl::optional<std::reference_wrapper<const SymbolTable>> symbolTable() const PURE;
+  virtual std::string tagValue(const StatName& name) const PURE;
 
   virtual ~StatMatchingData() = default;
-};
-
-template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
-public:
-  StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
-
-  static std::string name() { return "stat_matching_data_impl"; }
-
-  std::string fullName() const override { return metric_.name(); }
-
-  std::string tagValue(const std::string& name) const override {
-    for (const auto& tag : metric_.tags()) {
-      if (tag.name_ == name) {
-        return tag.value_;
-      }
-    }
-    return "";
-  }
-
-private:
-  const StatType& metric_;
 };
 
 } // namespace Stats

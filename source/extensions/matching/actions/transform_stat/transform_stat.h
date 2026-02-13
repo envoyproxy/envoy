@@ -1,9 +1,11 @@
 #pragma once
 
 #include "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.pb.h"
+#include "envoy/stats/tag.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +15,10 @@ namespace TransformStat {
 
 using ProtoTransformStat = envoy::extensions::matching::actions::transform_stat::v3::TransformStat;
 
-struct ActionContext {};
+struct ActionContext {
+  ActionContext(Envoy::Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  Envoy::Stats::SymbolTable& symbol_table_;
+};
 
 class TransformStatAction {
 public:
@@ -34,42 +39,44 @@ public:
    * @param tags supplied the tags to be applied.
    * @return Result result of the action.
    */
-  virtual Result apply(Envoy::Stats::TagVector& tags) const PURE;
+  virtual Result apply(Envoy::Stats::StatNameTagVector& tags) const PURE;
 };
 
 class DropStat : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropStat(const ProtoTransformStat::DropStat&) {}
+  explicit DropStat(const ProtoTransformStat::DropStat&, Envoy::Stats::SymbolTable&) {}
 
-  Result apply(Envoy::Stats::TagVector&) const override;
+  Result apply(Envoy::Stats::StatNameTagVector&) const override;
 };
 
 class InsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit InsertTag(const ProtoTransformStat::InsertTag& config)
-      : tag_name_(config.tag_name()), tag_value_(config.tag_value()) {}
+  InsertTag(const ProtoTransformStat::InsertTag& config, Envoy::Stats::SymbolTable& symbol_table);
 
-  Result apply(Envoy::Stats::TagVector& tags) const override;
+  Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
 
 private:
-  const std::string tag_name_;
-  const std::string tag_value_;
+  // Using StatNameManagedStorage (interned) because:
+  // 1. tag_name matching requires exact symbolic match with tags from StatNamePool.
+  // 2. tag_value is static config, so interning is efficient for repeated use.
+  const Envoy::Stats::StatNameManagedStorage tag_name_storage_;
+  const Envoy::Stats::StatNameManagedStorage tag_value_storage_;
 };
 
 class DropTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropTag(const ProtoTransformStat::DropTag& config)
-      : target_tag_name_(config.target_tag_name()) {}
+  DropTag(const ProtoTransformStat::DropTag& config, Envoy::Stats::SymbolTable& symbol_table);
 
-  Result apply(Envoy::Stats::TagVector& tags) const override;
+  Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
 
 private:
-  const std::string target_tag_name_;
+  const Envoy::Stats::StatNameManagedStorage target_tag_name_storage_;
 };
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  Result apply(Envoy::Stats::TagVector&) const override;
+  explicit NoOpAction(Envoy::Stats::SymbolTable&) {}
+  Result apply(Envoy::Stats::StatNameTagVector&) const override;
 };
 
 } // namespace TransformStat

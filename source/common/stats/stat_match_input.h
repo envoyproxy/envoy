@@ -6,6 +6,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -36,14 +37,27 @@ public:
 
 class StatTagValueInput : public Matcher::DataInput<Envoy::Stats::StatMatchingData> {
 public:
-  StatTagValueInput(const std::string& name) : name_(name) {}
+  StatTagValueInput(const std::string& tag_name) : tag_name_(tag_name) {}
 
   Matcher::DataInputGetResult get(const Envoy::Stats::StatMatchingData& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, data.tagValue(name_)};
+    if (!tag_name_storage_) {
+      auto symbol_table_opt = data.symbolTable();
+      if (!symbol_table_opt) {
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, ""};
+      }
+      tag_name_storage_ = std::make_unique<StatNameManagedStorage>(
+          tag_name_, const_cast<SymbolTable&>(symbol_table_opt->get()));
+    }
+
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            data.tagValue(tag_name_storage_->statName())};
   }
 
 private:
-  const std::string name_;
+  const std::string tag_name_;
+  // Storage for the tag name, initialized lazily when the symbol table is available.
+  // We need an interned StatName to match the tags in the stats system.
+  mutable std::unique_ptr<StatNameManagedStorage> tag_name_storage_;
 };
 
 class StatTagValueInputFactory : public Matcher::DataInputFactory<Envoy::Stats::StatMatchingData> {
