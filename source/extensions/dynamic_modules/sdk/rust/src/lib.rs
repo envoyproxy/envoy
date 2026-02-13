@@ -7352,6 +7352,17 @@ pub trait EnvoyBootstrapExtensionConfig {
     u64, // callout id
   );
 
+  /// Signal that the module's initialization is complete. Envoy automatically registers an init
+  /// target for every bootstrap extension, blocking traffic until this is called.
+  ///
+  /// The module must call this exactly once during or after `new_bootstrap_extension_config` to
+  /// unblock Envoy. If the module does not require asynchronous initialization, it should call
+  /// this immediately during config creation.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn signal_init_complete(&self);
+
   /// Define a new counter scoped to this bootstrap extension config with the given name.
   fn define_counter(
     &mut self,
@@ -7905,6 +7916,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     };
 
     (result, callout_id)
+  }
+
+  fn signal_init_complete(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(self.raw);
+    }
   }
 
   fn define_counter(

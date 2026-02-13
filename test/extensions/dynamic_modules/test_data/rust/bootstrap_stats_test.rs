@@ -96,6 +96,7 @@ fn my_new_bootstrap_extension_config_fn(
 
   envoy_log_info!("Bootstrap metrics definition and update test completed successfully!");
 
+  envoy_extension_config.signal_init_complete();
   Some(Box::new(StatsTestBootstrapExtensionConfig {}))
 }
 

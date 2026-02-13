@@ -92,6 +92,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that Envoy automatically registers an init target for every bootstrap
+// extension and that the module can signal readiness to unblock startup.
+TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Init target signaled complete during config creation"},
+                                  {"info", "Bootstrap init target test completed successfully!"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_init_target_test"));
+}
+
 // This test verifies that the Rust bootstrap extension timer API works correctly.
 // A timer is created during config_new, armed with a short delay, and on_timer_fired logs success.
 TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {

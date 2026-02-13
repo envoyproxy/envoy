@@ -124,6 +124,13 @@ envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
                "not implemented in this context");
 }
 
+__attribute__((weak)) void
+envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete: "
+               "not implemented in this context");
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, uint64_t* /* callout_id_out */,
