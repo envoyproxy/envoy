@@ -6006,31 +6006,14 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
 // -----------------------------------------------------------------------------
 
 /**
- * envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target is called by the
- * module to register an init target that blocks Envoy from accepting traffic until the module
- * signals readiness. This allows bootstrap extensions to perform asynchronous initialization
- * (e.g., loading data from external services) before any request is processed.
- *
- * This must be called during envoy_dynamic_module_on_bootstrap_extension_config_new, before the
- * init manager is initialized. Calling it after initialization will result in an assertion failure.
- *
- * After calling this, the module must eventually call
- * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete to unblock Envoy.
- *
- * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
- * object.
- */
-void envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
-
-/**
  * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete is called by the
- * module to signal that the bootstrap extension has completed its asynchronous initialization.
- * Envoy will start accepting traffic once all registered init targets have signaled readiness.
+ * module to signal that the bootstrap extension has completed its initialization. Envoy
+ * automatically registers an init target for every bootstrap extension, blocking traffic until
+ * the module signals readiness by calling this function.
  *
- * This must only be called after
- * envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target has been called.
- * Calling it without a prior registration will result in a no-op.
+ * The module must call this exactly once during or after
+ * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
+ * require asynchronous initialization, it should call this immediately during config creation.
  *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
  * to post an event to the main thread first.

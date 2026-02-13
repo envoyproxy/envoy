@@ -1758,12 +1758,6 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_sched
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
-  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-) {
-}
-
-#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 ) {

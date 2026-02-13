@@ -34,6 +34,7 @@ fn my_new_bootstrap_extension_config_fn(
 
   envoy_log_info!("Timer created and armed during config_new");
 
+  envoy_extension_config.signal_init_complete();
   Some(Box::new(TimerTestBootstrapExtensionConfig {
     timer: Mutex::new(Some(timer)),
   }))

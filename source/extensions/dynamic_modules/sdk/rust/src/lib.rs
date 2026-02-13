@@ -7352,21 +7352,12 @@ pub trait EnvoyBootstrapExtensionConfig {
     u64, // callout id
   );
 
-  /// Register an init target that blocks Envoy from accepting traffic until the module signals
-  /// readiness via [`EnvoyBootstrapExtensionConfig::signal_init_complete`].
+  /// Signal that the module's initialization is complete. Envoy automatically registers an init
+  /// target for every bootstrap extension, blocking traffic until this is called.
   ///
-  /// This must be called during the `new_bootstrap_extension_config` factory function, before
-  /// the init manager is initialized. Calling it after initialization will result in a failure.
-  ///
-  /// After calling this, the module must eventually call
-  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`] to unblock Envoy.
-  fn register_init_target(&self);
-
-  /// Signal that the module's asynchronous initialization is complete. Envoy will start accepting
-  /// traffic once all registered init targets have signaled readiness.
-  ///
-  /// This must only be called after [`EnvoyBootstrapExtensionConfig::register_init_target`] has
-  /// been called. Calling it without a prior registration will result in a no-op.
+  /// The module must call this exactly once during or after `new_bootstrap_extension_config` to
+  /// unblock Envoy. If the module does not require asynchronous initialization, it should call
+  /// this immediately during config creation.
   ///
   /// This must be called on the main thread. To call from other threads, use the scheduler
   /// mechanism to post an event to the main thread first.
@@ -7878,18 +7869,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     (result, callout_id)
   }
 
-  fn register_init_target(&self) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(self.raw);
-    }
-  }
-
   fn signal_init_complete(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(self.raw);
     }
   }
-      
+
   fn define_counter(
     &mut self,
     name: &str,

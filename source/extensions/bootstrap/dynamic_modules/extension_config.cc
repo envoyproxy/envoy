@@ -40,21 +40,9 @@ DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() 
   }
 }
 
-void DynamicModuleBootstrapExtensionConfig::registerInitTarget() {
-  if (init_target_ != nullptr) {
-    ENVOY_LOG(warn, "dynamic modules: init target already registered, ignoring duplicate call");
-    return;
-  }
-  init_target_ = std::make_unique<Init::TargetImpl>("dynamic_modules_bootstrap", []() {});
-  context_.initManager().add(*init_target_);
-  ENVOY_LOG(debug, "dynamic modules: init target registered, Envoy will wait for module to signal "
-                   "readiness before accepting traffic");
-}
-
 void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
   if (init_target_ == nullptr) {
-    ENVOY_LOG(warn, "dynamic modules: signal_init_complete called without prior "
-                    "register_init_target, ignoring");
+    IS_ENVOY_BUG("dynamic modules: signal_init_complete called but no init target registered");
     return;
   }
   init_target_->ready();
@@ -257,6 +245,12 @@ newDynamicModuleBootstrapExtensionConfig(
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
       stats_store);
+
+  // Always register an init target so that Envoy blocks traffic until the module signals readiness.
+  // This must happen before calling the module constructor so the module can call
+  // signal_init_complete during config creation.
+  config->init_target_ = std::make_unique<Init::TargetImpl>("dynamic_modules_bootstrap", []() {});
+  context.initManager().add(*config->init_target_);
 
   const void* extension_config_module_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {extension_name.data(), extension_name.size()},

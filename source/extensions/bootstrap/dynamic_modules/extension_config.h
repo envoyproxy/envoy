@@ -98,15 +98,9 @@ public:
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   /**
-   * Registers an init target with the server's init manager. This blocks Envoy from accepting
-   * traffic until signalInitComplete() is called. Must be called during config creation, before
-   * the init manager is initialized.
-   */
-  void registerInitTarget();
-
-  /**
-   * Signals that the module's asynchronous initialization is complete. This unblocks the init
-   * manager and allows Envoy to start accepting traffic.
+   * Signals that the module's initialization is complete. This unblocks the init manager and
+   * allows Envoy to start accepting traffic. An init target is automatically registered for every
+   * bootstrap extension, so the module must call this exactly once to unblock startup.
    */
   void signalInitComplete();
 
@@ -143,7 +137,7 @@ public:
   Stats::Store& stats_store_;
 
   // The init target for blocking Envoy startup until the module signals readiness.
-  // This is created lazily when registerInitTarget() is called.
+  // Created during config construction and registered with the init manager.
   std::unique_ptr<Init::TargetImpl> init_target_;
 
   // ----------------------------- Metrics Support -----------------------------

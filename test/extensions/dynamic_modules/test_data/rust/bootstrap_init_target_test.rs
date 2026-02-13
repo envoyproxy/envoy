@@ -1,8 +1,7 @@
 //! Test module for Bootstrap extension init target functionality.
 //!
-//! This module tests that a bootstrap extension can register an init target to block Envoy from
-//! accepting traffic until asynchronous initialization is complete. It calls register_init_target
-//! during config creation and immediately signals completion.
+//! This module tests that Envoy automatically registers an init target for every bootstrap
+//! extension, blocking traffic until the module signals readiness via signal_init_complete.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 
@@ -17,13 +16,8 @@ fn my_new_bootstrap_extension_config_fn(
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn BootstrapExtensionConfig>> {
-  // Register an init target during config creation. This blocks Envoy from accepting traffic
-  // until signal_init_complete is called.
-  envoy_extension_config.register_init_target();
-  envoy_log_info!("Init target registered during config creation");
-
-  // For this test, we signal completion immediately. In a real use case, this would be called
-  // after asynchronous initialization (e.g., loading data from an external service) completes.
+  // Envoy automatically registers an init target for every bootstrap extension.
+  // Signal completion immediately since this test does not require asynchronous initialization.
   envoy_extension_config.signal_init_complete();
   envoy_log_info!("Init target signaled complete during config creation");
 

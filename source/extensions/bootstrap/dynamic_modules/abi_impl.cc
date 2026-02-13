@@ -39,12 +39,6 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 
 // -------------------- Init Manager Callbacks --------------------
 
-void envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
-  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  config->registerInitTarget();
-}
-
 void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);

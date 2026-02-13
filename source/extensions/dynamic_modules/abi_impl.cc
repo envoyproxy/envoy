@@ -125,13 +125,6 @@ envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 }
 
 __attribute__((weak)) void
-envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target: "
-               "not implemented in this context");
-}
-
-__attribute__((weak)) void
 envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete: "
