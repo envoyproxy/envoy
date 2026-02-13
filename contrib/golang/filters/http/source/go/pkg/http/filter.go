@@ -395,8 +395,96 @@ func (s *streamInfo) DrainConnectionUponCompletion() {
 	cAPI.HttpSetDrainConnectionUponCompletion(unsafe.Pointer(s.request))
 }
 
+func (s *streamInfo) DownstreamSslConnection() api.SslConnection {
+	if !cAPI.HttpGetDownstreamSslConnection(unsafe.Pointer(s.request)) {
+		return nil
+	}
+	return &sslConnection{request: s.request}
+}
+
 type filterState struct {
 	request *httpRequest
+}
+
+type sslConnection struct {
+	request *httpRequest
+}
+
+func (s *sslConnection) PeerCertificatePresented() bool {
+	return cAPI.HttpSslPeerCertificatePresented(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) PeerCertificateValidated() bool {
+	return cAPI.HttpSslPeerCertificateValidated(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) Sha256PeerCertificateDigest() string {
+	return cAPI.HttpSslSha256PeerCertificateDigest(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) SerialNumberPeerCertificate() string {
+	return cAPI.HttpSslSerialNumberPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) SubjectPeerCertificate() string {
+	return cAPI.HttpSslSubjectPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) IssuerPeerCertificate() string {
+	return cAPI.HttpSslIssuerPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) SubjectLocalCertificate() string {
+	return cAPI.HttpSslSubjectLocalCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) UriSanPeerCertificate() []string {
+	return cAPI.HttpSslUriSanPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) UriSanLocalCertificate() []string {
+	return cAPI.HttpSslUriSanLocalCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) DnsSansPeerCertificate() []string {
+	return cAPI.HttpSslDnsSansPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) DnsSansLocalCertificate() []string {
+	return cAPI.HttpSslDnsSansLocalCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) ValidFromPeerCertificate() (uint64, bool) {
+	return cAPI.HttpSslValidFromPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) ExpirationPeerCertificate() (uint64, bool) {
+	return cAPI.HttpSslExpirationPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) TlsVersion() string {
+	return cAPI.HttpSslTlsVersion(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) CiphersuiteString() string {
+	return cAPI.HttpSslCiphersuiteString(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) CiphersuiteId() uint16 {
+	id, _ := cAPI.HttpSslCiphersuiteId(unsafe.Pointer(s.request))
+	return uint16(id)
+}
+
+func (s *sslConnection) SessionId() string {
+	return cAPI.HttpSslSessionId(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificate() string {
+	return cAPI.HttpSslUrlEncodedPemEncodedPeerCertificate(unsafe.Pointer(s.request))
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificateChain() string {
+	return cAPI.HttpSslUrlEncodedPemEncodedPeerCertificateChain(unsafe.Pointer(s.request))
 }
 
 func (s *streamInfo) FilterState() api.FilterState {

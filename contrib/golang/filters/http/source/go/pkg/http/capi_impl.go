@@ -496,6 +496,304 @@ func (c *httpCApiImpl) HttpSetDrainConnectionUponCompletion(r unsafe.Pointer) {
 	handleCApiStatus(res)
 }
 
+// SSL Connection APIs
+func (c *httpCApiImpl) HttpGetDownstreamSslConnection(r unsafe.Pointer) bool {
+	req := (*httpRequest)(r)
+	var sslExists C.uint64_t
+	res := C.envoyGoFilterHttpGetDownstreamSslConnection(unsafe.Pointer(req.req), &sslExists)
+	handleCApiStatus(res)
+	return sslExists != 0
+}
+
+func (c *httpCApiImpl) HttpSslPeerCertificatePresented(r unsafe.Pointer) bool {
+	req := (*httpRequest)(r)
+	var presented C.int
+	res := C.envoyGoFilterHttpSslPeerCertificatePresented(unsafe.Pointer(req.req), &presented)
+	if res == C.CAPIValueNotFound {
+		return false
+	}
+	handleCApiStatus(res)
+	return presented != 0
+}
+
+func (c *httpCApiImpl) HttpSslPeerCertificateValidated(r unsafe.Pointer) bool {
+	req := (*httpRequest)(r)
+	var validated C.int
+	res := C.envoyGoFilterHttpSslPeerCertificateValidated(unsafe.Pointer(req.req), &validated)
+	if res == C.CAPIValueNotFound {
+		return false
+	}
+	handleCApiStatus(res)
+	return validated != 0
+}
+
+func (c *httpCApiImpl) HttpSslSha256PeerCertificateDigest(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslSha256PeerCertificateDigest(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslSerialNumberPeerCertificate(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslSerialNumberPeerCertificate(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslSubjectPeerCertificate(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslSubjectPeerCertificate(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslIssuerPeerCertificate(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslIssuerPeerCertificate(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslSubjectLocalCertificate(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslSubjectLocalCertificate(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslUriSanPeerCertificate(r unsafe.Pointer) []string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var bufData C.uint64_t
+	var bufLen C.int
+	res := C.envoyGoFilterHttpSslUriSanPeerCertificate(unsafe.Pointer(req.req), &bufData, &bufLen)
+	if res == C.CAPIValueNotFound {
+		return []string{}
+	}
+	handleCApiStatus(res)
+
+	if bufLen == 0 {
+		return []string{}
+	}
+
+	buf := unsafe.String((*byte)(unsafe.Pointer(uintptr(bufData))), int(bufLen))
+	return strings.Split(buf, "\n")
+}
+
+func (c *httpCApiImpl) HttpSslUriSanLocalCertificate(r unsafe.Pointer) []string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var bufData C.uint64_t
+	var bufLen C.int
+	res := C.envoyGoFilterHttpSslUriSanLocalCertificate(unsafe.Pointer(req.req), &bufData, &bufLen)
+	if res == C.CAPIValueNotFound {
+		return []string{}
+	}
+	handleCApiStatus(res)
+
+	if bufLen == 0 {
+		return []string{}
+	}
+
+	buf := unsafe.String((*byte)(unsafe.Pointer(uintptr(bufData))), int(bufLen))
+	return strings.Split(buf, "\n")
+}
+
+func (c *httpCApiImpl) HttpSslDnsSansPeerCertificate(r unsafe.Pointer) []string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var bufData C.uint64_t
+	var bufLen C.int
+	res := C.envoyGoFilterHttpSslDnsSansPeerCertificate(unsafe.Pointer(req.req), &bufData, &bufLen)
+	if res == C.CAPIValueNotFound {
+		return []string{}
+	}
+	handleCApiStatus(res)
+
+	if bufLen == 0 {
+		return []string{}
+	}
+
+	buf := unsafe.String((*byte)(unsafe.Pointer(uintptr(bufData))), int(bufLen))
+	return strings.Split(buf, "\n")
+}
+
+func (c *httpCApiImpl) HttpSslDnsSansLocalCertificate(r unsafe.Pointer) []string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var bufData C.uint64_t
+	var bufLen C.int
+	res := C.envoyGoFilterHttpSslDnsSansLocalCertificate(unsafe.Pointer(req.req), &bufData, &bufLen)
+	if res == C.CAPIValueNotFound {
+		return []string{}
+	}
+	handleCApiStatus(res)
+
+	if bufLen == 0 {
+		return []string{}
+	}
+
+	buf := unsafe.String((*byte)(unsafe.Pointer(uintptr(bufData))), int(bufLen))
+	return strings.Split(buf, "\n")
+}
+
+func (c *httpCApiImpl) HttpSslValidFromPeerCertificate(r unsafe.Pointer) (uint64, bool) {
+	req := (*httpRequest)(r)
+	var timestamp C.uint64_t
+	res := C.envoyGoFilterHttpSslValidFromPeerCertificate(unsafe.Pointer(req.req), &timestamp)
+	if res == C.CAPIValueNotFound {
+		return 0, false
+	}
+	handleCApiStatus(res)
+	return uint64(timestamp), true
+}
+
+func (c *httpCApiImpl) HttpSslExpirationPeerCertificate(r unsafe.Pointer) (uint64, bool) {
+	req := (*httpRequest)(r)
+	var timestamp C.uint64_t
+	res := C.envoyGoFilterHttpSslExpirationPeerCertificate(unsafe.Pointer(req.req), &timestamp)
+	if res == C.CAPIValueNotFound {
+		return 0, false
+	}
+	handleCApiStatus(res)
+	return uint64(timestamp), true
+}
+
+func (c *httpCApiImpl) HttpSslTlsVersion(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslTlsVersion(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslCiphersuiteString(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslCiphersuiteString(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslCiphersuiteId(r unsafe.Pointer) (uint64, bool) {
+	req := (*httpRequest)(r)
+	var cipherId C.uint64_t
+	res := C.envoyGoFilterHttpSslCiphersuiteId(unsafe.Pointer(req.req), &cipherId)
+	if res == C.CAPIValueNotFound {
+		return 0, false
+	}
+	handleCApiStatus(res)
+	return uint64(cipherId), true
+}
+
+func (c *httpCApiImpl) HttpSslSessionId(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslSessionId(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslUrlEncodedPemEncodedPeerCertificate(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificate(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
+func (c *httpCApiImpl) HttpSslUrlEncodedPemEncodedPeerCertificateChain(r unsafe.Pointer) string {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificateChain(unsafe.Pointer(req.req), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return ""
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen)))
+}
+
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
