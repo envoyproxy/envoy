@@ -1,0 +1,43 @@
+# docs_admin_interface_snippet_start
+# docs_admin_address_snippet_start
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901
+  # docs_admin_address_snippet_end
+  allow_paths:
+  - exact: /ready
+  - prefix: /stats
+  profile_path: /tmp/envoy.prof
+# docs_admin_interface_snippet_end
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: local_tcp
+          cluster: local_service
+  clusters:
+  - name: local_service
+    connect_timeout: 1s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
