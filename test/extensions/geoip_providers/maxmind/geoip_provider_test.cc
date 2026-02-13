@@ -38,7 +38,7 @@ public:
   }
   static void setCountryDbToNull(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
-    absl::MutexLock lock(&provider->mmdb_mutex_);
+    absl::MutexLock lock(provider->mmdb_mutex_);
     provider->country_db_.reset();
   }
 };
@@ -711,7 +711,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
   cb_added_opt.value().waitReady();
   {
-    absl::ReaderMutexLock guard(&mutex_);
+    absl::ReaderMutexLock guard(mutex_);
     EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   }
   expectReloadStats("city_db", 1, 0);
@@ -753,7 +753,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
   cb_added_opt.value().waitReady();
   {
-    absl::ReaderMutexLock guard(&mutex_);
+    absl::ReaderMutexLock guard(mutex_);
     EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   }
   expectReloadStats("city_db", 1, 0);
@@ -1056,7 +1056,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
   cb_added_opt.value().waitReady();
   {
-    absl::ReaderMutexLock guard(&mutex_);
+    absl::ReaderMutexLock guard(mutex_);
     EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   }
   expectReloadStats(test_case.db_type_, 1, 0);
@@ -1112,7 +1112,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
   cb_added_opt.value().waitReady();
   {
-    absl::ReaderMutexLock guard(&mutex_);
+    absl::ReaderMutexLock guard(mutex_);
     EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   }
   GeoipProviderPeer::synchronizer(provider_).signal(lookup_sync_point_name);
@@ -1188,7 +1188,7 @@ TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   TestEnvironment::renameFile(invalid_db_file_path, source_db_file_path);
   cb_added_opt.value().waitReady();
   {
-    absl::ReaderMutexLock guard(&mutex_);
+    absl::ReaderMutexLock guard(mutex_);
     EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   }
   // On reload error the old db instance should be used for subsequent lookup requests.
