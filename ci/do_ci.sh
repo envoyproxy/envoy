@@ -263,6 +263,7 @@ function bazel_envoy_api_go_build() {
 }
 
 function build_openssl() {
+    test_fail_early
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     # shellcheck disable=SC2207
     # Append OpenSSL compat tests, and exclude quiche tests
