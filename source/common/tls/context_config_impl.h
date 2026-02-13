@@ -30,7 +30,8 @@ struct CertificateValidationContextConfigProviderSharedPtrWithName {
   Secret::CertificateValidationContextConfigProviderSharedPtr provider_;
 };
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig {
+class ContextConfigImpl : public virtual Ssl::ContextConfig,
+                          public Logger::Loggable<Logger::Id::misc> {
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }

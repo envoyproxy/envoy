@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
         "//test/test_common:test_runtime_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )

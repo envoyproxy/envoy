@@ -261,6 +261,13 @@ envoy.config.validators.minimum_clusters_validator:
   status: stable
   type_urls:
   - envoy.extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator
+envoy.content_parsers.json:
+  categories:
+  - envoy.content_parsers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.content_parsers.json.v3.JsonContentParser
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
@@ -713,6 +720,13 @@ envoy.filters.http.stateful_session:
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+envoy.filters.http.sse_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http
@@ -1412,6 +1426,11 @@ envoy.string_matcher.lua:
   status: alpha
   type_urls:
   - envoy.extensions.string_matcher.lua.v3.Lua
+envoy.tls.cert_validator.dynamic_modules:
+  categories:
+  - envoy.tls.cert_validator
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
@@ -1997,6 +2016,13 @@ envoy.load_balancing_policies.wrr_locality:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality
+envoy.load_balancing_policies.dynamic_modules:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

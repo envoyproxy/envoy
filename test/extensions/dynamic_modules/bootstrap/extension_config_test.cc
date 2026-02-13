@@ -36,8 +36,11 @@ TEST_F(ExtensionConfigTest, LoadOK) {
   EXPECT_NE(config.value()->on_bootstrap_extension_server_initialized_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_worker_thread_initialized_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_destroy_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_drain_started_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_shutdown_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_config_scheduled_, nullptr);
   EXPECT_NE(config.value()->on_bootstrap_extension_http_callout_done_, nullptr);
+  EXPECT_NE(config.value()->on_bootstrap_extension_timer_fired_, nullptr);
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {
@@ -126,6 +129,30 @@ TEST_F(ExtensionConfigTest, MissingConstructor) {
               testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_config_new"));
 }
 
+TEST_F(ExtensionConfigTest, MissingDrainStarted) {
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_drain_started.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_drain_started"));
+}
+
+TEST_F(ExtensionConfigTest, MissingShutdown) {
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_shutdown.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_shutdown"));
+}
+
 TEST_F(ExtensionConfigTest, MissingConfigScheduled) {
   // Test that config creation fails when
   // envoy_dynamic_module_on_bootstrap_extension_config_scheduled symbol is missing.
@@ -152,6 +179,20 @@ TEST_F(ExtensionConfigTest, MissingHttpCalloutDone) {
   EXPECT_FALSE(config.ok());
   EXPECT_THAT(config.status().message(),
               testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_http_callout_done"));
+}
+
+TEST_F(ExtensionConfigTest, MissingTimerFired) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_timer_fired symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_timer_fired.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_timer_fired"));
 }
 
 } // namespace DynamicModules

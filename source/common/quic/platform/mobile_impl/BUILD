@@ -17,6 +17,6 @@ envoy_quiche_platform_impl_cc_library(
         "quiche_bug_tracker_impl.h",
     ],
     deps = [
-        "@com_github_google_quiche//:quiche_common_platform_logging",
+        "@quiche//:quiche_common_platform_logging",
     ],
 )
