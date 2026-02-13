@@ -23,15 +23,10 @@ modify different aspects of the server:
   :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>`.
   This can be accomplished with a configuration like the following:
 
-  .. code-block:: yaml
-
-    admin:
-      profile_path: /tmp/envoy.prof
-      address:
-        socket_address: { address: 127.0.0.1, port_value: 9901 }
-      allow_paths:
-      - exact: /ready
-      - prefix: /stats
+  .. literalinclude:: /_configs/repo/admin-interface.yaml
+    :language: yaml
+    :start-after: docs_admin_interface_snippet_start
+    :end-before: docs_admin_interface_snippet_end
 
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
