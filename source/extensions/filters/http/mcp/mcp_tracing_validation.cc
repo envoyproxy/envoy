@@ -1,8 +1,7 @@
 #include "source/extensions/filters/http/mcp/mcp_tracing_validation.h"
 
-#include <cstddef>
-
 #include <algorithm>
+#include <cstddef>
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
