@@ -313,6 +313,37 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   ASSERT(Http2::Utility::initializeAndValidateOptions(validated_http2_options).status().ok());
 }
 
+absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
+ProtocolOptionsConfigImpl::createWithMergedOptions(
+    const ProtocolOptionsConfigImpl& base,
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_overrides) {
+  // Start with the base H2 options and merge in the overrides.
+  // MergeFrom will only overwrite fields that are set in http2_overrides.
+  envoy::config::core::v3::Http2ProtocolOptions merged_h2 = base.http2_options_;
+  merged_h2.MergeFrom(http2_overrides);
+
+  auto validated_or_error = Http2::Utility::initializeAndValidateOptions(merged_h2);
+  RETURN_IF_NOT_OK_REF(validated_or_error.status());
+
+  return std::shared_ptr<ProtocolOptionsConfigImpl>(
+      new ProtocolOptionsConfigImpl(base, std::move(validated_or_error.value())));
+}
+
+ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
+    const ProtocolOptionsConfigImpl& base,
+    envoy::config::core::v3::Http2ProtocolOptions merged_h2_options)
+    : http1_settings_(base.http1_settings_), http2_options_(std::move(merged_h2_options)),
+      http3_options_(base.http3_options_),
+      common_http_protocol_options_(base.common_http_protocol_options_),
+      upstream_http_protocol_options_(base.upstream_http_protocol_options_),
+      http_filters_(base.http_filters_),
+      alternate_protocol_cache_options_(base.alternate_protocol_cache_options_),
+      use_downstream_protocol_(base.use_downstream_protocol_), use_http2_(base.use_http2_),
+      use_http3_(base.use_http3_), use_alpn_(base.use_alpn_),
+      shadow_policies_(base.shadow_policies_), retry_policy_(base.retry_policy_) {
+  ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
+}
+
 LEGACY_REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,
                         "envoy.upstreams.http.http_protocol_options");
 } // namespace Http

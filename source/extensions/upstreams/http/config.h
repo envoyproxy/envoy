@@ -42,6 +42,14 @@ public:
       Server::Configuration::ServerFactoryContext& server_context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
+  // Creates a new ProtocolOptionsConfigImpl by copying fields from an existing config and
+  // merging in endpoint-specific Http2ProtocolOptions overrides. Fields not present in
+  // http2_overrides retain their values from the base config.
+  static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
+  createWithMergedOptions(
+      const ProtocolOptionsConfigImpl& base,
+      const envoy::config::core::v3::Http2ProtocolOptions& http2_overrides);
+
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
   static uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
@@ -126,6 +134,10 @@ private:
       bool use_downstream_protocol, bool use_http2,
       Server::Configuration::ServerFactoryContext& server_context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
+  // Constructor that copies from an existing config with merged Http2ProtocolOptions.
+  ProtocolOptionsConfigImpl(
+      const ProtocolOptionsConfigImpl& base,
+      envoy::config::core::v3::Http2ProtocolOptions merged_h2_options);
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

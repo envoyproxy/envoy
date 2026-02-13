@@ -58,6 +58,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_pool.h"
+#include "source/extensions/upstreams/http/ep_specific_config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -1372,6 +1373,27 @@ ClusterInfoImpl::ClusterInfoImpl(
                                creation_status);
     }
   }
+
+  // Pre-compute merged HttpProtocolOptions for endpoint-specific H2 overrides.
+  const auto ep_specific_protocol_options =
+      extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+  if (ep_specific_protocol_options != nullptr && http_protocol_options_) {
+    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+      if (ep_option.http2_protocol_options.has_value()) {
+        auto merged_or_error =
+            Extensions::Upstreams::Http::ProtocolOptionsConfigImpl::createWithMergedOptions(
+                *http_protocol_options_, *ep_option.http2_protocol_options);
+        if (!merged_or_error.ok()) {
+          creation_status = merged_or_error.status();
+          return;
+        }
+        ep_specific_merged_http_options_.push_back(std::move(merged_or_error.value()));
+      } else {
+        ep_specific_merged_http_options_.push_back(nullptr);
+      }
+    }
+  }
 }
 
 // Configures the load balancer based on config.load_balancing_policy
@@ -1695,6 +1717,60 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
 
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
+}
+
+uint32_t ClusterInfoImpl::maxRequestsPerConnection(HostDescriptionConstSharedPtr host) const {
+  // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
+  // side we do 2^29.
+  constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
+  uint32_t max_requests =
+      (max_requests_per_connection_ != 0) ? max_requests_per_connection_ : DEFAULT_MAX_STREAMS;
+
+  // Check for endpoint-specific max_requests_per_connection
+  const auto ep_specific_protocol_options =
+      extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+
+  if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
+    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+      // Check if the metadata matcher matches this endpoint's metadata
+      if (ep_option.metadata_matcher.has_value() &&
+          ep_option.metadata_matcher->match(*host->metadata())) {
+        if (ep_option.http_protocol_options.has_value() &&
+            ep_option.http_protocol_options->has_max_requests_per_connection()) {
+          max_requests = ep_option.http_protocol_options->max_requests_per_connection().value();
+        }
+        break;
+      }
+    }
+  }
+
+  return max_requests;
+}
+
+const HttpProtocolOptionsConfig& ClusterInfoImpl::httpProtocolOptions(HostDescriptionConstSharedPtr host) const {
+  if (!ep_specific_merged_http_options_.empty() && host->metadata() != nullptr) {
+    const auto ep_specific_protocol_options =
+        extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+            "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+
+    if (ep_specific_protocol_options != nullptr) {
+      size_t index = 0;
+      for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+        if (ep_option.metadata_matcher.has_value() &&
+            ep_option.metadata_matcher->match(*host->metadata())) {
+          if (index < ep_specific_merged_http_options_.size() &&
+              ep_specific_merged_http_options_[index] != nullptr) {
+            return *ep_specific_merged_http_options_[index];
+          }
+          break;
+        }
+        ++index;
+      }
+    }
+  }
+
+  return httpProtocolOptions();
 }
 
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {

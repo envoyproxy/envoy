@@ -6487,6 +6487,316 @@ TEST_P(ParametrizedClusterInfoImplTest, ClusterRetryPolicyWithRateLimitedBackoff
   EXPECT_EQ(3, retry_policy->numRetries());
 }
 
+// Tests for endpoint-specific protocol options via ClusterInfoImpl.
+// These test httpProtocolOptions(host) and maxRequestsPerConnection(host) which resolve
+// endpoint-specific overrides based on host metadata matching.
+class EpSpecificClusterInfoTest : public ClusterInfoImplTest {
+protected:
+  // Creates a cluster with both HttpProtocolOptions (with H2 explicit config) and
+  // EndpointSpecificHttpProtocolOptions.
+  std::shared_ptr<ClusterImplBase>
+  makeClusterWithEpSpecificOptions(const std::string& ep_specific_yaml,
+                                   uint32_t cluster_max_concurrent_streams = 100,
+                                   uint32_t cluster_max_requests_per_connection = 0) {
+    std::string yaml = fmt::format(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            max_concurrent_streams: {}
+        common_http_protocol_options:
+          max_requests_per_connection: {}
+      envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions
+{}
+    )EOF",
+                                   cluster_max_concurrent_streams,
+                                   cluster_max_requests_per_connection, ep_specific_yaml);
+    return makeCluster(yaml);
+  }
+
+  HostSharedPtr makeHostWithMetadata(ClusterInfoConstSharedPtr cluster_info,
+                                     const std::string& filter_name, const std::string& key,
+                                     const std::string& value) {
+    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[filter_name].mutable_fields()->insert(
+        {key, ValueUtil::stringValue(value)});
+    return makeTestHostWithMetadata(cluster_info, metadata, "tcp://10.0.0.1:443");
+  }
+};
+
+// Test that without ep-specific options, cluster defaults are used.
+TEST_F(EpSpecificClusterInfoTest, NoEpSpecificOptionsUsesClusterDefault) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            max_concurrent_streams: 100
+        common_http_protocol_options:
+          max_requests_per_connection: 500
+  )EOF";
+  auto cluster = makeCluster(yaml);
+  auto host = makeTestHost(cluster->info(), "tcp://10.0.0.1:443", 1);
+
+  // Without ep-specific options, httpProtocolOptions(host) should return the cluster default.
+  EXPECT_EQ(100, cluster->info()->httpProtocolOptions(host).http2Options().max_concurrent_streams().value());
+  // maxRequestsPerConnection(host) should return the cluster value.
+  EXPECT_EQ(500, cluster->info()->maxRequestsPerConnection(host));
+}
+
+// Test that ep-specific max_concurrent_streams is applied when metadata matches.
+TEST_F(EpSpecificClusterInfoTest, EpSpecificMaxConcurrentStreamsApplied) {
+  auto cluster = makeClusterWithEpSpecificOptions(R"EOF(
+        endpoint_specific_options:
+          - http2_protocol_options:
+              max_concurrent_streams: 500
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: endpoint_type
+              value:
+                string_match:
+                  exact: "high_throughput"
+  )EOF");
+
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "endpoint_type", "high_throughput");
+  EXPECT_EQ(500, cluster->info()->httpProtocolOptions(host).http2Options().max_concurrent_streams().value());
+}
+
+// Test that cluster default is used when metadata doesn't match.
+TEST_F(EpSpecificClusterInfoTest, ClusterDefaultWhenMetadataDoesNotMatch) {
+  auto cluster = makeClusterWithEpSpecificOptions(R"EOF(
+        endpoint_specific_options:
+          - http2_protocol_options:
+              max_concurrent_streams: 500
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: endpoint_type
+              value:
+                string_match:
+                  exact: "high_throughput"
+  )EOF");
+
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "endpoint_type", "standard");
+  EXPECT_EQ(100, cluster->info()->httpProtocolOptions(host).http2Options().max_concurrent_streams().value());
+}
+
+// Test that cluster default is used when host has no metadata.
+TEST_F(EpSpecificClusterInfoTest, ClusterDefaultWhenNoHostMetadata) {
+  auto cluster = makeClusterWithEpSpecificOptions(R"EOF(
+        endpoint_specific_options:
+          - http2_protocol_options:
+              max_concurrent_streams: 500
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: endpoint_type
+              value:
+                string_match:
+                  exact: "high_throughput"
+  )EOF");
+
+  auto host = makeTestHost(cluster->info(), "tcp://10.0.0.1:443", 1);
+  EXPECT_EQ(100, cluster->info()->httpProtocolOptions(host).http2Options().max_concurrent_streams().value());
+}
+
+// Test that first matching option is used when multiple options are configured.
+TEST_F(EpSpecificClusterInfoTest, FirstMatchingOptionIsUsed) {
+  auto cluster = makeClusterWithEpSpecificOptions(R"EOF(
+        endpoint_specific_options:
+          - http2_protocol_options:
+              max_concurrent_streams: 200
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: tier
+              value:
+                string_match:
+                  exact: "premium"
+          - http2_protocol_options:
+              max_concurrent_streams: 500
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: tier
+              value:
+                string_match:
+                  exact: "premium"
+  )EOF");
+
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "premium");
+  // Should use the first matching option (200), not the second (500).
+  EXPECT_EQ(200, cluster->info()->httpProtocolOptions(host).http2Options().max_concurrent_streams().value());
+}
+
+// Test ep-specific max_requests_per_connection overrides cluster setting when metadata matches.
+TEST_F(EpSpecificClusterInfoTest, EpSpecificMaxRequestsPerConnectionApplied) {
+  auto cluster = makeClusterWithEpSpecificOptions(
+      R"EOF(
+        endpoint_specific_options:
+          - http_protocol_options:
+              max_requests_per_connection: 5000
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: tier
+              value:
+                string_match:
+                  exact: "premium"
+  )EOF",
+      100, 1000);
+
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "premium");
+  EXPECT_EQ(5000, cluster->info()->maxRequestsPerConnection(host));
+}
+
+// Test that cluster default max_requests_per_connection is used when metadata doesn't match.
+TEST_F(EpSpecificClusterInfoTest, ClusterDefaultMaxRequestsWhenMetadataDoesNotMatch) {
+  auto cluster = makeClusterWithEpSpecificOptions(
+      R"EOF(
+        endpoint_specific_options:
+          - http_protocol_options:
+              max_requests_per_connection: 5000
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: tier
+              value:
+                string_match:
+                  exact: "premium"
+  )EOF",
+      100, 1000);
+
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "standard");
+  EXPECT_EQ(1000, cluster->info()->maxRequestsPerConnection(host));
+}
+
+// Test multiple endpoints with different metadata match to different options.
+TEST_F(EpSpecificClusterInfoTest, DifferentEndpointsMatchDifferentOptions) {
+  auto cluster = makeClusterWithEpSpecificOptions(R"EOF(
+        endpoint_specific_options:
+          - http2_protocol_options:
+              max_concurrent_streams: 50
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: capacity
+              value:
+                string_match:
+                  exact: "low"
+          - http2_protocol_options:
+              max_concurrent_streams: 500
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: capacity
+              value:
+                string_match:
+                  exact: "high"
+  )EOF");
+
+  auto low_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "capacity", "low");
+  EXPECT_EQ(50, cluster->info()->httpProtocolOptions(low_host).http2Options().max_concurrent_streams().value());
+
+  auto high_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "capacity", "high");
+  EXPECT_EQ(500, cluster->info()->httpProtocolOptions(high_host).http2Options().max_concurrent_streams().value());
+
+  // Unmatched endpoint uses cluster default.
+  auto medium_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "capacity", "medium");
+  EXPECT_EQ(100, cluster->info()->httpProtocolOptions(medium_host).http2Options().max_concurrent_streams().value());
+}
+
+// Test different endpoints with different max_requests_per_connection.
+TEST_F(EpSpecificClusterInfoTest, DifferentEndpointsDifferentMaxRequests) {
+  auto cluster = makeClusterWithEpSpecificOptions(
+      R"EOF(
+        endpoint_specific_options:
+          - http_protocol_options:
+              max_requests_per_connection: 100
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: limit
+              value:
+                string_match:
+                  exact: "low"
+          - http_protocol_options:
+              max_requests_per_connection: 10000
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: limit
+              value:
+                string_match:
+                  exact: "high"
+  )EOF",
+      100, 1000);
+
+  auto low_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "limit", "low");
+  EXPECT_EQ(100, cluster->info()->maxRequestsPerConnection(low_host));
+
+  auto high_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "limit", "high");
+  EXPECT_EQ(10000, cluster->info()->maxRequestsPerConnection(high_host));
+
+  // Unmatched endpoint uses cluster default.
+  auto medium_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "limit", "medium");
+  EXPECT_EQ(1000, cluster->info()->maxRequestsPerConnection(medium_host));
+}
+
+// Test that maxRequestsPerConnection(host) uses DEFAULT_MAX_STREAMS when cluster value is 0.
+TEST_F(EpSpecificClusterInfoTest, MaxRequestsDefaultsToDefaultMaxStreamsWhenZero) {
+  auto cluster = makeClusterWithEpSpecificOptions(
+      R"EOF(
+        endpoint_specific_options:
+          - http_protocol_options:
+              max_requests_per_connection: 5000
+            endpoint_metadata_match:
+              filter: envoy.lb
+              path:
+                - key: tier
+              value:
+                string_match:
+                  exact: "premium"
+  )EOF",
+      100, 0);
+
+  // Unmatched host: cluster max_requests_per_connection is 0, so DEFAULT_MAX_STREAMS (1 << 29).
+  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "standard");
+  EXPECT_EQ(1U << 29, cluster->info()->maxRequestsPerConnection(host));
+
+  // Matched host: ep-specific value overrides.
+  auto premium_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "premium");
+  EXPECT_EQ(5000, cluster->info()->maxRequestsPerConnection(premium_host));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -7,7 +7,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/upstreams/http/ep_specific_config.h"
 
 namespace Envoy {
 namespace Http {
@@ -106,10 +105,6 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
                         http_client->codec_client_->protocol());
 }
 
-// All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
-// side we do 2^29.
-constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
-
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
@@ -196,32 +191,13 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
 }
 
 uint32_t
-MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config,
-                                                     Upstream::HostDescriptionConstSharedPtr host) {
-  uint32_t max_requests = (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
-
-  // Check for endpoint-specific max_requests_per_connection
-  const auto ep_specific_protocol_options =
-      host->cluster()
-          .extensionProtocolOptionsTyped<
-              Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-              "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
-
-  if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
-    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
-      // Check if the metadata matcher matches this endpoint's metadata
-      if (ep_option.metadata_matcher.has_value() &&
-          ep_option.metadata_matcher->match(*host->metadata())) {
-        if (ep_option.http_protocol_options.has_value() &&
-            ep_option.http_protocol_options->has_max_requests_per_connection()) {
-          max_requests = ep_option.http_protocol_options->max_requests_per_connection().value();
-        }
-        break;
-      }
-    }
-  }
-
-  return max_requests;
+MultiplexedActiveClientBase::maxStreamsPerConnection(
+    Upstream::HostDescriptionConstSharedPtr host) {
+  // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
+  // side we do 2^29.
+  constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
+  uint32_t max_requests = host->cluster().maxRequestsPerConnection(host);
+  return (max_requests != 0) ? max_requests : DEFAULT_MAX_STREAMS;
 }
 
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(
@@ -229,9 +205,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
     OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
-          parent,
-          maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection(),
-                                  parent.host()),
+          parent, maxStreamsPerConnection(parent.host()),
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
