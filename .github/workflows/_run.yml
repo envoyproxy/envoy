@@ -270,6 +270,7 @@ jobs:
 
     - uses: envoyproxy/toolshed/actions/bson@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Configure Docker
+      if: runner.os == 'Linux'
       with:
         input-format: yaml
         input: |
