@@ -12,6 +12,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -102,9 +103,15 @@ test_program(name = "bootstrap_no_extension_destroy")
 
 test_program(name = "bootstrap_extension_new_null")
 
+test_program(name = "bootstrap_no_drain_started")
+
+test_program(name = "bootstrap_no_shutdown")
+
 test_program(name = "bootstrap_no_config_scheduled")
 
 test_program(name = "bootstrap_no_http_callout_done")
+
+test_program(name = "bootstrap_no_timer_fired")
 
 test_program(name = "access_log_no_op")
 
@@ -143,3 +150,15 @@ test_program(name = "matcher_missing_match")
 test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
+
+test_program(name = "cert_validator_no_op")
+
+test_program(name = "cert_validator_fail")
+
+test_program(name = "cert_validator_config_new_fail")
+
+test_program(name = "cert_validator_no_client_cert")
+
+test_program(name = "cert_validator_not_validated")
+
+test_program(name = "cert_validator_empty_digest")

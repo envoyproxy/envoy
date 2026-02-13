@@ -7,6 +7,7 @@
 pub mod access_log;
 pub mod buffer;
 pub mod matcher;
+pub mod cert_validator;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
@@ -3936,7 +3937,7 @@ macro_rules! declare_network_filter_init_functions {
 /// Declare the init functions for the dynamic module with any combination of filter types.
 ///
 /// This macro allows a single module to provide any combination of HTTP, Network, Listener,
-/// UDP Listener, and Bootstrap filters.
+/// UDP Listener, Bootstrap filters, and Certificate Validators.
 ///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
 /// loaded.
@@ -3949,6 +3950,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
+/// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 ///
 /// # Examples
 ///
@@ -4001,6 +4003,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register bootstrap : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register cert_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -7312,6 +7318,7 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyBootstrapExtensionConfig {
   /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
   ///
@@ -7345,6 +7352,142 @@ pub trait EnvoyBootstrapExtensionConfig {
     abi::envoy_dynamic_module_type_http_callout_init_result,
     u64, // callout id
   );
+
+  /// Signal that the module's initialization is complete. Envoy automatically registers an init
+  /// target for every bootstrap extension, blocking traffic until this is called.
+  ///
+  /// The module must call this exactly once during or after `new_bootstrap_extension_config` to
+  /// unblock Envoy. If the module does not require asynchronous initialization, it should call
+  /// this immediately during config creation.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn signal_init_complete(&self);
+
+  /// Define a new counter scoped to this bootstrap extension config with the given name.
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new counter vec scoped to this bootstrap extension config with the given name.
+  fn define_counter_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge scoped to this bootstrap extension config with the given name.
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec scoped to this bootstrap extension config with the given name.
+  fn define_gauge_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram scoped to this bootstrap extension config with the given name.
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec scoped to this bootstrap extension config with the given name.
+  fn define_histogram_vec<'a>(
+    &mut self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new timer on the main thread dispatcher.
+  ///
+  /// The timer is not armed upon creation. Call [`EnvoyBootstrapExtensionTimer::enable`] to arm it.
+  /// When the timer fires, [`BootstrapExtensionConfig::on_timer_fired`] is called on the main
+  /// thread.
+  ///
+  /// The returned timer handle owns the underlying Envoy timer and will destroy it when dropped.
+  ///
+  /// This must be called on the main thread.
+  fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer>;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -7427,6 +7570,56 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _response_body: Option<&[EnvoyBuffer]>,
   ) {
   }
+
+  /// This is called when a timer created via [`EnvoyBootstrapExtensionConfig::new_timer`] fires.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `timer` is a non-owning reference to the timer that fired. The module can re-arm the timer
+  ///   by calling [`EnvoyBootstrapExtensionTimer::enable`] on it.
+  fn on_timer_fired(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _timer: &dyn EnvoyBootstrapExtensionTimer,
+  ) {
+  }
+}
+
+/// A completion callback that must be invoked exactly once to signal that an asynchronous
+/// operation has finished. Envoy will wait for this callback before proceeding.
+///
+/// The callback is invoked by calling [`CompletionCallback::done`].
+pub struct CompletionCallback {
+  callback: abi::envoy_dynamic_module_type_event_cb,
+  context: *mut std::os::raw::c_void,
+}
+
+// Safety: The completion callback is provided by Envoy and is safe to send across threads.
+unsafe impl Send for CompletionCallback {}
+// Safety: The completion callback function pointer is thread-safe when invoked exactly once.
+unsafe impl Sync for CompletionCallback {}
+
+impl CompletionCallback {
+  /// Signal that the asynchronous operation is complete. This must be called exactly once.
+  pub fn done(self) {
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+    // Prevent Drop from running since we've consumed the callback.
+    std::mem::forget(self);
+  }
+}
+
+impl Drop for CompletionCallback {
+  fn drop(&mut self) {
+    // If the callback is dropped without being called, invoke it to prevent Envoy from hanging.
+    unsafe {
+      if let Some(cb) = self.callback {
+        cb(self.context);
+      }
+    }
+  }
 }
 
 /// BootstrapExtension is the module-side bootstrap extension.
@@ -7447,6 +7640,29 @@ pub trait BootstrapExtension: Send + Sync {
   /// This is called once per worker thread when it starts. You can use this to perform
   /// per-worker-thread initialization like setting up thread-local storage.
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy begins draining.
+  ///
+  /// This is called on the main thread before workers are stopped. The module can still make HTTP
+  /// callouts and use timers during drain. This is the appropriate place to close persistent
+  /// connections, stop background tasks, or de-register from service discovery.
+  fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when Envoy is about to exit.
+  ///
+  /// This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+  /// signal completion by calling [`CompletionCallback::done`] when it has finished cleanup. Envoy
+  /// will wait for the callback before terminating.
+  ///
+  /// If the [`CompletionCallback`] is dropped without calling `done`, it will automatically signal
+  /// completion to prevent Envoy from hanging.
+  fn on_shutdown(
+    &mut self,
+    _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    completion: CompletionCallback,
+  ) {
+    completion.done();
+  }
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -7486,6 +7702,107 @@ impl EnvoyBootstrapExtensionConfigScheduler for EnvoyBootstrapExtensionConfigSch
 impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionConfigScheduler> {
   fn commit(&self, event_id: u64) {
     (**self).commit(event_id);
+  }
+}
+
+/// A timer handle for bootstrap extensions on the main thread event loop.
+///
+/// The timer is created via [`EnvoyBootstrapExtensionConfig::new_timer`] and fires by calling
+/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread.
+///
+/// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
+/// timer when dropped.
+#[automock]
+pub trait EnvoyBootstrapExtensionTimer: Send + Sync {
+  /// Enable the timer with the given delay. If the timer is already enabled, it is reset.
+  fn enable(&self, delay: std::time::Duration);
+
+  /// Disable the timer without destroying it. The timer can be re-enabled later.
+  fn disable(&self);
+
+  /// Check whether the timer is currently armed.
+  fn enabled(&self) -> bool;
+}
+
+/// Owning implementation of [`EnvoyBootstrapExtensionTimer`]. Calls `timer_delete` on drop.
+struct EnvoyBootstrapExtensionTimerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+}
+
+unsafe impl Send for EnvoyBootstrapExtensionTimerImpl {}
+unsafe impl Sync for EnvoyBootstrapExtensionTimerImpl {}
+
+impl Drop for EnvoyBootstrapExtensionTimerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_timer_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerImpl {
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(self.raw_ptr) }
+  }
+}
+
+/// Non-owning reference to a timer, used in the [`BootstrapExtensionConfig::on_timer_fired`]
+/// callback. Does NOT call `timer_delete` on drop.
+struct EnvoyBootstrapExtensionTimerRef {
+  raw_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+}
+
+// SAFETY: The raw pointer is only used on the main thread, matching Envoy's threading model.
+unsafe impl Send for EnvoyBootstrapExtensionTimerRef {}
+unsafe impl Sync for EnvoyBootstrapExtensionTimerRef {}
+
+impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerRef {
+  fn enable(&self, delay: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+        self.raw_ptr,
+        delay.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(self.raw_ptr) }
+  }
+}
+
+impl EnvoyBootstrapExtensionTimer for Box<dyn EnvoyBootstrapExtensionTimer> {
+  fn enable(&self, delay: std::time::Duration) {
+    (**self).enable(delay);
+  }
+
+  fn disable(&self) {
+    (**self).disable();
+  }
+
+  fn enabled(&self) -> bool {
+    (**self).enabled()
   }
 }
 
@@ -7551,6 +7868,355 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     };
 
     (result, callout_id)
+  }
+
+  fn signal_init_complete(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(self.raw);
+    }
+  }
+
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterId(id))
+  }
+
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeId(id))
+  }
+
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+        self.raw,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer> {
+    unsafe {
+      let timer_ptr = abi::envoy_dynamic_module_callback_bootstrap_extension_timer_new(self.raw);
+      Box::new(EnvoyBootstrapExtensionTimerImpl { raw_ptr: timer_ptr })
+    }
   }
 }
 
@@ -7785,6 +8451,32 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_init
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  extension.on_drain_started(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+  completion_callback: abi::envoy_dynamic_module_type_event_cb,
+  completion_context: *mut std::os::raw::c_void,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  let completion = CompletionCallback {
+    callback: completion_callback,
+    context: completion_context,
+  };
+  extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
@@ -7844,6 +8536,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callou
     result,
     headers,
     body,
+  );
+}
+
+/// Event hook called by Envoy when a timer created by a bootstrap extension fires.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  // Create a non-owning reference to the timer so the module can re-enable it.
+  let timer_ref = EnvoyBootstrapExtensionTimerRef { raw_ptr: timer_ptr };
+
+  extension_config.on_timer_fired(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    &timer_ref,
   );
 }
 
@@ -8339,6 +9050,177 @@ macro_rules! declare_load_balancer_init_functions {
         .get_or_init(|| $new_lb_config_fn);
       if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =============================================================================
+// Certificate Validator
+// =============================================================================
+
+use cert_validator::CertValidatorConfig;
+
+/// The function signature for creating a new cert validator configuration.
+pub type NewCertValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn cert_validator::CertValidatorConfig>>;
+
+/// Global function for creating cert validator configurations.
+pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFunction> =
+  OnceLock::new();
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let new_config_fn = NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  certs_count: usize,
+  host_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  is_server: bool,
+) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+
+  let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
+  let cert_slices: Vec<&[u8]> = cert_buffers
+    .iter()
+    .map(|buf| std::slice::from_raw_parts(buf.ptr as *const u8, buf.length))
+    .collect();
+
+  let host_name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    host_name.ptr as *const _,
+    host_name.length,
+  ));
+
+  let result = config.do_verify_cert_chain(&cert_slices, host_name_str, is_server);
+
+  // If the module provided error details, pass them to Envoy via the callback.
+  // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
+  if let Some(ref error) = result.error_details {
+    let error_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: error.as_ptr() as *const _,
+      length: error.len(),
+    };
+    abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
+      config_envoy_ptr,
+      error_buf,
+    );
+  }
+
+  abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  handshaker_provides_certificates: bool,
+) -> std::os::raw::c_int {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+  config.get_ssl_verify_mode(handshaker_provides_certificates)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  out_data: *mut abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn cert_validator::CertValidatorConfig;
+    &**raw
+  };
+  let digest = config.update_digest();
+  (*out_data).ptr = digest.as_ptr() as *const _;
+  (*out_data).length = digest.len();
+}
+
+/// Declare the init functions for a cert validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the cert validator module.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_cert_validator_config(
+///   name: &str,
+///   config: &[u8],
+/// ) -> Option<Box<dyn CertValidatorConfig>> {
+///   Some(Box::new(MyCertValidatorConfig {}))
+/// }
+///
+/// declare_cert_validator_init_functions!(program_init, new_cert_validator_config);
+///
+/// struct MyCertValidatorConfig {}
+///
+/// impl CertValidatorConfig for MyCertValidatorConfig {
+///   fn do_verify_cert_chain(
+///     &self,
+///     certs: &[&[u8]],
+///     host_name: &str,
+///     is_server: bool,
+///   ) -> ValidationResult {
+///     ValidationResult::successful()
+///   }
+///
+///   fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+///     0x03
+///   }
+///
+///   fn update_digest(&self) -> &[u8] {
+///     b"my_cert_validator"
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_cert_validator_init_functions {
+  ($f:ident, $new_cert_validator_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+        .get_or_init(|| $new_cert_validator_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()

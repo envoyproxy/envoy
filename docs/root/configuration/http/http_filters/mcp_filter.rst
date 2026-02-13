@@ -79,7 +79,7 @@ The RBAC filter is then configured with a per-route policy to match against the 
 Integration with External Authorization
 ---------------------------------------
 
-The MCP filter can also function alongside the ``ext_authz`` filter. By default, the MCP filter exports metadata under the ``mcp_proxy`` namespace. An external authorization service can evaluate this metadata to approve or deny requests.
+The MCP filter can also function alongside the ``ext_authz`` filter. By default, the MCP filter exports metadata under the ``envoy.filters.http.mcp`` namespace. An external authorization service can evaluate this metadata to approve or deny requests.
 
 .. literalinclude:: _include/mcp-filter.yaml
     :language: yaml

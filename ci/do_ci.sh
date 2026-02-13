@@ -774,6 +774,10 @@ case $CI_TARGET in
                 -- "${TEST_TARGETS[@]}"
         ;;
 
+    openssl)
+        echo "Nothing to do right now, this is a placeholder for any OpenSSL-specific build or test steps that may be needed in the future."
+        ;;
+
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
