@@ -291,6 +291,10 @@ new_features:
 - area: dynamic_modules
   change: |
     Added timer API to the bootstrap extension dynamic modules ABI.
+- area: dynamic_modules
+  change: |
+    Added admin handler API to the bootstrap extension dynamic modules ABI, enabling modules to
+    register custom admin HTTP endpoints.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.

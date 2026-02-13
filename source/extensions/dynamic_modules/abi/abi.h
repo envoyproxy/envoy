@@ -6399,6 +6399,89 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
 
+// -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request is called when an admin endpoint
+ * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
+ * requested.
+ *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param method is the HTTP method of the request (e.g. "GET", "POST").
+ * @param path is the full path and query string of the request.
+ * @param body is the request body. May be empty.
+ * @return the HTTP status code to send back to the client. This corresponds to the numeric
+ * value of the HTTP status code (e.g. 200, 404, 500).
+ */
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
+ * module to register a custom admin HTTP endpoint. When the endpoint is requested, the
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request event hook will be invoked.
+ *
+ * This must be called on the main thread (e.g. during on_server_initialized or from a
+ * scheduled event on the main thread).
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix to handle (e.g. "/admin/my_module/status").
+ * @param help_text is the help text for the handler displayed in the admin console.
+ * @param removable if true, allows the handler to be removed later via
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler.
+ * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
+ * endpoints).
+ * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
+ * not available or the prefix is already taken).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler is called by the
+ * module to remove a previously registered admin HTTP endpoint.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix of the handler to remove.
+ * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
+ * was not found or is not removable).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix);
+
 // =============================================================================
 // =============================== Load Balancer ===============================
 // =============================================================================

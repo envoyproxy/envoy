@@ -109,6 +109,31 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_timer_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
+// and respond to admin requests.
+TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Admin handler registered: true",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_admin_handler_test"));
+
+  // Make an admin request to the registered endpoint.
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/dynamic_module_admin_test",
+                                         "", Http::CodecType::HTTP1, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("Hello from dynamic module admin handler!"));
+
+  // Verify the admin request was logged.
+  EXPECT_LOG_CONTAINS("info", "Admin request received: GET", {
+    response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                  "/dynamic_module_admin_test?foo=bar", "",
+                                                  Http::CodecType::HTTP1, version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  });
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions
