@@ -53,7 +53,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2025-11-25"
+  release_date: "2026-02-11"
   use_category:
   - controlplane
   - dataplane_core
@@ -549,7 +549,7 @@ abseil_cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
-  release_date: "2026-01-07"
+  release_date: "2026-02-11"
   use_category:
   - dataplane_core
   - controlplane
@@ -627,7 +627,7 @@ com_google_protobuf:
   project_name: "Protocol Buffers"
   project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - dataplane_core
   - controlplane
@@ -646,7 +646,7 @@ com_google_protobuf_protoc_linux_aarch_64:
   project_name: "Protocol Buffers (protoc) linux_aarch_64"
   project_desc: "Protoc compiler for protobuf (linux_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
@@ -654,7 +654,7 @@ com_google_protobuf_protoc_linux_ppcle_64:
   project_name: "Protocol Buffers (protoc) linux_ppcle_64"
   project_desc: "Protoc compiler for protobuf (linux_ppcle_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
@@ -662,7 +662,7 @@ com_google_protobuf_protoc_linux_x86_64:
   project_name: "Protocol Buffers (protoc) linux_x86_64"
   project_desc: "Protoc compiler for protobuf (linux_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
@@ -670,7 +670,7 @@ com_google_protobuf_protoc_osx_aarch_64:
   project_name: "Protocol Buffers (protoc) osx_aarch_64"
   project_desc: "Protoc compiler for protobuf (osx_aarch_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
@@ -678,7 +678,7 @@ com_google_protobuf_protoc_osx_x86_64:
   project_name: "Protocol Buffers (protoc) osx_x86_64"
   project_desc: "Protoc compiler for protobuf (osx_x86_64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
@@ -686,7 +686,7 @@ com_google_protobuf_protoc_win64:
   project_name: "Protocol Buffers (protoc) win64"
   project_desc: "Protoc compiler for protobuf (win64)"
   project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2025-12-05"
+  release_date: "2026-01-29"
   use_category:
   - build
 
