@@ -134,6 +134,10 @@ new_features:
     Added :ref:`TLS certificate validator
     <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
     support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added filter state read/write support for dynamic module cert validators, allowing modules to set and
+    get string values in the connection's filter state during certificate chain verification.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.

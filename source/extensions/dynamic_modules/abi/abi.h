@@ -6956,6 +6956,37 @@ void envoy_dynamic_module_callback_cert_validator_set_error_details(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer error_details);
 
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_filter_state is called by the module to
+ * set a string value in filter state with Connection life span. This must only be called from
+ * within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
+ * @return true if the operation was successful, false otherwise (e.g. no connection context
+ * available or the key already exists and is read-only).
+ */
+bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_get_filter_state is called by the module to
+ * get a string value from filter state. This must only be called from within the
+ * do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
 #ifdef __cplusplus
 }
 #endif
