@@ -1586,6 +1586,115 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, FilterDestructionCancelsPendin
 }
 
 // =============================================================================
+// Tests for cluster host count.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountClusterNotFound) {
+  std::string cluster_name = "nonexistent_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountInvalidPriority) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  // Priority 99 should exceed available priorities.
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 99, &total, &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountSuccess) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  // Set up hosts in the mock host set.
+  auto* mock_host_set = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(5);
+  mock_host_set->healthy_hosts_.resize(3);
+  mock_host_set->degraded_hosts_.resize(1);
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 3);
+  EXPECT_EQ(degraded, 1);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountNullOutputParams) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+
+  auto* mock_host_set = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(10);
+  mock_host_set->healthy_hosts_.resize(8);
+  mock_host_set->degraded_hosts_.resize(2);
+
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+
+  // Call with nullptr for some output params - should still succeed.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, nullptr, nullptr, nullptr));
+
+  // Call with only total.
+  size_t total = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, nullptr, nullptr));
+  EXPECT_EQ(total, 10);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountDifferentPriority) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+
+  // Set up priority 0 with 5 hosts.
+  auto* mock_host_set_0 = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set_0->hosts_.resize(5);
+  mock_host_set_0->healthy_hosts_.resize(5);
+  mock_host_set_0->degraded_hosts_.resize(0);
+
+  // Set up priority 1 with 3 hosts.
+  auto* mock_host_set_1 = thread_local_cluster.cluster_.priority_set_.getMockHostSet(1);
+  mock_host_set_1->hosts_.resize(3);
+  mock_host_set_1->healthy_hosts_.resize(2);
+  mock_host_set_1->degraded_hosts_.resize(1);
+
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+
+  // Check priority 0.
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 5);
+  EXPECT_EQ(degraded, 0);
+
+  // Check priority 1.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 1, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 3);
+  EXPECT_EQ(healthy, 2);
+  EXPECT_EQ(degraded, 1);
+}
+
+// =============================================================================
 // Tests for upstream host access.
 // =============================================================================
 

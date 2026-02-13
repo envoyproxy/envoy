@@ -4189,10 +4189,12 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
 pub trait EnvoyNetworkFilter {
-  /// Get the read buffer chunks. This is only valid during the on_read callback.
+  /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
+  /// of the connection.
   fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
-  /// Get the write buffer chunks. This is only valid during the on_write callback.
+  /// Get the write buffer chunks. This is valid after the first on_write callback for the lifetime
+  /// of the connection.
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
   /// Drain bytes from the beginning of the read buffer.
@@ -4394,6 +4396,12 @@ pub trait EnvoyNetworkFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Retrieve the host counts for a cluster by name at the given priority level.
+  /// Returns None if the cluster is not found or the priority level does not exist.
+  ///
+  /// This is useful for implementing scale-to-zero logic or custom load balancing decisions.
+  fn get_cluster_host_count(&self, cluster_name: &str, priority: u32) -> Option<ClusterHostCount>;
 
   /// Get the upstream host address and port if an upstream host is selected.
   /// Returns None if no upstream host is set or the address is not an IP.
@@ -5421,6 +5429,31 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       Ok(())
     } else {
       Err(res)
+    }
+  }
+
+  fn get_cluster_host_count(&self, cluster_name: &str, priority: u32) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
     }
   }
 
