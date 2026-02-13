@@ -2877,8 +2877,8 @@ void envoy_dynamic_module_callback_network_get_socket_options(
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size is called by the module
  * to get the number of chunks in the current read data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks, this can be used to iterate
- * over all chunks in the read buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * over all chunks in the read buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the read buffer. 0 if the buffer is not available or empty.
@@ -2888,8 +2888,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_size is called by the module to
- * get the total size of the current read data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the total size of the current read data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the read buffer. 0 if the buffer is not available or empty.
  */
@@ -2898,8 +2899,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks is called by the module to
- * get the current read data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the current read data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -2920,8 +2921,8 @@ bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size is called by the module
  * to get the number of chunks in the current write data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks, this can be used to iterate
- * over all chunks in the write buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * over all chunks in the write buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the write buffer. 0 if the buffer is not available or empty.
@@ -2931,8 +2932,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_size is called by the module to
- * get the total size of the current write data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the total size of the current write data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the write buffer. 0 if the buffer is not available or empty.
  */
@@ -2941,8 +2943,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks is called by the module to
- * get the current write data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the current write data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -3474,6 +3476,27 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
 // ---------------------- Upstream Host Access Callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_cluster_host_count retrieves the host counts for
+ * a cluster by name. This provides visibility into the cluster's health state and can be used to
+ * implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * found).
+ */
+bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_upstream_host_address is called by the module

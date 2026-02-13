@@ -277,6 +277,12 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
+    modules to access buffered data from ``on_scheduled`` and other callbacks. Added
+    ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts
+    by name, enabling scale-to-zero and custom load balancing decisions in network filters.
+- area: dynamic_modules
+  change: |
     Added metrics definition and update support for bootstrap dynamic modules.
 - area: dynamic_modules
   change: |
