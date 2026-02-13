@@ -993,6 +993,93 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
 }
 
 // =============================================================================
+// Cluster Host Count FFI stubs and tests.
+// =============================================================================
+
+struct MockClusterHostCount {
+  total: usize,
+  healthy: usize,
+  degraded: usize,
+}
+
+static MOCK_CLUSTER_HOST_COUNT: std::sync::Mutex<Option<MockClusterHostCount>> =
+  std::sync::Mutex::new(None);
+
+fn reset_cluster_host_count_mock() {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = None;
+}
+
+fn set_cluster_host_count_mock(count: MockClusterHostCount) {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = Some(count);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  let guard = MOCK_CLUSTER_HOST_COUNT.lock().unwrap();
+  match &*guard {
+    Some(count) => {
+      if !total_count.is_null() {
+        unsafe {
+          *total_count = count.total;
+        }
+      }
+      if !healthy_count.is_null() {
+        unsafe {
+          *healthy_count = count.healthy;
+        }
+      }
+      if !degraded_count.is_null() {
+        unsafe {
+          *degraded_count = count.degraded;
+        }
+      }
+      true
+    },
+    None => false,
+  }
+}
+
+#[test]
+fn test_get_cluster_host_count_success() {
+  reset_cluster_host_count_mock();
+  set_cluster_host_count_mock(MockClusterHostCount {
+    total: 10,
+    healthy: 8,
+    degraded: 1,
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("test_cluster", 0);
+  assert!(result.is_some());
+  let count = result.unwrap();
+  assert_eq!(count.total, 10);
+  assert_eq!(count.healthy, 8);
+  assert_eq!(count.degraded, 1);
+}
+
+#[test]
+fn test_get_cluster_host_count_not_found() {
+  reset_cluster_host_count_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("nonexistent_cluster", 0);
+  assert!(result.is_none());
+}
+
+// =============================================================================
 // Upstream Host Access and StartTLS FFI stubs for testing.
 // =============================================================================
 
@@ -1941,6 +2028,49 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+// Thread-local used by the test mock to capture the response body set via the callback.
+thread_local! {
+  static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
+    const { std::cell::RefCell::new(String::new()) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  response_body: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  if !response_body.ptr.is_null() && response_body.length > 0 {
+    let s = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        response_body.ptr as *const u8,
+        response_body.length,
+      ))
+    };
+    TEST_ADMIN_RESPONSE.with(|cell| {
+      *cell.borrow_mut() = s.to_string();
+    });
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+  _help_text: abi::envoy_dynamic_module_type_module_buffer,
+  _removable: bool,
+  _mutates_server_state: bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -2145,4 +2275,161 @@ fn test_bootstrap_extension_shutdown_default_calls_completion() {
   assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 
   envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_admin_request(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      method: &str,
+      path: &str,
+      _body: &[u8],
+    ) -> (u32, String) {
+      (200, format!("method={} path={}", method, path))
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test_admin?key=val";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 200);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert_eq!(*cell.borrow(), "method=GET path=/test_admin?key=val");
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request_default() {
+  // Verify that the default on_admin_request returns 404 with empty body.
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 404);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert!(cell.borrow().is_empty());
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
 }

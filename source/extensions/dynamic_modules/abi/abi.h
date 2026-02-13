@@ -2877,8 +2877,8 @@ void envoy_dynamic_module_callback_network_get_socket_options(
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size is called by the module
  * to get the number of chunks in the current read data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks, this can be used to iterate
- * over all chunks in the read buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * over all chunks in the read buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the read buffer. 0 if the buffer is not available or empty.
@@ -2888,8 +2888,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_size is called by the module to
- * get the total size of the current read data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the total size of the current read data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the read buffer. 0 if the buffer is not available or empty.
  */
@@ -2898,8 +2899,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks is called by the module to
- * get the current read data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the current read data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -2920,8 +2921,8 @@ bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size is called by the module
  * to get the number of chunks in the current write data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks, this can be used to iterate
- * over all chunks in the write buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * over all chunks in the write buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the write buffer. 0 if the buffer is not available or empty.
@@ -2931,8 +2932,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_size is called by the module to
- * get the total size of the current write data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the total size of the current write data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the write buffer. 0 if the buffer is not available or empty.
  */
@@ -2941,8 +2943,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks is called by the module to
- * get the current write data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the current write data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -3474,6 +3476,27 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
 // ---------------------- Upstream Host Access Callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_cluster_host_count retrieves the host counts for
+ * a cluster by name. This provides visibility into the cluster's health state and can be used to
+ * implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * found).
+ */
+bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_upstream_host_address is called by the module
@@ -6375,6 +6398,89 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
  */
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request is called when an admin endpoint
+ * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
+ * requested.
+ *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param method is the HTTP method of the request (e.g. "GET", "POST").
+ * @param path is the full path and query string of the request.
+ * @param body is the request body. May be empty.
+ * @return the HTTP status code to send back to the client. This corresponds to the numeric
+ * value of the HTTP status code (e.g. 200, 404, 500).
+ */
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
+ * module to register a custom admin HTTP endpoint. When the endpoint is requested, the
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request event hook will be invoked.
+ *
+ * This must be called on the main thread (e.g. during on_server_initialized or from a
+ * scheduled event on the main thread).
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix to handle (e.g. "/admin/my_module/status").
+ * @param help_text is the help text for the handler displayed in the admin console.
+ * @param removable if true, allows the handler to be removed later via
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler.
+ * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
+ * endpoints).
+ * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
+ * not available or the prefix is already taken).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler is called by the
+ * module to remove a previously registered admin HTTP endpoint.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix of the handler to remove.
+ * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
+ * was not found or is not removable).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix);
 
 // =============================================================================
 // =============================== Load Balancer ===============================

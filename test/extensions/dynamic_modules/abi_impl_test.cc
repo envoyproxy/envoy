@@ -152,6 +152,43 @@ TEST(CommonAbiImplTest, TimerDeleteEnvoyBug) {
 }
 
 // =====================================================================
+// Bootstrap extension admin handler weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for register_admin_handler triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, RegisterAdminHandlerEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
+  envoy_dynamic_module_type_module_buffer help = {"help", 4};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+            nullptr, path, help, true, false);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for remove_admin_handler triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, RemoveAdminHandlerEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result =
+            envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(nullptr, path);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for admin_set_response triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, AdminSetResponseEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer body = {"response", 8};
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr, body); },
+      "not implemented in this context");
+}
+
+// =====================================================================
 // Bootstrap extension stats definition and update weak symbol stub tests
 // =====================================================================
 
