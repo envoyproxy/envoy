@@ -65,13 +65,22 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
   EXPECT_LOG_CONTAINS("info", "Bootstrap extension shutdown from Rust!", { test_server_.reset(); });
 }
 
-// This test verifies that the Rust bootstrap extension can access stats from the stats store.
+// This test verifies that the Rust bootstrap extension can access stats from the stats store
+// and define/update its own metrics (counters, gauges, histograms).
 TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
   EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages({{"info", "Correctly returned None for non-existent counter"},
-                                  {"info", "Correctly returned None for non-existent gauge"},
-                                  {"info", "Correctly returned None for non-existent histogram"},
-                                  {"info", "Bootstrap stats access test completed successfully!"}}),
+      Envoy::ExpectedLogMessages(
+          {{"info", "Counter incremented to expected value of 5"},
+           {"info", "Gauge set to expected value of 80"},
+           {"info", "Histogram values recorded successfully"},
+           {"info", "Counter vec incremented successfully"},
+           {"info", "Gauge vec manipulated successfully"},
+           {"info", "Histogram vec recorded successfully"},
+           {"info", "Bootstrap metrics definition and update test completed successfully!"},
+           {"info", "Correctly returned None for non-existent counter"},
+           {"info", "Correctly returned None for non-existent gauge"},
+           {"info", "Correctly returned None for non-existent histogram"},
+           {"info", "Bootstrap stats access test completed successfully!"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
 }
 

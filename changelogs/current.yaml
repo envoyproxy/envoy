@@ -130,12 +130,6 @@ new_features:
     Added :ref:`TLS certificate validator
     <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
     support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
-- area: ext_authz
-  change: |
-    Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
-    request header mutations. Previously, only the deprecated ``append`` boolean was checked. Now
-    ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD``
-    actions are fully supported, providing parity with ``response_headers_to_add`` handling.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
@@ -245,6 +239,16 @@ new_features:
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
     and ``retry``, in addition to the existing ``data`` field. The ``retry`` field is parsed as a ``uint32_t``
     and only accepts values consisting of ASCII digits per the SSE specification.
+- area: http
+  change: |
+    Added :ref:`envoy.filters.http.sse_to_metadata <config_http_filters_sse_to_metadata>` filter for extracting
+    values from Server-Sent Events (SSE) streams and writing them to dynamic metadata. Useful for capturing
+    token usage metrics from LLM API responses. Supports pluggable content parsers for different SSE data formats.
+- area: content_parsers
+  change: |
+    Added :ref:`envoy.content_parsers.json <extension_envoy.content_parsers.json>` content parser for extracting
+    values from JSON content using JSON path selectors. Can be used by filters that need to parse structured
+    JSON data and extract specific fields into metadata.
 - area: resource_monitors
   change: |
     Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
@@ -271,6 +275,9 @@ new_features:
     functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
     can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
     cross-module interactions analogous to ``dlsym``.
+- area: dynamic_modules
+  change: |
+    Added metrics definition and update support for bootstrap dynamic modules.
 - area: dynamic_modules
   change: |
     Added timer API to the bootstrap extension dynamic modules ABI.
