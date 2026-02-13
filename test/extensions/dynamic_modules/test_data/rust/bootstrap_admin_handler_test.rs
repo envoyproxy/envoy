@@ -27,6 +27,9 @@ fn my_new_bootstrap_extension_config_fn(
   envoy_log_info!("Admin handler registered: {}", registered);
   assert!(registered, "Admin handler registration should succeed");
 
+  // Signal init complete so Envoy can start accepting traffic.
+  envoy_extension_config.signal_init_complete();
+
   Some(Box::new(AdminHandlerTestBootstrapExtensionConfig {}))
 }
 
