@@ -52,7 +52,7 @@ check_legacy_dep_names () {
     local legacy="$1"
     local new="$2"
     local matches
-    matches=$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh')
+    matches=$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' || '')
     if [[ -n "$matches" ]]; then
         echo "ERROR: Found references to '$legacy' that should use '@${new}' instead:"
         echo ""
