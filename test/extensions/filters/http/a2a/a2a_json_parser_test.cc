@@ -409,7 +409,7 @@ TEST_F(A2aJsonParserTest, ParseMessageSend) {
             "text/plain");
 }
 
-TEST_F(A2aJsonParserTest, ParseMessageSendChunks) {
+TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
   const std::string part1 = R"({
     "jsonrpc": "2.0",
     "method": "message/send",
@@ -439,23 +439,27 @@ TEST_F(A2aJsonParserTest, ParseMessageSendChunks) {
 
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
+  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
+  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
 
-  // Verify some fields to ensure partial parsing worked
   EXPECT_EQ(
       parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
       "task-abc-987");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("taskId")
-                .string_value(),
-            "task1");
+
+  const auto& message =
+      parser_.metadata().fields().at("params").struct_value().fields().at("message").struct_value();
+  EXPECT_EQ(message.fields().at("taskId").string_value(), "task1");
+  EXPECT_EQ(message.fields().at("contextId").string_value(), "context1");
+  EXPECT_EQ(message.fields().at("messageId").string_value(), "msg1");
+  EXPECT_EQ(message.fields().at("role").string_value(), "user");
+
+  EXPECT_TRUE(message.fields().at("parts").has_list_value());
+  EXPECT_EQ(message.fields().at("parts").list_value().values_size(), 1);
+  const auto& part0 = message.fields().at("parts").list_value().values(0).struct_value();
+  EXPECT_EQ(part0.fields().at("type").string_value(), "text");
+  EXPECT_EQ(part0.fields().at("text").string_value(),
+            "Can you analyze the attached CSV for Q3 sales trends?");
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksGet) {

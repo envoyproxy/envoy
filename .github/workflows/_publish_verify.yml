@@ -112,10 +112,25 @@ jobs:
           source: |
             export NO_BUILD_SETUP=1
           steps-pre: |
-            - run: |
-                IMAGES=(
-                    envoy-contrib-distroless:contrib-distroless-dev
-                    envoy-distroless:distroless-dev)
+            - id: version-support
+              uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+              with:
+                input: |
+                  version_major: ${{ fromJSON(inputs.request).request.version.major }}
+                  version_minor: ${{ fromJSON(inputs.request).request.version.minor }}
+                input-format: yaml
+                filter: |
+                  .
+                  | {contrib_distroless: (
+                       .version_major > 1 or (.version_major == 1 and .version_minor >= 37))}
+            - env:
+                CONTRIB_DISTROLESS: %{{ fromJSON(steps.version-support.outputs.value).contrib_distroless }}
+              run: |
+                IMAGES=()
+                IMAGES+=(envoy-distroless:distroless-dev)
+                if [[ "$CONTRIB_DISTROLESS" == "true" ]]; then
+                    IMAGES+=(envoy-contrib-distroless:contrib-distroless-dev)
+                fi
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
                     dest_name="$(echo ${image} | cut -d: -f2)"
