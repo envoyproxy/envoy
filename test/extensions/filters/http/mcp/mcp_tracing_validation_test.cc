@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/mcp/mcp_tracing_validation.h"
 
 #include "absl/strings/str_cat.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -46,13 +45,13 @@ TEST(McpTracingValidationTest, TraceParentValidation) {
 
   // Invalid hex
   EXPECT_FALSE(McpTracingValidation::isValidTraceParent(
-      "gg-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));  // version
+      "gg-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")); // version
   EXPECT_FALSE(McpTracingValidation::isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01"));  // traceid
+      "00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01")); // traceid
   EXPECT_FALSE(McpTracingValidation::isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902bg-01"));  // parentid
+      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902bg-01")); // parentid
   EXPECT_FALSE(McpTracingValidation::isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-0g"));  // flags
+      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-0g")); // flags
 
   // All zeros
   EXPECT_FALSE(McpTracingValidation::isValidTraceParent(
@@ -80,8 +79,8 @@ TEST(McpTracingValidationTest, TraceStateValidation) {
   EXPECT_FALSE(McpTracingValidation::isValidTraceState(std::string(1025, 'a')));
   // Multi-tenant keys
   EXPECT_TRUE(McpTracingValidation::isValidTraceState("tenant@system=val"));
-  EXPECT_FALSE(McpTracingValidation::isValidTraceState("@system=val"));  // empty tenant
-  EXPECT_FALSE(McpTracingValidation::isValidTraceState("tenant@=val"));  // empty system
+  EXPECT_FALSE(McpTracingValidation::isValidTraceState("@system=val")); // empty tenant
+  EXPECT_FALSE(McpTracingValidation::isValidTraceState("tenant@=val")); // empty system
   // multi-tenant system must be lower
   EXPECT_FALSE(McpTracingValidation::isValidTraceState("tenant@UPPER=val"));
   // multi-tenant and system may start or even consist wholly of digits
@@ -93,8 +92,8 @@ TEST(McpTracingValidationTest, TraceStateValidation) {
   EXPECT_TRUE(McpTracingValidation::isValidTraceState("a_-*/=val"));
 
   // isValidTraceStateKey niche cases
-  EXPECT_TRUE(McpTracingValidation::isValidTraceState("key/with/slash=val"));  // covers slash char
-  EXPECT_TRUE(McpTracingValidation::isValidTraceState("0key=val"));  // digits allowed at start
+  EXPECT_TRUE(McpTracingValidation::isValidTraceState("key/with/slash=val")); // covers slash char
+  EXPECT_TRUE(McpTracingValidation::isValidTraceState("0key=val")); // digits allowed at start
   // invalid start char (uppercase)
   EXPECT_FALSE(McpTracingValidation::isValidTraceState("Key=val"));
 

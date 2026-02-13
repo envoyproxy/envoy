@@ -126,7 +126,8 @@ bool McpTracingValidation::isValidTraceParent(absl::string_view trace_parent) {
     return false;
   }
 
-  if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) || !isValidHex(flags)) {
+  if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) ||
+      !isValidHex(flags)) {
     return false;
   }
 
@@ -165,7 +166,7 @@ bool McpTracingValidation::isValidTraceState(absl::string_view trace_state) {
       return false;
     }
     if (!keys.insert(key).second) {
-      return false;  // Duplicate key
+      return false; // Duplicate key
     }
   }
 
@@ -184,7 +185,7 @@ bool McpTracingValidation::isValidBaggage(absl::string_view baggage) {
   for (absl::string_view member : members) {
     absl::string_view trimmed_member = absl::StripAsciiWhitespace(member);
     if (trimmed_member.empty()) {
-      return false;  // Baggage doesn't allow empty members
+      return false; // Baggage doesn't allow empty members
     }
     std::vector<absl::string_view> parts = absl::StrSplit(trimmed_member, absl::MaxSplits(';', 1));
     std::vector<absl::string_view> kv = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
