@@ -496,6 +496,15 @@ void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
 
 // -------------------- Admin Handler Callbacks --------------------
 
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  if (response_body.ptr != nullptr && response_body.length > 0) {
+    config->admin_response_body_.assign(response_body.ptr, response_body.length);
+  }
+}
+
 bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix,
@@ -533,15 +542,15 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
         envoy_dynamic_module_type_envoy_buffer path_buf{path_str.data(), path_str.size()};
         envoy_dynamic_module_type_envoy_buffer body_buf{body_str.data(), body_str.size()};
 
-        envoy_dynamic_module_type_module_buffer response_body{nullptr, 0};
-        uint32_t response_body_length = 0;
+        // Clear any previous response body before calling the event hook.
+        config_shared->admin_response_body_.clear();
 
         uint32_t status_code = config_shared->on_bootstrap_extension_admin_request_(
             config_shared->thisAsVoidPtr(), config_shared->in_module_config_, method_buf, path_buf,
-            body_buf, &response_body, &response_body_length);
+            body_buf);
 
-        if (response_body.ptr != nullptr && response_body_length > 0) {
-          response.add(absl::string_view(response_body.ptr, response_body_length));
+        if (!config_shared->admin_response_body_.empty()) {
+          response.add(config_shared->admin_response_body_);
         }
 
         // Set content-type to text/plain by default.

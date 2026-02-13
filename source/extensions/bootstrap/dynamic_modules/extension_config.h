@@ -321,6 +321,11 @@ public:
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
 
+  // Temporary storage for the admin response body. Set by the
+  // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
+  // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
+  std::string admin_response_body_;
+
 private:
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

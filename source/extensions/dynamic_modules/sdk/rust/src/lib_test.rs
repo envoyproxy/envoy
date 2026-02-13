@@ -2028,6 +2028,30 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+// Thread-local used by the test mock to capture the response body set via the callback.
+thread_local! {
+  static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
+    const { std::cell::RefCell::new(String::new()) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  response_body: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  if !response_body.ptr.is_null() && response_body.length > 0 {
+    let s = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        response_body.ptr as *const u8,
+        response_body.length,
+      ))
+    };
+    TEST_ADMIN_RESPONSE.with(|cell| {
+      *cell.borrow_mut() = s.to_string();
+    });
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
@@ -2312,11 +2336,8 @@ fn test_bootstrap_extension_admin_request() {
     length: body.len(),
   };
 
-  let mut response_body = abi::envoy_dynamic_module_type_module_buffer {
-    ptr: std::ptr::null_mut(),
-    length: 0,
-  };
-  let mut response_body_length: u32 = 0;
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
 
   let status = unsafe {
     envoy_dynamic_module_on_bootstrap_extension_admin_request(
@@ -2325,20 +2346,13 @@ fn test_bootstrap_extension_admin_request() {
       method_buf,
       path_buf,
       body_buf,
-      &mut response_body,
-      &mut response_body_length,
     )
   };
 
   assert_eq!(status, 200);
-  assert!(response_body_length > 0);
-  let response_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      response_body.ptr as *const u8,
-      response_body_length as usize,
-    ))
-  };
-  assert_eq!(response_str, "method=GET path=/test_admin?key=val");
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert_eq!(*cell.borrow(), "method=GET path=/test_admin?key=val");
+  });
 
   // Clean up.
   unsafe {
@@ -2396,11 +2410,8 @@ fn test_bootstrap_extension_admin_request_default() {
     length: body.len(),
   };
 
-  let mut response_body = abi::envoy_dynamic_module_type_module_buffer {
-    ptr: std::ptr::null_mut(),
-    length: 0,
-  };
-  let mut response_body_length: u32 = 0;
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
 
   let status = unsafe {
     envoy_dynamic_module_on_bootstrap_extension_admin_request(
@@ -2409,13 +2420,13 @@ fn test_bootstrap_extension_admin_request_default() {
       method_buf,
       path_buf,
       body_buf,
-      &mut response_body,
-      &mut response_body_length,
     )
   };
 
   assert_eq!(status, 404);
-  assert_eq!(response_body_length, 0);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert!(cell.borrow().is_empty());
+  });
 
   // Clean up.
   unsafe {

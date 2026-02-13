@@ -180,6 +180,14 @@ TEST(CommonAbiImplTest, RemoveAdminHandlerEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for admin_set_response triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, AdminSetResponseEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer body = {"response", 8};
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr, body); },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Bootstrap extension stats definition and update weak symbol stub tests
 // =====================================================================

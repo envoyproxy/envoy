@@ -8666,13 +8666,6 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
   );
 }
 
-// Thread-local storage for the admin request response body. This keeps the response body alive
-// until the C++ side has read it after the event hook returns.
-thread_local! {
-  static ADMIN_RESPONSE_BODY: std::cell::RefCell<String> =
-    const { std::cell::RefCell::new(String::new()) };
-}
-
 /// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
 /// requested.
 ///
@@ -8687,8 +8680,6 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
   method: abi::envoy_dynamic_module_type_envoy_buffer,
   path: abi::envoy_dynamic_module_type_envoy_buffer,
   body: abi::envoy_dynamic_module_type_envoy_buffer,
-  response_body: *mut abi::envoy_dynamic_module_type_module_buffer,
-  response_body_length: *mut u32,
 ) -> u32 {
   let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
   let extension_config = unsafe { &**extension_config };
@@ -8714,15 +8705,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
     body_slice,
   );
 
-  ADMIN_RESPONSE_BODY.with(|cell| {
-    let mut stored = cell.borrow_mut();
-    *stored = response_str;
-    unsafe {
-      (*response_body).ptr = stored.as_ptr() as *mut _;
-      (*response_body).length = stored.len();
-      *response_body_length = stored.len() as u32;
-    }
-  });
+  // Pass the response body to Envoy via the callback. Envoy copies the buffer immediately,
+  // so the string only needs to live until the call returns.
+  if !response_str.is_empty() {
+    let response_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: response_str.as_ptr() as *const _,
+      length: response_str.len(),
+    };
+    abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+      envoy_ptr,
+      response_buf,
+    );
+  }
 
   status_code
 }

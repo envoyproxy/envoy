@@ -6406,6 +6406,10 @@ void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
  * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
  * requested.
  *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
  * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
@@ -6413,8 +6417,6 @@ void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
  * @param method is the HTTP method of the request (e.g. "GET", "POST").
  * @param path is the full path and query string of the request.
  * @param body is the request body. May be empty.
- * @param response_body is the buffer where the module should write the response body pointer.
- * @param response_body_length is where the module should write the length of the response body.
  * @return the HTTP status code to send back to the client. This corresponds to the numeric
  * value of the HTTP status code (e.g. 200, 404, 500).
  */
@@ -6422,8 +6424,23 @@ uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
-    envoy_dynamic_module_type_envoy_buffer body,
-    envoy_dynamic_module_type_module_buffer* response_body, uint32_t* response_body_length);
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
