@@ -266,8 +266,9 @@ jobs:
         sudo mkdir -p /etc/docker
         echo '{
           "ipv6": true,
-          "fixed-cidr-v6": "2001:db8:1::/64"
-          }' | sudo tee /etc/docker/daemon.json
+          "fixed-cidr-v6": "2001:db8:1::/64",
+          "features": {"containerd-snapshotter": false}
+        }' | sudo tee /etc/docker/daemon.json
       name: Configure Docker ipv6
       if: ${{ inputs.docker-ipv6 }}
     - if: >-
