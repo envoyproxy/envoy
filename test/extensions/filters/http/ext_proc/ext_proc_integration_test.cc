@@ -5201,7 +5201,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5279,7 +5278,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5319,7 +5317,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   // Ensure that we replaced and did not append to the request.
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   // No header mutations but a body replacement happened due to continue & replace.
   // Test that the request_body_effect shows mutation applied
@@ -5354,7 +5351,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Failed mutation request
@@ -5385,7 +5381,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
