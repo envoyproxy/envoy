@@ -50,6 +50,25 @@ In this example, the logs are simply discarded.
    You may wish to restrict the network address the admin server listens to in your own deployment as part
    of your strategy to limit access to this endpoint.
 
+You can also restrict which admin endpoints are exposed using
+:ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>`.
+This is useful when the admin listener is used for limited purposes, such as a readiness probe.
+
+Use ``prefix`` matchers for endpoints that are commonly queried with parameters (for example
+``/stats?filter=...`` or ``/config_dump?resource=...``).
+
+.. code-block:: yaml
+
+   admin:
+     address:
+       socket_address:
+         address: 127.0.0.1
+         port_value: 9901
+     allow_paths:
+     - exact: /ready
+     - prefix: /stats
+     - prefix: /config_dump
+
 
 ``stat_prefix``
 ---------------
