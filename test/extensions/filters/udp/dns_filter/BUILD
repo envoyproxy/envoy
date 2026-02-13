@@ -86,6 +86,23 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "dns_filter_access_log_integration_test",
+    size = "large",
+    srcs = ["dns_filter_access_log_integration_test.cc"],
+    extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "6gig",
+    deps = [
+        ":dns_filter_test_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/udp/dns_filter:config",
+        "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/integration:integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "dns_filter_utils_test",
     srcs = ["dns_filter_utils_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
