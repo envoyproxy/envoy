@@ -33,9 +33,6 @@ private:
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,
                                        Server::Configuration::ServerFactoryContext&,
                                        ProtobufMessage::ValidationVisitor&) override;
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const ProtoConfig& proto_config, const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace HeaderMutation

@@ -13,6 +13,8 @@ namespace FilterChain {
 
 namespace {
 
+constexpr absl::string_view FilterChainName = "envoy.filters.http.filter_chain";
+
 // Helper to process filter config and create filter factories
 Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
@@ -24,6 +26,9 @@ Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             filter_config);
+    if (factory.name() == FilterChainName) {
+      throw EnvoyException("FilterChain filter cannot be configured recursively.");
+    }
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
@@ -49,6 +54,9 @@ Http::FilterChainUtility::FilterFactoriesList createFilterFactoriesFromConfig(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             filter_config);
+    if (factory.name() == FilterChainName) {
+      throw EnvoyException("FilterChain filter cannot be configured recursively.");
+    }
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         filter_config, context.messageValidationVisitor(), factory);
