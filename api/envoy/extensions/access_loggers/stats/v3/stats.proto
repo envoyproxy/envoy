@@ -19,16 +19,16 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/acc
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stats logger]
-// Configuration for an access logger that emits custom Envoy stats according to
-// its configuration. The stats can have tags and values derived from
+// Configuration for an access logger that emits custom Envoy stats according to its
+// configuration. The stats can have tags and values derived from
 // :ref:`command operators <config_access_log_command_operators>`.
 // [#extension: envoy.access_loggers.stats]
 //
 // .. warning::
 //   It is easy to configure and use this extension in ways that create very
-//   large numbers of stats in Envoy, which can cause excessive memory or CPU
-//   use leading to a denial of service in Envoy, or can overwhelm any
-//   configured stat sinks by sending too many unique metrics.
+//   large numbers of stats in Envoy, which can cause excessive memory or CPU use
+//   leading to a denial of service in Envoy, or can overwhelm any configured
+//   stat sinks by sending too many unique metrics.
 
 // [#next-free-field: 6]
 message Config {
@@ -39,8 +39,7 @@ message Config {
     // The name of the tag.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // The value of the tag, using :ref:`command operators
-    // <config_access_log_command_operators>`.
+    // The value of the tag, using :ref:`command operators <config_access_log_command_operators>`.
     string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
@@ -72,9 +71,8 @@ message Config {
 
       Milliseconds = 3;
 
-      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be
-      // outside this range, but must be positive. Values extremely far out of
-      // this range may overflow.
+      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
+      // but must be positive. Values extremely far out of this range may overflow.
       Percent = 4;
     }
 
@@ -84,9 +82,8 @@ message Config {
     // The units for this histogram.
     Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
-    // The format string for the value of this histogram, using :ref:`command
-    // operators <config_access_log_command_operators>`. This must evaluate to a
-    // positive number.
+    // The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
+    // This must evaluate to a positive number.
     string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
@@ -95,9 +92,8 @@ message Config {
     // The name and tags of this counter.
     Stat stat = 1 [(validate.rules).message = {required: true}];
 
-    // The format string for the value to add to this counter, using
-    // :ref:`command operators <config_access_log_command_operators>`. One of
-    // ``value_format`` or ``value_fixed`` must be configured.
+    // The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
     string value_format = 2
         [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
