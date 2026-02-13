@@ -55,6 +55,10 @@ minor_behavior_changes:
   change: |
     OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
     stopped reporting empty delta counters and histograms.
+- area: ext_proc
+  change: |
+    added receoved_immediate_response flag in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
