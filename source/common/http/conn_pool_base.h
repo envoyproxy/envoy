@@ -226,8 +226,7 @@ public:
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow and
   // also checks for endpoint-specific max_requests_per_connection configuration.
-  static uint32_t maxStreamsPerConnection(uint32_t max_streams_config,
-                                          Upstream::HostDescriptionConstSharedPtr host);
+  static uint32_t maxStreamsPerConnection(Upstream::HostDescriptionConstSharedPtr host);
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;
