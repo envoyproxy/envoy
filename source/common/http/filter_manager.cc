@@ -463,6 +463,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state().observed_decode_end_stream_ = end_stream;
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -1886,6 +1890,10 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state_.observed_encode_end_stream_ = end_stream;
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);

@@ -68,6 +68,7 @@ envoy_extension_cc_test_library(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
