@@ -469,6 +469,8 @@ message Admin {
   bool ignore_global_conn_limit = 6;
 
   // List of admin paths that are accessible. If not specified, all admin endpoints are accessible.
+  // Matchers are evaluated against the request path. For endpoints commonly queried with
+  // parameters (for example ``/stats?format=...``), prefer ``prefix`` matchers.
   //
   // When specified, only paths in this list will be accessible, all others will return ``HTTP 403 Forbidden``.
   //
@@ -477,7 +479,8 @@ message Admin {
   // .. code-block:: yaml
   //
   //   allow_paths:
-  //   - exact: /stats
+  //   - prefix: /stats
+  //   - prefix: /config_dump
   //   - exact: /ready
   //   - prefix: /healthcheck
   //
