@@ -376,6 +376,337 @@ CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r) {
   });
 }
 
+// SSL Connection APIs
+CAPIStatus envoyGoFilterHttpGetDownstreamSslConnection(void* r, uint64_t* ssl_exists) {
+  return envoyGoFilterHandlerWrapper(
+      r, [ssl_exists](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        *ssl_exists = (ssl != nullptr) ? 1 : 0;
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslPeerCertificatePresented(void* r, int* presented) {
+  return envoyGoFilterHandlerWrapper(r, [presented](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *presented = ssl->peerCertificatePresented() ? 1 : 0;
+    return CAPIStatus::CAPIOK;
+  });
+}
+
+CAPIStatus envoyGoFilterHttpSslPeerCertificateValidated(void* r, int* validated) {
+  return envoyGoFilterHandlerWrapper(r, [validated](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *validated = ssl->peerCertificateValidated() ? 1 : 0;
+    return CAPIStatus::CAPIOK;
+  });
+}
+
+CAPIStatus envoyGoFilterHttpSslSha256PeerCertificateDigest(void* r, uint64_t* value_data,
+                                                           int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->sha256PeerCertificateDigest();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslSerialNumberPeerCertificate(void* r, uint64_t* value_data,
+                                                           int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->serialNumberPeerCertificate();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslSubjectPeerCertificate(void* r, uint64_t* value_data,
+                                                      int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->subjectPeerCertificate();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslIssuerPeerCertificate(void* r, uint64_t* value_data,
+                                                     int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->issuerPeerCertificate();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslSubjectLocalCertificate(void* r, uint64_t* value_data,
+                                                       int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->subjectLocalCertificate();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslUriSanPeerCertificate(void* r, uint64_t* buf_data, int* buf_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, buf_data, buf_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        const auto& sans = ssl->uriSanPeerCertificate();
+        std::ostringstream oss;
+        for (size_t i = 0; i < sans.size(); ++i) {
+          if (i > 0)
+            oss << "\n";
+          oss << sans[i];
+        }
+        req->strValue = oss.str();
+        *buf_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *buf_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslUriSanLocalCertificate(void* r, uint64_t* buf_data, int* buf_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, buf_data, buf_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        const auto& sans = ssl->uriSanLocalCertificate();
+        std::ostringstream oss;
+        for (size_t i = 0; i < sans.size(); ++i) {
+          if (i > 0)
+            oss << "\n";
+          oss << sans[i];
+        }
+        req->strValue = oss.str();
+        *buf_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *buf_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslDnsSansPeerCertificate(void* r, uint64_t* buf_data, int* buf_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, buf_data, buf_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        const auto& sans = ssl->dnsSansPeerCertificate();
+        std::ostringstream oss;
+        for (size_t i = 0; i < sans.size(); ++i) {
+          if (i > 0)
+            oss << "\n";
+          oss << sans[i];
+        }
+        req->strValue = oss.str();
+        *buf_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *buf_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslDnsSansLocalCertificate(void* r, uint64_t* buf_data, int* buf_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, buf_data, buf_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        const auto& sans = ssl->dnsSansLocalCertificate();
+        std::ostringstream oss;
+        for (size_t i = 0; i < sans.size(); ++i) {
+          if (i > 0)
+            oss << "\n";
+          oss << sans[i];
+        }
+        req->strValue = oss.str();
+        *buf_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *buf_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslValidFromPeerCertificate(void* r, uint64_t* timestamp) {
+  return envoyGoFilterHandlerWrapper(r, [timestamp](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->validFromPeerCertificate();
+    if (time_val.has_value()) {
+      *timestamp =
+          std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+              .count();
+      return CAPIStatus::CAPIOK;
+    }
+    return CAPIStatus::CAPIValueNotFound;
+  });
+}
+
+CAPIStatus envoyGoFilterHttpSslExpirationPeerCertificate(void* r, uint64_t* timestamp) {
+  return envoyGoFilterHandlerWrapper(r, [timestamp](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->expirationPeerCertificate();
+    if (time_val.has_value()) {
+      *timestamp =
+          std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+              .count();
+      return CAPIStatus::CAPIOK;
+    }
+    return CAPIStatus::CAPIValueNotFound;
+  });
+}
+
+CAPIStatus envoyGoFilterHttpSslTlsVersion(void* r, uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->tlsVersion();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslCiphersuiteString(void* r, uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        auto cipher_val = ssl->ciphersuiteString();
+        if (!cipher_val.empty()) {
+          req->strValue = cipher_val;
+          *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+          *value_len = req->strValue.length();
+          return CAPIStatus::CAPIOK;
+        }
+        return CAPIStatus::CAPIValueNotFound;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslCiphersuiteId(void* r, uint64_t* cipher_id) {
+  return envoyGoFilterHandlerWrapper(r, [cipher_id](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto id = ssl->ciphersuiteId();
+    if (id != 0xffff) {
+      *cipher_id = id;
+      return CAPIStatus::CAPIOK;
+    }
+    return CAPIStatus::CAPIValueNotFound;
+  });
+}
+
+CAPIStatus envoyGoFilterHttpSslSessionId(void* r, uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->sessionId();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificate(void* r, uint64_t* value_data,
+                                                                   int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->urlEncodedPemEncodedPeerCertificate();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificateChain(void* r,
+                                                                        uint64_t* value_data,
+                                                                        int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [r, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        const auto& ssl = filter->streamInfo().downstreamAddressProvider().sslConnection();
+        if (ssl == nullptr) {
+          return CAPIStatus::CAPIValueNotFound;
+        }
+        auto req = reinterpret_cast<HttpRequestInternal*>(r);
+        req->strValue = ssl->urlEncodedPemEncodedPeerCertificateChain();
+        *value_data = reinterpret_cast<uint64_t>(req->strValue.data());
+        *value_len = req->strValue.length();
+        return CAPIStatus::CAPIOK;
+      });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id) {
   return envoyGoConfigHandlerWrapper(
