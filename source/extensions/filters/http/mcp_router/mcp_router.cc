@@ -30,10 +30,13 @@ constexpr absl::string_view kGatewayName = "envoy-mcp-gateway";
 constexpr absl::string_view kGatewayVersion = "1.0.0";
 constexpr absl::string_view kProtocolVersion = "2025-06-18";
 
+constexpr absl::string_view kContentTypeJson = "application/json";
+constexpr absl::string_view kContentTypeSse = "text/event-stream";
+
 void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
   // Headers that we set explicitly or should not be forwarded
   static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
-      ":method", ":path", ":authority", "host", "content-type", kSessionIdHeader};
+      ":method", ":path", ":authority", "host", "content-type", "accept", kSessionIdHeader};
 
   source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key = header.key().getStringView();
@@ -76,55 +79,6 @@ McpMethod parseMethodString(absl::string_view method_str) {
   return it != mcpMethodMap().end() ? it->second : McpMethod::Unknown;
 }
 
-BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
-                                               std::function<void(BackendResponse)> on_complete)
-    : backend_name_(backend_name), on_complete_(std::move(on_complete)) {
-  response_.backend_name = backend_name;
-}
-
-void BackendStreamCallbacks::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
-  if (headers && headers->Status()) {
-    response_.status_code = Http::Utility::getResponseStatus(*headers);
-    response_.success = (response_.status_code >= 200 && response_.status_code < 300);
-
-    // Extract session ID from response header
-    auto session_header = headers->get(Http::LowerCaseString(std::string(kSessionIdHeader)));
-    if (!session_header.empty()) {
-      response_.session_id = std::string(session_header[0]->value().getStringView());
-    }
-  }
-
-  if (end_stream) {
-    complete();
-  }
-}
-
-void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
-  response_.body.append(data.toString());
-  if (end_stream) {
-    complete();
-  }
-}
-
-void BackendStreamCallbacks::onTrailers(Http::ResponseTrailerMapPtr&&) { complete(); }
-
-void BackendStreamCallbacks::onComplete() { complete(); }
-
-void BackendStreamCallbacks::onReset() {
-  response_.success = false;
-  response_.error = "Stream reset";
-  complete();
-}
-
-void BackendStreamCallbacks::complete() {
-  if (!completed_) {
-    completed_ = true;
-    ENVOY_LOG(debug, "Backend '{}' complete: status={}, body_size={}", backend_name_,
-              response_.status_code, response_.body.size());
-    on_complete_(std::move(response_));
-  }
-}
-
 McpRouterFilter::McpRouterFilter(McpRouterConfigSharedPtr config)
     : config_(std::move(config)), muxdemux_(Http::MuxDemux::create(config_->factoryContext())) {}
 
@@ -136,6 +90,8 @@ void McpRouterFilter::onDestroy() {
   }
   stream_callbacks_.clear();
   upstream_headers_.clear();
+  aggregation_callback_ = nullptr;
+  single_backend_callback_ = nullptr;
 }
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -167,7 +123,10 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
 Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   // Initialize on first data chunk - mcp_filter has already parsed metadata
   if (!initialized_) {
+    config_->stats().rq_total_.inc();
+
     if (!readMetadataFromMcpFilter()) {
+      config_->stats().rq_invalid_.inc();
       sendHttpError(400, "Invalid or missing MCP request");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -176,7 +135,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
               request_id_);
 
     if (!encoded_session_id_.empty() && !decodeAndParseSession()) {
-      // decodeAndParseSession already sent the appropriate error response
+      // decodeAndParseSession already sent the appropriate error response.
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -243,6 +202,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       break;
 
     default:
+      config_->stats().rq_invalid_.inc();
       sendHttpError(400, "Unsupported method");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -252,6 +212,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
     // Perform body rewriting if needed (e.g., tool/prompt name or URI prefix stripping).
     // This is done once on the first data chunk after initialization.
     if (needs_body_rewrite_) {
+      config_->stats().rq_body_rewrite_.inc();
       if (method_ == McpMethod::ToolsCall) {
         rewriteToolCallBody(data);
       } else if (method_ == McpMethod::ResourcesRead || method_ == McpMethod::ResourcesSubscribe ||
@@ -359,6 +320,7 @@ bool McpRouterFilter::decodeAndParseSession() {
   std::string decoded = SessionCodec::decode(encoded_session_id_);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
+    config_->stats().rq_session_invalid_.inc();
     sendHttpError(400, "Invalid session ID");
     return false;
   }
@@ -366,6 +328,7 @@ bool McpRouterFilter::decodeAndParseSession() {
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
   if (!parsed.ok()) {
     ENVOY_LOG(warn, "Failed to parse session: {}", parsed.status().message());
+    config_->stats().rq_session_invalid_.inc();
     sendHttpError(400, "Invalid session ID");
     return false;
   }
@@ -424,12 +387,14 @@ bool McpRouterFilter::validateSubjectIfRequired() {
   auto auth_subject = getAuthenticatedSubject();
   if (!auth_subject.ok()) {
     ENVOY_LOG(warn, "Failed to get authenticated subject: {}", auth_subject.status().message());
+    config_->stats().rq_auth_failure_.inc();
     sendHttpError(403, "Unable to verify session identity");
     return false;
   }
 
   if (session_subject_ != *auth_subject) {
     ENVOY_LOG(warn, "Session subject mismatch: session='{}'", session_subject_);
+    config_->stats().rq_auth_failure_.inc();
     sendHttpError(403, "Session identity mismatch");
     return false;
   }
@@ -606,6 +571,7 @@ ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos
 }
 
 void McpRouterFilter::initializeFanout(AggregationCallback callback) {
+  config_->stats().rq_fanout_.inc();
   if (config_->backends().empty()) {
     sendHttpError(500, "No backends configured");
     return;
@@ -632,13 +598,19 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
     auto expected_count = expected;
     auto agg_callback = aggregation_callback_;
 
+    // Pass request_id and aggregate_mode=true for fanout operations.
+    // This enables early completion when SSE backends return a valid JSON-RPC response,
+    // avoiding the need to wait for end_stream (which never comes for SSE).
+    // Pass parent weak_ptr to enable intermediate event (notification/server request) forwarding.
     auto stream_cb = std::make_shared<BackendStreamCallbacks>(
-        backend.name, [responses, count, expected_count, agg_callback](BackendResponse resp) {
+        backend.name,
+        [responses, count, expected_count, agg_callback](BackendResponse resp) {
           responses->push_back(std::move(resp));
           if (++(*count) >= expected_count && agg_callback) {
             agg_callback(std::move(*responses));
           }
-        });
+        },
+        request_id_, true /* aggregate_mode */, weak_from_this());
 
     // Create per-backend StreamOptions with the backend-specific timeout.
     Http::AsyncClient::StreamOptions backend_options;
@@ -683,6 +655,12 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
 
 void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
                                               std::function<void(BackendResponse)> callback) {
+  initializeSingleBackend(backend, std::move(callback), false);
+}
+
+void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
+                                              std::function<void(BackendResponse)> callback,
+                                              bool streaming_enabled) {
   if (!muxdemux_->isIdle()) {
     ENVOY_LOG(warn, "MuxDemux not idle, cannot start new single backend request for '{}'",
               backend.name);
@@ -693,7 +671,9 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
   }
 
   single_backend_callback_ = std::move(callback);
-  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_);
+  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_,
+                                                            request_id_, false /* aggregate_mode */,
+                                                            weak_from_this(), streaming_enabled);
   stream_callbacks_.push_back(stream_cb);
 
   Http::AsyncClient::StreamOptions options;
@@ -742,6 +722,61 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+void McpRouterFilter::pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  // Remove backend's session ID and replace with the request's session ID.
+  headers->remove(Http::LowerCaseString("mcp-session-id"));
+  if (!encoded_session_id_.empty()) {
+    headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+  }
+
+  ENVOY_LOG(debug, "SSE streaming: forwarding headers to client, end_stream={}", end_stream);
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "mcp_router");
+}
+
+void McpRouterFilter::pushSseData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "SSE streaming: forwarding {} bytes, end_stream={}", data.length(), end_stream);
+  decoder_callbacks_->encodeData(data, end_stream);
+}
+
+void McpRouterFilter::pushSseEvent(const std::string& backend_name, const std::string& event_data,
+                                   SseMessageType event_type) {
+  ENVOY_LOG(debug, "SSE aggregation: forwarding {} event from backend '{}' (size {})",
+            event_type == SseMessageType::Notification ? "notification" : "server_request",
+            backend_name, event_data.size());
+
+  // Send SSE headers on first intermediate event (converts response from JSON to SSE).
+  if (!sse_headers_sent_) {
+    auto headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    headers->setContentType("text/event-stream");
+    headers->addCopy(Http::LowerCaseString("cache-control"), "no-cache");
+    if (!encoded_session_id_.empty()) {
+      headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+    }
+    ENVOY_LOG(debug, "SSE aggregation: sending SSE headers to client");
+    decoder_callbacks_->encodeHeaders(std::move(headers), false, "mcp_router");
+    sse_headers_sent_ = true;
+  }
+
+  // TODO(botengyao): Transform server-to-client request IDs for proper routing.
+  // For ServerRequest events (roots/list, sampling/createMessage), the ID needs to be
+  // prefixed with backend_name so client responses can be routed back correctly.
+
+  // Format and send the SSE event to client.
+  Buffer::OwnedImpl buffer;
+  buffer.add("event: message\ndata: ");
+  buffer.add(event_data);
+  buffer.add("\n\n");
+  decoder_callbacks_->encodeData(buffer, false);
+}
+
+void McpRouterFilter::onStreamingError(absl::string_view error) {
+  ENVOY_LOG(warn, "SSE streaming error: {}", error);
+  sendHttpError(500, std::string(error));
+}
+
+void McpRouterFilter::onStreamingComplete() { ENVOY_LOG(debug, "SSE streaming: complete"); }
+
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
@@ -762,9 +797,14 @@ void McpRouterFilter::handleInitialize() {
     }
   }
 
-  initializeFanout([this, subject = std::move(subject)](std::vector<BackendResponse> responses) {
-    // TODO(botengyao): handle text/event-stream from backends.
-    std::string response_body = aggregateInitialize(responses);
+  initializeFanout([weak_self = weak_from_this(),
+                    subject = std::move(subject)](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "Initialize callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateInitialize(responses);
 
     absl::flat_hash_map<std::string, std::string> sessions;
     for (const auto& resp : responses) {
@@ -774,58 +814,20 @@ void McpRouterFilter::handleInitialize() {
     }
 
     if (sessions.empty()) {
-      sendHttpError(500, "All backends failed to initialize");
+      self->sendHttpError(500, "All backends failed to initialize");
       return;
     }
 
-    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, subject, sessions);
+    std::string composite =
+        SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
     std::string encoded_session = SessionCodec::encode(composite);
 
-    sendJsonResponse(response_body, encoded_session);
-  });
-}
-
-void McpRouterFilter::handleToolsList() {
-  ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
-
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregateToolsList(responses);
-    ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
-  });
-}
-
-void McpRouterFilter::handleToolsCall() {
-  auto [backend_name, actual_tool] = parseToolName(tool_name_);
-
-  if (backend_name.empty()) {
-    sendHttpError(400, fmt::format("Invalid tool name '{}': cannot determine backend", tool_name_));
-    return;
-  }
-
-  const McpBackendConfig* backend = config_->findBackend(backend_name);
-  if (!backend) {
-    sendHttpError(400, fmt::format("Unknown backend '{}' in tool name", backend_name));
-    return;
-  }
-
-  // Store the unprefixed tool name for body rewriting
-  unprefixed_tool_name_ = actual_tool;
-  needs_body_rewrite_ = (tool_name_ != unprefixed_tool_name_);
-
-  ENVOY_LOG(debug, "tools/call: backend='{}', tool='{}' -> '{}', needs_rewrite={}", backend_name,
-            tool_name_, actual_tool, needs_body_rewrite_);
-
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
-    if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
-    } else {
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
-    }
+    self->sendJsonResponse(response_body, encoded_session);
   });
 }
 
 void McpRouterFilter::handlePing() {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "Ping: responding immediately with empty result");
 
   // Ping is a request/response pattern - respond immediately with empty result.
@@ -836,23 +838,98 @@ void McpRouterFilter::handlePing() {
 }
 
 void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  config_->stats().rq_direct_response_.inc();
   ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
 
   // Forward notification to all backends and wait for responses.
   // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
-  initializeFanout([this](std::vector<BackendResponse>) {
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse>) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "notifications/initialized callback ignored: filter destroyed");
+      return;
+    }
     // All backends have responded (or failed), send 202 to client.
-    sendAccepted();
+    self->sendAccepted();
   });
+}
+
+void McpRouterFilter::handleToolsList() {
+  ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
+
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "tools/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateToolsList(responses);
+    ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
+  });
+}
+
+void McpRouterFilter::handleToolsCall() {
+  auto [backend_name, actual_tool] = parseToolName(tool_name_);
+
+  if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
+    sendHttpError(400, fmt::format("Invalid tool name '{}': cannot determine backend", tool_name_));
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
+    sendHttpError(400, fmt::format("Unknown backend '{}' in tool name", backend_name));
+    return;
+  }
+
+  // Store the unprefixed tool name for body rewriting.
+  unprefixed_tool_name_ = actual_tool;
+  needs_body_rewrite_ = (tool_name_ != unprefixed_tool_name_);
+
+  ENVOY_LOG(debug, "tools/call: backend='{}', tool='{}' -> '{}', needs_rewrite={}", backend_name,
+            tool_name_, actual_tool, needs_body_rewrite_);
+
+  // Use streaming mode for SSE pass-through, with fallback for JSON responses.
+  initializeSingleBackend(
+      *backend,
+      [weak_self = weak_from_this()](BackendResponse resp) {
+        auto self = weak_self.lock();
+        if (!self) {
+          return;
+        }
+        // This callback is invoked for non-SSE responses (JSON) or errors.
+        // SSE responses are streamed directly by the parent filter.
+        if (resp.success) {
+          if (resp.isSse()) {
+            // Should not reach here for successful SSE in streaming mode.
+            ENVOY_LOG(warn, "tools/call: SSE response reached non-streaming path");
+            self->sendHttpError(500, "Internal error: streaming failed for SSE response");
+          } else {
+            self->sendJsonResponse(resp.body, self->encoded_session_id_);
+          }
+        } else {
+          self->config_->stats().rq_backend_failure_.inc();
+          self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+        }
+      },
+      true /* streaming_enabled */);
 }
 
 void McpRouterFilter::handleResourcesList() {
   ENVOY_LOG(debug, "resources/list: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregateResourcesList(responses);
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "resources/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateResourcesList(responses);
     ENVOY_LOG(debug, "resources/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
   });
 }
 
@@ -860,6 +937,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
   auto [backend_name, actual_uri] = parseResourceUri(resource_uri_);
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(
         400, fmt::format("Invalid resource URI '{}': cannot determine backend", resource_uri_));
     return;
@@ -867,6 +945,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in resource URI", backend_name));
     return;
   }
@@ -881,6 +960,7 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
@@ -910,6 +990,7 @@ void McpRouterFilter::handlePromptsGet() {
   auto [backend_name, actual_prompt] = parsePromptName(prompt_name_);
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400,
                   fmt::format("Invalid prompt name '{}': cannot determine backend", prompt_name_));
     return;
@@ -917,6 +998,7 @@ void McpRouterFilter::handlePromptsGet() {
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in prompt name", backend_name));
     return;
   }
@@ -931,34 +1013,9 @@ void McpRouterFilter::handlePromptsGet() {
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
-  });
-}
-
-void McpRouterFilter::handleLoggingSetLevel() {
-  // Fan out to all backends and return empty result.
-  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
-  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
-
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    // Check if at least one backend succeeded.
-    bool any_success = false;
-    for (const auto& resp : responses) {
-      if (resp.success) {
-        any_success = true;
-        break;
-      }
-    }
-
-    if (!any_success) {
-      sendHttpError(500, "All backends failed to set logging level");
-      return;
-    }
-
-    // Return empty JSON-RPC result.
-    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
-    sendJsonResponse(response, encoded_session_id_);
   });
 }
 
@@ -993,12 +1050,14 @@ void McpRouterFilter::handleCompletionComplete() {
   }
 
   if (backend_name.empty()) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, "Cannot determine backend for completion request");
     return;
   }
 
   const McpBackendConfig* backend = config_->findBackend(backend_name);
   if (!backend) {
+    config_->stats().rq_unknown_backend_.inc();
     sendHttpError(400, fmt::format("Unknown backend '{}' in completion ref", backend_name));
     return;
   }
@@ -1007,9 +1066,49 @@ void McpRouterFilter::handleCompletionComplete() {
     if (resp.success) {
       sendJsonResponse(resp.body, encoded_session_id_);
     } else {
+      config_->stats().rq_backend_failure_.inc();
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
+}
+
+void McpRouterFilter::handleLoggingSetLevel() {
+  // Fan out to all backends and return empty result.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    // Check if at least one backend succeeded.
+    bool any_success = false;
+    for (const auto& resp : responses) {
+      if (resp.success) {
+        any_success = true;
+        break;
+      }
+    }
+
+    if (!any_success) {
+      config_->stats().rq_fanout_failure_.inc();
+      sendHttpError(500, "All backends failed to set logging level");
+      return;
+    }
+
+    // Return empty JSON-RPC result.
+    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
+    sendJsonResponse(response, encoded_session_id_);
+  });
+}
+
+// Response aggregation helpers.
+
+std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
+  const std::string& result = response.getJsonRpc();
+  ENVOY_LOG(debug,
+            "extractJsonRpcFromResponse: backend='{}', content_type={}, body_size={}, "
+            "extracted_size={}",
+            response.backend_name, static_cast<int>(response.content_type), response.body.size(),
+            result.size());
+  return result;
 }
 
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
@@ -1018,6 +1117,7 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
                                        [](const BackendResponse& resp) { return resp.success; });
 
   if (!any_success) {
+    config_->stats().rq_fanout_failure_.inc();
     return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
                         R"(,"error":{"code":-32603,"message":"All backends failed"}})");
   }
@@ -1119,8 +1219,9 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
     if (!resp.success) {
       continue;
     }
-    ENVOY_LOG(debug, "Aggregating tools from backend '{}'", resp.backend_name);
-    extractAndPrefixTools(resp.body, resp.backend_name, is_multiplexing, all_tools);
+    std::string json_body = extractJsonRpcFromResponse(resp);
+    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, json_body);
+    extractAndPrefixTools(json_body, resp.backend_name, is_multiplexing, all_tools);
   }
 
   return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{"tools":[)",
@@ -1149,9 +1250,10 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
           if (!resp.success) {
             continue;
           }
+          std::string json_body = extractJsonRpcFromResponse(resp);
           ENVOY_LOG(debug, "Aggregating resources list from backend '{}': {}", resp.backend_name,
-                    resp.body);
-          auto parsed_or = Json::Factory::loadFromString(resp.body);
+                    json_body);
+          auto parsed_or = Json::Factory::loadFromString(json_body);
           if (!parsed_or.ok()) {
             ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
                       parsed_or.status().message());
@@ -1341,16 +1443,20 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
                                        const std::string& backend_session_id) {
   auto headers = Http::RequestHeaderMapImpl::create();
 
-  // Set required headers for MCP backend
+  // Set required headers for MCP backend.
   headers->setMethod(Http::Headers::get().MethodValues.Post);
   headers->setPath(backend.path);
-  // Use host_rewrite_literal if configured, otherwise pass through original host
+  // Use host_rewrite_literal if configured, otherwise pass through original host.
   if (!backend.host_rewrite_literal.empty()) {
     headers->setHost(backend.host_rewrite_literal);
   } else if (request_headers_ != nullptr) {
     headers->setHost(request_headers_->getHostValue());
   }
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
+
+  // Accept both JSON and SSE responses.
+  headers->addCopy(Http::LowerCaseString("accept"),
+                   absl::StrCat(kContentTypeSse, ", ", kContentTypeJson));
 
   if (!backend_session_id.empty()) {
     headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
@@ -1400,9 +1506,21 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 }
 
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
+  // If SSE headers were already sent (due to intermediate events), send response as SSE event.
+  if (sse_headers_sent_) {
+    ENVOY_LOG(debug, "Sending aggregated response as SSE event: {}", body);
+    Buffer::OwnedImpl response_body;
+    response_body.add("event: message\ndata: ");
+    response_body.add(body);
+    response_body.add("\n\n");
+    decoder_callbacks_->encodeData(response_body, true);
+    return;
+  }
+
+  // Standard JSON response path.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
   headers->setContentLength(body.length());
 
   if (!session_id.empty()) {

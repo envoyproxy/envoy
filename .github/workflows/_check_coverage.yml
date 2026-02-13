@@ -24,8 +24,6 @@ concurrency:
 
 jobs:
   coverage:
-    secrets:
-      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       actions: read
       contents: read
@@ -45,20 +43,11 @@ jobs:
       rbe: true
       request: ${{ inputs.request }}
       runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
-      steps-post: |
-        - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-          with:
-            bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
-            path: generated/${{ matrix.target }}/html
-            path-upload: ${{ matrix.target }}
-            sha: ${{ fromJSON(inputs.request).request.sha }}
-            redirect: >-
-              ${{ vars.GCS_ARTIFACT_PREFIX
-                  && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
-              }}${{ fromJSON(inputs.request).request.pr
-                    || fromJSON(inputs.request).request.target-branch }}
+      steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
+      upload-name: ${{ matrix.target }}
+      upload-path: generated/${{ matrix.target }}/html
       trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
@@ -66,5 +55,56 @@ jobs:
         include:
         - target: coverage
           name: Coverage
+          upload-name: coverage
+          upload-path: generated/coverage/html
+          steps-post: |
+            - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+              with:
+                output-path: generated/coverage/html/gcs-metadata.json
+                input-format: yaml
+                input: |
+                  bucket: ${{
+                    inputs.trusted
+                    && vars.GCS_ARTIFACT_BUCKET_POST
+                    || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                  sha: ${{ fromJSON(inputs.request).request.sha }}
+                  path_upload: coverage
+                  redirect: ${{
+                    vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                    }}${{ fromJSON(inputs.request).request.pr
+                          || fromJSON(inputs.request).request.target-branch }}
+            - shell: bash
+              run: |
+                ln -sf %{{ github.workspace }}/generated %{{ runner.temp }}/generated
         - target: fuzz_coverage
           name: Fuzz coverage
+          steps-post: |
+            - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+              with:
+                output-path: generated/fuzz_coverage/html/gcs-metadata.json
+                input-format: yaml
+                input: |
+                  bucket: ${{
+                    inputs.trusted
+                    && vars.GCS_ARTIFACT_BUCKET_POST
+                    || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                  sha: ${{ fromJSON(inputs.request).request.sha }}
+                  path_upload: fuzz_coverage
+                  redirect: ${{
+                    vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                    }}${{ fromJSON(inputs.request).request.pr
+                          || fromJSON(inputs.request).request.target-branch }}
+            - shell: bash
+              run: |
+                ln -sf %{{ github.workspace }}/generated %{{ runner.temp }}/generated
+
+  upload:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    if: >-
+      !cancelled()
+    needs: coverage
+    uses: ./.github/workflows/_upload_gcs.yml
+    with:
+      artifacts: |
+        ["coverage", "fuzz_coverage"]

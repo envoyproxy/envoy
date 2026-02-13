@@ -41,10 +41,10 @@ envoy_cc_library(
         "@envoy//bazel:android": [],
         "//conditions:default": ["//bazel:jni"],
     }) + [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -107,7 +107,7 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/network:network_types_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//bazel:boringssl",
+        "@envoy//bazel:ssl",
     ],
 )
 

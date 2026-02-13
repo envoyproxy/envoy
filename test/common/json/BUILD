@@ -100,6 +100,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "json_rpc_field_extractor_test",
+    srcs = ["json_rpc_field_extractor_test.cc"],
+    deps = [
+        "//source/common/json:json_rpc_parser_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "gen_excluded_unicodes",
     srcs = ["gen_excluded_unicodes.cc"],

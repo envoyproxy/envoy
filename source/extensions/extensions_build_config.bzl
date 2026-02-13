@@ -215,6 +215,7 @@ EXTENSIONS = {
     "envoy.filters.http.thrift_to_metadata":            "//source/extensions/filters/http/thrift_to_metadata:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
+    "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
@@ -421,6 +422,7 @@ EXTENSIONS = {
     # TLS peer certification validators
     #
 
+    "envoy.tls.cert_validator.dynamic_modules":          "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
@@ -569,6 +571,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
+    "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
     #
     # HTTP Early Header Mutation
@@ -589,6 +592,11 @@ EXTENSIONS = {
     "envoy.config_subscription.ads_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
     "envoy.config_mux.delta_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
     "envoy.config_mux.sotw_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
+
+    #
+    # Content Parsers
+    #
+    "envoy.content_parsers.json":                            "//source/extensions/content_parsers/json:config",
 
     #
     # Geolocation Provider

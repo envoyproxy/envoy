@@ -14,8 +14,10 @@ namespace Extensions {
 namespace UdpFilters {
 namespace DynamicModules {
 
-// Custom namespace prefix for UDP listener filter stats.
-constexpr char UdpListenerFilterStatsNamespace[] = "dynamic_module_udp_listener_filter";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleUdpListenerFilterConfig {
 public:

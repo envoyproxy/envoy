@@ -141,8 +141,17 @@ jobs:
       with:
         input-format: yaml
         filter: >-
-          {manifests: .}
+          .version as $v
+          | {manifests:
+              [.manifests[]
+               | select(
+                   (.tag | test("contrib-distroless") | not)
+                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))]}
         input: |
+          version:
+            major: ${{ inputs.version-major }}
+            minor: ${{ inputs.version-minor }}
+          manifests:
           - name: ${{ inputs.dockerhub-repo }}
             tag: v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             registry: docker.io/envoyproxy

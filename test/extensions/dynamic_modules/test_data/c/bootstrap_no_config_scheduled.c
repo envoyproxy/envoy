@@ -3,10 +3,10 @@
 #include <string.h>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/abi/abi_version.h"
+
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 // A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_config_scheduled.
@@ -51,6 +51,22 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
 void envoy_dynamic_module_on_bootstrap_extension_destroy(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
   (void)extension_module_ptr;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_drain_started(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_envoy_ptr;
+  (void)extension_module_ptr;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context) {
+  (void)extension_envoy_ptr;
+  (void)extension_module_ptr;
+  completion_callback(completion_context);
 }
 
 // envoy_dynamic_module_on_bootstrap_extension_config_scheduled is intentionally missing.

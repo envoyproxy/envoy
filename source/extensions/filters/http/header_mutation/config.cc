@@ -22,14 +22,15 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Envoy::Http::FilterFactoryCb
+Http::FilterFactoryCb
 HeaderMutationFactoryConfig::createFilterFactoryFromProtoWithServerContextTyped(
-    const ProtoConfig& proto_config, const std::string&,
+    const ProtoConfig& config, const std::string&,
     Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
-  auto filter_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
-  THROW_IF_NOT_OK_REF(creation_status);
+  auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
+  if (!creation_status.ok()) {
+    ExceptionUtil::throwEnvoyException(std::string(creation_status.message()));
+  }
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));

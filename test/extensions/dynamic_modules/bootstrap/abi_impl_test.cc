@@ -5,6 +5,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
@@ -161,6 +162,30 @@ TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
 }
 
 // -----------------------------------------------------------------------------
+// Init Manager Tests
+// -----------------------------------------------------------------------------
+
+// Test that an init target is automatically registered during config creation. The C no-op module
+// calls signal_init_complete during its constructor. Calling it again here verifies idempotency.
+TEST_F(BootstrapAbiImplTest, InitTargetAutoRegisteredAndSignal) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // The init manager should receive an add call during config creation.
+  EXPECT_CALL(context_.init_manager_, add(_));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // The C no-op module already called signal_init_complete during config creation.
+  // Calling it again verifies that duplicate calls are safe.
+  envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+      config.value()->thisAsVoidPtr());
+}
+
+// -----------------------------------------------------------------------------
 // HTTP Callout Tests
 // -----------------------------------------------------------------------------
 
@@ -271,6 +296,10 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
       new Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-type", "text/plain"}}));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
   response->body().add("Hello, World!");
+
+  // Trigger the onBeforeFinalizeUpstreamSpan callback to exercise the no-op override.
+  Envoy::Tracing::MockSpan span;
+  callbacks_captured->onBeforeFinalizeUpstreamSpan(span, nullptr);
 
   // Trigger the success callback.
   callbacks_captured->onSuccess(request, std::move(response));
@@ -745,6 +774,546 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
       static_cast<void*>(extension.get()), iterator, &data);
 
   EXPECT_EQ(data.count, 2);
+}
+
+// -----------------------------------------------------------------------------
+// Stats Definition and Update Tests
+// -----------------------------------------------------------------------------
+
+// Test defining and incrementing a counter without labels.
+TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter without labels.
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter", 10};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &counter_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_id, 0u);
+
+  // Increment the counter.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_id, nullptr, 0, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Increment again.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_id, nullptr, 0, 3);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the counter was defined and is accessible.
+  EXPECT_TRUE(config.value()->getCounterById(counter_id).has_value());
+  EXPECT_FALSE(config.value()->getCounterById(counter_id + 1).has_value());
+}
+
+// Test incrementing a counter with an invalid ID.
+TEST_F(BootstrapAbiImplTest, IncrementCounterInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to increment a counter with an invalid ID.
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining and manipulating a gauge without labels.
+TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a gauge without labels.
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_gauge", 8};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &gauge_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_id, 0u);
+
+  // Set the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Increment the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Decrement the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 30);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the gauge was defined and is accessible.
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id).has_value());
+  EXPECT_FALSE(config.value()->getGaugeById(gauge_id + 1).has_value());
+}
+
+// Test gauge operations with an invalid ID.
+TEST_F(BootstrapAbiImplTest, GaugeOperationsInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to set, increment, and decrement a gauge with an invalid ID.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining and recording a histogram value without labels.
+TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a histogram without labels.
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_histogram", 12};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &histogram_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(histogram_id, 0u);
+
+  // Record a value.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_id, nullptr, 0, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Record another value.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_id, nullptr, 0, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test recording a histogram value with an invalid ID.
+TEST_F(BootstrapAbiImplTest, RecordHistogramInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to record a histogram value with an invalid ID.
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), 999, nullptr, 0, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining multiple metrics with sequential IDs.
+TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define multiple counters.
+  size_t counter_id_0 = 0;
+  size_t counter_id_1 = 0;
+  envoy_dynamic_module_type_module_buffer name_0 = {"counter_a", 9};
+  envoy_dynamic_module_type_module_buffer name_1 = {"counter_b", 9};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name_0, nullptr, 0, &counter_id_0),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name_1, nullptr, 0, &counter_id_1),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_id_0, 0u);
+  EXPECT_EQ(counter_id_1, 1u);
+
+  // Define multiple gauges.
+  size_t gauge_id_0 = 0;
+  size_t gauge_id_1 = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name_0 = {"gauge_a", 7};
+  envoy_dynamic_module_type_module_buffer gauge_name_1 = {"gauge_b", 7};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name_0, nullptr, 0, &gauge_id_0),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name_1, nullptr, 0, &gauge_id_1),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_id_0, 0u);
+  EXPECT_EQ(gauge_id_1, 1u);
+
+  // Increment each counter independently.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_id_0, nullptr, 0, 10),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_id_1, nullptr, 0, 20),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify all counters and gauges are accessible by their IDs.
+  EXPECT_TRUE(config.value()->getCounterById(counter_id_0).has_value());
+  EXPECT_TRUE(config.value()->getCounterById(counter_id_1).has_value());
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_0).has_value());
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_1).has_value());
+}
+
+// -----------------------------------------------------------------------------
+// Stats Definition and Update Tests (with labels / vec variants)
+// -----------------------------------------------------------------------------
+
+// Test defining and incrementing a counter vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter vec with labels.
+  size_t counter_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter_vec", 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"method", 6}, {"status", 6}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+      config.value()->thisAsVoidPtr(), name, label_names, 2, &counter_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_vec_id, 0u);
+
+  // Increment the counter vec with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"GET", 3}, {"200", 3}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_vec_id, label_values, 2, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the counter vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getCounterVecById(counter_vec_id).has_value());
+  EXPECT_FALSE(config.value()->getCounterVecById(counter_vec_id + 1).has_value());
+}
+
+// Test incrementing a counter vec with mismatched label count.
+TEST_F(BootstrapAbiImplTest, IncrementCounterVecInvalidLabels) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter vec with 2 labels.
+  size_t counter_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter_vec", 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"method", 6}, {"status", 6}};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name, label_names, 2, &counter_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Try to increment with only 1 label value (mismatched).
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"GET", 3}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_vec_id, label_values, 1, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test defining and manipulating a gauge vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a gauge vec with labels.
+  size_t gauge_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_gauge_vec", 12};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"host", 4}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+      config.value()->thisAsVoidPtr(), name, label_names, 1, &gauge_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_vec_id, 0u);
+
+  // Set, increment, and decrement the gauge vec with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"upstream_a", 10}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the gauge vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getGaugeVecById(gauge_vec_id).has_value());
+}
+
+// Test defining and recording a histogram vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a histogram vec with labels.
+  size_t histogram_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_histogram_vec", 16};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"endpoint", 8}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+      config.value()->thisAsVoidPtr(), name, label_names, 1, &histogram_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(histogram_vec_id, 0u);
+
+  // Record values with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"svc_a", 5}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_vec_id, label_values, 1, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the histogram vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getHistogramVecById(histogram_vec_id).has_value());
+}
+
+// Test vec metric operations with an invalid vec ID and mismatched label count.
+// This covers the vec code paths for all metric types.
+TEST_F(BootstrapAbiImplTest, VecMetricsInvalidIdAndLabels) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define vec metrics with a single label each.
+  size_t counter_vec_id = 0;
+  size_t gauge_vec_id = 0;
+  size_t histogram_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {"cv", 2};
+  envoy_dynamic_module_type_module_buffer gauge_name = {"gv", 2};
+  envoy_dynamic_module_type_module_buffer histogram_name = {"hv", 2};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"lbl", 3}};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), counter_name, label_names, 1, &counter_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name, label_names, 1, &gauge_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+                config.value()->thisAsVoidPtr(), histogram_name, label_names, 1, &histogram_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Use a valid label value for MetricNotFound tests.
+  envoy_dynamic_module_type_module_buffer one_label[] = {{"val", 3}};
+  size_t invalid_id = 999;
+
+  // Test MetricNotFound for all vec update operations with an invalid vec ID.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Use two label values to trigger InvalidLabels (defined with 1 label, passing 2).
+  envoy_dynamic_module_type_module_buffer two_labels[] = {{"a", 1}, {"b", 1}};
+
+  // Test InvalidLabels for all vec update operations with mismatched label count.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                config.value()->thisAsVoidPtr(), histogram_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// -----------------------------------------------------------------------------
+// Timer Tests
+// -----------------------------------------------------------------------------
+
+// Test that a timer can be created, enabled, checked, disabled, and deleted.
+TEST_F(BootstrapAbiImplTest, TimerLifecycle) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // The MockDispatcher's createTimer_ returns a NiceMock<MockTimer> by default.
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // The timer should not be enabled initially.
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Enable the timer with a 100ms delay.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 100);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Disable the timer.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_disable(timer_ptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Delete the timer via the ABI callback.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that the timer fires and invokes the on_timer_fired event hook.
+TEST_F(BootstrapAbiImplTest, TimerFired) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Use MockTimer to capture the timer callback.
+  Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback. This will use the MockTimer we set up.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // Enable the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(50), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 50);
+
+  // Invoke the timer callback (simulating timer firing).
+  mock_timer->invokeCallback();
+
+  // Clean up.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that the timer callback safely handles a destroyed config via weak_ptr.
+TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
+  Event::TimerCb captured_timer_cb;
+
+  // Use a raw pointer so we can control when the config is destroyed.
+  void* timer_ptr = nullptr;
+
+  {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        testDataDir() + "/libbootstrap_no_op.so", false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+    // Capture the timer callback from createTimer.
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+      captured_timer_cb = std::move(cb);
+      return new testing::NiceMock<Event::MockTimer>();
+    }));
+
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", "config",
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    ASSERT_TRUE(config.ok()) << config.status();
+
+    // Create a timer via the ABI callback.
+    timer_ptr = envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+        config.value()->thisAsVoidPtr());
+    EXPECT_NE(timer_ptr, nullptr);
+
+    // Config goes out of scope here and is destroyed.
+  }
+
+  // Execute the captured timer callback after config is destroyed.
+  // This should not crash - the weak_ptr should be expired.
+  ASSERT_NE(captured_timer_cb, nullptr);
+  captured_timer_cb();
+
+  // Clean up the timer.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that re-enabling the timer resets it.
+TEST_F(BootstrapAbiImplTest, TimerReEnable) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // Enable with 100ms.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 100);
+
+  // Re-enable with 200ms - this should reset the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(200), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 200);
+
+  // Clean up.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
 }
 
 } // namespace DynamicModules
