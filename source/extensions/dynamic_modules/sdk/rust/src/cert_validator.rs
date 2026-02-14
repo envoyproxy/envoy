@@ -25,6 +25,7 @@
 //! impl CertValidatorConfig for MyCertValidatorConfig {
 //!   fn do_verify_cert_chain(
 //!     &self,
+//!     _envoy_cert_validator: &EnvoyCertValidator,
 //!     certs: &[&[u8]],
 //!     host_name: &str,
 //!     is_server: bool,
@@ -42,7 +43,59 @@
 //! }
 //! ```
 
-use crate::abi;
+use crate::{abi, bytes_to_module_buffer, EnvoyBuffer};
+
+/// Wrapper around the Envoy cert validator config pointer, providing access to
+/// Envoy-side operations such as filter state during certificate validation.
+///
+/// This is passed to [`CertValidatorConfig::do_verify_cert_chain`] and is only valid for
+/// the duration of that call.
+pub struct EnvoyCertValidator {
+  raw: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+}
+
+impl EnvoyCertValidator {
+  /// Create a new `EnvoyCertValidator` from the raw Envoy pointer.
+  pub(crate) fn new(raw: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr) -> Self {
+    Self { raw }
+  }
+
+  /// Set a string value in the connection's filter state with Connection life span.
+  ///
+  /// Returns true if the operation was successful, false otherwise (e.g. no connection
+  /// context available or the key already exists and is read-only).
+  pub fn set_filter_state(&self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cert_validator_set_filter_state(
+        self.raw,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  /// Get a string value from the connection's filter state.
+  ///
+  /// Returns `None` if the key is not found or no connection context is available.
+  pub fn get_filter_state<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cert_validator_get_filter_state(
+        self.raw,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+}
 
 /// The result of a certificate chain validation.
 pub struct ValidationResult {
@@ -153,12 +206,17 @@ pub trait CertValidatorConfig: Send + Sync {
   /// Called during a TLS handshake to validate the peer's certificate chain.
   /// Each certificate in `certs` is DER-encoded, with the first entry being the leaf certificate.
   ///
+  /// The `envoy_cert_validator` provides access to Envoy-side operations such as reading and
+  /// writing filter state on the connection. It is only valid for the duration of this call.
+  ///
   /// # Arguments
+  /// * `envoy_cert_validator` - The Envoy cert validator handle for accessing filter state.
   /// * `certs` - Slice of DER-encoded certificates. The first entry is the leaf certificate.
   /// * `host_name` - The SNI host name for validation.
   /// * `is_server` - True if validating client certificates on the server side.
   fn do_verify_cert_chain(
     &self,
+    envoy_cert_validator: &EnvoyCertValidator,
     certs: &[&[u8]],
     host_name: &str,
     is_server: bool,
