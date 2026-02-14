@@ -33,6 +33,18 @@ public:
   ReverseConnectionClusterIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), ConfigHelper::httpProxyConfig()) {}
 
+  ~ReverseConnectionClusterIntegrationTest() override {
+    // Ensure proper cleanup even if test fails/times out.
+    if (test_server_) {
+      // Best-effort cleanup of listeners to ensure reverse connection sockets are cleaned up before
+      // workers.
+      BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+          lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+      EXPECT_TRUE(drain_response->complete());
+      EXPECT_EQ("200", drain_response->headers().getStatusValue());
+    }
+  }
+
   void initialize() override {
     // Set up one fake upstream for the final destination service.
     setUpstreamCount(1);
@@ -173,7 +185,7 @@ protected:
     auto* lua_filter = egress_hcm.add_http_filters();
     lua_filter->set_name("envoy.filters.http.lua");
     envoy::extensions::filters::http::lua::v3::Lua lua_config;
-    lua_config.set_inline_code(fmt::format(R"(
+    lua_config.mutable_default_source_code()->mutable_inline_string()->assign(fmt::format(R"(
       function envoy_on_request(request_handle)
         local headers = request_handle:headers()
         local node_id = headers:get("x-node-id")
@@ -196,7 +208,7 @@ protected:
         headers:add("x-computed-host-id", host_id)
       end
     )",
-                                           node_id));
+                                                                                          node_id));
     lua_filter->mutable_typed_config()->PackFrom(lua_config);
 
     auto* egress_router = egress_hcm.add_http_filters();
@@ -705,7 +717,13 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     lds_cluster->set_name("lds_cluster");
     lds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
     lds_cluster->mutable_connect_timeout()->set_seconds(5);
-    lds_cluster->mutable_http2_protocol_options();
+
+    // Configure HTTP/2 protocol using modern API
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
+    lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    (*lds_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(lds_http_options);
 
     auto* lds_load_assignment = lds_cluster->mutable_load_assignment();
     lds_load_assignment->set_cluster_name("lds_cluster");
@@ -822,7 +840,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     auto* lua_filter = egress_hcm.add_http_filters();
     lua_filter->set_name("envoy.filters.http.lua");
     envoy::extensions::filters::http::lua::v3::Lua lua_config;
-    lua_config.set_inline_code(R"(
+    lua_config.mutable_default_source_code()->mutable_inline_string()->assign(R"(
           function envoy_on_request(request_handle)
             local headers = request_handle:headers()
             local node_id = headers:get("x-node-id")
@@ -1195,6 +1213,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
     ENVOY_LOG_MISC(info, "Worker {} has accepted 1 reverse connection.", worker_id);
   }
+
+  // Allow time for all reverse connections to be fully registered in the cluster.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
 
   ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
 
