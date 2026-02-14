@@ -4,6 +4,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -1285,6 +1286,172 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
 
   // Clean up the timer.
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// -----------------------------------------------------------------------------
+// Admin Handler Tests
+// -----------------------------------------------------------------------------
+
+// Test that registering an admin handler succeeds when admin is available.
+TEST_F(BootstrapAbiImplTest, RegisterAdminHandler) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Expect the admin handler to be registered.
+  EXPECT_CALL(context_.admin_, addHandler("/test_prefix", "Test help text", _, true, false, _))
+      .WillOnce(testing::Return(true));
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/test_prefix", 12};
+  envoy_dynamic_module_type_module_buffer help_text = {"Test help text", 14};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix, help_text, true, false);
+  EXPECT_TRUE(result);
+}
+
+// Test that registering an admin handler fails when addHandler returns false.
+TEST_F(BootstrapAbiImplTest, RegisterAdminHandlerFails) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Expect the admin handler registration to fail.
+  EXPECT_CALL(context_.admin_, addHandler("/duplicate", "Duplicate handler", _, false, true, _))
+      .WillOnce(testing::Return(false));
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/duplicate", 10};
+  envoy_dynamic_module_type_module_buffer help_text = {"Duplicate handler", 17};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix, help_text, false, true);
+  EXPECT_FALSE(result);
+}
+
+// Test that registering an admin handler fails when admin is not available.
+TEST_F(BootstrapAbiImplTest, RegisterAdminHandlerNoAdmin) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Override admin() to return nullopt.
+  EXPECT_CALL(context_, admin()).WillRepeatedly(testing::Return(OptRef<Server::Admin>{}));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/no_admin", 9};
+  envoy_dynamic_module_type_module_buffer help_text = {"No admin", 8};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix, help_text, true, false);
+  EXPECT_FALSE(result);
+}
+
+// Test that removing an admin handler succeeds.
+TEST_F(BootstrapAbiImplTest, RemoveAdminHandler) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  EXPECT_CALL(context_.admin_, removeHandler("/test_prefix")).WillOnce(testing::Return(true));
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/test_prefix", 12};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix);
+  EXPECT_TRUE(result);
+}
+
+// Test that removing an admin handler fails when handler is not found.
+TEST_F(BootstrapAbiImplTest, RemoveAdminHandlerNotFound) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  EXPECT_CALL(context_.admin_, removeHandler("/nonexistent")).WillOnce(testing::Return(false));
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/nonexistent", 12};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix);
+  EXPECT_FALSE(result);
+}
+
+// Test that removing an admin handler fails when admin is not available.
+TEST_F(BootstrapAbiImplTest, RemoveAdminHandlerNoAdmin) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Override admin() to return nullopt.
+  EXPECT_CALL(context_, admin()).WillRepeatedly(testing::Return(OptRef<Server::Admin>{}));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/no_admin", 9};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix);
+  EXPECT_FALSE(result);
+}
+
+// Test that the admin handler callback invokes the module's on_admin_request event hook.
+TEST_F(BootstrapAbiImplTest, AdminHandlerCallbackInvokesEventHook) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Capture the handler callback when addHandler is called.
+  Server::Admin::HandlerCb captured_handler;
+  EXPECT_CALL(context_.admin_, addHandler("/test_admin", "Test admin handler", _, true, false, _))
+      .WillOnce(
+          testing::Invoke([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb,
+                              bool, bool, const Server::Admin::ParamDescriptorVec&) -> bool {
+            captured_handler = std::move(cb);
+            return true;
+          }));
+
+  envoy_dynamic_module_type_module_buffer path_prefix = {"/test_admin", 11};
+  envoy_dynamic_module_type_module_buffer help_text = {"Test admin handler", 18};
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+      config.value()->thisAsVoidPtr(), path_prefix, help_text, true, false);
+  EXPECT_TRUE(result);
+  EXPECT_NE(captured_handler, nullptr);
+
+  // Invoke the captured handler to simulate an admin request.
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl response_body;
+  testing::NiceMock<Server::MockAdminStream> admin_stream;
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.setMethod("GET");
+  request_headers.setPath("/test_admin?param=value");
+  EXPECT_CALL(admin_stream, getRequestHeaders())
+      .WillRepeatedly(testing::ReturnRef(request_headers));
+  EXPECT_CALL(admin_stream, getRequestBody()).WillRepeatedly(testing::Return(nullptr));
+
+  auto code = captured_handler(response_headers, response_body, admin_stream);
+
+  // The no_op module's admin_request hook returns 200.
+  EXPECT_EQ(code, Http::Code::OK);
 }
 
 // Test that re-enabling the timer resets it.
