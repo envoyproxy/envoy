@@ -25,6 +25,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -2512,6 +2513,7 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   const std::string bootstrap = R"EOF(
   static_resources:
     clusters:
@@ -2533,6 +2535,8 @@ TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     create(parseBootstrapFromV3Yaml(bootstrap));
     FAIL() << "Invalid address was not rejected";

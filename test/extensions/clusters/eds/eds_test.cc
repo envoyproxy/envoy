@@ -439,6 +439,7 @@ TEST_F(EdsTest, DualStackEndpoint) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -459,6 +460,8 @@ TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
   initialize();
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     (void)eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
     FAIL() << "Invalid address was not rejected";
