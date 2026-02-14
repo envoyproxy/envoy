@@ -1,3 +1,4 @@
+
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -496,8 +497,19 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   ENVOY_LOG_MISC(info, "All tests completed successfully.");
 
-  // Cleanup.
+  // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
+
+  // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
+  // before workers are destroyed.
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+
+  // Wait for listeners to be fully stopped before test cleanup.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
+                                 std::chrono::milliseconds(5000));
 }
 
 // End-to-end reverse connection cluster test with mTLS.
@@ -650,8 +662,19 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 
   ENVOY_LOG_MISC(info, "mTLS reverse tunnel test completed successfully.");
 
-  // Cleanup.
+  // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
+
+  // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
+  // before workers are destroyed.
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+
+  // Wait for listeners to be fully stopped before test cleanup.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
+                                 std::chrono::milliseconds(5000));
 }
 
 // Test resilience when an initiator node goes down and comes back up.
@@ -1034,7 +1057,37 @@ typed_config:
 
   ENVOY_LOG_MISC(info, "Initiator resilience test completed successfully!");
 
+  // Cleanup LDS connection first to prevent race with FakeStream destruction.
+  // Finish the gRPC stream to ensure no more messages are being processed.
+  if (lds_upstream_info_.stream_) {
+    lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
+  }
+  if (lds_upstream_info_.connection_) {
+    AssertionResult result = lds_upstream_info_.connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = lds_upstream_info_.connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+  }
+  // Allow worker threads time to process the stream closure before destroying objects.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // Now reset the pointers.
+  lds_upstream_info_.stream_.reset();
+  lds_upstream_info_.connection_.reset();
+
+  // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
+
+  // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
+  // before workers are destroyed.
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+
+  // Wait for listeners to be fully stopped before test cleanup.
+  test_server_->waitForCounterGe("listener_manager.listener_stopped", 7,
+                                 std::chrono::milliseconds(5000));
 }
 
 // Multi-worker reverse tunnel test where:
@@ -1201,8 +1254,19 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   ENVOY_LOG_MISC(info, "Multi-worker reverse tunnel test completed successfully!");
 
-  // Cleanup.
+  // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
+
+  // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
+  // before workers are destroyed.
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+
+  // Wait for listeners to be fully stopped before test cleanup.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 3,
+                                 std::chrono::milliseconds(5000));
 }
 
 } // namespace
