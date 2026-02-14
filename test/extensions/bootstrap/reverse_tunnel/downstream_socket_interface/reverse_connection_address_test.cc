@@ -115,6 +115,10 @@ TEST_F(ReverseConnectionAddressTest, IpAddressProperties) {
   EXPECT_EQ(address.ip()->version(), Network::Address::IpVersion::v4);
   EXPECT_FALSE(address.ip()->isAnyAddress());
   EXPECT_TRUE(address.ip()->isUnicastAddress());
+  EXPECT_FALSE(address.ip()->isLinkLocalAddress());
+  EXPECT_FALSE(address.ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(address.ip()->isSiteLocalAddress());
+  EXPECT_FALSE(address.ip()->isTeredoAddress());
 
   // Should have ipv4() for version v4
   EXPECT_NE(address.ip()->ipv4(), nullptr);
@@ -244,7 +248,7 @@ TEST_F(ReverseConnectionAddressTest, EmptyConfigValues) {
 
   ReverseConnectionAddress address(config);
 
-  // Should still work with empty values. Uses placeholder port 1.
+  // Should still work with empty values. The placeholder port is always used.
   EXPECT_EQ(address.asString(), "127.0.0.1:1");
   EXPECT_EQ(address.logicalName(), "rc://::@:0");
 
@@ -282,8 +286,9 @@ TEST_F(ReverseConnectionAddressTest, MultipleInstances) {
   // Should have different logical names.
   EXPECT_NE(address1.logicalName(), address2.logicalName());
 
-  // Should have same address string (both use 127.0.0.1:0)
+  // Should have same address string (both use the placeholder port 127.0.0.1:1)
   EXPECT_EQ(address1.asString(), address2.asString());
+  EXPECT_EQ(address1.asString(), "127.0.0.1:1");
 }
 
 // Test copy constructor and assignment (if implemented).

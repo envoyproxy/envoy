@@ -993,6 +993,93 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
 }
 
 // =============================================================================
+// Cluster Host Count FFI stubs and tests.
+// =============================================================================
+
+struct MockClusterHostCount {
+  total: usize,
+  healthy: usize,
+  degraded: usize,
+}
+
+static MOCK_CLUSTER_HOST_COUNT: std::sync::Mutex<Option<MockClusterHostCount>> =
+  std::sync::Mutex::new(None);
+
+fn reset_cluster_host_count_mock() {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = None;
+}
+
+fn set_cluster_host_count_mock(count: MockClusterHostCount) {
+  *MOCK_CLUSTER_HOST_COUNT.lock().unwrap() = Some(count);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  let guard = MOCK_CLUSTER_HOST_COUNT.lock().unwrap();
+  match &*guard {
+    Some(count) => {
+      if !total_count.is_null() {
+        unsafe {
+          *total_count = count.total;
+        }
+      }
+      if !healthy_count.is_null() {
+        unsafe {
+          *healthy_count = count.healthy;
+        }
+      }
+      if !degraded_count.is_null() {
+        unsafe {
+          *degraded_count = count.degraded;
+        }
+      }
+      true
+    },
+    None => false,
+  }
+}
+
+#[test]
+fn test_get_cluster_host_count_success() {
+  reset_cluster_host_count_mock();
+  set_cluster_host_count_mock(MockClusterHostCount {
+    total: 10,
+    healthy: 8,
+    degraded: 1,
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("test_cluster", 0);
+  assert!(result.is_some());
+  let count = result.unwrap();
+  assert_eq!(count.total, 10);
+  assert_eq!(count.healthy, 8);
+  assert_eq!(count.degraded, 1);
+}
+
+#[test]
+fn test_get_cluster_host_count_not_found() {
+  reset_cluster_host_count_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_cluster_host_count("nonexistent_cluster", 0);
+  assert!(result.is_none());
+}
+
+// =============================================================================
 // Upstream Host Access and StartTLS FFI stubs for testing.
 // =============================================================================
 
@@ -1731,4 +1818,618 @@ fn test_network_filter_watermark_callbacks() {
 
   assert!(ON_ABOVE_HIGH_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_BELOW_LOW_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Bootstrap Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+  _ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _value_ptr: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _sample_count_ptr: *mut u64,
+  _sample_sum_ptr: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_counter_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+  _extension_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  _iterator_fn: abi::envoy_dynamic_module_type_gauge_iterator_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+  _delay_milliseconds: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+  _timer_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
+) {
+}
+
+// Thread-local used by the test mock to capture the response body set via the callback.
+thread_local! {
+  static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
+    const { std::cell::RefCell::new(String::new()) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  response_body: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  if !response_body.ptr.is_null() && response_body.length > 0 {
+    let s = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        response_body.ptr as *const u8,
+        response_body.length,
+      ))
+    };
+    TEST_ADMIN_RESPONSE.with(|cell| {
+      *cell.borrow_mut() = s.to_string();
+    });
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+  _help_text: abi::envoy_dynamic_module_type_module_buffer,
+  _removable: bool,
+  _mutates_server_state: bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path_prefix: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Bootstrap Extension Tests
+// =============================================================================
+
+#[test]
+fn test_bootstrap_extension_config_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+  impl Drop for TestBootstrapExtensionConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+  impl Drop for TestBootstrapExtension {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+  assert!(!extension_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_bootstrap_extension_drain_started() {
+  static DRAIN_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_drain_started(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+      DRAIN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_drain_started(std::ptr::null_mut(), extension_ptr);
+
+  assert!(DRAIN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown() {
+  static SHUTDOWN_CALLED: AtomicBool = AtomicBool::new(false);
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    fn on_shutdown(
+      &mut self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+      completion: CompletionCallback,
+    ) {
+      SHUTDOWN_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      completion.done();
+    }
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(SHUTDOWN_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_shutdown_default_calls_completion() {
+  // Verify that the default on_shutdown implementation calls the completion callback.
+  static COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {
+    // Use the default on_shutdown implementation.
+  }
+
+  unsafe extern "C" fn test_completion(context: *mut std::os::raw::c_void) {
+    let flag = &*(context as *const AtomicBool);
+    flag.store(true, std::sync::atomic::Ordering::SeqCst);
+  }
+
+  let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let extension_ptr =
+    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+
+  envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    std::ptr::null_mut(),
+    extension_ptr,
+    Some(test_completion),
+    &COMPLETION_CALLED as *const AtomicBool as *mut std::os::raw::c_void,
+  );
+
+  assert!(COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_admin_request(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      method: &str,
+      path: &str,
+      _body: &[u8],
+    ) -> (u32, String) {
+      (200, format!("method={} path={}", method, path))
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test_admin?key=val";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 200);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert_eq!(*cell.borrow(), "method=GET path=/test_admin?key=val");
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_admin_request_default() {
+  // Verify that the default on_admin_request returns 404 with empty body.
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let method = "GET";
+  let path = "/test";
+  let body = b"";
+
+  let method_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: method.as_ptr() as *mut _,
+    length: method.len(),
+  };
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  let body_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: body.as_ptr() as *mut _,
+    length: body.len(),
+  };
+
+  // Clear the test mock before calling.
+  TEST_ADMIN_RESPONSE.with(|cell| cell.borrow_mut().clear());
+
+  let status = unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_admin_request(
+      std::ptr::null_mut(),
+      config_ptr,
+      method_buf,
+      path_buf,
+      body_buf,
+    )
+  };
+
+  assert_eq!(status, 404);
+  TEST_ADMIN_RESPONSE.with(|cell| {
+    assert!(cell.borrow().is_empty());
+  });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
 }

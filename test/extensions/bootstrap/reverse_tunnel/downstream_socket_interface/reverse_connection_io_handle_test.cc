@@ -15,11 +15,13 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -30,6 +32,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -2325,6 +2328,25 @@ TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   maintainClusterConnections("test-cluster", cluster_config);
 
   EXPECT_EQ(getConnectionWrappers().size(), 0);
+}
+
+// Bind to address must be no-op for reverse connection io handle.
+TEST_F(ReverseConnectionIOHandleTest, ReverseConnectionIoHandleBindMustBeNoOp) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  auto address = io_handle_->localAddress();
+  EXPECT_EQ(address.ok(), true);
+
+  // Set up the api mocks any call here fails the test.
+  StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+
+  auto result = io_handle_->bind(address.value());
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
 }
 
 // Test ReverseConnectionIOHandle::close() method without trigger pipe.

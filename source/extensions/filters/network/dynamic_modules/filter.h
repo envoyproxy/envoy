@@ -176,7 +176,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // Current buffers, only valid during callbacks.
+  // Current buffers. Set on the first on_read/on_write callback and kept for the lifetime of the
+  // connection so that modules can access buffered data outside of on_read/on_write callbacks.
   Buffer::Instance* current_read_buffer_ = nullptr;
   Buffer::Instance* current_write_buffer_ = nullptr;
 
