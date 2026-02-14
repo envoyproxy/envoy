@@ -11,6 +11,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -109,6 +110,10 @@ test_program(name = "bootstrap_no_config_scheduled")
 
 test_program(name = "bootstrap_no_http_callout_done")
 
+test_program(name = "bootstrap_no_timer_fired")
+
+test_program(name = "bootstrap_no_admin_request")
+
 test_program(name = "access_log_no_op")
 
 test_program(name = "access_log_missing_config_new")
@@ -134,3 +139,15 @@ test_program(name = "lb_new_fail")
 test_program(name = "lb_no_choose_host")
 
 test_program(name = "lb_invalid_host_index")
+
+test_program(name = "cert_validator_no_op")
+
+test_program(name = "cert_validator_fail")
+
+test_program(name = "cert_validator_config_new_fail")
+
+test_program(name = "cert_validator_no_client_cert")
+
+test_program(name = "cert_validator_not_validated")
+
+test_program(name = "cert_validator_empty_digest")

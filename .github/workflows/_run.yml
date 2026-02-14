@@ -163,6 +163,12 @@ on:
         type: string
       temp-dir:
         type: string
+      template-docker-configure:
+        type: string
+        default: |
+          sudo mkdir -p /etc/docker
+          echo '\(tojson)' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
       timeout-minutes:
         type: number
         default: 60
@@ -262,20 +268,20 @@ jobs:
         mount
         df -h
 
-    - run: |
-        sudo mkdir -p /etc/docker
-        echo '{
-          "ipv6": true,
-          "fixed-cidr-v6": "2001:db8:1::/64"
-          }' | sudo tee /etc/docker/daemon.json
-      name: Configure Docker ipv6
-      if: ${{ inputs.docker-ipv6 }}
-    - if: >-
-        inputs.docker-ipv6
-        && inputs.cache-build-image
-        && steps.cache-lookup.outputs.cache-hit == 'true'
-      run: |
-        sudo systemctl restart docker
+    - uses: envoyproxy/toolshed/actions/bson@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      name: Configure Docker
+      if: runner.os == 'Linux'
+      with:
+        input-format: yaml
+        input: |
+          docker-ipv6: ${{ inputs.docker-ipv6 }}
+        filter: |
+          .["docker-ipv6"] as $ipv6
+          | {"features": {"containerd-snapshotter": false}}
+          | if $ipv6 then
+              . + {"ipv6": true, "fixed-cidr-v6": "2001:db8:1::/64"}
+            else . end
+          | "${{ inputs.template-docker-configure }}"
 
     # Caches
     - uses: envoyproxy/toolshed/actions/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1

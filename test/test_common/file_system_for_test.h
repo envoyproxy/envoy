@@ -19,7 +19,7 @@ public:
   FilePtr createFile(const FilePathAndType& file_info) override;
 
   bool fileExists(const std::string& path) override {
-    absl::MutexLock m(&lock_);
+    absl::MutexLock m(lock_);
     auto it = files_.find(path);
     return (it != files_.end() || file_system_->fileExists(path));
   }
@@ -48,12 +48,12 @@ private:
   friend class ScopedUseMemfiles;
 
   void setUseMemfiles(bool value) {
-    absl::MutexLock m(&lock_);
+    absl::MutexLock m(lock_);
     use_memfiles_ = value;
   }
 
   bool useMemfiles() {
-    absl::MutexLock m(&lock_);
+    absl::MutexLock m(lock_);
     return use_memfiles_;
   }
 
