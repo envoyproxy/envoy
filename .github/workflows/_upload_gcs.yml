@@ -1,0 +1,48 @@
+name: Upload to GCS
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+        required: true
+    inputs:
+      artifacts:
+        description: JSON array of artifacts to upload to GCS
+        type: string
+        required: true
+
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact: ${{ fromJSON(inputs.artifacts) }}
+    steps:
+    - uses: actions/download-artifact@v4.1.3
+      with:
+        name: ${{ matrix.artifact }}
+        path: ${{ matrix.artifact }}
+    - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      id: metadata
+      with:
+        input: ${{ matrix.artifact }}/gcs-metadata.json
+        input-format: json-path
+    - run: |
+        rm -rf ${{ matrix.artifact }}/gcs-metadata.json
+    - uses: envoyproxy/toolshed/actions/gcp/setup@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      with:
+        key: ${{ secrets.gcp-key }}
+    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      with:
+        bucket: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
+        path: ${{ matrix.artifact }}
+        path-upload: ${{ matrix.artifact }}
+        sha: ${{ fromJSON(steps.metadata.outputs.value).sha }}
+        redirect: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
