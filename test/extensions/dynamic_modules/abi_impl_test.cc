@@ -367,6 +367,47 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
 }
 
 // =====================================================================
+// Cert Validator weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for cert_validator_set_error_details triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, CertValidatorSetErrorDetailsEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer error_details = {"error", 5};
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_cert_validator_set_error_details(nullptr, error_details); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cert_validator_set_filter_state triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, CertValidatorSetFilterStateEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer key = {"key", 3};
+  envoy_dynamic_module_type_module_buffer value = {"value", 5};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result =
+            envoy_dynamic_module_callback_cert_validator_set_filter_state(nullptr, key, value);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cert_validator_get_filter_state triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, CertValidatorGetFilterStateEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer key = {"key", 3};
+  envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result =
+            envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, key, &value_out);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// =====================================================================
 // Load Balancer weak symbol stub tests
 // =====================================================================
 

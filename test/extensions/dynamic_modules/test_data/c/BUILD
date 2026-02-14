@@ -151,3 +151,5 @@ test_program(name = "cert_validator_no_client_cert")
 test_program(name = "cert_validator_not_validated")
 
 test_program(name = "cert_validator_empty_digest")
+
+test_program(name = "cert_validator_filter_state")

@@ -2433,3 +2433,310 @@ fn test_bootstrap_extension_admin_request_default() {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
 }
+
+// =============================================================================
+// Cert Validator callback stubs.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_error_details(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _error_details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_get_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Cert Validator tests.
+// =============================================================================
+
+#[test]
+fn test_cert_validator_config_new_and_destroy() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  NEW_CERT_VALIDATOR_CONFIG_FUNCTION.get_or_init(|| {
+    |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
+      Some(Box::new(TestCertValidatorConfig))
+    }
+  });
+
+  let name = "test";
+  let config = b"config";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: config.as_ptr() as *const _,
+    length: config.len(),
+  };
+
+  let config_ptr = unsafe {
+    envoy_dynamic_module_on_cert_validator_config_new(std::ptr::null_mut(), name_buf, config_buf)
+  };
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_successful() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      certs: &[&[u8]],
+      host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      assert_eq!(certs.len(), 1);
+      assert_eq!(certs[0], b"cert_data");
+      assert_eq!(host_name, "example.com");
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Successful
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Validated
+  );
+  assert!(!result.has_tls_alert);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_failed() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::failed(
+        cert_validator::ClientValidationStatus::Failed,
+        Some(42),
+        Some("test error".to_string()),
+      )
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Failed
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Failed
+  );
+  assert!(result.has_tls_alert);
+  assert_eq!(result.tls_alert, 42);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_filter_state_methods() {
+  // Test that EnvoyCertValidator filter state methods call the ABI functions correctly.
+  // In unit tests, the ABI functions are weak stubs that return false, so we verify
+  // the methods handle the failure case gracefully.
+  let envoy_validator = cert_validator::EnvoyCertValidator::new(std::ptr::null_mut());
+
+  // set_filter_state should return false because the weak stub returns false.
+  let result = envoy_validator.set_filter_state(b"key", b"value");
+  assert!(!result);
+
+  // get_filter_state should return None because the weak stub returns false.
+  let result = envoy_validator.get_filter_state(b"key");
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_cert_validator_get_ssl_verify_mode() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, handshaker_provides_certificates: bool) -> i32 {
+      if handshaker_provides_certificates {
+        0x01
+      } else {
+        0x03
+      }
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, false) };
+  assert_eq!(result, 0x03);
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, true) };
+  assert_eq!(result, 0x01);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_update_digest() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"my_digest_data"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let mut out_data = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_update_digest(config_ptr, &mut out_data);
+  }
+  assert!(!out_data.ptr.is_null());
+  assert_eq!(out_data.length, 14);
+  let digest = unsafe { std::slice::from_raw_parts(out_data.ptr as *const u8, out_data.length) };
+  assert_eq!(digest, b"my_digest_data");
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}

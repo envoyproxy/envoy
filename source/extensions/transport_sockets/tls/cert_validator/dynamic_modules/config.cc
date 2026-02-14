@@ -3,15 +3,17 @@
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.validate.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "openssl/ssl.h"
 
-// Callback implementation for the cert validator ABI. The module calls this during
-// do_verify_cert_chain to set error details. Envoy copies the buffer immediately.
+// Callback implementations for the cert validator ABI. These are called by the module during
+// do_verify_cert_chain.
 extern "C" {
 void envoy_dynamic_module_callback_cert_validator_set_error_details(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
@@ -22,6 +24,59 @@ void envoy_dynamic_module_callback_cert_validator_set_error_details(
   if (error_details.ptr != nullptr && error_details.length > 0) {
     config->last_error_details_ = std::string(error_details.ptr, error_details.length);
   }
+}
+
+bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  auto* config = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+      config_envoy_ptr);
+
+  if (config->current_callbacks_ == nullptr || key.ptr == nullptr || value.ptr == nullptr) {
+    return false;
+  }
+
+  std::string key_str(key.ptr, key.length);
+  std::string value_str(value.ptr, value.length);
+
+  config->current_callbacks_->connection().streamInfo().filterState()->setData(
+      key_str, std::make_shared<Envoy::Router::StringAccessorImpl>(value_str),
+      Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+      Envoy::StreamInfo::FilterState::LifeSpan::Connection);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  auto* config = static_cast<
+      Envoy::Extensions::TransportSockets::Tls::DynamicModules::DynamicModuleCertValidatorConfig*>(
+      config_envoy_ptr);
+
+  if (config->current_callbacks_ == nullptr || key.ptr == nullptr) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  std::string key_str(key.ptr, key.length);
+  const auto* accessor = config->current_callbacks_->connection()
+                             .streamInfo()
+                             .filterState()
+                             ->getDataReadOnly<Envoy::Router::StringAccessor>(key_str);
+
+  if (accessor == nullptr) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  absl::string_view value = accessor->asString();
+  value_out->ptr = const_cast<char*>(value.data());
+  value_out->length = value.size();
+  return true;
 }
 } // extern "C"
 
@@ -110,7 +165,7 @@ absl::Status DynamicModuleCertValidator::addClientValidationContext(SSL_CTX* con
 ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
-    SSL_CTX& /*ssl_ctx*/, const CertValidator::ExtraValidationContext& /*validation_context*/,
+    SSL_CTX& /*ssl_ctx*/, const CertValidator::ExtraValidationContext& validation_context,
     bool is_server, absl::string_view host_name) {
 
   const int num_certs = sk_X509_num(&cert_chain);
@@ -147,10 +202,18 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
   // envoy_dynamic_module_callback_cert_validator_set_error_details callback.
   config_->last_error_details_.reset();
 
+  // Store the callbacks pointer so that filter state callbacks can access the connection's
+  // stream info during the module's do_verify_cert_chain call. Set immediately before and
+  // reset immediately after to ensure the pointer is only valid during the module call.
+  config_->current_callbacks_ = validation_context.callbacks;
+
   // Call the module's verify function.
   auto result = config_->on_do_verify_cert_chain_(
       static_cast<void*>(config_.get()), config_->in_module_config_, cert_buffers.data(),
       static_cast<size_t>(num_certs), host_name_buffer, is_server);
+
+  // Reset the callbacks pointer after the module call returns.
+  config_->current_callbacks_ = nullptr;
 
   // Translate the result.
   ValidationResults::ValidationStatus status;
