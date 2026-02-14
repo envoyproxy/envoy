@@ -1,17 +1,13 @@
-# docs_admin_interface_snippet_start
-# docs_admin_address_snippet_start
 admin:
   address:
     socket_address:
       protocol: TCP
       address: 127.0.0.1
       port_value: 9901
-  # docs_admin_address_snippet_end
   allow_paths:
   - exact: /ready
   - prefix: /stats
   profile_path: /tmp/envoy.prof
-# docs_admin_interface_snippet_end
 static_resources:
   listeners:
   - name: listener_0

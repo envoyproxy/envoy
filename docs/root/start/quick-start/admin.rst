@@ -31,9 +31,10 @@ which in this example configuration is ``127.0.0.1:9901``.
 
 .. literalinclude:: /_configs/repo/admin-interface.yaml
    :language: yaml
-   :start-after: docs_admin_address_snippet_start
-   :end-before: docs_admin_address_snippet_end
+   :start-at: admin:
+   :end-before: allow_paths:
    :emphasize-lines: 5-6
+   :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
 .. warning::
 
@@ -54,8 +55,10 @@ Use ``prefix`` matchers for endpoints that are commonly queried with parameters 
 
 .. literalinclude:: /_configs/repo/admin-interface.yaml
    :language: yaml
-   :start-after: docs_admin_interface_snippet_start
-   :end-before: docs_admin_interface_snippet_end
+   :start-at: admin:
+   :end-before: static_resources:
+   :emphasize-lines: 7-9
+   :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
 
 ``stat_prefix``

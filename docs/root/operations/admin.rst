@@ -25,8 +25,10 @@ modify different aspects of the server:
 
   .. literalinclude:: /_configs/repo/admin-interface.yaml
     :language: yaml
-    :start-after: docs_admin_interface_snippet_start
-    :end-before: docs_admin_interface_snippet_end
+    :start-at: admin:
+    :end-before: static_resources:
+    :emphasize-lines: 7-9
+    :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
