@@ -38,6 +38,7 @@ jobs:
         Error:
       rbe: true
       request: ${{ inputs.request }}
+      skip: ${{ matrix.skip != false && true || false }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -52,3 +53,6 @@ jobs:
           docker-ci: true
         - target: gcc
           name: GCC
+        - target: openssl
+          name: OpenSSL
+          skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
