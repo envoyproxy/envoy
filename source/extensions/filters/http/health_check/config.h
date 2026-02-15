@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
-#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

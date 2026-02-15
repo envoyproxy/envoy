@@ -18,7 +18,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
-        test::integration::filters::SetRouteFilterConfig set_route_config;
+        ::test::integration::filters::SetRouteFilterConfig set_route_config;
 
         auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
         auto* config = virtual_host->mutable_typed_per_filter_config();

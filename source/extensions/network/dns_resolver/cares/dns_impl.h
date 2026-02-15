@@ -4,8 +4,10 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 

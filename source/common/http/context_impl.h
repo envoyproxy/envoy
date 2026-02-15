@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/http/context.h"
 
 #include "source/common/http/codes.h"

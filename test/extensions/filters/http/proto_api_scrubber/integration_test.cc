@@ -27,7 +27,7 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
-namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
+namespace scrubber_test = ::test::extensions::filters::http::proto_api_scrubber;
 
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;

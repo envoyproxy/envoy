@@ -1,6 +1,9 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/message_validator_impl.h"

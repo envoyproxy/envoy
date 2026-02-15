@@ -26,22 +26,22 @@ class DummyConfigProviderManager;
 class DummyConfig : public Envoy::Config::ConfigProvider::Config {
 public:
   DummyConfig() = default;
-  explicit DummyConfig(const test::common::config::DummyConfig& config_proto) {
+  explicit DummyConfig(const ::test::common::config::DummyConfig& config_proto) {
     protos_.push_back(config_proto);
   }
-  void addProto(const test::common::config::DummyConfig& config_proto) {
+  void addProto(const ::test::common::config::DummyConfig& config_proto) {
     protos_.push_back(config_proto);
   }
 
   uint32_t numProtos() const { return protos_.size(); }
 
 private:
-  std::vector<test::common::config::DummyConfig> protos_;
+  std::vector<::test::common::config::DummyConfig> protos_;
 };
 
 class StaticDummyConfigProvider : public ImmutableConfigProviderBase {
 public:
-  StaticDummyConfigProvider(const test::common::config::DummyConfig& config_proto,
+  StaticDummyConfigProvider(const ::test::common::config::DummyConfig& config_proto,
                             Server::Configuration::ServerFactoryContext& factory_context,
                             DummyConfigProviderManager& config_provider_manager);
 
@@ -55,7 +55,7 @@ public:
 
 private:
   ConfigConstSharedPtr config_;
-  test::common::config::DummyConfig config_proto_;
+  ::test::common::config::DummyConfig config_proto_;
 };
 
 class DummyConfigSubscription : public ConfigSubscriptionInstance,
@@ -73,14 +73,14 @@ public:
   ConfigProvider::ConfigConstSharedPtr
   onConfigProtoUpdate(const Protobuf::Message& config_proto) override {
     return std::make_shared<DummyConfig>(
-        static_cast<const test::common::config::DummyConfig&>(config_proto));
+        static_cast<const ::test::common::config::DummyConfig&>(config_proto));
   }
 
   // Envoy::Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
                               const std::string& version_info) override {
     const auto& config =
-        dynamic_cast<const test::common::config::DummyConfig&>(resources[0].get().resource());
+        dynamic_cast<const ::test::common::config::DummyConfig&>(resources[0].get().resource());
     if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
@@ -97,12 +97,12 @@ public:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                             const EnvoyException*) override {}
 
-  const absl::optional<test::common::config::DummyConfig>& configProto() const {
+  const absl::optional<::test::common::config::DummyConfig>& configProto() const {
     return config_proto_;
   }
 
 private:
-  absl::optional<test::common::config::DummyConfig> config_proto_;
+  absl::optional<::test::common::config::DummyConfig> config_proto_;
 };
 using DummyConfigSubscriptionSharedPtr = std::shared_ptr<DummyConfigSubscription>;
 
@@ -143,7 +143,7 @@ public:
 
   // Envoy::Config::ConfigProviderManagerImplBase
   ProtobufTypes::MessagePtr dumpConfigs(const Matchers::StringMatcher&) const override {
-    auto config_dump = std::make_unique<test::common::config::DummyConfigsDump>();
+    auto config_dump = std::make_unique<::test::common::config::DummyConfigsDump>();
     for (const auto& element : configSubscriptions()) {
       auto subscription = element.second.lock();
       ASSERT(subscription);
@@ -159,10 +159,10 @@ public:
     }
 
     for (const auto* provider : immutableConfigProviders(ConfigProviderInstanceType::Static)) {
-      ASSERT(provider->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
+      ASSERT(provider->configProtoInfoVector<::test::common::config::DummyConfig>().has_value());
       auto* static_config = config_dump->mutable_static_dummy_configs()->Add();
       static_config->mutable_dummy_config()->MergeFrom(
-          *provider->configProtoInfoVector<test::common::config::DummyConfig>()
+          *provider->configProtoInfoVector<::test::common::config::DummyConfig>()
                .value()
                .config_protos_[0]);
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
@@ -199,7 +199,7 @@ public:
     // Currently, the dummy config provider only supports a single static config. We can extend this
     // to support multiple static configs if needed.
     ASSERT(configs.size() == 1);
-    auto config = dynamic_cast<const test::common::config::DummyConfig&>(*configs[0]);
+    auto config = dynamic_cast<const ::test::common::config::DummyConfig&>(*configs[0]);
     return std::make_unique<StaticDummyConfigProvider>(config, factory_context, *this);
   }
 };
@@ -214,7 +214,7 @@ DummyConfigSubscription::DummyConfigSubscription(
 }
 
 StaticDummyConfigProvider::StaticDummyConfigProvider(
-    const test::common::config::DummyConfig& config_proto,
+    const ::test::common::config::DummyConfig& config_proto,
     Server::Configuration::ServerFactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
     : ImmutableConfigProviderBase(factory_context, config_provider_manager,
@@ -238,15 +238,15 @@ protected:
   std::unique_ptr<DummyConfigProviderManager> provider_manager_;
 };
 
-test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& yaml) {
-  test::common::config::DummyConfig config;
+::test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& yaml) {
+  ::test::common::config::DummyConfig config;
   TestUtility::loadFromYaml(yaml, config);
   return config;
 }
 
-std::unique_ptr<test::common::config::DummyConfig>
+std::unique_ptr<::test::common::config::DummyConfig>
 parseDummyConfigPtrFromYaml(const std::string& yaml) {
-  auto config = std::make_unique<test::common::config::DummyConfig>();
+  auto config = std::make_unique<::test::common::config::DummyConfig>();
   TestUtility::loadFromYaml(yaml, *config);
   return config;
 }
@@ -266,7 +266,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       ConfigProviderManager::NullOptionalArg());
 
   // No config protos have been received via the subscription yet.
-  EXPECT_FALSE(provider1->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
+  EXPECT_FALSE(provider1->configProtoInfoVector<::test::common::config::DummyConfig>().has_value());
 
   const auto dummy_config = parseDummyConfigFromYaml("a: a dummy config");
 
@@ -281,7 +281,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
 
-  EXPECT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
+  EXPECT_TRUE(provider2->configProtoInfoVector<::test::common::config::DummyConfig>().has_value());
   EXPECT_EQ(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DummyDynamicConfigProvider&>(*provider2).subscription());
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
@@ -303,7 +303,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
                   .onConfigUpdate(decoded_resources.refvec_, "provider3")
                   .ok());
 
-  EXPECT_EQ(2UL, static_cast<test::common::config::DummyConfigsDump*>(
+  EXPECT_EQ(2UL, static_cast<::test::common::config::DummyConfigsDump*>(
                      provider_manager_->dumpConfigs().get())
                      ->dynamic_dummy_configs()
                      .size());
@@ -314,7 +314,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   provider2.reset();
 
   auto dynamic_dummy_configs =
-      static_cast<test::common::config::DummyConfigsDump*>(provider_manager_->dumpConfigs().get())
+      static_cast<::test::common::config::DummyConfigsDump*>(provider_manager_->dumpConfigs().get())
           ->dynamic_dummy_configs();
   EXPECT_EQ(1UL, dynamic_dummy_configs.size());
 
@@ -322,7 +322,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
 
   provider3.reset();
 
-  EXPECT_EQ(0UL, static_cast<test::common::config::DummyConfigsDump*>(
+  EXPECT_EQ(0UL, static_cast<::test::common::config::DummyConfigsDump*>(
                      provider_manager_->dumpConfigs().get())
                      ->dynamic_dummy_configs()
                      .size());
@@ -416,9 +416,9 @@ TEST_F(ConfigProviderImplTest, ConfigDump) {
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
           Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump =
-      static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
+      static_cast<const ::test::common::config::DummyConfigsDump&>(*message_ptr);
 
-  test::common::config::DummyConfigsDump expected_config_dump;
+  ::test::common::config::DummyConfigsDump expected_config_dump;
   TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
 dynamic_dummy_configs:
@@ -436,7 +436,7 @@ dynamic_dummy_configs:
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump2 =
-      static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
+      static_cast<const ::test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: a static dummy config }
@@ -464,7 +464,7 @@ dynamic_dummy_configs:
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump3 =
-      static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
+      static_cast<const ::test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: a static dummy config }
@@ -484,7 +484,7 @@ dynamic_dummy_configs:
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
   const auto& dummy_config_dump4 =
-      static_cast<const test::common::config::DummyConfigsDump&>(*message_ptr);
+      static_cast<const ::test::common::config::DummyConfigsDump&>(*message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_dummy_configs:
   - dummy_config: { a: another static dummy config }
@@ -524,7 +524,7 @@ class DeltaDummyConfigProviderManager;
 class DeltaDummyConfigSubscription : public DeltaConfigSubscriptionInstance,
                                      Envoy::Config::SubscriptionCallbacks {
 public:
-  using ProtoMap = std::map<std::string, test::common::config::DummyConfig>;
+  using ProtoMap = std::map<std::string, ::test::common::config::DummyConfig>;
 
   DeltaDummyConfigSubscription(const uint64_t manager_identifier,
                                Server::Configuration::ServerFactoryContext& factory_context,
@@ -546,7 +546,7 @@ public:
     // implementations.
     for (const auto& resource : resources) {
       const auto& dummy_config =
-          dynamic_cast<const test::common::config::DummyConfig&>(resource.get().resource());
+          dynamic_cast<const ::test::common::config::DummyConfig&>(resource.get().resource());
       proto_map_[version_info] = dummy_config;
       // Propagate the new config proto to all worker threads.
       applyConfigUpdate([&dummy_config](ConfigProvider::ConfigConstSharedPtr prev_config)
@@ -614,7 +614,7 @@ public:
 
   // Envoy::Config::ConfigProviderManagerImplBase
   ProtobufTypes::MessagePtr dumpConfigs(const Matchers::StringMatcher&) const override {
-    auto config_dump = std::make_unique<test::common::config::DeltaDummyConfigsDump>();
+    auto config_dump = std::make_unique<::test::common::config::DeltaDummyConfigsDump>();
     for (const auto& element : configSubscriptions()) {
       auto subscription = element.second.lock();
       ASSERT(subscription);
@@ -700,7 +700,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
       ConfigProviderManager::NullOptionalArg());
 
   // No config protos have been received via the subscription yet.
-  EXPECT_FALSE(provider1->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
+  EXPECT_FALSE(provider1->configProtoInfoVector<::test::common::config::DummyConfig>().has_value());
 
   const auto dummy_config_0 = parseDummyConfigFromYaml("a: a dummy config");
   const auto dummy_config_1 = parseDummyConfigFromYaml("a: another dummy config");
@@ -719,10 +719,13 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   // expected to be shared for a given subscription.
   EXPECT_EQ(&dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider2).subscription());
-  ASSERT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
-  EXPECT_EQ(
-      provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_,
-      provider2->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_);
+  ASSERT_TRUE(provider2->configProtoInfoVector<::test::common::config::DummyConfig>().has_value());
+  EXPECT_EQ(provider1->configProtoInfoVector<::test::common::config::DummyConfig>()
+                .value()
+                .config_protos_,
+            provider2->configProtoInfoVector<::test::common::config::DummyConfig>()
+                .value()
+                .config_protos_);
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
             provider2->config<const DummyConfig>().get());
   // Validate that the config protos are propagated to the thread local config implementation.

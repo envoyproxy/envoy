@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
-#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_factory_base.h"

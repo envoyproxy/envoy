@@ -1,4 +1,3 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/http/header_utility.h"
@@ -84,7 +83,7 @@ TEST_F(LocalReplyTest, TestInvalidConfigEmptyFilter) {
   TestUtility::loadFromYaml(yaml, config_);
 
   std::string err;
-  EXPECT_FALSE(Validate(config_, &err));
+  EXPECT_THROW(MessageUtil::validateWithProtovalidate(config_), ProtoValidationException);
 }
 
 TEST_F(LocalReplyTest, TestInvalidConfigStatusCode) {
@@ -103,7 +102,7 @@ TEST_F(LocalReplyTest, TestInvalidConfigStatusCode) {
   TestUtility::loadFromYaml(yaml, config_);
 
   std::string err;
-  EXPECT_FALSE(Validate(config_, &err));
+  EXPECT_THROW(MessageUtil::validateWithProtovalidate(config_), ProtoValidationException);
 }
 
 TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
@@ -115,7 +114,6 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = *Factory::create(config_, context_);
-
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/formatter/metadata/v3/metadata.pb.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {

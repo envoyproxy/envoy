@@ -16,7 +16,7 @@ import yaml
 
 from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
-from validate import validate_pb2
+from buf.validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 from tools.api_proto_plugin import annotations, constants, plugin, visitor
@@ -367,14 +367,16 @@ class RstFormatVisitor(visitor.Visitor):
             contrib_extensions=sorted(contrib_extensions))
 
     def _field_is_required(self, field) -> bool:
-        if not field.options.HasExtension(validate_pb2.rules):
+        if not field.options.HasExtension(validate_pb2.field):
             return False
-        rule = field.options.Extensions[validate_pb2.rules]
-        return ((rule.HasField('message') and rule.message.required)
-                or (rule.HasField('duration') and rule.duration.required)
-                or (rule.HasField('string') and rule.string.min_len > 0)
-                or (rule.HasField('string') and rule.string.min_bytes > 0)
-                or (rule.HasField('repeated') and rule.repeated.min_items > 0))
+        rule = field.options.Extensions[validate_pb2.field]
+        if rule.required:
+            return True
+        if rule.HasField('string'):
+            return rule.string.min_len > 0 or rule.string.min_bytes > 0
+        if rule.HasField('repeated'):
+            return rule.repeated.min_items > 0
+        return False
 
     def _field_security_options(self, field, type_context):
         # If there is a udpa.annotations.security option, include it after the comment.
@@ -551,9 +553,9 @@ class RstFormatVisitor(visitor.Visitor):
                     continue
                 type_context.oneof_fields[field.oneof_index].append((index, field.name))
         for index, oneof_decl in enumerate(msg.oneof_decl):
-            if oneof_decl.options.HasExtension(validate_pb2.required):
-                type_context.oneof_required[index] = oneof_decl.options.Extensions[
-                    validate_pb2.required]
+            if oneof_decl.options.HasExtension(validate_pb2.oneof):
+                oneof_constraints = oneof_decl.options.Extensions[validate_pb2.oneof]
+                type_context.oneof_required[index] = oneof_constraints.required
             type_context.oneof_names[index] = oneof_decl.name
         for index, field in enumerate(msg.field):
             item = self._message(type_context, type_context.extend_field(index, field.name), field)

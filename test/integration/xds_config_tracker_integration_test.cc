@@ -52,7 +52,7 @@ public:
   void onConfigAccepted(const absl::string_view,
                         const std::vector<Config::DecodedResourcePtr>& decoded_resources) override {
     stats_.on_config_accepted_.inc();
-    test::envoy::config::xds::TestTrackerMetadata test_metadata;
+    ::test::envoy::config::xds::TestTrackerMetadata test_metadata;
     for (const auto& resource : decoded_resources) {
       if (resource->metadata().has_value()) {
         const auto& config_typed_metadata = resource->metadata()->typed_filter_metadata();
@@ -72,7 +72,7 @@ public:
                         absl::Span<const envoy::service::discovery::v3::Resource* const> resources,
                         const Protobuf::RepeatedPtrField<std::string>&) override {
     stats_.on_config_accepted_.inc();
-    test::envoy::config::xds::TestTrackerMetadata test_metadata;
+    ::test::envoy::config::xds::TestTrackerMetadata test_metadata;
     for (const auto* resource : resources) {
       if (resource->has_metadata()) {
         const auto& config_typed_metadata = resource->metadata().typed_filter_metadata();
@@ -108,7 +108,7 @@ private:
 class TestXdsConfigTrackerFactory : public Config::XdsConfigTrackerFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::envoy::config::xds::TestXdsConfigTracker>();
+    return std::make_unique<::test::envoy::config::xds::TestXdsConfigTracker>();
   }
 
   std::string name() const override { return "envoy.config.xds.test_xds_tracker"; };
@@ -145,7 +145,7 @@ public:
       auto* tracer_extension = bootstrap.mutable_xds_config_tracker_extension();
       tracer_extension->set_name("envoy.config.xds.test_xds_tracer");
       tracer_extension->mutable_typed_config()->PackFrom(
-          test::envoy::config::xds::TestXdsConfigTracker());
+          ::test::envoy::config::xds::TestXdsConfigTracker());
     });
   }
 
@@ -220,7 +220,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   // Add a typed metadata to the Resource wrapper.
-  test::envoy::config::xds::TestTrackerMetadata test_metadata;
+  ::test::envoy::config::xds::TestTrackerMetadata test_metadata;
   Protobuf::Any packed_value;
   packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(

@@ -26,5 +26,7 @@ envoy_cc_extension(
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/runtime:runtime_features_lib",
         "@c-ares//:ares",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto",
     ],
 )

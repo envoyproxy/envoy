@@ -30,5 +30,8 @@ envoy_cc_library(
     name = "random_lb_lib",
     srcs = ["random_lb.cc"],
     hdrs = ["random_lb.h"],
-    deps = ["//source/extensions/load_balancing_policies/common:load_balancer_lib"],
+    deps = [
+        "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
+    ],
 )

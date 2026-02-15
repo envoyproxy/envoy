@@ -159,7 +159,7 @@ TEST(SseToMetadataConfigTest, InvalidConfigMissingPath) {
   SseToMetadataConfig factory;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
-      EnvoyException, "Proto constraint validation failed.*Selectors.*at least 1 item");
+      EnvoyException, "rules.rule.selectors': value must contain at least 1 item");
 }
 
 TEST(SseToMetadataConfigTest, InvalidConfigEmptyPath) {
@@ -185,7 +185,7 @@ TEST(SseToMetadataConfigTest, InvalidConfigEmptyPath) {
   SseToMetadataConfig factory;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
-      EnvoyException, "Proto constraint validation failed.*Selectors.*at least 1 item");
+      EnvoyException, "rules.rule.selectors': value must contain at least 1 item");
 }
 
 TEST(SseToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
@@ -261,7 +261,7 @@ TEST(SseToMetadataConfigTest, InvalidConfigNoSelector) {
   SseToMetadataConfig factory;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
-      EnvoyException, "Proto constraint validation failed.*Selectors.*at least 1 item");
+      EnvoyException, "field 'rules.rule.selectors': value must contain at least 1 item");
 }
 
 TEST(SseToMetadataConfigTest, RequiresAtLeastOneAction) {

@@ -59,6 +59,9 @@ envoy_cc_library(
         ":hash_policy_lib",
         "//envoy/router:router_interface",
         "//source/common/router:router_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -170,6 +173,7 @@ envoy_cc_library(
         ":codes_lib",
         ":user_agent_lib",
         "//envoy/http:context_interface",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -539,6 +543,9 @@ envoy_cc_library(
     name = "http_option_limits_lib",
     srcs = ["http_option_limits.cc"],
     hdrs = ["http_option_limits.h"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -656,6 +663,8 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/router:header_parser_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

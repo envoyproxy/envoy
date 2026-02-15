@@ -16,7 +16,7 @@ envoy::config::route::v3::RouteConfiguration buildRoute(const std::string& route
 
 // Add, warm, drain and remove a listener.
 TEST(XdsVerifier, Basic) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
   EXPECT_TRUE(verifier.hasListener("listener_0", verifier.WARMING));
   EXPECT_EQ(verifier.numAdded(), 1);
@@ -41,7 +41,7 @@ TEST(XdsVerifier, Basic) {
 }
 
 TEST(XdsVerifier, RouteBeforeListenerSOTW) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
   // Send a route first, so envoy will not accept it.
   verifier.routeAdded(buildRoute("route_config_0"));
   EXPECT_TRUE(verifier.hasRoute("route_config_0"));
@@ -64,7 +64,7 @@ TEST(XdsVerifier, RouteBeforeListenerSOTW) {
 }
 
 TEST(XdsVerifier, RouteBeforeListenerDelta) {
-  XdsVerifier verifier(test::server::config_validation::Config::DELTA);
+  XdsVerifier verifier(::test::server::config_validation::Config::DELTA);
   // Send a route first, so envoy will not accept it.
   verifier.routeAdded(buildRoute("route_config_0"));
   EXPECT_FALSE(verifier.hasActiveRoute("route_config_0"));
@@ -85,7 +85,7 @@ TEST(XdsVerifier, RouteBeforeListenerDelta) {
 }
 
 TEST(XdsVerifier, UpdateWarmingListener) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
   verifier.listenerUpdated(buildListener("listener_0", "route_config_1"));
   // The new listener should directly replace the old listener since it's warming.
@@ -102,7 +102,7 @@ TEST(XdsVerifier, UpdateWarmingListener) {
 }
 
 TEST(XdsVerifier, UpdateActiveListener) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Add an active listener.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
@@ -125,7 +125,7 @@ TEST(XdsVerifier, UpdateActiveListener) {
 }
 
 TEST(XdsVerifier, UpdateActiveToActive) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Add two active listeners to different routes.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
@@ -147,7 +147,7 @@ TEST(XdsVerifier, UpdateActiveToActive) {
 }
 
 TEST(XdsVerifier, WarmMultipleListenersSOTW) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Add two warming listener to the same route.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
@@ -161,7 +161,7 @@ TEST(XdsVerifier, WarmMultipleListenersSOTW) {
 }
 
 TEST(XdsVerifier, WarmMultipleListenersDelta) {
-  XdsVerifier verifier(test::server::config_validation::Config::DELTA);
+  XdsVerifier verifier(::test::server::config_validation::Config::DELTA);
 
   // Add two warming listener to the same route.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
@@ -175,7 +175,7 @@ TEST(XdsVerifier, WarmMultipleListenersDelta) {
 }
 
 TEST(XdsVerifier, ResendRouteSOTW) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Send a route that will be ignored.
   verifier.routeAdded(buildRoute("route_config_0"));
@@ -190,7 +190,7 @@ TEST(XdsVerifier, ResendRouteSOTW) {
 }
 
 TEST(XdsVerifier, ResendRouteDelta) {
-  XdsVerifier verifier(test::server::config_validation::Config::DELTA);
+  XdsVerifier verifier(::test::server::config_validation::Config::DELTA);
 
   // Send a route that will be ignored.
   verifier.routeAdded(buildRoute("route_config_0"));
@@ -205,7 +205,7 @@ TEST(XdsVerifier, ResendRouteDelta) {
 }
 
 TEST(XdsVerifier, RemoveThenAddListener) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Add an active listener.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
@@ -223,7 +223,7 @@ TEST(XdsVerifier, RemoveThenAddListener) {
 }
 
 TEST(XdsVerifier, UpdateBackToOriginal) {
-  XdsVerifier verifier(test::server::config_validation::Config::SOTW);
+  XdsVerifier verifier(::test::server::config_validation::Config::SOTW);
 
   // Add an active listener.
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));

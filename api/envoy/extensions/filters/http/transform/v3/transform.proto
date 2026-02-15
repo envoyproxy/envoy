@@ -5,8 +5,9 @@ package envoy.extensions.filters.http.transform.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.transform.v3";
 option java_outer_classname = "TransformProto";
@@ -87,8 +88,7 @@ message BodyTransformation {
   // The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
   // And except the commonly used format specifiers, the additional format specifiers
   // ``%REQUEST_BODY(KEY*)%`` and ``%RESPONSE_BODY(KEY*)%`` could also be used here.
-  config.core.v3.SubstitutionFormatString body_format = 1
-      [(validate.rules).message = {required: true}];
+  config.core.v3.SubstitutionFormatString body_format = 1 [(buf.validate.field).required = true];
 
   // The action to perform for new body content and original body content.
   // For example, if ``MERGE`` is used, then the new body content generated from the ``body_format``

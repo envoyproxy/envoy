@@ -4,8 +4,9 @@ package envoy.extensions.filters.common.set_filter_state.v3;
 
 import "envoy/config/core/v3/substitution_format_string.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.common.set_filter_state.v3";
 option java_outer_classname = "ValueProto";
@@ -30,7 +31,7 @@ message FilterStateValue {
   }
 
   oneof key {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The name under which the filter state object will be stored and can be retrieved.
     //
@@ -65,7 +66,7 @@ message FilterStateValue {
     //      text_format_source:
     //        inline_string: "my-value"
     //
-    string object_key = 1 [(validate.rules).string = {min_len: 1}];
+    string object_key = 1 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Specifies which registered factory should be used to create the filter state object from the
@@ -84,7 +85,7 @@ message FilterStateValue {
   string factory_key = 6;
 
   oneof value {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Uses the :ref:`format string <config_access_log_format_strings>` to
     // instantiate the filter state object value.

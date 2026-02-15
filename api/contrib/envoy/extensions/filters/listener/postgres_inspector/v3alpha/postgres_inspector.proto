@@ -5,8 +5,9 @@ package envoy.extensions.filters.listener.postgres_inspector.v3alpha;
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.listener.postgres_inspector.v3alpha";
 option java_outer_classname = "PostgresInspectorProto";
@@ -32,7 +33,7 @@ message PostgresInspector {
   // PostgreSQL defines MAX_STARTUP_PACKET_LENGTH as 10KB.
   // Valid range is 256 bytes to 10KB.
   google.protobuf.UInt32Value max_startup_message_size = 2
-      [(validate.rules).uint32 = {lte: 10000 gte: 256}];
+      [(buf.validate.field).uint32 = {lte: 10000 gte: 256}];
 
   // Timeout for the inspector to receive and process the startup message.
   // The timeout starts when the connection is accepted by the listener.
@@ -40,7 +41,7 @@ message PostgresInspector {
   // the connection will be closed.
   //
   // If not specified, defaults to 10 seconds. Minimum is 1 second.
-  google.protobuf.Duration startup_timeout = 3 [(validate.rules).duration = {gte {seconds: 1}}];
+  google.protobuf.Duration startup_timeout = 3 [(buf.validate.field).duration = {gte {seconds: 1}}];
 }
 
 // StartupMetadata stores connection attributes extracted from the PostgreSQL startup message.

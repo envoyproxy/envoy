@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
-#include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.validate.h"
 #include "envoy/router/internal_redirect.h"
 
 #include "source/common/protobuf/message_validator_impl.h"

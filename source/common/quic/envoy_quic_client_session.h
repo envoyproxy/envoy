@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/http_server_properties_cache.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"

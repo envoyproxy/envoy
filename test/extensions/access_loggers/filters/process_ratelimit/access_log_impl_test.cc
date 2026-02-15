@@ -5,12 +5,10 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/v3/token_bucket.pb.h"
-#include "envoy/type/v3/token_bucket.pb.validate.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"

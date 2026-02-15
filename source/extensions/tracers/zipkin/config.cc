@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/zipkin/config.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
-#include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/utility.h"

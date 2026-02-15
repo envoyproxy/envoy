@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
-#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"

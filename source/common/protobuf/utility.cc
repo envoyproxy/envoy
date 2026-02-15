@@ -17,9 +17,9 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "buf/validate/validator.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
-#include "validate/validate.h"
 #include "xds/annotations/v3/status.pb.h"
 
 using namespace std::chrono_literals;
@@ -59,6 +59,20 @@ void validateDuration(const Protobuf::Duration& duration) {
   if (!result.ok()) {
     throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
+}
+
+// Get a singleton ValidatorFactory for protovalidate-cc validation.
+// This is expensive to create, so we cache it.
+buf::validate::ValidatorFactory& getProtovalidateValidatorFactory() {
+  static auto* factory = []() {
+    auto factory_result = buf::validate::ValidatorFactory::New();
+    if (!factory_result.ok()) {
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to create protovalidate ValidatorFactory: {}",
+                                             factory_result.status().message()));
+    }
+    return factory_result.value().release();
+  }();
+  return *factory;
 }
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
@@ -356,29 +370,100 @@ public:
 
 } // namespace
 
-void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
-  DurationFieldProtoVisitor duration_field_visitor;
-  THROW_IF_NOT_OK(
-      ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
-}
-
 namespace {
 
-class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+// Returns true if this violation should be suppressed because it's a required-oneof
+// violation where the oneof contains a bool field. In proto3, bool fields set to false
+// are indistinguishable from unset, so we can't enforce required on oneofs containing
+// bool fields without breaking backward compatibility.
+bool shouldSuppressViolation(const buf::validate::Violation& violation,
+                             const Protobuf::Message& message) {
+  if (!violation.has_field() || violation.field().elements_size() == 0) {
+    return false;
+  }
+
+  // Only suppress "value is required" violations.
+  if (!violation.has_message() || violation.message() != "value is required") {
+    return false;
+  }
+
+  // Get the field that the violation is about.
+  const auto& elements = violation.field().elements();
+  const std::string& field_name = elements[elements.size() - 1].field_name();
+
+  Protobuf::ReflectableMessage reflectable = createReflectableMessage(message);
+  const auto* descriptor = reflectable->GetDescriptor();
+  const auto* field_desc = descriptor->FindFieldByName(field_name);
+  if (field_desc == nullptr) {
+    return false;
+  }
+
+  // Check if this field is in a oneof.
+  const auto* oneof = field_desc->containing_oneof();
+  if (oneof == nullptr) {
+    return false;
+  }
+
+  // Check if any sibling field in the same oneof is a bool.
+  for (int i = 0; i < oneof->field_count(); i++) {
+    if (oneof->field(i)->type() == Protobuf::FieldDescriptor::TYPE_BOOL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+class ProtovalidateCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   absl::Status onMessage(const Protobuf::Message& message,
                          absl::Span<const Protobuf::Message* const>,
                          bool was_any_or_top_level) override {
-    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
-    std::string err;
-    // PGV verification is itself recursive up to the point at which it hits an Any message. As
-    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
-    // at which PGV would have stopped because it does not itself check within Any messages.
-    if (was_any_or_top_level &&
-        !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
-                                      reflectable_message->DebugString(), err);
-      return absl::InvalidArgumentError(error);
+    // Only validate at points where we've unpacked an Any (or at the top level),
+    // because protovalidate itself recurses into sub-messages within a single
+    // concrete message. This avoids N^2 checking.
+    if (!was_any_or_top_level) {
+      return absl::OkStatus();
+    }
+
+    google::protobuf::Arena arena;
+    buf::validate::Validator validator = getProtovalidateValidatorFactory().NewValidator(&arena);
+
+    auto result = validator.Validate(message);
+    if (!result.ok()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "{}: Proto constraint validation failed (protovalidate validation failed: {})",
+          message.DebugString(), result.status().message()));
+    }
+
+    const buf::validate::Violations& violations = result.value().proto();
+    if (violations.violations_size() > 0) {
+      std::vector<std::string> violation_messages;
+      for (const auto& violation : violations.violations()) {
+        if (shouldSuppressViolation(violation, message)) {
+          continue;
+        }
+        std::string message_text = violation.has_message() ? violation.message() : "";
+        std::string field_path;
+        if (violation.has_field()) {
+          for (const auto& element : violation.field().elements()) {
+            if (!field_path.empty()) {
+              field_path += ".";
+            }
+            field_path += element.field_name();
+          }
+        }
+        if (!field_path.empty() && !message_text.empty()) {
+          violation_messages.push_back(fmt::format("field '{}': {}", field_path, message_text));
+        } else if (!message_text.empty()) {
+          violation_messages.push_back(message_text);
+        }
+      }
+      std::string error_message = absl::StrJoin(violation_messages, "; ");
+      if (!violation_messages.empty()) {
+        std::string error_message = absl::StrJoin(violation_messages, "; ");
+        return absl::InvalidArgumentError(fmt::format("{}: Proto constraint validation failed ({})",
+                                                      message.DebugString(), error_message));
+      }
     }
     return absl::OkStatus();
   }
@@ -388,9 +473,57 @@ public:
 
 } // namespace
 
-void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
-  PgvCheckVisitor visitor;
-  THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
+void MessageUtil::validateWithProtovalidate(const Protobuf::Message& message,
+                                            bool recurse_into_any) {
+  if (recurse_into_any) {
+    // Expensive path: walk the tree, unpack Any messages, validate each inner message.
+    ProtovalidateCheckVisitor visitor;
+    THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
+  } else {
+    // Fast path: just validate this single message (protovalidate recurses into
+    // concrete sub-messages on its own, just not into Any).
+    google::protobuf::Arena arena;
+    buf::validate::Validator validator = getProtovalidateValidatorFactory().NewValidator(&arena);
+    auto result = validator.Validate(message);
+    if (!result.ok()) {
+      ProtoExceptionUtil::throwProtoValidationException(
+          fmt::format("protovalidate validation failed: {}", result.status().message()), message);
+    }
+    const buf::validate::Violations& violations = result.value().proto();
+    if (violations.violations_size() > 0) {
+      std::vector<std::string> violation_messages;
+      for (const auto& violation : violations.violations()) {
+        if (shouldSuppressViolation(violation, message)) {
+          continue;
+        }
+        std::string message_text = violation.has_message() ? violation.message() : "";
+        std::string field_path;
+        if (violation.has_field()) {
+          for (const auto& element : violation.field().elements()) {
+            if (!field_path.empty()) {
+              field_path += ".";
+            }
+            field_path += element.field_name();
+          }
+        }
+        if (!field_path.empty() && !message_text.empty()) {
+          violation_messages.push_back(fmt::format("field '{}': {}", field_path, message_text));
+        } else if (!message_text.empty()) {
+          violation_messages.push_back(message_text);
+        }
+      }
+      if (!violation_messages.empty()) {
+        std::string error_message = absl::StrJoin(violation_messages, "; ");
+        ProtoExceptionUtil::throwProtoValidationException(error_message, message);
+      }
+    }
+  }
+}
+
+void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
+  DurationFieldProtoVisitor duration_field_visitor;
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
 }
 
 void MessageUtil::packFrom(Protobuf::Any& any_message, const Protobuf::Message& message) {

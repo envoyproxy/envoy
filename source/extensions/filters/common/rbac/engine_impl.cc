@@ -1,7 +1,6 @@
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
 

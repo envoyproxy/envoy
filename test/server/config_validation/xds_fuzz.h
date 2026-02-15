@@ -22,7 +22,7 @@ namespace Envoy {
 
 class XdsFuzzTest : public HttpIntegrationTest {
 public:
-  XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
+  XdsFuzzTest(const ::test::server::config_validation::XdsTestCase& input,
               bool use_unified_mux = false);
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
@@ -72,7 +72,7 @@ private:
 
   XdsVerifier verifier_;
 
-  Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
+  Protobuf::RepeatedPtrField<::test::server::config_validation::Action> actions_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   std::vector<envoy::config::listener::v3::Listener> listeners_;
 

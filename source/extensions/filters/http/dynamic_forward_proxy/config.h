@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
-#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
-#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"

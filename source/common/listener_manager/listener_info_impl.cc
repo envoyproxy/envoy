@@ -1,5 +1,7 @@
 #include "source/common/listener_manager/listener_info_impl.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 namespace Envoy {
 namespace Server {
 

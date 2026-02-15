@@ -7,7 +7,6 @@
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
-#include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -17,11 +16,11 @@ namespace UdpProxy {
 namespace SessionFilters {
 
 using ReadDrainerConfig =
-    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionReadFilterConfig;
-using WriteDrainerConfig =
-    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionWriteFilterConfig;
+    ::test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionReadFilterConfig;
+using WriteDrainerConfig = ::test::extensions::filters::udp::udp_proxy::session_filters::
+    DrainerUdpSessionWriteFilterConfig;
 using DrainerConfig =
-    test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionFilterConfig;
+    ::test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionFilterConfig;
 
 using Filter = Network::UdpSessionFilter;
 using ReadFilter = Network::UdpSessionReadFilter;

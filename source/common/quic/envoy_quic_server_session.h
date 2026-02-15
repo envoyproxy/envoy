@@ -3,6 +3,8 @@
 #include <memory>
 #include <ostream>
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"

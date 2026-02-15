@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,12 +1,10 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
 #include "envoy/http/header_validator_factory.h"
 
 #include "source/common/config/utility.h"
 #include "source/extensions/upstreams/http/config.h"
 
 #include "test/extensions/upstreams/http/config.pb.h"
-#include "test/extensions/upstreams/http/config.pb.validate.h"
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
@@ -113,7 +111,7 @@ public:
   std::string name() const override { return "test.upstreams.http.CustomHeaderValidator"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::upstreams::http::CustomHeaderValidator>();
+    return std::make_unique<::test::upstreams::http::CustomHeaderValidator>();
   }
 
   ::Envoy::Http::HeaderValidatorFactoryPtr

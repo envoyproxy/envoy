@@ -1,7 +1,5 @@
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
-#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/router_ratelimit.h"

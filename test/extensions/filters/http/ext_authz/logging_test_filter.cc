@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -19,7 +18,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using test::integration::filters::LoggingTestFilterConfig;
+using ::test::integration::filters::LoggingTestFilterConfig;
 
 Grpc::Status::WellKnownGrpcStatus
 GrpcStatusFromProto(LoggingTestFilterConfig::GrpcStatus grpc_status) {

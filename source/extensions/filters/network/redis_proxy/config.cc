@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"

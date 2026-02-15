@@ -10,7 +10,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/non_terminal_encoding_filter.pb.h"
-#include "test/integration/filters/non_terminal_encoding_filter.pb.validate.h"
 #include "test/integration/utility.h"
 
 namespace Envoy {
@@ -18,17 +17,17 @@ namespace Envoy {
 class NonTerminalEncodingFilterConfig {
 public:
   NonTerminalEncodingFilterConfig(
-      test::integration::filters::NonTerminalEncodingFilterConfig::WhereToStartEncoding
+      ::test::integration::filters::NonTerminalEncodingFilterConfig::WhereToStartEncoding
           where_to_start_encoding,
-      test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_body,
-      test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_trailers)
+      ::test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_body,
+      ::test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_trailers)
       : where_to_start_encoding_(where_to_start_encoding), encode_body_(encode_body),
         encode_trailers_(encode_trailers) {}
 
-  const test::integration::filters::NonTerminalEncodingFilterConfig::WhereToStartEncoding
+  const ::test::integration::filters::NonTerminalEncodingFilterConfig::WhereToStartEncoding
       where_to_start_encoding_;
-  const test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_body_;
-  const test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_trailers_;
+  const ::test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_body_;
+  const ::test::integration::filters::NonTerminalEncodingFilterConfig::HowToEncode encode_trailers_;
 };
 
 // A test filter that encodes a response in a decodeXXX handler.
@@ -40,17 +39,17 @@ public:
   void startEncoding() {
     const bool end_stream =
         config_->encode_body_ ==
-            test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING &&
+            ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING &&
         config_->encode_trailers_ ==
-            test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING;
+            ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING;
     Http::ResponseHeaderMapPtr response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
         Http::TestResponseHeaderMapImpl{{":status", "200"}});
     decoder_callbacks_->encodeHeaders(std::move(response_headers), end_stream, "");
     if (config_->encode_body_ !=
-        test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
       encodeBody();
     } else if (config_->encode_trailers_ !=
-               test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
+               ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
       encodeResponseTrailers();
     }
   }
@@ -59,16 +58,16 @@ public:
     auto encode_lambda = [this]() -> void {
       const bool end_stream =
           config_->encode_trailers_ ==
-          test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING;
+          ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING;
       Buffer::OwnedImpl buffer("encoded body");
       decoder_callbacks_->encodeData(buffer, end_stream);
       if (config_->encode_trailers_ !=
-          test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
+          ::test::integration::filters::NonTerminalEncodingFilterConfig::SKIP_ENCODING) {
         encodeResponseTrailers();
       }
     };
     if (config_->encode_body_ ==
-        test::integration::filters::NonTerminalEncodingFilterConfig::SYNCHRONOUSLY) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::SYNCHRONOUSLY) {
       encode_lambda();
     } else {
       decoder_callbacks_->dispatcher().post(encode_lambda);
@@ -83,7 +82,7 @@ public:
       decoder_callbacks_->encodeTrailers(std::move(response_trailers));
     };
     if (config_->encode_trailers_ ==
-        test::integration::filters::NonTerminalEncodingFilterConfig::SYNCHRONOUSLY) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::SYNCHRONOUSLY) {
       encode_lambda();
     } else {
       decoder_callbacks_->dispatcher().post(encode_lambda);
@@ -92,7 +91,7 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     if (config_->where_to_start_encoding_ ==
-        test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_HEADERS) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_HEADERS) {
       startEncoding();
     }
 
@@ -101,7 +100,7 @@ public:
 
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     if (config_->where_to_start_encoding_ ==
-        test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_DATA) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_DATA) {
       startEncoding();
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -110,7 +109,7 @@ public:
 
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     if (config_->where_to_start_encoding_ ==
-        test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_TRAILERS) {
+        ::test::integration::filters::NonTerminalEncodingFilterConfig::DECODE_TRAILERS) {
       startEncoding();
     }
     return Http::FilterTrailersStatus::StopIteration;
@@ -122,13 +121,13 @@ private:
 
 class NonTerminalEncodingFilterFactory
     : public Extensions::HttpFilters::Common::DualFactoryBase<
-          test::integration::filters::NonTerminalEncodingFilterConfig> {
+          ::test::integration::filters::NonTerminalEncodingFilterConfig> {
 public:
   NonTerminalEncodingFilterFactory() : DualFactoryBase("non-terminal-encoding-filter") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const test::integration::filters::NonTerminalEncodingFilterConfig& proto_config,
+      const ::test::integration::filters::NonTerminalEncodingFilterConfig& proto_config,
       const std::string&, DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<NonTerminalEncodingFilterConfig>(
         proto_config.where_to_start_encoding(), proto_config.encode_body(),

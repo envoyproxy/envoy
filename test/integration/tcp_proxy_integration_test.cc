@@ -19,7 +19,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
-#include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 
@@ -1152,7 +1151,7 @@ TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("testaccesslog");
-    test::integration::accesslog::FakeAccessLog access_log_config;
+    ::test::integration::accesslog::FakeAccessLog access_log_config;
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);
   });
@@ -1482,14 +1481,14 @@ public:
 };
 
 class InjectDynamicMetadataFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                         test::integration::tcp_proxy::InjectDynamicMetadata> {
+                                         ::test::integration::tcp_proxy::InjectDynamicMetadata> {
 public:
   InjectDynamicMetadataFactory() : FactoryBase("test.inject_dynamic_metadata") {}
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
-                                    Server::Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const ::test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
+      Server::Configuration::FactoryContext&) override {
     std::string key = cfg.key();
     return [key = std::move(key)](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<InjectDynamicMetadata>(key));
@@ -1850,13 +1849,13 @@ public:
 };
 
 class PauseFilterFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                               test::integration::tcp_proxy::PauseFilterConfig> {
+                               ::test::integration::tcp_proxy::PauseFilterConfig> {
 public:
   PauseFilterFactory() : FactoryBase("test.pause_iteration") {}
 
 private:
   Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::PauseFilterConfig& cfg,
+  createFilterFactoryFromProtoTyped(const ::test::integration::tcp_proxy::PauseFilterConfig& cfg,
                                     Server::Configuration::FactoryContext&) override {
     int data_size_before_continue = cfg.data_size_before_continue();
     return [data_size_before_continue = std::move(data_size_before_continue)](

@@ -26,7 +26,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
-#include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
+#include "test/common/http/conn_manager_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -333,7 +333,7 @@ public:
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
              const HeaderMap& request_headers,
-             test::common::http::HeaderStatus decode_header_status, bool end_stream)
+             ::test::common::http::HeaderStatus decode_header_status, bool end_stream)
       : conn_manager_(conn_manager), config_(config) {
     config_.newStream();
     request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
@@ -382,41 +382,41 @@ public:
     conn_manager_.onData(fake_input, false);
   }
 
-  Http::FilterHeadersStatus fromHeaderStatus(test::common::http::HeaderStatus status) {
+  Http::FilterHeadersStatus fromHeaderStatus(::test::common::http::HeaderStatus status) {
     switch (status) {
-    case test::common::http::HeaderStatus::HEADER_CONTINUE:
+    case ::test::common::http::HeaderStatus::HEADER_CONTINUE:
       return Http::FilterHeadersStatus::Continue;
-    case test::common::http::HeaderStatus::HEADER_STOP_ITERATION:
+    case ::test::common::http::HeaderStatus::HEADER_STOP_ITERATION:
       return Http::FilterHeadersStatus::StopIteration;
-    case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_BUFFER:
+    case ::test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_BUFFER:
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
-    case test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_WATERMARK:
+    case ::test::common::http::HeaderStatus::HEADER_STOP_ALL_ITERATION_AND_WATERMARK:
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     default:
       return Http::FilterHeadersStatus::Continue;
     }
   }
 
-  Http::FilterDataStatus fromDataStatus(test::common::http::DataStatus status) {
+  Http::FilterDataStatus fromDataStatus(::test::common::http::DataStatus status) {
     switch (status) {
-    case test::common::http::DataStatus::DATA_CONTINUE:
+    case ::test::common::http::DataStatus::DATA_CONTINUE:
       return Http::FilterDataStatus::Continue;
-    case test::common::http::DataStatus::DATA_STOP_ITERATION_AND_BUFFER:
+    case ::test::common::http::DataStatus::DATA_STOP_ITERATION_AND_BUFFER:
       return Http::FilterDataStatus::StopIterationAndBuffer;
-    case test::common::http::DataStatus::DATA_STOP_ITERATION_AND_WATERMARK:
+    case ::test::common::http::DataStatus::DATA_STOP_ITERATION_AND_WATERMARK:
       return Http::FilterDataStatus::StopIterationAndWatermark;
-    case test::common::http::DataStatus::DATA_STOP_ITERATION_NO_BUFFER:
+    case ::test::common::http::DataStatus::DATA_STOP_ITERATION_NO_BUFFER:
       return Http::FilterDataStatus::StopIterationNoBuffer;
     default:
       return Http::FilterDataStatus::Continue;
     }
   }
 
-  Http::FilterTrailersStatus fromTrailerStatus(test::common::http::TrailerStatus status) {
+  Http::FilterTrailersStatus fromTrailerStatus(::test::common::http::TrailerStatus status) {
     switch (status) {
-    case test::common::http::TrailerStatus::TRAILER_CONTINUE:
+    case ::test::common::http::TrailerStatus::TRAILER_CONTINUE:
       return Http::FilterTrailersStatus::Continue;
-    case test::common::http::TrailerStatus::TRAILER_STOP_ITERATION:
+    case ::test::common::http::TrailerStatus::TRAILER_STOP_ITERATION:
       return Http::FilterTrailersStatus::StopIteration;
     default:
       return Http::FilterTrailersStatus::Continue;
@@ -424,9 +424,9 @@ public:
   }
 
   void decoderFilterCallbackAction(
-      const test::common::http::DecoderFilterCallbackAction& decoder_filter_callback_action) {
+      const ::test::common::http::DecoderFilterCallbackAction& decoder_filter_callback_action) {
     switch (decoder_filter_callback_action.decoder_filter_callback_action_selector_case()) {
-    case test::common::http::DecoderFilterCallbackAction::kAddDecodedData: {
+    case ::test::common::http::DecoderFilterCallbackAction::kAddDecodedData: {
       if (request_state_ == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(std::string(
             decoder_filter_callback_action.add_decoded_data().size() % (1024 * 1024), 'a'));
@@ -441,9 +441,10 @@ public:
     }
   }
 
-  void requestAction(StreamState& state, const test::common::http::RequestAction& request_action) {
+  void requestAction(StreamState& state,
+                     const ::test::common::http::RequestAction& request_action) {
     switch (request_action.request_action_selector_case()) {
-    case test::common::http::RequestAction::kData: {
+    case ::test::common::http::RequestAction::kData: {
       if (state == StreamState::PendingDataOrTrailers) {
         const auto& data_action = request_action.data();
         ON_CALL(*decoder_filter_, decodeData(_, _))
@@ -466,7 +467,7 @@ public:
       }
       break;
     }
-    case test::common::http::RequestAction::kTrailers: {
+    case ::test::common::http::RequestAction::kTrailers: {
       if (state == StreamState::PendingDataOrTrailers) {
         const auto& trailers_action = request_action.trailers();
         ON_CALL(*decoder_filter_, decodeTrailers(_))
@@ -491,7 +492,7 @@ public:
       }
       break;
     }
-    case test::common::http::RequestAction::kContinueDecoding: {
+    case ::test::common::http::RequestAction::kContinueDecoding: {
       if (!decoding_done_ && state != StreamState::Closed &&
           (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
            header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
@@ -506,9 +507,9 @@ public:
       }
       break;
     }
-    case test::common::http::RequestAction::kThrowDecoderException:
+    case ::test::common::http::RequestAction::kThrowDecoderException:
     // Dispatch no longer throws, execute subsequent kReturnDecoderError case.
-    case test::common::http::RequestAction::kReturnDecoderError: {
+    case ::test::common::http::RequestAction::kReturnDecoderError: {
       if (state == StreamState::PendingDataOrTrailers) {
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(testing::Return(codecProtocolError("blah")));
@@ -526,10 +527,10 @@ public:
   }
 
   void responseAction(StreamState& state,
-                      const test::common::http::ResponseAction& response_action) {
+                      const ::test::common::http::ResponseAction& response_action) {
     const bool end_stream = response_action.end_stream();
     switch (response_action.response_action_selector_case()) {
-    case test::common::http::ResponseAction::kContinueHeaders: {
+    case ::test::common::http::ResponseAction::kContinueHeaders: {
       if (state == StreamState::PendingHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
@@ -541,7 +542,7 @@ public:
       }
       break;
     }
-    case test::common::http::ResponseAction::kHeaders: {
+    case ::test::common::http::ResponseAction::kHeaders: {
       if (state == StreamState::PendingHeaders ||
           state == StreamState::PendingNonInformationalHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
@@ -560,7 +561,7 @@ public:
       }
       break;
     }
-    case test::common::http::ResponseAction::kData: {
+    case ::test::common::http::ResponseAction::kData: {
       if (state == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(std::string(response_action.data() % (1024 * 1024), 'a'));
         decoder_filter_->callbacks_->encodeData(buf, end_stream);
@@ -568,7 +569,7 @@ public:
       }
       break;
     }
-    case test::common::http::ResponseAction::kTrailers: {
+    case ::test::common::http::ResponseAction::kTrailers: {
       if (state == StreamState::PendingDataOrTrailers) {
         decoder_filter_->callbacks_->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
             Fuzz::fromHeaders<TestResponseTrailerMapImpl>(response_action.trailers())));
@@ -582,13 +583,13 @@ public:
     }
   }
 
-  void streamAction(const test::common::http::StreamAction& stream_action) {
+  void streamAction(const ::test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
-    case test::common::http::StreamAction::kRequest: {
+    case ::test::common::http::StreamAction::kRequest: {
       requestAction(request_state_, stream_action.request());
       break;
     }
-    case test::common::http::StreamAction::kResponse: {
+    case ::test::common::http::StreamAction::kResponse: {
       responseAction(response_state_, stream_action.response());
       break;
     }
@@ -614,7 +615,7 @@ public:
 
 using FuzzStreamPtr = std::unique_ptr<FuzzStream>;
 
-DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::http::ConnManagerImplTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const Envoy::EnvoyException& e) {
@@ -666,7 +667,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
     }
 
     switch (action.action_selector_case()) {
-    case test::common::http::Action::kNewStream: {
+    case ::test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(
           conn_manager, *config,
           Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers(),
@@ -674,7 +675,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
           action.new_stream().status(), action.new_stream().end_stream()));
       break;
     }
-    case test::common::http::Action::kStreamAction: {
+    case ::test::common::http::Action::kStreamAction: {
       const auto& stream_action = action.stream_action();
       if (streams.empty()) {
         break;

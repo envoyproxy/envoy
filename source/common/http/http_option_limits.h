@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <limits>
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 namespace Envoy {
 
 namespace Http2 {

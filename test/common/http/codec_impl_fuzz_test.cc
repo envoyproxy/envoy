@@ -17,8 +17,9 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
 
-#include "test/common/http/codec_impl_fuzz.pb.validate.h"
+#include "test/common/http/codec_impl_fuzz.pb.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
+#include "test/fuzz/common.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -42,7 +43,7 @@ namespace Http2Utility = ::Envoy::Http2::Utility;
 // debugging.
 constexpr bool DebugMode = false;
 
-template <class T> T fromSanitizedHeaders(const test::fuzz::Headers& headers) {
+template <class T> T fromSanitizedHeaders(const ::test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<T>(headers, {"transfer-encoding"});
 }
 
@@ -52,13 +53,13 @@ template <class T> T fromSanitizedHeaders(const test::fuzz::Headers& headers) {
 // this and fail gracefully.
 template <>
 TestRequestHeaderMapImpl
-fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
+fromSanitizedHeaders<TestRequestHeaderMapImpl>(const ::test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
                                                      {":authority", ":method", ":path"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
-Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
+Http1Settings fromHttp1Settings(const ::test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
 
   h1_settings.allow_absolute_url_ = settings.allow_absolute_url();
@@ -75,7 +76,7 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
 }
 
 envoy::config::core::v3::Http2ProtocolOptions
-fromHttp2Settings(const test::common::http::Http2Settings& settings) {
+fromHttp2Settings(const ::test::common::http::Http2Settings& settings) {
   envoy::config::core::v3::Http2ProtocolOptions options(
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
@@ -239,11 +240,11 @@ public:
 
   // Some stream action applied in either the request or response direction.
   void directionalAction(DirectionalState& state,
-                         const test::common::http::DirectionalAction& directional_action) {
+                         const ::test::common::http::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
     const bool response = &state == &response_;
     switch (directional_action.directional_action_selector_case()) {
-    case test::common::http::DirectionalAction::kContinueHeaders: {
+    case ::test::common::http::DirectionalAction::kContinueHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
         auto headers =
             fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
@@ -252,7 +253,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kHeaders: {
+    case ::test::common::http::DirectionalAction::kHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
         if (response) {
           auto headers =
@@ -281,7 +282,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kData: {
+    case ::test::common::http::DirectionalAction::kData: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(std::string(directional_action.data() % (1024 * 1024), 'a'));
         if (response) {
@@ -295,7 +296,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kDataValue: {
+    case ::test::common::http::DirectionalAction::kDataValue: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(directional_action.data_value());
         if (response) {
@@ -309,7 +310,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kTrailers: {
+    case ::test::common::http::DirectionalAction::kTrailers: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
         if (response) {
           state.response_encoder_->encodeTrailers(
@@ -323,7 +324,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kMetadata: {
+    case ::test::common::http::DirectionalAction::kMetadata: {
       if (state.isLocalOpen() && state.stream_state_ != StreamState::Closed) {
         if (response) {
           state.response_encoder_->encodeMetadata(
@@ -334,7 +335,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kResetStream: {
+    case ::test::common::http::DirectionalAction::kResetStream: {
       if (state.stream_state_ != StreamState::Closed) {
         StreamEncoder* encoder;
         if (response) {
@@ -354,7 +355,7 @@ public:
       }
       break;
     }
-    case test::common::http::DirectionalAction::kReadDisable: {
+    case ::test::common::http::DirectionalAction::kReadDisable: {
       if (state.stream_state_ != StreamState::Closed) {
         const bool disable = directional_action.read_disable();
         if (state.read_disable_count_ == 0 && !disable) {
@@ -406,9 +407,9 @@ public:
     }
   }
 
-  void streamAction(const test::common::http::StreamAction& stream_action) {
+  void streamAction(const ::test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
-    case test::common::http::StreamAction::kRequest: {
+    case ::test::common::http::StreamAction::kRequest: {
       ENVOY_LOG_MISC(debug, "Request stream action on {} in state request({}) response({})",
                      stream_index_, streamStateToString(request_.stream_state_),
                      streamStateToString(response_.stream_state_));
@@ -420,11 +421,11 @@ public:
                        stream_index_, streamStateToString(request_.stream_state_),
                        streamStateToString(response_.stream_state_));
         auto request_action = stream_action.dispatching_action().directional_action_selector_case();
-        if (request_action == test::common::http::DirectionalAction::kHeaders) {
+        if (request_action == ::test::common::http::DirectionalAction::kHeaders) {
           EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
               .WillOnce(InvokeWithoutArgs(
                   [&] { directionalAction(response_, stream_action.dispatching_action()); }));
-        } else if (request_action == test::common::http::DirectionalAction::kData) {
+        } else if (request_action == ::test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
               .WillRepeatedly(InvokeWithoutArgs([&] {
@@ -439,7 +440,7 @@ public:
                   directionalAction(response_, stream_action.dispatching_action());
                 }
               }));
-        } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
+        } else if (request_action == ::test::common::http::DirectionalAction::kTrailers) {
           EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
               .WillOnce(InvokeWithoutArgs(
                   [&] { directionalAction(response_, stream_action.dispatching_action()); }));
@@ -456,7 +457,7 @@ public:
       stream_action_active_ = false;
       break;
     }
-    case test::common::http::StreamAction::kResponse: {
+    case ::test::common::http::StreamAction::kResponse: {
       ENVOY_LOG_MISC(debug, "Response stream action on {} in state request({}) response({})",
                      stream_index_, streamStateToString(request_.stream_state_),
                      streamStateToString(response_.stream_state_));
@@ -563,7 +564,7 @@ namespace {
 
 enum class HttpVersion { Http1, Http2Nghttp2, Http2Oghttp2 };
 
-void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
+void codecFuzz(const ::test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
   Stats::Scope& scope = *stats_store.rootScope();
   NiceMock<Network::MockConnection> client_connection;
@@ -696,7 +697,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     ENVOY_LOG_MISC(trace, "action #{}/{}: {} with {} streams", i, num_actions, action.DebugString(),
                    streams.size());
     switch (action.action_selector_case()) {
-    case test::common::http::Action::kNewStream: {
+    case ::test::common::http::Action::kNewStream: {
       if (!http2) {
         // HTTP/1 codec needs to have existing streams complete, so make it
         // easier to achieve a successful multi-stream example by flushing.
@@ -724,7 +725,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }
-    case test::common::http::Action::kStreamAction: {
+    case ::test::common::http::Action::kStreamAction: {
       const auto& stream_action = action.stream_action();
       if (streams.empty()) {
         break;
@@ -735,33 +736,33 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
       (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
       break;
     }
-    case test::common::http::Action::kMutate: {
+    case ::test::common::http::Action::kMutate: {
       const auto& mutate = action.mutate();
       ReorderBuffer& write_buf = mutate.server() ? server_write_buf : client_write_buf;
       write_buf.mutate(mutate.buffer(), mutate.offset(), mutate.value());
       break;
     }
-    case test::common::http::Action::kSwapBuffer: {
+    case ::test::common::http::Action::kSwapBuffer: {
       const auto& swap_buffer = action.swap_buffer();
       ReorderBuffer& write_buf = swap_buffer.server() ? server_write_buf : client_write_buf;
       write_buf.swap(swap_buffer.buffer());
       break;
     }
-    case test::common::http::Action::kClientDrain: {
+    case ::test::common::http::Action::kClientDrain: {
       if (!client_write_buf.drain().ok()) {
         codec_error = true;
         break;
       }
       break;
     }
-    case test::common::http::Action::kServerDrain: {
+    case ::test::common::http::Action::kServerDrain: {
       if (!server_write_buf.drain().ok()) {
         codec_error = true;
         break;
       }
       break;
     }
-    case test::common::http::Action::kQuiesceDrain: {
+    case ::test::common::http::Action::kQuiesceDrain: {
       if (!client_server_buf_drain().ok()) {
         codec_error = true;
         break;
@@ -796,17 +797,17 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 }
 
 #ifdef FUZZ_PROTOCOL_http1
-void codecFuzzHttp1(const test::common::http::CodecImplFuzzTestCase& input) {
+void codecFuzzHttp1(const ::test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http1);
 }
 #endif
 
 #ifdef FUZZ_PROTOCOL_http2
-void codecFuzzHttp2Nghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
+void codecFuzzHttp2Nghttp2(const ::test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http2Nghttp2);
 }
 
-void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
+void codecFuzzHttp2Oghttp2(const ::test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http2Oghttp2);
 }
 #endif
@@ -814,7 +815,7 @@ void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& inpu
 } // namespace
 
 // Fuzz the H1/H2 codec implementations.
-DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
     TestUtility::validate(input);

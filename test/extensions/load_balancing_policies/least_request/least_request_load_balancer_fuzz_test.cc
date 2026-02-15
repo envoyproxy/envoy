@@ -4,7 +4,7 @@
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
-#include "test/extensions/load_balancing_policies/least_request/least_request_load_balancer_fuzz.pb.validate.h"
+#include "test/extensions/load_balancing_policies/least_request/least_request_load_balancer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 
@@ -43,7 +43,7 @@ void removeRequestsActiveForStaticHosts(NiceMock<MockPrioritySet>& priority_set)
   }
 }
 
-DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::upstream::LeastRequestLoadBalancerTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -57,8 +57,8 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
     return;
   }
 
-  const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
-      input.zone_aware_load_balancer_test_case();
+  const ::test::common::upstream::ZoneAwareLoadBalancerTestCase&
+      zone_aware_load_balancer_test_case = input.zone_aware_load_balancer_test_case();
 
   if (input.has_least_request_lb_config()) {
     const auto& least_request_lb_config = input.least_request_lb_config();

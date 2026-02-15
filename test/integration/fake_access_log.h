@@ -37,7 +37,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new test::integration::accesslog::FakeAccessLog()};
+    return ProtobufTypes::MessagePtr{new ::test::integration::accesslog::FakeAccessLog()};
   }
 
   void setLogCallback(LogSignature callable) {

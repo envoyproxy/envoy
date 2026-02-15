@@ -8,11 +8,17 @@ api_cc_test(
     # Workaround for https://github.com/bazelbuild/bazel/issues/13819
     linkstatic = True,
     deps = [
+        "//envoy/api/v2:pkg_cc_grpc",
         "//envoy/api/v2:pkg_cc_proto",
+        "//envoy/service/accesslog/v2:pkg_cc_grpc",
         "//envoy/service/accesslog/v2:pkg_cc_proto",
+        "//envoy/service/discovery/v2:pkg_cc_grpc",
         "//envoy/service/discovery/v2:pkg_cc_proto",
+        "//envoy/service/metrics/v2:pkg_cc_grpc",
         "//envoy/service/metrics/v2:pkg_cc_proto",
+        "//envoy/service/ratelimit/v2:pkg_cc_grpc",
         "//envoy/service/ratelimit/v2:pkg_cc_proto",
+        "@xds//udpa/service/orca/v1:pkg_cc_grpc",
         "@xds//udpa/service/orca/v1:pkg_cc_proto",
     ],
 )

@@ -2,7 +2,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"
+#include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.h"
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/fuzz/fuzz_runner.h"
 
@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
-DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::extensions::filters::http::FilterFuzzTestCase& input) {
 
   // The filters to exclude in this general fuzzer. For some of them dedicated fuzzer
   // exists. See #20737 or #21141.
@@ -24,7 +24,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
       "envoy.filters.http.kill_request"};
 
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
-      [](test::extensions::filters::http::FilterFuzzTestCase* input, unsigned int seed) {
+      [](::test::extensions::filters::http::FilterFuzzTestCase* input, unsigned int seed) {
         // This ensures that the mutated configs all have valid filter names and type_urls. The list
         // of names and type_urls is pulled from the NamedHttpFilterConfigFactory. All Envoy
         // extensions are built with this test (see BUILD file). This post-processor mutation is

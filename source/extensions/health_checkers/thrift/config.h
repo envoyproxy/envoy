@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
-#include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
 #include "source/extensions/health_checkers/thrift/thrift.h"

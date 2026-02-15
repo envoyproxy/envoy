@@ -1,7 +1,7 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/tls_inspector/tls_inspector_fuzz_test.pb.validate.h"
+#include "test/extensions/filters/listener/tls_inspector/tls_inspector_fuzz_test.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
@@ -10,7 +10,7 @@ namespace ListenerFilters {
 namespace TlsInspector {
 
 DEFINE_PROTO_FUZZER(
-    const test::extensions::filters::listener::tls_inspector::TlsInspectorTestCase& input) {
+    const ::test::extensions::filters::listener::tls_inspector::TlsInspectorTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {

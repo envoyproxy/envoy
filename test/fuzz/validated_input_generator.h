@@ -4,15 +4,13 @@
 #include "test/fuzz/random.h"
 
 #include "src/libfuzzer/libfuzzer_mutator.h"
-#include "validate/validate.h"
-#include "validate/validate.pb.h"
 
 namespace Envoy {
 namespace ProtobufMessage {
 
 template <typename T, typename R> static bool handleNumericRules(T& number, const R& number_rules);
 
-class ValidatedInputGenerator : public ProtobufMessage::ProtoVisitor, private pgv::BaseValidator {
+class ValidatedInputGenerator : public ProtobufMessage::ProtoVisitor {
 public:
   static const std::string kAny;
 
@@ -35,24 +33,23 @@ public:
   ValidatedInputGenerator(unsigned int seed, AnyMap&& default_any_map = getDefaultAnyMap(),
                           unsigned int max_depth = 0);
 
-  void handleAnyRules(Protobuf::Message* msg, const validate::AnyRules& any_rules,
+  // Stub methods - no longer perform PGV validation
+  void handleAnyRules(Protobuf::Message* msg,
                       const absl::Span<const Protobuf::Message* const>& parents);
 
   void handleMessageTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                                const Protobuf::Reflection* reflection,
-                               const validate::FieldRules& rules,
                                const absl::Span<const Protobuf::Message* const>& parents,
                                bool force_create, bool cut_off);
 
-  // Handle all validation rules for intrinsic types like int, uint and string.
-  // Messages are more complicated to handle and can not be handled here.
+  // Stub: Template method signature kept for API compatibility but no longer performs any
+  // validation. This method previously enforced PGV validation rules for intrinsic types (int,
+  // uint, string, etc.). After protovalidate migration, validation is performed at proto level, not
+  // in C++ runtime.
   template <typename T, auto FIELDGETTER, auto FIELDSETTER, auto REPGETTER, auto REPSETTER,
-            auto FIELDADDER, auto RULEGETTER,
-            auto TYPEHANDLER = &handleNumericRules<
-                T, typename std::invoke_result<decltype(RULEGETTER), validate::FieldRules>::type>>
+            auto FIELDADDER>
   void handleIntrinsicTypedField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
-                                 const Protobuf::Reflection* reflection,
-                                 const validate::FieldRules& rules, bool force);
+                                 const Protobuf::Reflection* reflection, bool force);
 
   void onField(Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
                const absl::Span<const Protobuf::Message* const> parents) override;

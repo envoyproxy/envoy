@@ -261,5 +261,6 @@ envoy_cc_library(
         "//envoy/config:eds_resources_cache_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )

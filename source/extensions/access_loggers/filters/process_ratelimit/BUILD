@@ -50,6 +50,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/access_log:access_log_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/filters/process_ratelimit/v3:pkg_cc_proto",
     ],
 )

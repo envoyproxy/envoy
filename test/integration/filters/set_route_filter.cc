@@ -11,16 +11,15 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/set_route_filter_config.pb.h"
-#include "test/integration/filters/set_route_filter_config.pb.validate.h"
 #include "test/test_common/delegating_route_utility.h"
 
 namespace Envoy {
 
 class SetRouteFilterConfig {
 public:
-  SetRouteFilterConfig(const test::integration::filters::SetRouteFilterConfig& config)
+  SetRouteFilterConfig(const ::test::integration::filters::SetRouteFilterConfig& config)
       : proto_config_(config) {}
-  const test::integration::filters::SetRouteFilterConfig proto_config_;
+  const ::test::integration::filters::SetRouteFilterConfig proto_config_;
 };
 
 // A test filter that sets the cached route via setRoute callback and uses the
@@ -46,13 +45,13 @@ private:
 };
 
 class SetRouteFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                  test::integration::filters::SetRouteFilterConfig> {
+                                  ::test::integration::filters::SetRouteFilterConfig> {
 public:
   SetRouteFilterFactory() : FactoryBase(SetRouteFilter::name) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::SetRouteFilterConfig& proto_config, const std::string&,
+      const ::test::integration::filters::SetRouteFilterConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
     auto filter_config = std::make_shared<SetRouteFilterConfig>(proto_config);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) {

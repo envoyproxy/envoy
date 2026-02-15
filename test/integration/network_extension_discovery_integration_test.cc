@@ -54,7 +54,7 @@ public:
       discovery->add_type_urls(
           "type.googleapis.com/test.integration.filters.TestDrainerNetworkFilterConfig");
       if (set_default_config) {
-        auto default_configuration = test::integration::filters::TestDrainerNetworkFilterConfig();
+        auto default_configuration = ::test::integration::filters::TestDrainerNetworkFilterConfig();
         default_configuration.set_bytes_to_drain(default_bytes_to_drain_);
         discovery->mutable_default_config()->PackFrom(default_configuration);
       }
@@ -86,7 +86,7 @@ public:
           auto* filter_chain = listener->mutable_filter_chains(0);
           auto* filter = filter_chain->add_filters();
           filter->set_name(name);
-          auto configuration = test::integration::filters::TestDrainerNetworkFilterConfig();
+          auto configuration = ::test::integration::filters::TestDrainerNetworkFilterConfig();
           configuration.set_bytes_to_drain(bytes_to_drain);
           filter->mutable_typed_config()->PackFrom(configuration);
         });
@@ -227,7 +227,7 @@ public:
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
 
-    auto configuration = test::integration::filters::TestDrainerNetworkFilterConfig();
+    auto configuration = ::test::integration::filters::TestDrainerNetworkFilterConfig();
     configuration.set_bytes_to_drain(bytes_to_drain);
     configuration.set_is_terminal_filter(is_terminal);
     typed_config.mutable_typed_config()->PackFrom(configuration);
@@ -262,7 +262,7 @@ public:
   // Verify ECDS config dump data.
   bool verifyConfigDumpData(
       envoy::config::core::v3::TypedExtensionConfig filter_config,
-      test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config) {
+      ::test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config) {
     // There is no ordering. i.e, either foo or bar could be the 1st in the config dump.
     if (filter_config.name() == "foo") {
       EXPECT_EQ(3, network_filter_config.bytes_to_drain());
@@ -651,7 +651,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
-  test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
   filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(5, network_filter_config.bytes_to_drain());
 }
@@ -721,7 +721,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTypeW
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
   config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
-  test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
@@ -764,7 +764,7 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithR
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
-  test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerNetworkFilterConfig network_filter_config;
   filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }

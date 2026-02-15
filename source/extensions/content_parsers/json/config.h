@@ -2,7 +2,6 @@
 
 #include "envoy/content_parser/config.h"
 #include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.h"
-#include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

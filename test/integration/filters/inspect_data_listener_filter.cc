@@ -2,7 +2,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/filters/inspect_data_listener_filter_config.pb.h"
-#include "test/integration/filters/inspect_data_listener_filter_config.pb.validate.h"
 
 namespace Envoy {
 
@@ -93,7 +92,7 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
     const auto& proto_config = MessageUtil::downcastAndValidate<
-        const test::integration::filters::InspectDataListenerFilterConfig&>(
+        const ::test::integration::filters::InspectDataListenerFilterConfig&>(
         message, context.messageValidationVisitor());
     auto config = std::make_shared<InspectDataListenerConfig>(
         proto_config.max_read_bytes(), proto_config.close_connection(), proto_config.drain(),
@@ -106,7 +105,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::InspectDataListenerFilterConfig>();
+    return std::make_unique<::test::integration::filters::InspectDataListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.listener.inspect_data"; }

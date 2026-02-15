@@ -61,5 +61,6 @@ envoy_cc_library(
         "//source/common/event:dispatcher_includes",
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

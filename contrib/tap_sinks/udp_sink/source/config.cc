@@ -3,8 +3,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.pb.validate.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TapSinks {

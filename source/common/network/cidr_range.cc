@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/address.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -14,6 +15,8 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+
+#include "xds/core/v3/cidr.pb.h"
 
 namespace Envoy {
 namespace Network {

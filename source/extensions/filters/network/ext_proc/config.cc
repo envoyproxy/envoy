@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

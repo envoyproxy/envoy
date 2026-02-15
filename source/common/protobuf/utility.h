@@ -307,53 +307,42 @@ public:
                                      bool recurse_into_any = false);
 
   /**
-   * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
+   * Validates proto constraints using protovalidate-cc runtime validation.
+   * @param message message to validate.
+   * @throw ProtoValidationException if the message violates any constraints.
    */
-  static void recursivePgvCheck(const Protobuf::Message& message);
+  static void validateWithProtovalidate(const Protobuf::Message& message,
+                                        bool recurse_into_any = false);
 
   /**
-   * Validate protoc-gen-validate constraints on a given protobuf as well as performing
-   * unexpected field validation.
-   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
-   * of caller.
+   * Validate unexpected field usage, duration fields, and proto constraints.
+   *
+   * This function:
+   * - Checks for unexpected fields (deprecated or unknown fields) and logs warnings or throws
+   * errors
+   * - Validates that Duration fields have valid values (non-negative, within protobuf limits)
+   * - Validates proto constraints using protovalidate-cc (e.g., required fields, ranges, patterns)
+   *
    * @param message message to validate.
    * @param validation_visitor the validation visitor to use.
    * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
-   * @throw EnvoyException if the message does not satisfy its type constraints.
+   * @throw EnvoyException if the message contains invalid duration fields.
    */
   template <class MessageType>
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        bool recurse_into_any = false) {
-    // TODO(adisuissa): There are multiple recursive traversals done by the
-    // calls in this function. This can be refactored into a single recursive
-    // traversal that invokes the various validators.
-
-    // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
+      // Log warnings or throw errors if deprecated fields or unknown fields are in use.
       checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
+
+      // Validate proto constraints using protovalidate-cc
+      validateWithProtovalidate(message, recurse_into_any);
     }
 
     // Throw an exception if the config has an invalid Duration field. This is needed
-    // because Envoy validates the duration in a strict way that is not supported by PGV.
+    // because Envoy validates the duration in a strict way.
     validateDurationFields(message, recurse_into_any);
-
-    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
-    // we move to always recursing, satisfying the TODO below, we should merge into a single
-    // recursion for performance reasons.
-    if (recurse_into_any) {
-      return recursivePgvCheck(message);
-    }
-
-    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
-    // types, we can remove bottom up validation from the entire codebase and only validate
-    // at top level ingestion (bootstrap, discovery response). This is a large change and will be
-    // done as a separate PR. This change will also allow removing templating from most/all of
-    // related functions.
-    std::string err;
-    if (!Validate(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
-    }
   }
 
 #ifdef ENVOY_ENABLE_YAML
@@ -366,9 +355,7 @@ public:
 #endif
 
   /**
-   * Downcast and validate protoc-gen-validate constraints on a given protobuf.
-   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
-   * of caller.
+   * Downcast and validate a given protobuf.
    * @param message const Protobuf::Message& to downcast and validate.
    * @return const MessageType& the concrete message type downcasted to on success.
    * @throw EnvoyException if the message does not satisfy its type constraints.

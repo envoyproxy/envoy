@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

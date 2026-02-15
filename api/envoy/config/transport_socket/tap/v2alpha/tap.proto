@@ -5,9 +5,10 @@ package envoy.config.transport_socket.tap.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/config/common/tap/v2alpha/common.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v2alpha";
 option java_outer_classname = "TapProto";
@@ -25,9 +26,8 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // ability to interpose and record in plain text any traffic that is surfaced to Envoy.
 message Tap {
   // Common configuration for the tap transport socket.
-  common.tap.v2alpha.CommonExtensionConfig common_config = 1
-      [(validate.rules).message = {required: true}];
+  common.tap.v2alpha.CommonExtensionConfig common_config = 1 [(buf.validate.field).required = true];
 
   // The underlying transport socket being wrapped.
-  api.v2.core.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+  api.v2.core.TransportSocket transport_socket = 2 [(buf.validate.field).required = true];
 }

@@ -1,7 +1,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/header_parser.h"
 
-#include "test/common/router/header_parser_fuzz.pb.validate.h"
+#include "test/common/router/header_parser_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Fuzz {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::router::TestCase& input) {
   try {
     TestUtility::validate(input);
     auto parser_or_error =

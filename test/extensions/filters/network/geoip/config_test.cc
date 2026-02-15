@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
-#include "envoy/extensions/filters/network/geoip/v3/geoip.pb.validate.h"
 
 #include "source/extensions/filters/network/geoip/config.h"
 
@@ -56,8 +55,9 @@ TEST_F(GeoipConfigTest, CreateFilterFactory) {
 TEST_F(GeoipConfigTest, InvalidConfigMissingProvider) {
   envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
   // Proto validation fails for missing required provider field.
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate("{}", proto_config), EnvoyException,
-                          "Provider: value is required");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::loadFromYamlAndValidate("{}", proto_config), EnvoyException,
+      "Proto constraint validation failed \\(field 'provider': value is required\\)");
 }
 
 TEST_F(GeoipConfigTest, FilterIsNotTerminal) {

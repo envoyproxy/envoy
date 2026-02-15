@@ -1,5 +1,7 @@
 #include "source/common/config/stats_utility.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"

@@ -10,6 +10,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"

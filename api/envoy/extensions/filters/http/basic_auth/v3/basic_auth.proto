@@ -4,9 +4,10 @@ package envoy.extensions.filters.http.basic_auth.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.basic_auth.v3";
 option java_outer_classname = "BasicAuthProto";
@@ -39,14 +40,18 @@ message BasicAuth {
   // the backend. The header will be added to the request with the username as the value.
   //
   // If it is not specified, the username will not be forwarded.
-  string forward_username_header = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+  string forward_username_header = 2 [
+    (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 
   // This field specifies the request header to load the basic credential from.
   //
   // If it is not specified, the filter loads the credential from  the "Authorization" header.
-  string authentication_header = 3
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+  string authentication_header = 3 [
+    (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 }
 
 // Extra settings that may be added to per-route configuration for
@@ -54,5 +59,5 @@ message BasicAuth {
 message BasicAuthPerRoute {
   // Username-password pairs for this route.
   config.core.v3.DataSource users = 1
-      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+      [(buf.validate.field).required = true, (udpa.annotations.sensitive) = true];
 }

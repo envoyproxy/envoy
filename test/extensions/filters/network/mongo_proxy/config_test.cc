@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/filters/network/mongo_proxy/config.h"
@@ -97,7 +96,8 @@ TEST(MongoFilterConfigTest, InvalidExtraProperty) {
 }
 
 TEST(MongoFilterConfigTest, EmptyConfig) {
-  handleInvalidConfiguration("{}", "StatPrefix: value length must be at least 1 characters");
+  handleInvalidConfiguration("{}",
+                             "field 'stat_prefix': value length must be at least 1 characters");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
@@ -106,8 +106,8 @@ TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
   delay: {}
   )EOF";
 
-  handleInvalidConfiguration(yaml_string,
-                             R"(caused by field: "fault_delay_secifier", reason: is required)");
+  handleInvalidConfiguration(
+      yaml_string, "field 'delay.fault_delay_secifier': exactly one field is required in oneof");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsMissingFixedDelayTime) {
@@ -119,8 +119,8 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingFixedDelayTime) {
       denominator: HUNDRED
   )EOF";
 
-  handleInvalidConfiguration(yaml_string,
-                             R"(caused by field: "fault_delay_secifier", reason: is required)");
+  handleInvalidConfiguration(
+      yaml_string, "field 'delay.fault_delay_secifier': exactly one field is required in oneof");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
@@ -133,7 +133,8 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
     fixed_delay: -1s
   )EOF";
 
-  handleInvalidConfiguration(yaml_string, "Invalid duration: Expected positive duration");
+  handleInvalidConfiguration(yaml_string,
+                             "field 'delay.fixed_delay': value must be greater than 0s");
 }
 
 TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
@@ -188,7 +189,8 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       fixed_delay: 0s
     )EOF";
 
-    handleInvalidConfiguration(yaml_string, "FixedDelay: value must be greater than 0s");
+    handleInvalidConfiguration(yaml_string,
+                               "field 'delay.fixed_delay': value must be greater than 0s");
   }
 }
 

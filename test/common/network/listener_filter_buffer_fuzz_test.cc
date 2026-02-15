@@ -27,7 +27,7 @@ constexpr uint32_t max_readable_size = max_buffer_size + 1024;
 
 class ListenerFilterBufferFuzzer {
 public:
-  void fuzz(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
+  void fuzz(const ::test::common::network::ListenerFilterBufferFuzzTestCase& input) {
     // Ensure the buffer is not exceed the limit we set.
     auto max_bytes_read = input.max_bytes_read() % max_buffer_size;
     // There won't be any case the max size of buffer is 0.
@@ -55,7 +55,7 @@ public:
       const char insert_value = 'a' + i % 26;
 
       switch (input.actions(i).action_selector_case()) {
-      case test::common::network::Action::kReadable: {
+      case ::test::common::network::Action::kReadable: {
         // Generate the available data, and ensure it is under the max_readable_size.
         auto append_data_size =
             input.actions(i).readable() % (max_readable_size - available_data_.size());
@@ -78,7 +78,7 @@ public:
         EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
         break;
       }
-      case test::common::network::Action::kDrain: {
+      case ::test::common::network::Action::kDrain: {
         // The drain method only support drain size less than the buffer size.
         auto drain_size = std::min(input.actions(i).drain(), listener_buffer->rawSlice().len_);
         if (drain_size != 0) {
@@ -96,7 +96,7 @@ public:
         on_data_cb(*listener_buffer);
         break;
       }
-      case test::common::network::Action::kResetCapacity: {
+      case ::test::common::network::Action::kResetCapacity: {
         auto capacity_size = input.actions(i).drain() % max_buffer_size;
         if (capacity_size == 0) {
           break;
@@ -124,7 +124,7 @@ private:
   uint64_t drained_size_{0};
 };
 
-DEFINE_PROTO_FUZZER(const test::common::network::ListenerFilterBufferFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::network::ListenerFilterBufferFuzzTestCase& input) {
   auto fuzzer = ListenerFilterBufferFuzzer();
   fuzzer.fuzz(input);
 }

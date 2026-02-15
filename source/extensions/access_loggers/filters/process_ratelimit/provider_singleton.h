@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/type/v3/token_bucket.pb.h"
-#include "envoy/type/v3/token_bucket.pb.validate.h"
 
 #include "source/common/config/subscription_base.h"
 #include "source/common/init/target_impl.h"

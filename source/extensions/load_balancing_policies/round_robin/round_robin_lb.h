@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
+
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {

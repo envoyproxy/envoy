@@ -33,7 +33,7 @@ public:
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          test::integration::filters::TestNetworkAsyncTcpFilterConfig proto_config;
+          ::test::integration::filters::TestNetworkAsyncTcpFilterConfig proto_config;
           TestUtility::loadFromYaml(yaml, proto_config);
 
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);

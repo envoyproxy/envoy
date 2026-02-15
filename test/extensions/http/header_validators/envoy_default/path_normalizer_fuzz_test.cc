@@ -2,7 +2,6 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.h"
-#include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/header_validator.h"
 #include "test/test_common/utility.h"
@@ -11,7 +10,7 @@ namespace Envoy {
 
 // Fuzz the path normalization code.
 DEFINE_PROTO_FUZZER(
-    const test::extensions::http::header_validators::envoy_default::PathNormalizerFuzzTestCase&
+    const ::test::extensions::http::header_validators::envoy_default::PathNormalizerFuzzTestCase&
         input) {
   // Validate the PGV constraints of the input.
   try {

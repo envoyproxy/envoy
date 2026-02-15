@@ -3,7 +3,8 @@
 
 #include <algorithm>
 
-#include "test/common/http/http2/hpack_fuzz.pb.validate.h"
+#include "test/common/http/http2/hpack_fuzz.pb.h"
+#include "test/fuzz/common.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 
@@ -19,7 +20,7 @@ namespace {
 // Dynamic Header Table Size
 constexpr int kHeaderTableSize = 4096;
 
-std::vector<nghttp2_nv> createNameValueArray(const test::fuzz::Headers& input) {
+std::vector<nghttp2_nv> createNameValueArray(const ::test::fuzz::Headers& input) {
   const size_t nvlen = input.headers().size();
   std::vector<nghttp2_nv> nva(nvlen);
   int i = 0;
@@ -105,7 +106,7 @@ struct NvComparator {
   }
 };
 
-DEFINE_PROTO_FUZZER(const test::common::http::http2::HpackTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::http::http2::HpackTestCase& input) {
   // Validate headers.
   try {
     TestUtility::validate(input);

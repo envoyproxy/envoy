@@ -987,7 +987,7 @@ public:
                                                  const std::string& value) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
-    auto configuration = test::integration::filters::AddHeaderFilterConfig();
+    auto configuration = ::test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
     filter_config.mutable_typed_config()->PackFrom(configuration);
@@ -997,7 +997,7 @@ public:
   const HttpFilterProto getStopAndContinueFilterConfig() {
     HttpFilterProto filter_config;
     filter_config.set_name("stop-iteration-and-continue-filter");
-    auto configuration = test::integration::filters::StopAndContinueConfig();
+    auto configuration = ::test::integration::filters::StopAndContinueConfig();
     configuration.set_stop_and_buffer(true);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;

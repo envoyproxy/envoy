@@ -1,4 +1,3 @@
-#include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
 
 #include "source/common/formatter/substitution_format_string.h"
 
@@ -39,8 +38,7 @@ public:
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestEmptyIsInvalid) {
   envoy::config::core::v3::SubstitutionFormatString empty_config;
-  std::string err;
-  EXPECT_FALSE(Validate(empty_config, &err));
+  EXPECT_THROW(MessageUtil::validateWithProtovalidate(empty_config), ProtoValidationException);
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {

@@ -4,8 +4,9 @@ package envoy.extensions.http.injected_credentials.generic.v3;
 
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.injected_credentials.generic.v3";
 option java_outer_classname = "GenericProto";
@@ -24,13 +25,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Generic {
   // The SDS configuration for the credential that will be injected to the specified HTTP request header.
   // It must be a generic secret.
-  transport_sockets.tls.v3.SdsSecretConfig credential = 1
-      [(validate.rules).message = {required: true}];
+  transport_sockets.tls.v3.SdsSecretConfig credential = 1 [(buf.validate.field).required = true];
 
   // The header that will be injected to the HTTP request with the provided credential.
   // If not set, filter will default to: ``Authorization``
-  string header = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+  string header = 2 [
+    (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 
   // The prefix to prepend to the credential value before injecting it into the header.
   // This is useful for adding a scheme such as ``Bearer `` or ``Basic `` to the credential.

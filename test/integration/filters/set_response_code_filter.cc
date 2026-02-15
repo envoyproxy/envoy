@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
-#include "test/integration/filters/set_response_code_filter_config.pb.validate.h"
 
 #include "absl/strings/match.h"
 
@@ -79,14 +78,14 @@ private:
 // SetResponseCodeFilterFactory for downstream filter.
 class SetResponseCodeFilterFactory
     : public Extensions::HttpFilters::Common::FactoryBase<
-          test::integration::filters::SetResponseCodeFilterConfig,
-          test::integration::filters::SetResponseCodePerRouteFilterConfig> {
+          ::test::integration::filters::SetResponseCodeFilterConfig,
+          ::test::integration::filters::SetResponseCodePerRouteFilterConfig> {
 public:
   SetResponseCodeFilterFactory() : FactoryBase("set-response-code-filter") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
+      const ::test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(),
@@ -96,7 +95,7 @@ private:
     };
   }
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
+      const ::test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
@@ -107,7 +106,7 @@ private:
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
-      const test::integration::filters::SetResponseCodePerRouteFilterConfig& proto_config,
+      const ::test::integration::filters::SetResponseCodePerRouteFilterConfig& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<const SetResponseCodeFilterRouteSpecificConfig>(
@@ -120,14 +119,14 @@ REGISTER_FACTORY(SetResponseCodeFilterFactory, Server::Configuration::NamedHttpF
 // SetResponseCodeFilterFactoryDual for dual filter.
 class SetResponseCodeFilterFactoryDual
     : public Extensions::HttpFilters::Common::DualFactoryBase<
-          test::integration::filters::SetResponseCodeFilterConfigDual,
-          test::integration::filters::SetResponseCodePerRouteFilterConfigDual> {
+          ::test::integration::filters::SetResponseCodeFilterConfigDual,
+          ::test::integration::filters::SetResponseCodePerRouteFilterConfigDual> {
 public:
   SetResponseCodeFilterFactoryDual() : DualFactoryBase("set-response-code-filter-dual") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
+      const ::test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
       const std::string&, DualInfo, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
@@ -137,7 +136,7 @@ private:
   }
 
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
+      const ::test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
@@ -148,7 +147,7 @@ private:
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
-      const test::integration::filters::SetResponseCodePerRouteFilterConfigDual& proto_config,
+      const ::test::integration::filters::SetResponseCodePerRouteFilterConfigDual& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<const SetResponseCodeFilterRouteSpecificConfig>(
@@ -166,15 +165,15 @@ REGISTER_FACTORY(UpstreamSetResponseCodeFilterFactoryDual,
 // createFilterFactoryFromProtoWithServerContextTyped().
 class SetResponseCodeFilterFactoryNoServerContext
     : public Extensions::HttpFilters::Common::FactoryBase<
-          test::integration::filters::SetResponseCodeFilterConfigNoServerContext,
-          test::integration::filters::SetResponseCodePerRouteFilterConfigNoServerContext> {
+          ::test::integration::filters::SetResponseCodeFilterConfigNoServerContext,
+          ::test::integration::filters::SetResponseCodePerRouteFilterConfigNoServerContext> {
 public:
   SetResponseCodeFilterFactoryNoServerContext()
       : FactoryBase("set-response-code-filter-no-server-context") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::SetResponseCodeFilterConfigNoServerContext& proto_config,
+      const ::test::integration::filters::SetResponseCodeFilterConfigNoServerContext& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(),
@@ -192,15 +191,15 @@ REGISTER_FACTORY(SetResponseCodeFilterFactoryNoServerContext,
 // createFilterFactoryFromProtoWithServerContextTyped().
 class SetResponseCodeFilterFactoryDualNoServerContext
     : public Extensions::HttpFilters::Common::DualFactoryBase<
-          test::integration::filters::SetResponseCodeFilterConfigDualNoServerContext,
-          test::integration::filters::SetResponseCodePerRouteFilterConfigDualNoServerContext> {
+          ::test::integration::filters::SetResponseCodeFilterConfigDualNoServerContext,
+          ::test::integration::filters::SetResponseCodePerRouteFilterConfigDualNoServerContext> {
 public:
   SetResponseCodeFilterFactoryDualNoServerContext()
       : DualFactoryBase("set-response-code-filter-dual-no-server-context") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const test::integration::filters::SetResponseCodeFilterConfigDualNoServerContext&
+      const ::test::integration::filters::SetResponseCodeFilterConfigDualNoServerContext&
           proto_config,
       const std::string&, DualInfo, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(

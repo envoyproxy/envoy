@@ -211,6 +211,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "//envoy/http:codec_interface",
         "//envoy/registry",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_http_spdy_session_lib",
     ]),
 )
@@ -229,6 +230,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/registry",
         "//envoy/server/overload:overload_manager_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_http_spdy_session_lib",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
@@ -263,6 +265,7 @@ envoy_cc_library(
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_connection_lib",
     ]),
 )
@@ -291,6 +294,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:session_idle_list_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_server_http_spdy_session_lib",
         "@abseil-cpp//absl/types:optional",
     ]) + envoy_select_enable_http_datagrams([
@@ -328,6 +332,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_http_client_lib",
         "@quiche//:quic_core_error_codes_lib",
     ]) + envoy_select_enable_http_datagrams([
@@ -385,6 +390,7 @@ envoy_cc_library(
         "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/quic:envoy_quic_utils_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_core_connection_lib",
         "@quiche//:quic_core_packet_writer_lib",
         "@quiche//:quic_core_packets_lib",
@@ -623,6 +629,7 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:quic_platform",
     ]) + select({
         "//bazel:http3_enabled_and_linux": ["@quiche//:quic_core_batch_writer_gso_batch_writer_lib"],

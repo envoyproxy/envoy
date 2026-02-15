@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/config_validator.h"
+#include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.h"
 
 #include "source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.h"
 

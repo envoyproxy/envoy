@@ -6,10 +6,10 @@ import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/duration.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
 option java_outer_classname = "McpRouterProto";
@@ -39,13 +39,14 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Extract identity from a request header.
 message HeaderSource {
   // Header name to extract (e.g., "x-user-identity").
-  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+  string name = 1
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 }
 
 // Extract identity from dynamic metadata (e.g., populated by JWT or ext_authz filter).
 message DynamicMetadataSource {
   // The metadata key to retrieve the value from.
-  type.metadata.v3.MetadataKey key = 1 [(validate.rules).message = {required: true}];
+  type.metadata.v3.MetadataKey key = 1 [(buf.validate.field).required = true];
 }
 
 // Defines how the identity (user/principal) is extracted from the request.
@@ -73,13 +74,13 @@ message ValidationPolicy {
     ENFORCE = 2;
   }
 
-  Mode mode = 1 [(validate.rules).enum = {defined_only: true}];
+  Mode mode = 1 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 // Session identity configuration.
 message SessionIdentity {
   // Defines how the identity (user/principal) is extracted from the request.
-  IdentityExtractor identity = 1 [(validate.rules).message = {required: true}];
+  IdentityExtractor identity = 1 [(buf.validate.field).required = true];
 
   // Specifies how to handle requests where the subject is missing or invalid.
   // Defaults to DISABLED.
@@ -103,7 +104,7 @@ message McpRouter {
   // Cluster-based backend configuration.
   message McpCluster {
     // Cluster name to route requests to.
-    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+    string cluster = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // Path to use for MCP requests. Defaults to "/mcp".
     string path = 2;

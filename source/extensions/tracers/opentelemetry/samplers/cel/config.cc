@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "envoy/extensions/tracers/opentelemetry/samplers/v3/cel_sampler.pb.validate.h"
-
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/opentelemetry/samplers/cel/cel_sampler.h"

@@ -5,7 +5,6 @@
 #include "source/extensions/tracers/common/factory_base.h"
 
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 
 #include "gtest/gtest.h"
 
@@ -128,7 +127,7 @@ private:
 
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
 public:
-  Driver(const test::integration::filters::TracerTestConfig& test_config,
+  Driver(const ::test::integration::filters::TracerTestConfig& test_config,
          Server::Configuration::CommonFactoryContext&)
       : expected_spans_(std::make_shared<std::vector<ExpectedSpan>>()) {
     ENVOY_LOG_MISC(trace, "TestTracer creating driver with config: {}", test_config.DebugString());
@@ -165,14 +164,14 @@ private:
 };
 
 class TracerTestFactory
-    : public Tracers::Common::FactoryBase<test::integration::filters::TracerTestConfig> {
+    : public Tracers::Common::FactoryBase<::test::integration::filters::TracerTestConfig> {
 public:
   TracerTestFactory();
 
 private:
   // FactoryBase
   Tracing::DriverSharedPtr
-  createTracerDriverTyped(const test::integration::filters::TracerTestConfig& test_config,
+  createTracerDriverTyped(const ::test::integration::filters::TracerTestConfig& test_config,
                           Server::Configuration::TracerFactoryContext& context) override {
     return std::make_shared<Driver>(test_config, context.serverFactoryContext());
   };

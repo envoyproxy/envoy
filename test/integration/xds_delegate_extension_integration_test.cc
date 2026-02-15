@@ -79,7 +79,7 @@ std::map<std::string, envoy::service::discovery::v3::Resource>
 class TestXdsResourcesDelegateFactory : public Config::XdsResourcesDelegateFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::envoy::config::xds::TestXdsResourcesDelegateConfig>();
+    return std::make_unique<::test::envoy::config::xds::TestXdsResourcesDelegateConfig>();
   }
 
   std::string name() const override { return "envoy.config.xds.test_delegate"; };
@@ -143,7 +143,7 @@ public:
       auto* delegate_extension = bootstrap.mutable_xds_delegate_extension();
       delegate_extension->set_name("envoy.config.xds.test_delegate");
       delegate_extension->mutable_typed_config()->PackFrom(
-          test::envoy::config::xds::TestXdsResourcesDelegateConfig());
+          ::test::envoy::config::xds::TestXdsResourcesDelegateConfig());
     });
   }
 

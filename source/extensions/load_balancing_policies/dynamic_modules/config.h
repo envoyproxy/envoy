@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"

@@ -581,6 +581,7 @@ envoy_cc_benchmark_binary(
         "//test/test_common:utility_lib",
         "@benchmark",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

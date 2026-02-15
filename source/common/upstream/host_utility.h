@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/primitive_stats.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"

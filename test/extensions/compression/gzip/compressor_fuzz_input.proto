@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 package envoy.extensions.compression.gzip.compressor.fuzz;
 
@@ -18,10 +18,10 @@ message CompressorFuzzInput {
     RLE = 3;
   }
 
-  CompressionLevel compression_level = 1 [(validate.rules).enum.defined_only = true];
-  CompressionStrategy compression_strategy = 2 [(validate.rules).enum.defined_only = true];
-  int32 window_bits = 3 [(validate.rules).int32 = {gte: 9, lte: 15}];
-  int32 memory_level = 4 [(validate.rules).int32 = {gte: 1, lte: 9}];
+  CompressionLevel compression_level = 1 [(buf.validate.field).enum.defined_only = true];
+  CompressionStrategy compression_strategy = 2 [(buf.validate.field).enum.defined_only = true];
+  int32 window_bits = 3 [(buf.validate.field).int32 = {gte: 9, lte: 15}];
+  int32 memory_level = 4 [(buf.validate.field).int32 = {gte: 1, lte: 9}];
 
   // Input data chunks to be compressed.
   repeated bytes data_chunks = 5;

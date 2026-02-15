@@ -4,10 +4,10 @@ package envoy.extensions.content_parsers.json.v3;
 
 import "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.content_parsers.json.v3";
 option java_outer_classname = "JsonContentParserProto";
@@ -31,7 +31,7 @@ message JsonContentParser {
     // See :ref:`json_to_metadata rule <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule>`
     // for available configuration options including selectors, on_present, on_missing, on_error actions.
     filters.http.json_to_metadata.v3.JsonToMetadata.Rule rule = 1
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
 
     // Controls how many times this rule should successfully match before stopping evaluation
     // of this rule for subsequent content items.
@@ -55,11 +55,11 @@ message JsonContentParser {
     //
     // - Extract token usage from final content: ``stop_processing_after_matches: 0``
     //   (Processes all content items, extracts value from the last one that contains it)
-    uint32 stop_processing_after_matches = 2 [(validate.rules).uint32 = {lte: 1}];
+    uint32 stop_processing_after_matches = 2 [(buf.validate.field).uint32 = {lte: 1}];
   }
 
   // The rules to apply for extracting values from JSON content.
   // Rules are evaluated in order for each content item provided.
   // At least one rule must be specified.
-  repeated RuleConfig rules = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated RuleConfig rules = 1 [(buf.validate.field).repeated = {min_items: 1}];
 }

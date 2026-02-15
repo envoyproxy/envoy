@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
+
 #include "source/common/tls/context_config_impl.h"
 
 namespace Envoy {

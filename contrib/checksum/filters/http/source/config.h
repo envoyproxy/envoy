@@ -3,7 +3,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/http/checksum/v3alpha/checksum.pb.h"
-#include "contrib/envoy/extensions/filters/http/checksum/v3alpha/checksum.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

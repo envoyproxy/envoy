@@ -1,5 +1,8 @@
 #include "source/common/common/dns_utils.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/common/dns/v3/dns.pb.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"

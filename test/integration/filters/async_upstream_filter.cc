@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/async_upstream_filter.pb.h"
-#include "test/integration/filters/async_upstream_filter.pb.validate.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {
@@ -74,12 +73,12 @@ private:
 };
 
 class AsyncUpstreamFilterFactory : public Extensions::HttpFilters::Common::DualFactoryBase<
-                                       test::integration::filters::AsyncUpstreamFilterConfig> {
+                                       ::test::integration::filters::AsyncUpstreamFilterConfig> {
 public:
   AsyncUpstreamFilterFactory() : DualFactoryBase("envoy.test.async_upstream") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const test::integration::filters::AsyncUpstreamFilterConfig&,
+  createFilterFactoryFromProtoTyped(const ::test::integration::filters::AsyncUpstreamFilterConfig&,
                                     const std::string&, DualInfo,
                                     Server::Configuration::ServerFactoryContext& context) override {
     return [&cluster_manager =

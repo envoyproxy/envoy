@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/formatter/req_without_query/v3/req_without_query.pb.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {

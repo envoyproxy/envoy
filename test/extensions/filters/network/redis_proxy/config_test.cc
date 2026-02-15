@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/network/address.h"
 
 #include "source/common/protobuf/utility.h"
@@ -67,8 +66,9 @@ settings: {}
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
-                          ProtoValidationException, "embedded message failed validation");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException,
+      "Proto constraint validation failed \\(field 'settings.op_timeout': value is required\\)");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectProto) {
@@ -195,7 +195,9 @@ settings:
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException,
-                          "ConnectionRateLimitPerSec: value must be greater than 0");
+                          "Proto constraint validation failed \\(field "
+                          "'settings.connection_rate_limit.connection_rate_limit_per_sec': value "
+                          "must be greater than 0\\)");
 }
 
 // Verify async gRPC client is created if external auth is enabled.

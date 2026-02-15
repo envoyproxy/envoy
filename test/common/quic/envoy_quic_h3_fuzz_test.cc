@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Quic {
 
-using namespace test::common::quic;
+using namespace ::test::common::quic;
 
 // The following classes essentially mock the `QUIC` handshake
 class ProofSourceDetailsSetter {
@@ -129,7 +129,7 @@ struct Harness {
         }));
   }
 
-  void fuzz(const test::common::quic::QuicH3FuzzCase& input) {
+  void fuzz(const ::test::common::quic::QuicH3FuzzCase& input) {
     auto connection_socket = Quic::createConnectionSocket(peer_addr_, self_addr_, nullptr);
     auto connection = std::make_unique<EnvoyQuicServerConnection>(
         quic::test::TestConnectionId(), srv_addr_, cli_addr_, *connection_helper_, *alarm_factory_,
@@ -209,7 +209,7 @@ struct Harness {
 
 std::unique_ptr<Harness> harness;
 static void resetHarness() { harness = nullptr; };
-DEFINE_PROTO_FUZZER(const test::common::quic::QuicH3FuzzCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::quic::QuicH3FuzzCase& input) {
   if (harness == nullptr) {
     harness = std::make_unique<Harness>(quic::CurrentSupportedHttp3Versions()[0]);
     atexit(resetHarness);

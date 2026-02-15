@@ -10,7 +10,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"

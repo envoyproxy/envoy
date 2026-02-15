@@ -4,8 +4,9 @@ package envoy.extensions.compression.gzip.compressor.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.compression.gzip.compressor.v3";
 option java_outer_classname = "GzipProto";
@@ -84,7 +85,7 @@ message Gzip {
   // use more memory, but are faster and produce better compression results.
   //
   // Defaults to ``5``.
-  google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {lte: 9 gte: 1}];
+  google.protobuf.UInt32Value memory_level = 1 [(buf.validate.field).uint32 = {lte: 9 gte: 1}];
 
   // A value used for selecting the zlib compression level. This setting will affect speed and
   // amount of compression applied to the content. ``BEST_COMPRESSION`` provides higher compression
@@ -94,7 +95,7 @@ message Gzip {
   // to zlib's manual, this level gives the same result as ``COMPRESSION_LEVEL_6``.
   //
   // Defaults to ``DEFAULT_COMPRESSION``.
-  CompressionLevel compression_level = 2 [(validate.rules).enum = {defined_only: true}];
+  CompressionLevel compression_level = 2 [(buf.validate.field).enum = {defined_only: true}];
 
   // A value used for selecting the zlib compression strategy which is directly related to the
   // characteristics of the content. Most of the time ``DEFAULT_STRATEGY`` will be the best choice,
@@ -104,7 +105,7 @@ message Gzip {
   // each strategy, please refer to the `zlib manual <https://www.zlib.net/manual.html>`_.
   //
   // Defaults to ``DEFAULT_STRATEGY``.
-  CompressionStrategy compression_strategy = 3 [(validate.rules).enum = {defined_only: true}];
+  CompressionStrategy compression_strategy = 3 [(buf.validate.field).enum = {defined_only: true}];
 
   // Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
   // Larger window results in better compression at the expense of memory usage. For more details
@@ -112,7 +113,7 @@ message Gzip {
   // `zlib manual <https://www.zlib.net/manual.html>`_ for ``deflateInit2``.
   //
   // Defaults to ``12``, which will produce a 4096 bytes window.
-  google.protobuf.UInt32Value window_bits = 4 [(validate.rules).uint32 = {lte: 15 gte: 9}];
+  google.protobuf.UInt32Value window_bits = 4 [(buf.validate.field).uint32 = {lte: 15 gte: 9}];
 
   // Value for zlib's next output buffer. See the
   // `zlib manual <https://www.zlib.net/manual.html>`_ for more details. Also see
@@ -120,5 +121,5 @@ message Gzip {
   // performance.
   //
   // Defaults to ``4096``.
-  google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+  google.protobuf.UInt32Value chunk_size = 5 [(buf.validate.field).uint32 = {lte: 65536 gte: 4096}];
 }

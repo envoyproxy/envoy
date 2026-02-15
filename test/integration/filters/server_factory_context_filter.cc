@@ -10,14 +10,13 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
-#include "test/integration/filters/server_factory_context_filter_config.pb.validate.h"
 #include "test/proto/helloworld.pb.h"
 
 namespace Envoy {
 
 using ResponsePtr = std::unique_ptr<helloworld::HelloReply>;
 using FilterConfigSharedPtr =
-    std::shared_ptr<const test::integration::filters::ServerFactoryContextFilterConfig>;
+    std::shared_ptr<const ::test::integration::filters::ServerFactoryContextFilterConfig>;
 
 class FilterCallbacks {
 public:
@@ -123,7 +122,7 @@ private:
 // Downstream only filter factory.
 class ServerFactoryContextFilterFactory
     : public Extensions::HttpFilters::Common::FactoryBase<
-          test::integration::filters::ServerFactoryContextFilterConfig> {
+          ::test::integration::filters::ServerFactoryContextFilterConfig> {
 public:
   ServerFactoryContextFilterFactory() : FactoryBase("server-factory-context-filter") {}
 
@@ -131,16 +130,16 @@ private:
   // Only the creation from serverFactoryContext is implemented, returns nullptr in
   // `createFilterFactoryFromProtoTyped`
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::ServerFactoryContextFilterConfig&, const std::string&,
+      const ::test::integration::filters::ServerFactoryContextFilterConfig&, const std::string&,
       Server::Configuration::FactoryContext&) override {
     return nullptr;
   }
 
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
+      const ::test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
     FilterConfigSharedPtr filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfig>(
+        std::make_shared<::test::integration::filters::ServerFactoryContextFilterConfig>(
             proto_config);
     return [&server_context, filter_config = std::move(filter_config)](
                Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -156,17 +155,17 @@ REGISTER_FACTORY(ServerFactoryContextFilterFactory,
 // Dual filter factory.
 class ServerFactoryContextFilterFactoryDual
     : public Extensions::HttpFilters::Common::DualFactoryBase<
-          test::integration::filters::ServerFactoryContextFilterConfigDual> {
+          ::test::integration::filters::ServerFactoryContextFilterConfigDual> {
 public:
   ServerFactoryContextFilterFactoryDual() : DualFactoryBase("server-factory-context-filter-dual") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
+      const ::test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
       const std::string&, DualInfo,
       Server::Configuration::ServerFactoryContext& server_context) override {
     auto filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
+        std::make_shared<::test::integration::filters::ServerFactoryContextFilterConfigDual>(
             proto_config);
     return [&server_context, filter_config = std::move(filter_config)](
                Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -176,10 +175,10 @@ private:
   }
 
   Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
+      const ::test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
       const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
     auto filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
+        std::make_shared<::test::integration::filters::ServerFactoryContextFilterConfigDual>(
             proto_config);
     return [&server_context, filter_config = std::move(filter_config)](
                Http::FilterChainFactoryCallbacks& callbacks) -> void {

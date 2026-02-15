@@ -1,3 +1,4 @@
+#include "test/config/link_hacks.h"
 #include "test/test_common/environment.h"
 #include "test/tools/schema_validator/validator.h"
 
@@ -115,10 +116,9 @@ TEST_F(SchemaValidatorTest, BootstrapPgvFail) {
   CommandLineFormatter formatter = [](absl::string_view final_command_line) {
     return fmt::format("schema_validator_tool -c {} -t bootstrap", final_command_line);
   };
-  EXPECT_THROW_WITH_REGEX(
-      run(formatter, "bootstrap_pgv_fail.yaml"), EnvoyException,
-      "Proto constraint validation failed \\(BootstrapValidationError.StatsFlushInterval: value "
-      "must be inside range");
+  EXPECT_THROW_WITH_REGEX(run(formatter, "bootstrap_pgv_fail.yaml"), EnvoyException,
+                          "Proto constraint validation failed \\(field 'stats_flush_interval': "
+                          "value must be greater than or equal to 0.001s and less than 300s\\)");
 }
 
 // LDS with PGV failure that requires recursing into an Any.
@@ -128,9 +128,7 @@ TEST_F(SchemaValidatorTest, LdsRecursivePgvFail) {
   };
   EXPECT_THROW_WITH_REGEX(
       run(formatter, "lds_pgv_fail.yaml"), EnvoyException,
-      "Proto constraint validation failed \\(HttpConnectionManagerValidationError.RouteConfig:"
-      ".* caused by RouteConfigurationValidationError.VirtualHosts.*"
-      "VirtualHostValidationError.Domains: value must contain at least 1 item\\(s\\)");
+      "field 'route_config.virtual_hosts.domains': value must contain at least 1 item\\(s\\)");
 }
 
 } // namespace Envoy

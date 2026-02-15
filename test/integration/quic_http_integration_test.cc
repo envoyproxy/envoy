@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "test/integration/filters/test_listener_filter.pb.h"
+
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 
 namespace Envoy {
@@ -1525,7 +1527,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
         auto* listener_filter =
             bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
         listener_filter->set_name("dumb_filter");
-        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
@@ -1608,7 +1610,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
         auto* listener_filter =
             bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
         listener_filter->set_name("dumb_filter");
-        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
@@ -1699,7 +1701,7 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
         auto* listener_filter =
             bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
         listener_filter->set_name("dumb_filter");
-        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
@@ -1820,7 +1822,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
         auto* listener_filter =
             bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
         listener_filter->set_name("dumb_filter");
-        auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+        auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
         configuration.set_added_value("foo");
         configuration.set_allow_server_migration(false);
         configuration.set_allow_client_migration(false);
@@ -2014,7 +2016,7 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
     cmsg->set_expected_size(128);
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.quic_listener.test");
-    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
     configuration.set_added_value("foo");
     configuration.set_allow_server_migration(false);
     configuration.set_allow_client_migration(false);

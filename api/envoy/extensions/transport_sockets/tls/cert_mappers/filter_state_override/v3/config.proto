@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3";
 option java_outer_classname = "ConfigProto";
@@ -18,5 +19,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // secret resource name. This filter state is expected to be shared from the downstream connection.
 message Config {
   // The value to use as the secret name when the filter state is absent.
-  string default_value = 1 [(validate.rules).string = {min_len: 1}];
+  string default_value = 1 [(buf.validate.field).string = {min_len: 1}];
 }

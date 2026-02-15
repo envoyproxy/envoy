@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
-#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

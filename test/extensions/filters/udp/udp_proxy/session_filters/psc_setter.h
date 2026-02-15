@@ -8,7 +8,6 @@
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
-#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -18,8 +17,8 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace PerSessionCluster {
 
-using PerSessionClusterSetterFilterConfig =
-    test::extensions::filters::udp::udp_proxy::session_filters::PerSessionClusterSetterFilterConfig;
+using PerSessionClusterSetterFilterConfig = ::test::extensions::filters::udp::udp_proxy::
+    session_filters::PerSessionClusterSetterFilterConfig;
 
 using ReadFilter = Network::UdpSessionReadFilter;
 using ReadFilterStatus = Network::UdpSessionReadFilterStatus;

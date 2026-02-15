@@ -1,7 +1,7 @@
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/proxy_protocol/proxy_protocol_fuzz_test.pb.validate.h"
+#include "test/extensions/filters/listener/proxy_protocol/proxy_protocol_fuzz_test.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
@@ -10,7 +10,7 @@ namespace ListenerFilters {
 namespace ProxyProtocol {
 
 DEFINE_PROTO_FUZZER(
-    const test::extensions::filters::listener::proxy_protocol::ProxyProtocolTestCase& input) {
+    const ::test::extensions::filters::listener::proxy_protocol::ProxyProtocolTestCase& input) {
   Stats::IsolatedStoreImpl store;
   ConfigSharedPtr cfg;
   try {

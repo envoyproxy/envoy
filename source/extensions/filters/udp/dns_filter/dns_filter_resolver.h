@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 

@@ -10,7 +10,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.pb.validate.h"
 #include "openssl/ssl.h"
 
 #ifndef QAT_DISABLED

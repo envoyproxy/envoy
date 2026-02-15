@@ -6,8 +6,9 @@ import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -37,12 +38,12 @@ message DynamicModuleCertValidatorConfig {
   // Dynamic module configuration. See :ref:`dynamic module configuration
   // <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for details.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // The name of the cert validator implementation in the dynamic module.
   // This is passed to the module's ``envoy_dynamic_module_on_cert_validator_config_new``
   // function.
-  string validator_name = 2 [(validate.rules).string = {min_len: 1}];
+  string validator_name = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Optional configuration for the cert validator. This is passed as bytes to the dynamic module.
   google.protobuf.Any validator_config = 3;

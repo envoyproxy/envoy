@@ -1,5 +1,6 @@
 #include "source/common/http/http1/settings.h"
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_formatter.h"
 
 #include "source/common/common/matchers.h"

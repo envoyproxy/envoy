@@ -10,6 +10,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/api/os_sys_calls_impl.h"

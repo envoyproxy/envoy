@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log_config.h"
+#include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
 
 namespace Envoy {
 namespace Extensions {

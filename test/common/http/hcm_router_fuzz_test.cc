@@ -12,7 +12,7 @@
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/conn_manager_impl_test_base.h"
-#include "test/common/http/hcm_router_fuzz.pb.validate.h"
+#include "test/common/http/hcm_router_fuzz.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -31,9 +31,9 @@ namespace Http {
 
 class FuzzConfig;
 
-using FuzzCase = test::common::http::RedirectFuzzCase;
-using FuzzAction = test::common::http::FuzzAction;
-using ActionCase = test::common::http::FuzzAction::ActionCase;
+using FuzzCase = ::test::common::http::RedirectFuzzCase;
+using FuzzAction = ::test::common::http::FuzzAction;
+using ActionCase = ::test::common::http::FuzzAction::ActionCase;
 
 // An instance of this class will be installed in the filter chain
 // for downstream connections by the `HTTP` connection manager.
@@ -88,7 +88,7 @@ enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
 // that the fuzzer can proceed regardless.
 template <class T>
 inline T fromHeaders(
-    const test::fuzz::Headers& headers,
+    const ::test::fuzz::Headers& headers,
     const absl::node_hash_set<std::string>& ignore_headers = absl::node_hash_set<std::string>(),
     absl::node_hash_set<std::string> include_headers = absl::node_hash_set<std::string>()) {
   T header_map;
@@ -118,7 +118,7 @@ public:
         }));
   }
 
-  void sendHeaders(const test::fuzz::Headers& request_headers, bool end_stream,
+  void sendHeaders(const ::test::fuzz::Headers& request_headers, bool end_stream,
                    absl::string_view path) {
     if (request_state_ == StreamState::PendingHeaders) {
       request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
@@ -141,7 +141,7 @@ public:
     }
   }
 
-  void sendTrailers(const test::fuzz::Headers& request_trailers) {
+  void sendTrailers(const ::test::fuzz::Headers& request_trailers) {
     if (request_state_ == StreamState::PendingDataOrTrailers) {
       auto trailers = std::make_unique<TestRequestTrailerMapImpl>(
           fromHeaders<TestRequestTrailerMapImpl>(request_trailers));
@@ -238,7 +238,7 @@ public:
     upstreams_.push_back(std::move(upstream));
   }
 
-  void sendHeaders(uint32_t stream, const test::fuzz::Headers& response_headers,
+  void sendHeaders(uint32_t stream, const ::test::fuzz::Headers& response_headers,
                    bool end_stream) const {
     FuzzUpstream* s = select(stream);
     if (s) {
@@ -260,7 +260,7 @@ public:
     }
   }
 
-  void sendTrailers(uint32_t stream, const test::fuzz::Headers& response_trailers) const {
+  void sendTrailers(uint32_t stream, const ::test::fuzz::Headers& response_trailers) const {
     FuzzUpstream* s = select(stream);
     if (s) {
       auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>(

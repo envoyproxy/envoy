@@ -4,7 +4,7 @@
 
 #include "source/common/upstream/load_balancer_context_base.h"
 
-#include "test/extensions/load_balancing_policies/common/load_balancer_fuzz.pb.validate.h"
+#include "test/extensions/load_balancing_policies/common/load_balancer_fuzz.pb.h"
 #include "test/fuzz/random.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
@@ -25,7 +25,7 @@ public:
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
-  virtual void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input);
+  virtual void initializeLbComponents(const ::test::common::upstream::LoadBalancerTestCase& input);
   virtual void
   updateHealthFlagsForAHostSet(const uint64_t host_priority, const uint32_t num_healthy_hosts,
                                const uint32_t num_degraded_hosts, const uint32_t num_excluded_hosts,
@@ -36,7 +36,7 @@ public:
   // and lb_->chooseHost().
   void preconnect();
   void chooseHost();
-  void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
+  void replay(const Protobuf::RepeatedPtrField<::test::common::upstream::LbAction>& actions);
 
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
@@ -69,7 +69,7 @@ protected:
   // Untrusted upstreams don't have the ability to change the host set size, so keep it constant
   // over the fuzz iteration.
   virtual void
-  initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+  initializeASingleHostSet(const ::test::common::upstream::SetupPriorityLevel& setup_priority_level,
                            const uint8_t priority_level, uint16_t& port);
 
   // This is used to choose a host set to update the flags in an update flags event by modding a

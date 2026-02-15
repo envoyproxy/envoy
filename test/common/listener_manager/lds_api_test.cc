@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/listener_manager/lds_api.h"
@@ -28,6 +29,9 @@ using ::testing::Throw;
 namespace Envoy {
 namespace Server {
 namespace {
+
+const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext
+    _downstream_tls_context_dummy;
 
 class LdsApiTest : public testing::Test {
 public:

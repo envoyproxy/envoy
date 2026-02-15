@@ -1,5 +1,7 @@
 #include "source/common/config/watched_directory.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 namespace Envoy {
 namespace Config {
 

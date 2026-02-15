@@ -8,7 +8,7 @@ namespace ListenerFilters {
 
 void ListenerFilterFuzzer::fuzz(
     Network::ListenerFilterPtr filter,
-    const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+    const ::test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     socket_.connectionInfoProvider().setLocalAddress(
         THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(input.sock().local_address()),
@@ -85,7 +85,7 @@ void ListenerFilterWithDataFuzzer::disconnect() {
 
 void ListenerFilterWithDataFuzzer::fuzz(
     Network::ListenerFilterPtr filter,
-    const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input) {
+    const ::test::extensions::filters::listener::FilterFuzzWithDataTestCase& input) {
   filter_ = std::move(filter);
   connect();
   for (int i = 0; i < input.data_size(); i++) {

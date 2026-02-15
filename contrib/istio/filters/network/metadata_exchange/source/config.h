@@ -3,7 +3,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "contrib/envoy/extensions/filters/network/metadata_exchange/v3/metadata_exchange.pb.h"
-#include "contrib/envoy/extensions/filters/network/metadata_exchange/v3/metadata_exchange.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

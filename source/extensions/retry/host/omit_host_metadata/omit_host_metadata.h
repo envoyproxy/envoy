@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/retry.h"
 #include "envoy/upstream/upstream.h"
 

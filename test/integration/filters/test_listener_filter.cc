@@ -1,7 +1,6 @@
 #include "test/integration/filters/test_listener_filter.h"
 
 #include "test/integration/filters/test_listener_filter.pb.h"
-#include "test/integration/filters/test_listener_filter.pb.validate.h"
 
 namespace Envoy {
 
@@ -22,7 +21,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestInspectorFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestInspectorFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.listener.test"; }
@@ -43,7 +42,7 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
     const auto& message = MessageUtil::downcastAndValidate<
-        const test::integration::filters::TestTcpListenerFilterConfig&>(
+        const ::test::integration::filters::TestTcpListenerFilterConfig&>(
         proto_config, context.messageValidationVisitor());
     return [listener_filter_matcher,
             message](Network::ListenerFilterManager& filter_manager) -> void {
@@ -53,7 +52,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestTcpListenerFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestTcpListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.tcp_listener.test"; }
@@ -76,7 +75,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestUdpListenerFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestUdpListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
@@ -95,7 +94,7 @@ public:
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
     const auto& message = MessageUtil::downcastAndValidate<
-        const test::integration::filters::TestQuicListenerFilterConfig&>(
+        const ::test::integration::filters::TestQuicListenerFilterConfig&>(
         proto_config, context.messageValidationVisitor());
     return [listener_filter_matcher, added_value = message.added_value(),
             allow_server_migration = message.allow_server_migration(),
@@ -108,7 +107,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestQuicListenerFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestQuicListenerFilterConfig>();
   }
 
   std::string name() const override { return "envoy.filters.quic_listener.test"; }

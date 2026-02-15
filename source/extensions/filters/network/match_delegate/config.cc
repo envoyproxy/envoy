@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"

@@ -1,5 +1,7 @@
 #include "source/common/quic/client_codec_impl.h"
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/quic/envoy_quic_client_stream.h"
 
 namespace Envoy {

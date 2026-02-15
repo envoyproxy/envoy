@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/tracers/fluentd/v3/fluentd.pb.h"
-#include "envoy/extensions/tracers/fluentd/v3/fluentd.pb.validate.h"
 
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"

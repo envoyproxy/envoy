@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/config:context_provider_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:thread_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -93,6 +94,8 @@ envoy_cc_library(
     hdrs = ["null_grpc_mux_impl.h"],
     deps = [
         "//envoy/config:grpc_mux_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -127,6 +130,11 @@ envoy_cc_library(
     name = "protobuf_link_hacks",
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/endpoint/v3:pkg_cc_proto",
@@ -265,6 +273,7 @@ envoy_cc_library(
         "//envoy/config:custom_config_validators_interface",
         "//envoy/server:instance_interface",
         "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -313,6 +322,7 @@ envoy_cc_library(
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -4,10 +4,10 @@ package envoy.extensions.filters.network.geoip.v3;
 
 import "envoy/config/core/v3/extension.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.geoip.v3";
 option java_outer_classname = "GeoipProto";
@@ -36,7 +36,7 @@ message Geoip {
 
   // Geoip driver specific configuration which depends on the driver being instantiated.
   // [#extension-category: envoy.geoip_providers]
-  config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig provider = 2 [(buf.validate.field).required = true];
 
   // Configuration for dynamically extracting the client IP address used for geolocation lookups.
   //

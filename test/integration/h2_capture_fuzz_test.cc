@@ -20,7 +20,7 @@ void H2FuzzIntegrationTest::initialize() {
   HttpIntegrationTest::initialize();
 }
 
-DEFINE_PROTO_FUZZER(const test::integration::H2CaptureFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::integration::H2CaptureFuzzTestCase& input) {
   // Pick an IP version to use for loopback, it doesn't matter which.
   FUZZ_ASSERT(!TestEnvironment::getIpVersionsForTest().empty());
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];

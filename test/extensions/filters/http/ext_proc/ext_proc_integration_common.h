@@ -39,7 +39,7 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
-using test::integration::filters::LoggingTestFilterConfig;
+using ::test::integration::filters::LoggingTestFilterConfig;
 
 struct ConfigOptions {
   enum class FilterSetup {

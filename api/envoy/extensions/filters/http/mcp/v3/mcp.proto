@@ -4,10 +4,10 @@ package envoy.extensions.filters.http.mcp.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp.v3";
 option java_outer_classname = "McpProto";
@@ -54,7 +54,7 @@ message Mcp {
   }
 
   // Configures how the filter handles non-MCP traffic.
-  TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+  TrafficMode traffic_mode = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // When set to true, the filter will clear the route cache after setting dynamic metadata.
   // This allows the route to be re-selected based on the MCP metadata (e.g., method, params).
@@ -68,7 +68,8 @@ message Mcp {
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in production.
-  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+  google.protobuf.UInt32Value max_request_body_size = 3
+      [(buf.validate.field).uint32 = {lte: 10485760}];
 
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
@@ -76,7 +77,7 @@ message Mcp {
   // Where to store parsed MCP request attributes.
   // Controls whether attributes are written to dynamic metadata, filter state, or both.
   // Default is DYNAMIC_METADATA when unspecified.
-  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+  RequestStorageMode request_storage_mode = 5 [(buf.validate.field).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.
@@ -87,14 +88,14 @@ message ParserConfig {
     // JSON path to extract (e.g., "params.name", "params.uri").
     // The path is a dot-separated string representing the location of the field in the JSON payload.
     // For example, "params.name" extracts the "name" field from the "params" object.
-    string path = 1 [(validate.rules).string = {min_len: 1}];
+    string path = 1 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // Configuration for a specific MCP method.
   message MethodConfig {
     // Method name (e.g., "tools/call", "resources/read", "initialize").
     // This matches the "method" field in the JSON-RPC request.
-    string method = 1 [(validate.rules).string = {min_len: 1}];
+    string method = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // The group/category name to assign to this method (e.g., "tool", "lifecycle").
     // This will be emitted to dynamic metadata under the key specified by group_metadata_key.
@@ -120,10 +121,11 @@ message ParserConfig {
 // Per-route override configuration for MCP filter
 message McpOverride {
   // Optional per-route traffic mode override
-  Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
+  Mcp.TrafficMode traffic_mode = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // Optional per-route max request body size override.
   // When set, this overrides the global max_request_body_size for this route.
   // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
-  google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+  google.protobuf.UInt32Value max_request_body_size = 2
+      [(buf.validate.field).uint32 = {lte: 10485760}];
 }

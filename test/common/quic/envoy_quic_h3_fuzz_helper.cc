@@ -8,7 +8,7 @@ namespace Quic {
 
 static uint64_t clampU64(uint64_t in) { return in & ((1ULL << 62) - 1); }
 
-using namespace test::common::quic;
+using namespace ::test::common::quic;
 
 enum class Type : uint8_t {
   Data = 0x00,
@@ -372,7 +372,7 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serialize(quic::QuicFrame frame) {
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame) {
+QuicPacketizer::serializeStreamFrame(const ::test::common::quic::QuicStreamFrame& frame) {
   bool unidirectional = frame.unidirectional();
   uint32_t type = frame.type();
   uint32_t id = frame.id();
@@ -394,7 +394,7 @@ QuicPacketizer::serializeStreamFrame(const test::common::quic::QuicStreamFrame& 
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame) {
+QuicPacketizer::serializeNewTokenFrame(const ::test::common::quic::QuicNewTokenFrame& frame) {
   char buffer[1024];
   size_t len = std::min(frame.token().size(), sizeof(buffer));
   memcpy(buffer, frame.token().data(), len);
@@ -404,7 +404,7 @@ QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFra
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeDatagramFrame(const test::common::quic::QuicDatagramFrame& frame) {
+QuicPacketizer::serializeDatagramFrame(const ::test::common::quic::QuicDatagramFrame& frame) {
   char buffer[1024];
   auto message = frame.data();
   size_t len = std::min(message.size(), sizeof(buffer));
@@ -414,7 +414,7 @@ QuicPacketizer::serializeDatagramFrame(const test::common::quic::QuicDatagramFra
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame) {
+QuicPacketizer::serializeCryptoFrame(const ::test::common::quic::QuicCryptoFrame& frame) {
   char buffer[1024];
   auto data = frame.data();
   uint16_t len = std::min(data.size(), sizeof(buffer));
@@ -425,7 +425,7 @@ QuicPacketizer::serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& 
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeAckFrame(const test::common::quic::QuicAckFrame& frame) {
+QuicPacketizer::serializeAckFrame(const ::test::common::quic::QuicAckFrame& frame) {
   auto largest_acked = quic::QuicPacketNumber(clampU64(frame.largest_acked()));
   quic::QuicAckFrame ack_frame;
   ack_frame.largest_acked = largest_acked;
@@ -439,7 +439,7 @@ QuicPacketizer::serializeAckFrame(const test::common::quic::QuicAckFrame& frame)
 }
 
 QuicPacketizer::QuicPacketPtr QuicPacketizer::serializeNewConnectionIdFrame(
-    const test::common::quic::QuicNewConnectionIdFrame& frame) {
+    const ::test::common::quic::QuicNewConnectionIdFrame& frame) {
   quic::QuicNewConnectionIdFrame new_connection_id_frame;
   new_connection_id_frame.control_frame_id = frame.control_frame_id();
   new_connection_id_frame.connection_id = toConnectionId(frame.connection_id());

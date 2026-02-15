@@ -3,9 +3,7 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
 #include "envoy/http/header_validator_factory.h"
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -17,7 +15,6 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
-#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
@@ -2570,7 +2567,7 @@ namespace {
 
 class TestRequestIDExtension : public Http::RequestIDExtension {
 public:
-  TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
+  TestRequestIDExtension(const ::test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
   void set(Http::RequestHeaderMap&, bool, bool) override {}
@@ -2589,7 +2586,7 @@ public:
   std::string testField() { return config_.test_field(); }
 
 private:
-  test::http_connection_manager::CustomRequestIDExtension config_;
+  ::test::http_connection_manager::CustomRequestIDExtension config_;
 };
 
 class TestRequestIDExtensionFactory : public Server::Configuration::RequestIDExtensionFactory {
@@ -2599,14 +2596,14 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::http_connection_manager::CustomRequestIDExtension>();
+    return std::make_unique<::test::http_connection_manager::CustomRequestIDExtension>();
   }
 
   Http::RequestIDExtensionSharedPtr
   createExtensionInstance(const Protobuf::Message& config,
                           Server::Configuration::FactoryContext& context) override {
     const auto& custom_config = MessageUtil::downcastAndValidate<
-        const test::http_connection_manager::CustomRequestIDExtension&>(
+        const ::test::http_connection_manager::CustomRequestIDExtension&>(
         config, context.messageValidationVisitor());
     return std::make_shared<TestRequestIDExtension>(custom_config);
   }
@@ -3521,7 +3518,7 @@ public:
   std::string name() const override { return "test.http_connection_manager.CustomHeaderValidator"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::http_connection_manager::CustomHeaderValidator>();
+    return std::make_unique<::test::http_connection_manager::CustomHeaderValidator>();
   }
 
   Http::HeaderValidatorFactoryPtr
@@ -3829,9 +3826,10 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "cluster_min_healthy_percentages contains a NaN value for cluster: test");
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Proto constraint validation failed "
+                          "\\(field 'cluster_min_healthy_percentages.value': "
+                          "value must be greater than or equal to 0 and less than or equal to 100");
 }
 
 class HcmUtilityTest : public testing::Test {

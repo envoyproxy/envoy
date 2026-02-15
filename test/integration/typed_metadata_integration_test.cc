@@ -5,7 +5,6 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/typed_metadata_integration_test.pb.h"
-#include "test/integration/typed_metadata_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
 #include "test/test_common/registry.h"
@@ -72,7 +71,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new test::integration::typed_metadata::TestAccessLog()};
+    return ProtobufTypes::MessagePtr{new ::test::integration::typed_metadata::TestAccessLog()};
   }
 
   std::string name() const override { return "envoy.access_loggers.test"; }
@@ -93,7 +92,7 @@ TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        test::integration::typed_metadata::TestAccessLog access_log_config;
+        ::test::integration::typed_metadata::TestAccessLog access_log_config;
         hcm.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
       });
 

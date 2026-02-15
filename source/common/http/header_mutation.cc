@@ -1,5 +1,9 @@
 #include "source/common/http/header_mutation.h"
 
+#include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+
 #include "source/common/common/matchers.h"
 #include "source/common/router/header_parser.h"
 

@@ -6,7 +6,6 @@
 
 #include "test/common/http/filters/test_logger/filter.h"
 #include "test/common/http/filters/test_logger/filter.pb.h"
-#include "test/common/http/filters/test_logger/filter.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

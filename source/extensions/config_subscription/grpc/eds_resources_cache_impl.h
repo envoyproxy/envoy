@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/config/eds_resources_cache.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 

@@ -122,7 +122,7 @@ void UberFilterFuzzer::fuzz(
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
-    case test::extensions::filters::network::Action::kOnData: {
+    case ::test::extensions::filters::network::Action::kOnData: {
       ASSERT(read_filter_ != nullptr);
       Buffer::OwnedImpl buffer(action.on_data().data());
       read_filter_->onData(buffer, action.on_data().end_stream());
@@ -134,13 +134,13 @@ void UberFilterFuzzer::fuzz(
 
       break;
     }
-    case test::extensions::filters::network::Action::kOnNewConnection: {
+    case ::test::extensions::filters::network::Action::kOnNewConnection: {
       ASSERT(read_filter_ != nullptr);
       read_filter_->onNewConnection();
 
       break;
     }
-    case test::extensions::filters::network::Action::kAdvanceTime: {
+    case ::test::extensions::filters::network::Action::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
           factory_context_.server_factory_context_.mainThreadDispatcher(),

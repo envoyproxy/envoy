@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.matching.common_inputs.transport_socket.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.transport_socket.v3";
 option java_outer_classname = "TransportSocketInputsProto";
@@ -38,10 +39,10 @@ message EndpointMetadataInput {
   // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_len: 1}];
+      string key = 1 [(buf.validate.field).string = {min_len: 1}];
     }
   }
 
@@ -50,7 +51,7 @@ message EndpointMetadataInput {
   string filter = 1;
 
   // The path to retrieve the Value from the Struct.
-  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated PathSegment path = 2 [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 // Specifies that matching should be performed by the locality metadata.
@@ -78,10 +79,10 @@ message LocalityMetadataInput {
   // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_len: 1}];
+      string key = 1 [(buf.validate.field).string = {min_len: 1}];
     }
   }
 
@@ -90,7 +91,7 @@ message LocalityMetadataInput {
   string filter = 1;
 
   // The path to retrieve the Value from the Struct.
-  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated PathSegment path = 2 [(buf.validate.field).repeated = {min_items: 1}];
 }
 
 // Specifies that matching should be performed by filter state.
@@ -111,7 +112,7 @@ message LocalityMetadataInput {
 message FilterStateInput {
   // The key of the filter state object to retrieve.
   // The object must implement serializeAsString() to be used for matching.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string = {min_len: 1}];
 }
 
 // Configuration for the transport socket name action.
@@ -120,5 +121,5 @@ message FilterStateInput {
 message TransportSocketNameAction {
   // The name of the transport socket to use.
   // This name must reference a named transport socket in the cluster's transport_socket_matches.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 }

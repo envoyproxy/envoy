@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/network/sni_cluster/v3/sni_cluster.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/network/well_known_names.h"

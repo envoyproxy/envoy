@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 

@@ -1,6 +1,6 @@
 #include "source/common/http/utility.h"
 
-#include "test/common/http/utility_fuzz.pb.validate.h"
+#include "test/common/http/utility_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Fuzz {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::http::UtilityTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (ProtoValidationException& e) {
@@ -17,12 +17,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     return;
   }
   switch (input.utility_selector_case()) {
-  case test::common::http::UtilityTestCase::kParseQueryString: {
+  case ::test::common::http::UtilityTestCase::kParseQueryString: {
     Http::Utility::QueryParamsMulti::parseQueryString(input.parse_query_string());
     Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(input.parse_query_string());
     break;
   }
-  case test::common::http::UtilityTestCase::kParseCookieValue: {
+  case ::test::common::http::UtilityTestCase::kParseCookieValue: {
     const auto& parse_cookie_value = input.parse_cookie_value();
     // Use the production RequestHeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
     auto headers = Http::RequestHeaderMapImpl::create();
@@ -32,7 +32,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     Http::Utility::parseCookieValue(*headers, parse_cookie_value.key());
     break;
   }
-  case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
+  case ::test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
     const auto& get_last_address_from_xff = input.get_last_address_from_xff();
     // Use the production RequestHeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
     auto headers = Http::RequestHeaderMapImpl::create();
@@ -42,21 +42,21 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     Http::Utility::getLastAddressFromXFF(*headers, get_last_address_from_xff.num_to_skip() % 32);
     break;
   }
-  case test::common::http::UtilityTestCase::kExtractHostPathFromUri: {
+  case ::test::common::http::UtilityTestCase::kExtractHostPathFromUri: {
     absl::string_view host;
     absl::string_view path;
     Http::Utility::extractHostPathFromUri(input.extract_host_path_from_uri(), host, path);
     break;
   }
-  case test::common::http::UtilityTestCase::kPercentEncodingString: {
+  case ::test::common::http::UtilityTestCase::kPercentEncodingString: {
     Http::Utility::PercentEncoding::encode(input.percent_encoding_string());
     break;
   }
-  case test::common::http::UtilityTestCase::kPercentDecodingString: {
+  case ::test::common::http::UtilityTestCase::kPercentDecodingString: {
     Http::Utility::PercentEncoding::decode(input.percent_decoding_string());
     break;
   }
-  case test::common::http::UtilityTestCase::kParseParameters: {
+  case ::test::common::http::UtilityTestCase::kParseParameters: {
     const auto& parse_parameters = input.parse_parameters();
     Http::Utility::QueryParamsMulti::parseParameters(parse_parameters.data(),
                                                      parse_parameters.start(),
@@ -66,24 +66,24 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
                                                      /*decode_params*/ true);
     break;
   }
-  case test::common::http::UtilityTestCase::kFindQueryString: {
+  case ::test::common::http::UtilityTestCase::kFindQueryString: {
     Http::HeaderString path(input.find_query_string());
     Http::Utility::findQueryStringStart(path);
     break;
   }
-  case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
+  case ::test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
                                       std::chrono::seconds(cookie_value.max_age()),
                                       cookie_value.httponly(), {});
     break;
   }
-  case test::common::http::UtilityTestCase::kParseAuthorityString: {
+  case ::test::common::http::UtilityTestCase::kParseAuthorityString: {
     const auto& authority_string = input.parse_authority_string();
     Http::Utility::parseAuthority(authority_string);
     break;
   }
-  case test::common::http::UtilityTestCase::kInitializeAndValidate: {
+  case ::test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
     auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
     if (!options_or_error.status().ok()) {

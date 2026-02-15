@@ -54,5 +54,6 @@ envoy_cc_extension(
         ":filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/udp/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

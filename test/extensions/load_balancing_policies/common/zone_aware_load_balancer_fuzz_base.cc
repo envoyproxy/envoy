@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 
 void ZoneAwareLoadBalancerFuzzBase::initializeASingleHostSet(
-    const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+    const ::test::common::upstream::SetupPriorityLevel& setup_priority_level,
     const uint8_t priority_level, uint16_t& port) {
   LoadBalancerFuzzBase::initializeASingleHostSet(setup_priority_level, priority_level, port);
   // Update local priority set if it exists - will mean load balancer is zone aware and has decided
@@ -39,7 +39,7 @@ void ZoneAwareLoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
 }
 
 void ZoneAwareLoadBalancerFuzzBase::initializeLbComponents(
-    const test::common::upstream::LoadBalancerTestCase& input) {
+    const ::test::common::upstream::LoadBalancerTestCase& input) {
   LoadBalancerFuzzBase::initializeLbComponents(input);
   setupZoneAwareLoadBalancingSpecificLogic();
 }

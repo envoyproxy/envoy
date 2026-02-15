@@ -1,4 +1,3 @@
-#include "envoy/extensions/transport_sockets/tls/v3/common.pb.validate.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"

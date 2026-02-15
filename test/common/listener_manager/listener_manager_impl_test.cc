@@ -30,7 +30,6 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/listener_manager/config.pb.h"
-#include "test/common/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"
@@ -728,7 +727,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
+        ::test::extensions::listener_managers::listener_manager::NonTerminalFilter>();
   }
 
   std::string name() const override { return "non_terminal"; }
@@ -808,7 +807,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        test::extensions::listener_managers::listener_manager::TestStatsFilter>();
+        ::test::extensions::listener_managers::listener_manager::TestStatsFilter>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -6003,7 +6002,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        test::extensions::listener_managers::listener_manager::OriginalDstTestFilter>();
+        ::test::extensions::listener_managers::listener_manager::OriginalDstTestFilter>();
   }
 
   std::string name() const override { return "test.listener.original_dst"; }
@@ -6206,7 +6205,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
       return std::make_unique<
-          test::extensions::listener_managers::listener_manager::OriginalDstTestIPv6Filter>();
+          ::test::extensions::listener_managers::listener_manager::OriginalDstTestIPv6Filter>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }

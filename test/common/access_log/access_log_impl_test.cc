@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 

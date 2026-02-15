@@ -3,7 +3,7 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.validate.h"
+#include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.h"
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
 #include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -11,9 +11,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::extensions::filters::network::FilterFuzzTestCase& input) {
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
-      [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
+      [](::test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
         // This post-processor mutation is applied only when libprotobuf-mutator
         // calls mutate on an input, and *not* during fuzz target execution.
         // Replaying a corpus through the fuzzer will not be affected by the

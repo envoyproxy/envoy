@@ -6,7 +6,6 @@
 #include <memory>
 
 #include "envoy/config/trace/v3/datadog.pb.h"
-#include "envoy/config/trace/v3/datadog.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/version/version.h"

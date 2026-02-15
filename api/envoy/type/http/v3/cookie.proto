@@ -4,8 +4,9 @@ package envoy.type.http.v3;
 
 import "google/protobuf/duration.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.http.v3";
 option java_outer_classname = "CookieProto";
@@ -19,11 +20,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Cookie {
   // The name that will be used to obtain cookie value from downstream HTTP request or generate
   // new cookie for downstream.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Duration of cookie. This will be used to set the expiry time of a new cookie when it is
   // generated. Set this to 0s to use a session cookie and disable cookie expiration.
-  google.protobuf.Duration ttl = 2 [(validate.rules).duration = {gte {}}];
+  google.protobuf.Duration ttl = 2 [(buf.validate.field).duration = {gte {}}];
 
   // Path of cookie. This will be used to set the path of a new cookie when it is generated.
   // If no path is specified here, no path will be set for the cookie.
@@ -36,12 +37,11 @@ message Cookie {
 // CookieAttribute defines an API for adding additional attributes for a HTTP cookie.
 message CookieAttribute {
   // The name of the cookie attribute.
-  string name = 1
-      [(validate.rules).string =
-           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+  string name = 1 [(buf.validate.field).string =
+                       {min_len: 1 max_len: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
   // The optional value of the cookie attribute.
   string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (buf.validate.field).string = {max_len: 16384 well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE}
   ];
 }

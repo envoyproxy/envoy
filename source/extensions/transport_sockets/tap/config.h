@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 namespace Envoy {

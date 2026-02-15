@@ -3,7 +3,7 @@
 namespace Envoy {
 void H1FuzzIntegrationTest::initialize() { HttpIntegrationTest::initialize(); }
 
-DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::integration::CaptureFuzzTestCase& input) {
   if (input.events_size() == 0) {
     return;
   }

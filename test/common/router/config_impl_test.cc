@@ -8,7 +8,6 @@
 
 #include "envoy/common/hashable.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -74,7 +73,7 @@ public:
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
       static uint32_t n;
-      test::common::router::RouteTestCase route_test_case;
+      ::test::common::router::RouteTestCase route_test_case;
       route_test_case.mutable_config()->MergeFrom(config_);
       route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
       route_test_case.set_random_value(random_value);
@@ -5738,7 +5737,8 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                      creation_status_),
       EnvoyException,
-      "RouteActionValidationError.PrefixRewrite:.*value does not match regex pattern");
+      "Proto constraint validation failed \\(field 'virtual_hosts.routes.route.prefix_rewrite': "
+      "value must be a valid HTTP header value\\)");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRewrites) {
@@ -5753,11 +5753,12 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RouteActionValidationError.HostRewriteLiteral:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "Proto constraint validation failed \\(field "
+                          "'virtual_hosts.routes.route.host_rewrite_literal': value must be a "
+                          "valid HTTP header value\\)");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInAutoHostRewrites) {
@@ -5772,11 +5773,12 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RouteActionValidationError.HostRewriteHeader:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "Proto constraint validation failed \\(field "
+                          "'virtual_hosts.routes.route.host_rewrite_header': value must be a valid "
+                          "HTTP header name\\)");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRedirect) {
@@ -5793,7 +5795,8 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                      creation_status_),
       EnvoyException,
-      "RedirectActionValidationError.HostRedirect:.*value does not match regex pattern");
+      "Proto constraint validation failed \\(field 'virtual_hosts.routes.redirect.host_redirect': "
+      "value must be a valid HTTP header value\\)");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPathRedirect) {
@@ -5810,7 +5813,8 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                      creation_status_),
       EnvoyException,
-      "RedirectActionValidationError.PathRedirect:.*value does not match regex pattern");
+      "Proto constraint validation failed \\(field 'virtual_hosts.routes.redirect.path_redirect': "
+      "value must be a valid HTTP header value\\)");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewriteRedirect) {
@@ -5827,7 +5831,8 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                      creation_status_),
       EnvoyException,
-      "RedirectActionValidationError.PrefixRewrite:.*value does not match regex pattern");
+      "Proto constraint validation failed \\(field 'virtual_hosts.routes.redirect.prefix_rewrite': "
+      "value must be a valid HTTP header value\\)");
 }
 
 TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {
@@ -7328,7 +7333,9 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
                                          true, creation_status_),
-                          EnvoyException, "RouteValidationError.Match");
+                          EnvoyException,
+                          "Proto constraint validation failed \\(field "
+                          "'virtual_hosts.routes.match': value is required\\)");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -7362,9 +7369,12 @@ virtual_hosts:
       prefix: "/api"
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
-                                         true, creation_status_),
-                          EnvoyException, "caused by field: \"action\", reason: is required");
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                     creation_status_),
+      EnvoyException,
+      "Proto constraint validation failed \\(field 'virtual_hosts.routes.action': exactly one "
+      "field is required in oneof\\)");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {

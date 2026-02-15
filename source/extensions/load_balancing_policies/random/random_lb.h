@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
+
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {

@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_proc.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3";
 option java_outer_classname = "ProcessingModeProto";
@@ -140,30 +141,30 @@ message ProcessingMode {
   //    processed.
   //
   // Defaults to ``SEND``.
-  HeaderSendMode request_header_mode = 1 [(validate.rules).enum = {defined_only: true}];
+  HeaderSendMode request_header_mode = 1 [(buf.validate.field).enum = {defined_only: true}];
 
   // How to handle the response header.
   //
   // Defaults to ``SEND``.
-  HeaderSendMode response_header_mode = 2 [(validate.rules).enum = {defined_only: true}];
+  HeaderSendMode response_header_mode = 2 [(buf.validate.field).enum = {defined_only: true}];
 
   // How to handle the request body.
   //
   // Defaults to ``NONE``.
-  BodySendMode request_body_mode = 3 [(validate.rules).enum = {defined_only: true}];
+  BodySendMode request_body_mode = 3 [(buf.validate.field).enum = {defined_only: true}];
 
   // How to handle the response body.
   //
   // Defaults to ``NONE``.
-  BodySendMode response_body_mode = 4 [(validate.rules).enum = {defined_only: true}];
+  BodySendMode response_body_mode = 4 [(buf.validate.field).enum = {defined_only: true}];
 
   // How to handle the request trailers.
   //
   // Defaults to ``SKIP``.
-  HeaderSendMode request_trailer_mode = 5 [(validate.rules).enum = {defined_only: true}];
+  HeaderSendMode request_trailer_mode = 5 [(buf.validate.field).enum = {defined_only: true}];
 
   // How to handle the response trailers.
   //
   // Defaults to ``SKIP``.
-  HeaderSendMode response_trailer_mode = 6 [(validate.rules).enum = {defined_only: true}];
+  HeaderSendMode response_trailer_mode = 6 [(buf.validate.field).enum = {defined_only: true}];
 }

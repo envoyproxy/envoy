@@ -1,5 +1,7 @@
 #include "source/common/http/dependency_manager.h"
 
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/substitute.h"
 

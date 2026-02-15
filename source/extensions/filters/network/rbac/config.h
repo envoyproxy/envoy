@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"

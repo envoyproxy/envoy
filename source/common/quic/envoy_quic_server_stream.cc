@@ -6,6 +6,8 @@
 #include <memory>
 #include <utility>
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"

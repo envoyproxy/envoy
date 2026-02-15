@@ -104,6 +104,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/functional:bind_front",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
 
@@ -131,6 +132,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/functional:bind_front",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
 

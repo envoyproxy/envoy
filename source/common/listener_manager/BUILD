@@ -231,6 +231,7 @@ envoy_cc_library(
         "//source/common/network:generic_listener_filter_impl_base_lib",
         "//source/common/stats:timespan_lib",
         "//source/server:active_listener_base",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -243,6 +244,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:listener_interface",
         "//source/common/config:metadata_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
@@ -270,6 +272,7 @@ envoy_cc_library(
         "//source/common/network:listener_filter_buffer_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:active_listener_base",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

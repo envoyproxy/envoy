@@ -46,5 +46,6 @@ envoy_cc_extension(
         "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/extensions/access_loggers/fluentd/v3:pkg_cc_proto",
     ],
 )

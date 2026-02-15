@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.h"
 #include "envoy/server/instance.h"
 
 #include "source/server/configuration_impl.h"

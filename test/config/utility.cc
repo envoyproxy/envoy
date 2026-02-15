@@ -1082,7 +1082,7 @@ void ConfigHelper::setAsyncLb(bool hang) {
     auto* policy = cluster->mutable_load_balancing_policy()->mutable_policies()->Add();
     policy->mutable_typed_extension_config()->set_name(
         "envoy.load_balancing_policies.async_round_robin");
-    test::integration::lb::AsyncRoundRobin lb_config;
+    ::test::integration::lb::AsyncRoundRobin lb_config;
     lb_config.set_hang(hang);
     policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);
   }

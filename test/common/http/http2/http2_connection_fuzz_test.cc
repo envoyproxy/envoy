@@ -24,7 +24,7 @@ namespace {
 static const uint32_t MAX_HEADERS = 32;
 static const size_t MAX_HD_TABLE_BUF_SIZE = 4096;
 
-void deflateHeaders(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fragment,
+void deflateHeaders(nghttp2_hd_deflater* deflater, const ::test::fuzz::Headers& fragment,
                     std::string& payload) {
 #define MAX_HDRS 32
   nghttp2_nv h2hdrs[MAX_HEADERS];
@@ -58,7 +58,7 @@ void deflateHeaders(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& fr
 }
 
 Http2Frame pbToH2Frame(nghttp2_hd_deflater* deflater,
-                       const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
+                       const ::test::common::http::http2::Http2FrameOrJunk& pb_frame) {
   if (pb_frame.has_junk()) {
     // Junk frame
     const auto& junk = pb_frame.junk();
@@ -226,7 +226,7 @@ static void resetHarness() { harness = nullptr; }
 //
 // Uses a mix of structured HTTP/2 frames and junk frames for coverage
 
-DEFINE_PROTO_FUZZER(const test::common::http::http2::Http2ConnectionFuzzCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::http::http2::Http2ConnectionFuzzCase& input) {
   if (harness == nullptr) {
     harness = std::make_unique<Http2Harness>();
     atexit(resetHarness);

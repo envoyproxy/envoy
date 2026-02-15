@@ -1,5 +1,4 @@
 #include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.h"
-#include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/resource_monitors/downstream_connections/config.h"
@@ -35,8 +34,8 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(config, context),
                           ProtoValidationException,
                           "Proto constraint validation failed "
-                          "\\(DownstreamConnectionsConfigValidationError."
-                          "MaxActiveDownstreamConnections: value must be greater than 0");
+                          "\\(field 'max_active_downstream_connections': "
+                          "value must be greater than 0");
 }
 
 TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
@@ -73,9 +72,8 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
 
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(*config, context),
                           ProtoValidationException,
-                          "Proto constraint validation failed "
-                          "\\(DownstreamConnectionsConfigValidationError."
-                          "MaxActiveDownstreamConnections: value must be greater than 0");
+                          "Proto constraint validation failed \\(field "
+                          "'max_active_downstream_connections': value must be greater than 0\\)");
 }
 
 } // namespace

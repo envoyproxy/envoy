@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
-#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/transport_socket_matching_data.h"

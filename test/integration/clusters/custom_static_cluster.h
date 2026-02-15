@@ -17,7 +17,6 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
-#include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/test_common/registry.h"
 
 namespace Envoy {
@@ -50,8 +49,8 @@ private:
   const uint32_t port_;
   Upstream::HostSharedPtr host_;
 
-  friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1>;
-  friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig2>;
+  friend class CustomStaticClusterFactoryBase<::test::integration::clusters::CustomStaticConfig1>;
+  friend class CustomStaticClusterFactoryBase<::test::integration::clusters::CustomStaticConfig2>;
 };
 
 template <class ConfigProto>
@@ -79,14 +78,14 @@ private:
 };
 
 class CustomStaticClusterFactoryNoLb
-    : public CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1> {
+    : public CustomStaticClusterFactoryBase<::test::integration::clusters::CustomStaticConfig1> {
 public:
   CustomStaticClusterFactoryNoLb()
       : CustomStaticClusterFactoryBase("envoy.clusters.custom_static", false) {};
 };
 
 class CustomStaticClusterFactoryWithLb
-    : public CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig2> {
+    : public CustomStaticClusterFactoryBase<::test::integration::clusters::CustomStaticConfig2> {
 public:
   CustomStaticClusterFactoryWithLb()
       : CustomStaticClusterFactoryBase("envoy.clusters.custom_static_with_lb", true) {}

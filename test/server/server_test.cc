@@ -1266,21 +1266,23 @@ TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_missing_name.yaml"),
-      EnvoyException, "RuntimeLayerValidationError.Name: value length must be at least");
+      EnvoyException,
+      "field 'layered_runtime.layers.name': value length must be at least 1 characters");
 }
 
 // Validate invalid layered runtime with duplicate names is rejected.
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_duplicate_name.yaml"),
-      EnvoyException, "Duplicate layer name: some_static_laye");
+      EnvoyException, "Duplicate layer name: some_static_layer");
 }
 
 // Validate invalid layered runtime with no layer specifier is rejected.
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
   EXPECT_THROW_WITH_REGEX(
       initialize("test/server/test_data/server/invalid_layered_runtime_no_layer_specifier.yaml"),
-      EnvoyException, "BootstrapValidationError.LayeredRuntime");
+      EnvoyException,
+      "field 'layered_runtime.layers.layer_specifier': exactly one field is required in oneof");
 }
 
 // Regression test for segfault when server initialization fails prior to
@@ -1295,7 +1297,8 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0.25),
-      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
+      EnvoyException,
+      "field 'static_resources.clusters.health_checks.timeout': value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid interval entry of a health check config entry.
@@ -1303,7 +1306,8 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidInterval) {
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0.5, 0),
-      EnvoyException, "HealthCheckValidationError.Interval: value must be greater than 0s");
+      EnvoyException,
+      "field 'static_resources.clusters.health_checks.interval': value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on invalid timeout and interval entry of a health check
@@ -1312,7 +1316,8 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeoutAndInter
   EXPECT_THROW_WITH_REGEX(
       initializeWithHealthCheckParams(
           "test/server/test_data/server/cluster_health_check_bootstrap.yaml", 0, 0),
-      EnvoyException, "HealthCheckValidationError.Timeout: value must be greater than 0s");
+      EnvoyException,
+      "field 'static_resources.clusters.health_checks.timeout': value must be greater than 0s");
 }
 
 // Test for protoc-gen-validate constraint on valid interval entry of a health check config entry.
@@ -1544,14 +1549,14 @@ class FooBootstrapExtension : public BootstrapExtension {};
 TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
   EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<test::common::config::DummyConfig>();
+    return std::make_unique<::test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
 
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce(
           Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            const auto* proto = dynamic_cast<const ::test::common::config::DummyConfig*>(&config);
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
@@ -1572,7 +1577,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
 TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
   NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
   EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<test::common::config::DummyConfig>();
+    return std::make_unique<::test::common::config::DummyConfig>();
   }));
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))

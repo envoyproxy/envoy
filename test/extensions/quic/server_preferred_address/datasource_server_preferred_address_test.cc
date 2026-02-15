@@ -43,9 +43,9 @@ TEST_F(DataSourceServerPreferredAddressConfigTest, Validation) {
     envoy::extensions::quic::server_preferred_address::v3::DataSourceServerPreferredAddressConfig
         cfg;
     cfg.mutable_ipv4_config()->mutable_dnat_address()->set_inline_string("127.0.0.1");
-    EXPECT_THROW_WITH_REGEX(factory_.createServerPreferredAddressConfig(cfg, visitor_, context_),
-                            EnvoyException,
-                            ".*AddressFamilyConfigValidationError.Address: value is required.*");
+    EXPECT_THROW_WITH_REGEX(
+        factory_.createServerPreferredAddressConfig(cfg, visitor_, context_), EnvoyException,
+        "Proto constraint validation failed \\(field 'ipv4_config.address': value is required\\)");
   }
   {
     // Cannot set port on address if dnat address isn't set.

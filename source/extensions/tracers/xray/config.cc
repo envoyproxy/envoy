@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/trace/v3/xray.pb.h"
-#include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/utility.h"
