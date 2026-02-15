@@ -989,6 +989,22 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
 
+  /// Set a typed filter state value with the given key. The value is deserialized by a
+  /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
+  /// setting filter state objects that other Envoy filters expect to read as specific C++ types
+  /// (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key, if deserialization fails, or if the key already exists and is read-only.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
   /// Get the received request body (the request body pieces received in the latest event).
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
   ///
@@ -2317,6 +2333,35 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         bytes_to_module_buffer(key),
         bytes_to_module_buffer(value),
       )
+    }
+  }
+
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
     }
   }
 
@@ -4280,6 +4325,22 @@ pub trait EnvoyNetworkFilter {
   /// Returns None if the filter state is not found.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
+  /// Set a typed filter state value with the given key. The value is deserialized by a
+  /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
+  /// setting filter state objects that other Envoy filters expect to read as specific C++ types
+  /// (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key, if deserialization fails, or if the key already exists and is read-only.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
@@ -5096,6 +5157,35 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_network_get_filter_state_bytes(
+        self.raw,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_filter_state_typed(
+        self.raw,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_filter_state_typed(
         self.raw,
         bytes_to_module_buffer(key),
         &mut result as *mut _ as *mut _,

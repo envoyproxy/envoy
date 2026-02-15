@@ -1723,6 +1723,47 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_typed is called by the module to set the
+ * typed filter state with the given key. Unlike set_filter_state_bytes which stores a raw
+ * StringAccessor, this uses the registered ObjectFactory for the key to create a properly typed
+ * filter state object via createFromBytes. This is required for interoperability with built-in
+ * Envoy filters that read filter state as typed objects (e.g., tcp_proxy reads
+ * PerConnectionCluster).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the stream info is not available, no
+ * ObjectFactory is registered for the key, the factory fails to create the object, or the key
+ * already exists and is marked as read-only.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_typed is called by the module to get the
+ * serialized bytes value of a typed filter state object with the given key. This retrieves the
+ * object generically and calls serializeAsString to get the bytes representation. This works with
+ * any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
 /**
@@ -3269,6 +3310,44 @@ bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
  * @return true if the key exists and is a bytes value, false otherwise.
  */
 bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_typed is called by the module to set
+ * typed filter state using the registered ObjectFactory for the key. Unlike set_filter_state_bytes
+ * which stores a raw StringAccessor, this creates a properly typed filter state object via
+ * ObjectFactory::createFromBytes. This is required for interoperability with built-in Envoy
+ * filters that read filter state as typed objects (e.g., tcp_proxy reads PerConnectionCluster
+ * via the key "envoy.tcp_proxy.cluster").
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if no ObjectFactory is registered for the
+ * key, the factory fails to create the object, or the key already exists and is marked as
+ * read-only.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_typed is called by the module to get
+ * the serialized bytes value of a typed filter state object with the given key. This retrieves
+ * the object generically and calls serializeAsString to get the bytes representation. This works
+ * with any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the serialized value owned by Envoy will be stored.
+ * @return true if the key exists and the object supports serialization, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_typed(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 

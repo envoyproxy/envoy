@@ -131,6 +131,11 @@ removed_config_or_runtime:
 new_features:
 - area: dynamic_modules
   change: |
+    Added typed filter state support for dynamic module HTTP and network filters. This allows modules
+    to set and get filter state objects using registered ``StreamInfo::FilterState::ObjectFactory``
+    instances, enabling interoperability with built-in Envoy filters that expect specific typed objects.
+- area: dynamic_modules
+  change: |
     Added :ref:`TLS certificate validator
     <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
     support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
