@@ -62,7 +62,7 @@ bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) con
   // Check if this is a POST request with JSON content
   bool is_post_request =
       headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+      absl::StartsWith(headers.getContentTypeValue(), Http::Headers::get().ContentTypeValues.Json);
 
   if (!is_post_request) {
     return false;
