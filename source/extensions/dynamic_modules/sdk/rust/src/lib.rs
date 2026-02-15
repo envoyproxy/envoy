@@ -4189,10 +4189,12 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
 pub trait EnvoyNetworkFilter {
-  /// Get the read buffer chunks. This is only valid during the on_read callback.
+  /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
+  /// of the connection.
   fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
-  /// Get the write buffer chunks. This is only valid during the on_write callback.
+  /// Get the write buffer chunks. This is valid after the first on_write callback for the lifetime
+  /// of the connection.
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
   /// Drain bytes from the beginning of the read buffer.
@@ -4394,6 +4396,12 @@ pub trait EnvoyNetworkFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Retrieve the host counts for a cluster by name at the given priority level.
+  /// Returns None if the cluster is not found or the priority level does not exist.
+  ///
+  /// This is useful for implementing scale-to-zero logic or custom load balancing decisions.
+  fn get_cluster_host_count(&self, cluster_name: &str, priority: u32) -> Option<ClusterHostCount>;
 
   /// Get the upstream host address and port if an upstream host is selected.
   /// Returns None if no upstream host is set or the address is not an IP.
@@ -5421,6 +5429,31 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       Ok(())
     } else {
       Err(res)
+    }
+  }
+
+  fn get_cluster_host_count(&self, cluster_name: &str, priority: u32) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+        self.raw,
+        str_to_module_buffer(cluster_name),
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
     }
   }
 
@@ -7487,6 +7520,36 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This must be called on the main thread.
   fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer>;
+
+  /// Register a custom admin HTTP endpoint.
+  ///
+  /// When the endpoint is requested, [`BootstrapExtensionConfig::on_admin_request`] is called.
+  ///
+  /// * `path_prefix` is the URL prefix to handle (e.g. "/my_module/status").
+  /// * `help_text` is the help text displayed in the admin console.
+  /// * `removable` if true, allows the handler to be removed later via
+  ///   [`EnvoyBootstrapExtensionConfig::remove_admin_handler`].
+  /// * `mutates_server_state` if true, indicates the handler mutates server state.
+  ///
+  /// Returns `true` if the handler was successfully registered, `false` otherwise.
+  ///
+  /// This must be called on the main thread.
+  fn register_admin_handler(
+    &self,
+    path_prefix: &str,
+    help_text: &str,
+    removable: bool,
+    mutates_server_state: bool,
+  ) -> bool;
+
+  /// Remove a previously registered admin HTTP endpoint.
+  ///
+  /// * `path_prefix` is the URL prefix of the handler to remove.
+  ///
+  /// Returns `true` if the handler was successfully removed, `false` otherwise.
+  ///
+  /// This must be called on the main thread.
+  fn remove_admin_handler(&self, path_prefix: &str) -> bool;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -7580,6 +7643,25 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _timer: &dyn EnvoyBootstrapExtensionTimer,
   ) {
+  }
+
+  /// This is called when an admin endpoint registered via
+  /// [`EnvoyBootstrapExtensionConfig::register_admin_handler`] is requested.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `method` is the HTTP method of the request (e.g. "GET", "POST").
+  /// * `path` is the full path and query string of the request.
+  /// * `body` is the request body. May be empty.
+  ///
+  /// Returns a tuple of (HTTP status code, response body string).
+  fn on_admin_request(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _method: &str,
+    _path: &str,
+    _body: &[u8],
+  ) -> (u32, String) {
+    (404, String::new())
   }
 }
 
@@ -8217,6 +8299,33 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       Box::new(EnvoyBootstrapExtensionTimerImpl { raw_ptr: timer_ptr })
     }
   }
+
+  fn register_admin_handler(
+    &self,
+    path_prefix: &str,
+    help_text: &str,
+    removable: bool,
+    mutates_server_state: bool,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+        self.raw,
+        str_to_module_buffer(path_prefix),
+        str_to_module_buffer(help_text),
+        removable,
+        mutates_server_state,
+      )
+    }
+  }
+
+  fn remove_admin_handler(&self, path_prefix: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+        self.raw,
+        str_to_module_buffer(path_prefix),
+      )
+    }
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -8555,6 +8664,61 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
     &timer_ref,
   );
+}
+
+/// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
+/// requested.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+/// must ensure that all pointers are valid and that the memory they point to remains valid for
+/// the duration of the function call.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_request(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  method: abi::envoy_dynamic_module_type_envoy_buffer,
+  path: abi::envoy_dynamic_module_type_envoy_buffer,
+  body: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> u32 {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let method_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      method.ptr as *const u8,
+      method.length,
+    ))
+  };
+  let path_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      path.ptr as *const u8,
+      path.length,
+    ))
+  };
+  let body_slice = unsafe { std::slice::from_raw_parts(body.ptr as *const u8, body.length) };
+
+  let (status_code, response_str) = extension_config.on_admin_request(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    method_str,
+    path_str,
+    body_slice,
+  );
+
+  // Pass the response body to Envoy via the callback. Envoy copies the buffer immediately,
+  // so the string only needs to live until the call returns.
+  if !response_str.is_empty() {
+    let response_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: response_str.as_ptr() as *const _,
+      length: response_str.len(),
+    };
+    abi::envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+      envoy_ptr,
+      response_buf,
+    );
+  }
+
+  status_code
 }
 
 /// Declare the init functions for the bootstrap extension dynamic module.
@@ -9112,6 +9276,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain
     &**raw
   };
 
+  let envoy_cert_validator = cert_validator::EnvoyCertValidator::new(config_envoy_ptr);
+
   let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
   let cert_slices: Vec<&[u8]> = cert_buffers
     .iter()
@@ -9123,7 +9289,12 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain
     host_name.length,
   ));
 
-  let result = config.do_verify_cert_chain(&cert_slices, host_name_str, is_server);
+  let result = config.do_verify_cert_chain(
+    &envoy_cert_validator,
+    &cert_slices,
+    host_name_str,
+    is_server,
+  );
 
   // If the module provided error details, pass them to Envoy via the callback.
   // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
@@ -9195,6 +9366,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
 /// impl CertValidatorConfig for MyCertValidatorConfig {
 ///   fn do_verify_cert_chain(
 ///     &self,
+///     _envoy_cert_validator: &EnvoyCertValidator,
 ///     certs: &[&[u8]],
 ///     host_name: &str,
 ///     is_server: bool,

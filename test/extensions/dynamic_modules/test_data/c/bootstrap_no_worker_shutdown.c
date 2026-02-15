@@ -10,7 +10,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 }
 
 // A bootstrap extension that is missing
-// envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+// envoy_dynamic_module_on_bootstrap_extension_worker_thread_shutdown.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -36,7 +36,12 @@ envoy_dynamic_module_on_bootstrap_extension_new(
   return (envoy_dynamic_module_type_bootstrap_extension_module_ptr)0x2;
 }
 
-// envoy_dynamic_module_on_bootstrap_extension_server_initialized is intentionally missing.
+void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_envoy_ptr;
+  (void)extension_module_ptr;
+}
 
 void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
@@ -44,6 +49,8 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
   (void)extension_envoy_ptr;
   (void)extension_module_ptr;
 }
+
+// envoy_dynamic_module_on_bootstrap_extension_worker_thread_shutdown is intentionally missing.
 
 void envoy_dynamic_module_on_bootstrap_extension_destroy(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
@@ -95,11 +102,15 @@ uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
-    envoy_dynamic_module_type_envoy_buffer body) {
+    envoy_dynamic_module_type_envoy_buffer body,
+    envoy_dynamic_module_type_module_buffer* response_body, uint32_t* response_body_length) {
   (void)extension_config_envoy_ptr;
   (void)extension_config_module_ptr;
   (void)method;
   (void)path;
   (void)body;
+  (void)response_body;
+  (void)response_body_length;
   return 200;
 }
+

@@ -275,6 +275,49 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cert_validator_set_erro
                "not implemented in this context");
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_set_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_get_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
+// ---------------------- Bootstrap extension admin handler callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_admin_set_response: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler: "
+               "not implemented in this context");
+  return false;
+}
+
 // ---------------------- Bootstrap extension timer callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.

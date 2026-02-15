@@ -10,7 +10,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 }
 
 // A bootstrap extension that is missing
-// envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+// envoy_dynamic_module_on_bootstrap_extension_admin_request.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -36,17 +36,17 @@ envoy_dynamic_module_on_bootstrap_extension_new(
   return (envoy_dynamic_module_type_bootstrap_extension_module_ptr)0x2;
 }
 
-// envoy_dynamic_module_on_bootstrap_extension_server_initialized is intentionally missing.
-
-void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
   (void)extension_envoy_ptr;
   (void)extension_module_ptr;
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_destroy(
+void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_envoy_ptr;
   (void)extension_module_ptr;
 }
 
@@ -64,6 +64,11 @@ void envoy_dynamic_module_on_bootstrap_extension_shutdown(
   (void)extension_envoy_ptr;
   (void)extension_module_ptr;
   completion_callback(completion_context);
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_module_ptr;
 }
 
 void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
@@ -91,15 +96,13 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks_size;
 }
 
-uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
-    envoy_dynamic_module_type_envoy_buffer body) {
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
   (void)extension_config_envoy_ptr;
   (void)extension_config_module_ptr;
-  (void)method;
-  (void)path;
-  (void)body;
-  return 200;
+  (void)timer_ptr;
 }
+
+// NOTE: envoy_dynamic_module_on_bootstrap_extension_admin_request is intentionally missing.
