@@ -58,9 +58,9 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, true));
 
-  // Verify buffer is cleared after callbacks.
-  EXPECT_EQ(nullptr, filter->currentReadBuffer());
-  EXPECT_EQ(nullptr, filter->currentWriteBuffer());
+  // Verify buffers persist after callbacks for access from on_scheduled and other callbacks.
+  EXPECT_NE(nullptr, filter->currentReadBuffer());
+  EXPECT_NE(nullptr, filter->currentWriteBuffer());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {
