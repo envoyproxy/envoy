@@ -67,3 +67,9 @@ name = "bootstrap_admin_handler_test"
 path = "bootstrap_admin_handler_test.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "network_integration_test"
+path = "network_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
