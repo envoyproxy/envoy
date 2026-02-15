@@ -4955,6 +4955,70 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsDefaultClient) {
   filter_->onDestroy();
 }
 
+// Verify that the default client is NOT destroyed when a per-route client override
+// is active.
+TEST_P(HttpFilterTestParam, OnDestroyPreservesDefaultClientWithPerRouteOverride) {
+  if (std::get<1>(GetParam())) {
+    return;
+  }
+
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  // Create a new filter with an explicitly tracked default client.
+  auto default_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* default_client_ptr = default_client.get();
+
+  // we'll verify after decodeHeaders() to prove the client is still alive.
+  EXPECT_CALL(*default_client_ptr, streamInfo()).WillRepeatedly(Return(nullptr));
+
+  auto test_filter = std::make_unique<Filter>(config_, std::move(default_client), factory_context_);
+  test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+  test_filter->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+
+  // Mock successful gRPC async client manager access.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  auto mock_async_request = std::make_unique<Grpc::MockAsyncRequest>();
+  auto* mock_async_request_ptr = mock_async_request.get();
+
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Return(mock_async_request_ptr));
+
+  // The default client's check should NOT be called.
+  EXPECT_CALL(*default_client_ptr, check(_, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            test_filter->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(nullptr, default_client_ptr->streamInfo());
+
+  EXPECT_CALL(*default_client_ptr, cancel()).Times(0);
+  EXPECT_CALL(*mock_async_request_ptr, cancel());
+  test_filter->onDestroy();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/pull/8436.
 // Test that ext_authz filter is not in noop mode when cluster is not specified per route
 // (this could be the case when route is configured with redirect or direct response action).
