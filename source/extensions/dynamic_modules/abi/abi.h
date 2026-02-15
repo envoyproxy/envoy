@@ -4018,6 +4018,32 @@ void envoy_dynamic_module_on_listener_filter_config_scheduled(
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_module_ptr,
     uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_on_listener_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a listener filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param filter_module_ptr is the pointer to the in-module listener filter created by
+ * envoy_dynamic_module_on_listener_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_listener_filter_http_callout_done(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
 // =============================================================================
 // Listener Filter Callbacks
 // =============================================================================
@@ -4544,6 +4570,32 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value);
+
+// ---------------------- Listener Filter Callbacks - HTTP Callout ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_http_callout is called by the module to initiate an
+ * HTTP callout. The callout is initiated by the listener filter and the response is received in
+ * envoy_dynamic_module_on_listener_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_listener_filter_http_callout(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 // ---------------------- Listener filter scheduler callbacks -----------------
 
