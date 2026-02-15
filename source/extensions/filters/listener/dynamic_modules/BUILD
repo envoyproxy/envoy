@@ -33,6 +33,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_filter_buffer_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

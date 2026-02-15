@@ -6110,6 +6110,19 @@ pub trait EnvoyListenerFilter {
 
   /// Get the index of the current worker thread.
   fn get_worker_index(&self) -> u32;
+
+  /// Close the socket immediately.
+  fn close_socket(&mut self);
+
+  /// Close the socket immediately with a specific termination reason.
+  /// The details are set on the connection's stream info before closing.
+  fn close_socket_with_details(&mut self, details: &str);
+
+  /// Write data directly to the raw socket.
+  /// This is useful for protocol negotiation at the listener filter level,
+  /// such as writing SSL support responses in Postgres or MySQL handshake packets.
+  /// Returns the number of bytes written, or -1 if the write failed.
+  fn write_to_socket(&mut self, data: &[u8]) -> i64;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -6668,6 +6681,31 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
   fn get_worker_index(&self) -> u32 {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
+  }
+
+  fn close_socket(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_close_socket(self.raw);
+    }
+  }
+
+  fn close_socket_with_details(&mut self, details: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_close_socket_with_details(
+        self.raw,
+        str_to_module_buffer(details),
+      );
+    }
+  }
+
+  fn write_to_socket(&mut self, data: &[u8]) -> i64 {
+    unsafe {
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_listener_filter_write_to_socket(self.raw, buffer)
+    }
   }
 }
 

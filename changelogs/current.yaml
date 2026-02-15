@@ -138,6 +138,11 @@ new_features:
   change: |
     Added filter state read/write support for dynamic module cert validators, allowing modules to set and
     get string values in the connection's filter state during certificate chain verification.
+- area: dynamic_modules
+  change: |
+    Added ``write_to_socket`` and ``close_socket_with_details`` ABI callbacks for the dynamic module listener
+    filter, enabling protocol negotiation use cases such as Postgres SSL and MySQL handshake at the listener
+    filter level.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
