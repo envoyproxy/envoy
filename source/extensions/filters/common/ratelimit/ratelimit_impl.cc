@@ -37,7 +37,6 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::detach() {
-  ASSERT(callbacks_ != nullptr);
   if (request_) {
     request_->detach();
     request_ = nullptr;
@@ -77,8 +76,11 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
                            uint32_t hits_addend) {
+  // The client should only be used for one outstanding request at a time,
+  // so we assert that there is no existing request or callback.
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  request_ = nullptr;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
   createRequest(request, domain, descriptors, hits_addend);
@@ -130,6 +132,7 @@ void GrpcClientImpl::onSuccess(
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
                        std::move(dynamic_metadata));
@@ -144,6 +147,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
