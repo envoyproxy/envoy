@@ -6019,6 +6019,41 @@ pub trait EnvoyListenerFilter {
   /// This is used to determine the buffer size for reading data.
   fn max_read_bytes(&self) -> usize;
 
+  /// Get the requested server name (SNI) from the connection socket.
+  /// Returns None if SNI is not available.
+  fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection socket.
+  /// Returns None if the transport protocol is not available.
+  fn get_detected_transport_protocol<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the requested application protocols (ALPN) from the connection socket.
+  /// Returns an empty vector if no application protocols are available.
+  fn get_requested_application_protocols<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the JA3 fingerprint hash from the connection socket.
+  /// Returns None if the JA3 hash is not available.
+  fn get_ja3_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the JA4 fingerprint hash from the connection socket.
+  /// Returns None if the JA4 hash is not available.
+  fn get_ja4_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Check if SSL/TLS connection information is available on the socket.
+  fn is_ssl(&self) -> bool;
+
+  /// Get the SSL URI SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no URI SANs are present.
+  fn get_ssl_uri_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the SSL DNS SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no DNS SANs are present.
+  fn get_ssl_dns_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the SSL subject from the peer certificate.
+  /// Returns None if the connection is not SSL or subject is not available.
+  fn get_ssl_subject<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
   /// Get the raw socket file descriptor.
   /// Returns -1 if the socket is not available.
   fn get_socket_fd(&self) -> i64;
@@ -6514,6 +6549,214 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
   fn max_read_bytes(&self) -> usize {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_max_read_bytes(self.raw) }
+  }
+
+  fn get_requested_server_name(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_detected_transport_protocol(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_requested_application_protocols(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+        self.raw,
+      )
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut protocol_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+        self.raw,
+        protocol_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    protocol_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ja3_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_ja4_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn is_ssl(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_is_ssl(self.raw) }
+  }
+
+  fn get_ssl_uri_sans(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(self.raw) };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(self.raw) };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
   }
 
   fn get_socket_fd(&self) -> i64 {

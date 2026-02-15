@@ -110,6 +110,253 @@ void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
   }
 }
 
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view sni = callbacks->socket().requestedServerName();
+  if (sni.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(sni.data());
+  result_out->length = sni.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view protocol = callbacks->socket().detectedTransportProtocol();
+  if (protocol.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(protocol.data());
+  result_out->length = protocol.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  return callbacks->socket().requestedApplicationProtocols().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto& protocols = callbacks->socket().requestedApplicationProtocols();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < protocols.size(); ++i) {
+    protocols_out[i].ptr = const_cast<char*>(protocols[i].data());
+    protocols_out[i].length = protocols[i].size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view hash = callbacks->socket().ja3Hash();
+  if (hash.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(hash.data());
+  result_out->length = hash.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view hash = callbacks->socket().ja4Hash();
+  if (hash.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(hash.data());
+  result_out->length = hash.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  return ssl != nullptr;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return 0;
+  }
+
+  return ssl->uriSanPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return false;
+  }
+
+  const auto& uri_sans = ssl->uriSanPeerCertificate();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < uri_sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(uri_sans[i].data());
+    sans_out[i].length = uri_sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return 0;
+  }
+
+  return ssl->dnsSansPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return false;
+  }
+
+  const auto& dns_sans = ssl->dnsSansPeerCertificate();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < dns_sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(dns_sans[i].data());
+    sans_out[i].length = dns_sans[i].size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const std::string& subject = ssl->subjectPeerCertificate();
+  result_out->ptr = const_cast<char*>(subject.data());
+  result_out->length = subject.size();
+  return true;
+}
+
 bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
