@@ -379,6 +379,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
+  active_client_ = client_to_use;
   initiating_call_ = true;
   client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
                        decoder_callbacks_->streamInfo());
@@ -559,7 +560,8 @@ void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& g
         decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
   }
 
-  auto const* stream_info = client_->streamInfo();
+  // Use the client that actually served this check request for stream info.
+  auto const* stream_info = active_client_ ? active_client_->streamInfo() : client_->streamInfo();
   if (stream_info == nullptr) {
     return;
   }
@@ -586,7 +588,10 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
-    client_->cancel();
+    if (active_client_ != nullptr) {
+      active_client_->cancel();
+      active_client_ = nullptr;
+    }
   }
 }
 
@@ -607,6 +612,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
+  active_client_ = nullptr;
 
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {
