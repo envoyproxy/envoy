@@ -22,6 +22,9 @@ constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr absl::string_view METHOD_FIELD = "method";
 constexpr absl::string_view ID_FIELD = "id";
 
+// HTTP header names
+constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
+
 // Method names
 namespace Methods {
 // Tools
