@@ -36,6 +36,7 @@
 #include "source/common/orca/orca_parser.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
+#include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
@@ -2188,6 +2189,48 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     // attempt before potentially creating a new one.
     host_selection_cancelable_->cancel();
     host_selection_cancelable_.reset();
+  }
+
+  // Retry-aware weighted cluster selection: record the failed cluster name in
+  // filter state so that on route re-evaluation, pickWeightedCluster can
+  // zero out its weight and select a different cluster.
+  if (route_entry_ != nullptr) {
+    const std::string& failed_cluster_name = route_entry_->clusterName();
+    auto& filter_state = callbacks_->streamInfo().filterState();
+
+    auto* attempted =
+        filter_state->getDataMutable<AttemptedClustersFilterState>(
+            kWeightedClusterAttemptedClustersKey);
+    if (attempted == nullptr) {
+      auto attempted_clusters = std::make_shared<AttemptedClustersFilterState>();
+      attempted_clusters->addAttemptedCluster(failed_cluster_name);
+      filter_state->setData(kWeightedClusterAttemptedClustersKey, attempted_clusters,
+                            StreamInfo::FilterState::StateType::Mutable,
+                            StreamInfo::FilterState::LifeSpan::Request);
+      ENVOY_STREAM_LOG(debug,
+                       "retry-aware lb: recorded first attempted cluster '{}' in filter state",
+                       *callbacks_, failed_cluster_name);
+    } else {
+      attempted->addAttemptedCluster(failed_cluster_name);
+      ENVOY_STREAM_LOG(debug,
+                       "retry-aware lb: recorded attempted cluster '{}' in filter state "
+                       "(total attempted: {})",
+                       *callbacks_, failed_cluster_name, attempted->size());
+    }
+
+    // Re-evaluate the route so that pickWeightedCluster runs again with the
+    // updated attempted-clusters filter state. This will cause a different
+    // cluster to be selected (if available).
+    callbacks_->clearRouteCache();
+    route_ = callbacks_->route();
+    if (route_ != nullptr) {
+      const auto* new_route_entry = route_->routeEntry();
+      if (new_route_entry != nullptr) {
+        route_entry_ = new_route_entry;
+        ENVOY_STREAM_LOG(debug, "retry-aware lb: re-evaluated route, new cluster '{}'",
+                         *callbacks_, route_entry_->clusterName());
+      }
+    }
   }
 
   // Clusters can technically get removed by CDS during a retry. Make sure it still exists.

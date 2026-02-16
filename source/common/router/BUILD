@@ -129,8 +129,11 @@ envoy_cc_library(
         ":per_filter_config_lib",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -378,6 +381,7 @@ envoy_cc_library(
         ":retry_state_lib",
         ":upstream_codec_filter_lib",
         ":upstream_to_downstream_impl_base",
+        ":weighted_cluster_specifier_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/grpc:status",

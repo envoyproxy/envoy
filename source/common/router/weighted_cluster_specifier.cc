@@ -3,6 +3,8 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/config_utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -46,6 +48,43 @@ uint64_t WeightedClusterSpecifierPlugin::healthawareClusterWeight(const std::str
   }
 
   return config_weight;
+}
+
+uint64_t WeightedClusterSpecifierPlugin::retryAwareClusterWeight(
+    const std::string& cluster_name, uint64_t config_weight,
+    const AttemptedClustersFilterState* attempted_clusters) const {
+  if (!retry_aware_lb_ || config_weight == 0 || attempted_clusters == nullptr) {
+    return config_weight;
+  }
+
+  if (!attempted_clusters->hasAttempted(cluster_name)) {
+    return config_weight;
+  }
+
+  // Only zero out the weight if the cluster has a single endpoint. When a cluster
+  // has multiple endpoints, the existing host-level retry predicate
+  // (shouldSelectAnotherHost / PreviousHostsRetryPredicate) can avoid the
+  // previously-attempted host within the same cluster. Zeroing out a multi-endpoint
+  // cluster would unnecessarily remove it from consideration.
+  auto* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
+  if (cluster != nullptr) {
+    uint64_t total_hosts = 0;
+    for (const auto& ps : cluster->prioritySet().hostSetsPerPriority()) {
+      total_hosts += ps->hosts().size();
+    }
+    if (total_hosts > 1) {
+      ENVOY_LOG(debug,
+                "retry-aware lb: keeping previously attempted cluster {} "
+                "(has {} endpoints, host-level predicate can handle retry)",
+                cluster_name, total_hosts);
+      return config_weight;
+    }
+  }
+
+  ENVOY_LOG(debug, "retry-aware lb: zeroing weight for previously attempted single-endpoint "
+                   "cluster {}",
+            cluster_name);
+  return 0;
 }
 
 absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>> WeightedClustersConfigEntry::create(
@@ -333,6 +372,58 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
       use_weight_override = true;
     } else {
       ENVOY_LOG(debug, "All clusters are unhealthy, weighted panic mode");
+    }
+  }
+
+  // Retry-aware weighted cluster selection: zero out the weight of any cluster
+  // that has already been attempted (and failed) on this request. This ensures that
+  // on retry, a different cluster is selected rather than re-trying the same
+  // (likely broken) cluster due to consistent hashing.
+  //
+  // This step only applies when:
+  //  - The feature is enabled (retry_aware_lb_)
+  //  - There are multiple clusters to choose from
+  //  - A hash policy is driving selection (hash_value.has_value()). Without hashing,
+  //    random selection will naturally distribute retries across clusters, so
+  //    zeroing out weights is unnecessary.
+  const AttemptedClustersFilterState* attempted_clusters = nullptr;
+  if (retry_aware_lb_ && weighted_clusters_.size() > 1 && hash_value.has_value()) {
+    attempted_clusters =
+        stream_info.filterState().getDataReadOnly<AttemptedClustersFilterState>(
+            kWeightedClusterAttemptedClustersKey);
+    if (attempted_clusters != nullptr && attempted_clusters->size() > 0) {
+      absl::InlinedVector<uint32_t, 4> retry_cluster_weights;
+      retry_cluster_weights.reserve(weighted_clusters_.size());
+      uint32_t total_retry_weight = 0;
+
+      // Start from current effective weights (which may already incorporate
+      // health-aware or runtime overrides).
+      auto current_weight = cluster_weights.begin();
+      for (const auto& cluster : weighted_clusters_) {
+        uint32_t cw;
+        if (use_weight_override && current_weight != cluster_weights.end()) {
+          cw = *current_weight++;
+        } else {
+          cw = cluster->clusterWeight(loader_);
+        }
+        cw = retryAwareClusterWeight(cluster->cluster_name_, cw, attempted_clusters);
+        retry_cluster_weights.push_back(cw);
+        total_retry_weight += cw;
+      }
+
+      if (total_retry_weight > 0) {
+        total_cluster_weight = total_retry_weight;
+        cluster_weights = std::move(retry_cluster_weights);
+        use_weight_override = true;
+        ENVOY_LOG(debug, "retry-aware lb: adjusted total weight to {} after excluding {} "
+                         "previously attempted cluster(s)",
+                  total_cluster_weight, attempted_clusters->size());
+      } else {
+        // All clusters have been attempted; fall back to original weights
+        // (panic mode — re-try any cluster rather than giving up).
+        ENVOY_LOG(debug, "retry-aware lb: all clusters previously attempted, "
+                         "falling back to original weights (panic mode)");
+      }
     }
   }
 
