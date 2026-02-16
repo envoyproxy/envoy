@@ -41,12 +41,8 @@ public:
 
   Matcher::DataInputGetResult get(const Envoy::Stats::StatMatchingData& data) const override {
     if (!tag_name_storage_) {
-      auto symbol_table_opt = data.symbolTable();
-      if (!symbol_table_opt) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, ""};
-      }
       tag_name_storage_ = std::make_unique<StatNameManagedStorage>(
-          tag_name_, const_cast<SymbolTable&>(symbol_table_opt->get()));
+          tag_name_, const_cast<SymbolTable&>(data.symbolTable()));
     }
 
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
