@@ -303,8 +303,18 @@ std::string print(CelValue value) {
     return std::string(value.StringOrDie().value());
   case CelValue::Type::kBytes:
     return std::string(value.BytesOrDie().value());
-  case CelValue::Type::kMessage:
-    return value.IsNull() ? "NULL" : value.MessageOrDie()->ShortDebugString();
+  case CelValue::Type::kMessage: {
+    if (value.IsNull()) {
+      return "NULL";
+    }
+    std::string textproto;
+    Protobuf::TextFormat::Printer printer;
+    printer.SetSingleLineMode(true);
+    if (printer.PrintToString(*value.MessageOrDie(), &textproto)) {
+      return textproto;
+    }
+    return "";
+  }
   case CelValue::Type::kDuration:
     return absl::FormatDuration(value.DurationOrDie());
   case CelValue::Type::kTimestamp:
