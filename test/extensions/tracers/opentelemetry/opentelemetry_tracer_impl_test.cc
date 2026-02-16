@@ -677,6 +677,77 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies spans are exported with their events
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithEvents) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->log(SystemTime(), "");
+  span->log(SystemTime(SystemTime::duration(Event::TimeSystem::Milliseconds(1))), "event1");
+  span->log(SystemTime(SystemTime::duration(Event::TimeSystem::Milliseconds(2))), "event2");
+
+  // Note the placeholders for the bytes - cleaner to manually set after.
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      events:
+        - name: event1
+          time_unix_nano: 1000000
+        - name: event2
+          time_unix_nano: 2000000
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 // Verifies spans are exported with their attributes and status
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributesAndStatus) {
   setupValidDriver();

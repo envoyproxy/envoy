@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
@@ -44,6 +46,12 @@ public:
    */
   Stats::Store& statsStore() { return config_->stats_store_; }
 
+  /**
+   * Destroys the in-module extension. This is called by the destructor. It is safe to call
+   * multiple times.
+   */
+  void destroy();
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -51,9 +59,9 @@ private:
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
   /**
-   * Destroys the in-module extension.
+   * Registers drain and shutdown lifecycle callbacks with the server.
    */
-  void destroy();
+  void registerLifecycleCallbacks();
 
   // The configuration for this extension.
   DynamicModuleBootstrapExtensionConfigSharedPtr config_;
@@ -63,6 +71,12 @@ private:
 
   // Whether the extension has been destroyed.
   bool destroyed_ = false;
+
+  // Handle for the drain close callback registration. Dropped on destruction to unregister.
+  Common::CallbackHandlePtr drain_handle_;
+
+  // Handle for the shutdown lifecycle callback registration.
+  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
 };
 
 } // namespace DynamicModules
