@@ -131,9 +131,8 @@ removed_config_or_runtime:
 new_features:
 - area: dynamic_modules
   change: |
-    Added typed filter state support for dynamic module HTTP and network filters. This allows modules
-    to set and get filter state objects using registered ``StreamInfo::FilterState::ObjectFactory``
-    instances, enabling interoperability with built-in Envoy filters that expect specific typed objects.
+    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    in external languages (Rust, Go, C) via dynamic modules.
 - area: dynamic_modules
   change: |
     Added :ref:`TLS certificate validator
@@ -193,6 +192,11 @@ new_features:
   change: |
     Added support for MCP client-to-server notification methods ``notifications/cancelled``
     and ``notifications/roots/list_changed``.
+- area: dynamic_modules
+  change: |
+    Added typed filter state support for dynamic module HTTP and network filters. This allows modules
+    to set and get filter state objects using registered ``StreamInfo::FilterState::ObjectFactory``
+    instances, enabling interoperability with built-in Envoy filters that expect specific typed objects.
 - area: mcp_router
   change: |
     Added support for MCP completion method ``completion/complete`` with routing based on
@@ -340,6 +344,10 @@ new_features:
   change: |
     Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
     observability into request routing, fanout operations, and error conditions.
+- area: mcp
+  change: |
+    Added HTTP DELETE session termination support to the MCP filter. DELETE requests with an
+    ``MCP-Session-Id`` header are now recognized as valid MCP traffic in ``REJECT_NO_MCP`` mode.
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
