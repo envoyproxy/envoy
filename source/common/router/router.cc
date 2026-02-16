@@ -2221,7 +2221,11 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     // Re-evaluate the route so that pickWeightedCluster runs again with the
     // updated attempted-clusters filter state. This will cause a different
     // cluster to be selected (if available).
-    callbacks_->clearRouteCache();
+    // clearRouteCache is on DownstreamStreamFilterCallbacks, not available for
+    // async connections, so guard with a null check.
+    if (callbacks_->downstreamCallbacks()) {
+      callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
     route_ = callbacks_->route();
     if (route_ != nullptr) {
       const auto* new_route_entry = route_->routeEntry();
