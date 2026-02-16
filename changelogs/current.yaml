@@ -131,6 +131,10 @@ removed_config_or_runtime:
 new_features:
 - area: dynamic_modules
   change: |
+    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
     Added :ref:`TLS certificate validator
     <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
     support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
