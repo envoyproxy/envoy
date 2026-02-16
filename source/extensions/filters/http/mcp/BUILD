@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/mcp:constants_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )

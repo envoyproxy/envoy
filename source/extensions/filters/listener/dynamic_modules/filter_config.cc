@@ -4,6 +4,8 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -11,10 +13,10 @@ namespace ListenerFilters {
 
 DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Event::Dispatcher& main_thread_dispatcher)
+    const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher)
     : main_thread_dispatcher_(main_thread_dispatcher),
-      stats_scope_(stats_scope.createScope(std::string(ListenerFilterStatsNamespace) + ".")),
+      stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {}
 
@@ -30,11 +32,10 @@ void DynamicModuleListenerFilterConfig::onScheduled(uint64_t event_id) {
   }
 }
 
-absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr>
-newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
-                                     const absl::string_view filter_config,
-                                     DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-                                     Event::Dispatcher& main_thread_dispatcher) {
+absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
+    const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher) {
 
   // Resolve the symbols for the listener filter using graceful error handling.
   auto on_config_new =
@@ -82,7 +83,8 @@ newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
           "envoy_dynamic_module_on_listener_filter_config_scheduled");
 
   auto config = std::make_shared<DynamicModuleListenerFilterConfig>(
-      filter_name, filter_config, std::move(dynamic_module), stats_scope, main_thread_dispatcher);
+      filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
+      main_thread_dispatcher);
 
   // Store the resolved function pointers.
   config->on_listener_filter_config_destroy_ = on_config_destroy.value();

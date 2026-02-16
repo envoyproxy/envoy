@@ -1670,6 +1670,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
   auto healthy_list = std::make_shared<HealthyHostVector>();
   auto degraded_list = std::make_shared<DegradedHostVector>();
   auto excluded_list = std::make_shared<ExcludedHostVector>();
+  healthy_list->get().reserve(hosts.size());
 
   for (const auto& host : hosts) {
     const Host::Health health_status = host->coarseHealth();
@@ -2291,9 +2292,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   absl::flat_hash_set<std::string> hosts_with_active_health_check_flag_changed(
       current_priority_hosts.size());
   HostVector final_hosts;
+  final_hosts.reserve(new_hosts.size() + current_priority_hosts.size());
   for (const HostSharedPtr& host : new_hosts) {
     // To match a new host with an existing host means comparing their addresses.
-    auto existing_host = all_hosts.find(addressToString(host->address()));
+    const auto host_address_string = addressToString(host->address());
+    auto existing_host = all_hosts.find(host_address_string);
     const bool existing_host_found = existing_host != all_hosts.end();
 
     // Clear any pending deletion flag on an existing host in case it came back while it was
@@ -2377,7 +2380,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       final_hosts.push_back(existing_host->second);
     } else {
-      new_hosts_for_current_priority.emplace(addressToString(host->address()));
+      new_hosts_for_current_priority.emplace(host_address_string);
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
@@ -2462,18 +2465,19 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
          &hosts_with_updated_locality_for_current_priority,
          &hosts_with_active_health_check_flag_changed, &final_hosts,
          &max_host_weight](const HostSharedPtr& p) {
+          const auto address_string = addressToString(p->address());
           // This host has already been added as a new host in the
           // new_hosts_for_current_priority. Return false here to make sure that host
           // reference with older locality gets cleaned up from the priority.
-          if (hosts_with_updated_locality_for_current_priority.contains(p->address()->asString())) {
+          if (hosts_with_updated_locality_for_current_priority.contains(address_string)) {
             return false;
           }
-          if (hosts_with_active_health_check_flag_changed.contains(p->address()->asString())) {
+          if (hosts_with_active_health_check_flag_changed.contains(address_string)) {
             return false;
           }
 
-          if (all_new_hosts.contains(p->address()->asString()) &&
-              !new_hosts_for_current_priority.contains(p->address()->asString())) {
+          if (all_new_hosts.contains(address_string) &&
+              !new_hosts_for_current_priority.contains(address_string)) {
             // If the address is being completely deleted from this priority, but is
             // referenced from another priority, then we assume that the other
             // priority will perform an in-place update to re-use the existing Host.

@@ -10,6 +10,7 @@
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
 #include <linux/bpf.h>
 #include <linux/filter.h>
+
 #include "test/mocks/network/mocks.h"
 #endif
 

@@ -623,6 +623,59 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   }
 }
 
+TEST_P(DynamicModulesIntegrationTest, CustomMetricsNamespace) {
+  // Skip for non-Rust languages to avoid duplication.
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "Custom namespace test only runs for Rust";
+  }
+
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                  GetParam()),
+      1);
+  TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
+
+  // Configure filter with custom metrics_namespace.
+  constexpr auto filter_config_yaml = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: http_integration_test
+    metrics_namespace: myapp
+  filter_name: stats_callbacks
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: header_to_count,header_to_set
+)EOF";
+
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.prependFilter(filter_config_yaml);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy(Http::LowerCaseString("header_to_count"), "5");
+  request_headers.addCopy(Http::LowerCaseString("header_to_set"), "42");
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+  test_server_->waitUntilHistogramHasSamples("myapp.requests_header_values");
+
+  // Verify stats are using the custom namespace "myapp" instead of default "dynamicmodulescustom".
+  EXPECT_EQ(test_server_->counter("myapp.requests_total")->value(), 1);
+  EXPECT_EQ(test_server_->gauge("myapp.requests_pending")->value(), 1);
+  EXPECT_EQ(test_server_->gauge("myapp.requests_set_value")->value(), 42);
+
+  Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+}
+
 std::string terminal_filter_config;
 
 class DynamicModulesTerminalIntegrationTest

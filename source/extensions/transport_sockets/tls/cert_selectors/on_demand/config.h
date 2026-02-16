@@ -66,6 +66,8 @@ class AsyncContext {
 public:
   virtual ~AsyncContext() = default;
 
+  explicit AsyncContext(Stats::Scope& scope) : scope_(scope.createScope("")) {}
+
   /**
    * @return OCSP policy for the certificate, only needed by the server TLS context.
    */
@@ -75,17 +77,26 @@ public:
    * @return the low-level TLS context stored in this context.
    */
   virtual const Ssl::TlsContext& tlsContext() const PURE;
+
+  /**
+   * @return certificate-specific stats scope.
+   */
+  Stats::Scope& certScope() const { return *scope_; }
+
+private:
+  Stats::ScopeSharedPtr scope_;
 };
 
-class ServerAsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl,
-                           public AsyncContext {
+class ServerAsyncContext : public AsyncContext,
+                           public Extensions::TransportSockets::Tls::ServerContextImpl {
 public:
   ServerAsyncContext(Stats::Scope& scope,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const Ssl::ServerContextConfig& tls_config,
                      const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : ServerContextImpl(
-            scope, tls_config,
+      : AsyncContext(scope),
+        ServerContextImpl(
+            certScope(), tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, /** used by quic */ nullptr, creation_status) {}
 
@@ -95,15 +106,16 @@ public:
   const Ssl::TlsContext& tlsContext() const override;
 };
 
-class ClientAsyncContext : public Extensions::TransportSockets::Tls::ClientContextImpl,
-                           public AsyncContext {
+class ClientAsyncContext : public AsyncContext,
+                           public Extensions::TransportSockets::Tls::ClientContextImpl {
 public:
   ClientAsyncContext(Stats::Scope& scope,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const Ssl::ClientContextConfig& tls_config,
                      const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : ClientContextImpl(
-            scope, tls_config,
+      : AsyncContext(scope),
+        ClientContextImpl(
+            certScope(), tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, creation_status) {}
 
