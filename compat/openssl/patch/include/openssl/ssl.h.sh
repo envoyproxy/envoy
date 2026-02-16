@@ -100,6 +100,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CIPHER_get_min_version \
   --uncomment-func-decl SSL_get_peer_full_cert_chain \
   --uncomment-func-decl SSL_set_ocsp_response \
+  --uncomment-func-decl SSL_set_enforce_rsa_key_usage \
   --uncomment-func-decl SSL_set_renegotiate_mode \
   --uncomment-func-decl SSL_CTX_get0_certificate \
   --uncomment-func-decl SSL_enable_ocsp_stapling \
@@ -205,6 +206,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef SSL_MAX_SSL_SESSION_ID_LENGTH \
   --uncomment-macro SSL_TICKET_KEY_NAME_LEN \
   --uncomment-enum ssl_verify_result_t \
+  --uncomment-func-decl SSL_CTX_set_reverify_on_resume \
   --uncomment-func-decl SSL_CTX_set_custom_verify \
   --uncomment-func-decl SSL_CTX_set_private_key_method \
   --uncomment-func-decl SSL_send_fatal_alert \
@@ -224,21 +226,26 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CIPHER_get_handshake_digest \
   --uncomment-enum ssl_compliance_policy_t \
   --uncomment-func-decl SSL_CTX_set_compliance_policy \
+  --uncomment-func-decl SSL_was_key_usage_invalid \
   --uncomment-func-decl SSL_get_verify_result \
   --uncomment-func-decl SSL_CIPHER_get_version \
   --uncomment-func-decl SSL_set0_CA_names \
   --uncomment-func-decl SSL_clear \
   --uncomment-macro DTLS1_3_VERSION
 
-# Append OpenSSL-specific constants that don't exist in BoringSSL.
-# SSL_ERROR_WANT_CLIENT_HELLO_CB is returned by SSL_get_error() when
-# the client_hello callback returns SSL_CLIENT_HELLO_RETRY.
+# Append BoringSSL-only SSL_ERROR constants that have no OpenSSL equivalent.
+# These are needed so that Envoy code can reference them unconditionally.
+# The compat layer's SSL_get_error() translates the corresponding OpenSSL
+# error codes to these values.
 cat >> "$1" <<'EOF'
 
-// OpenSSL-specific error code for async client hello callback.
-// This is returned by SSL_get_error() when SSL_CTX_set_client_hello_cb's
-// callback returns SSL_CLIENT_HELLO_RETRY.
-#ifdef ossl_SSL_ERROR_WANT_CLIENT_HELLO_CB
-#define SSL_ERROR_WANT_CLIENT_HELLO_CB ossl_SSL_ERROR_WANT_CLIENT_HELLO_CB
+#ifndef SSL_ERROR_PENDING_CERTIFICATE
+#define SSL_ERROR_PENDING_CERTIFICATE 12
+#endif
+#ifndef SSL_ERROR_WANT_PRIVATE_KEY_OPERATION
+#define SSL_ERROR_WANT_PRIVATE_KEY_OPERATION 13
+#endif
+#ifndef SSL_ERROR_WANT_CERTIFICATE_VERIFY
+#define SSL_ERROR_WANT_CERTIFICATE_VERIFY 16
 #endif
 EOF
