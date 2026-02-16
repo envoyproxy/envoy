@@ -94,11 +94,11 @@ public:
     bool done = false;
     ThreadLocalStoreTestingPeer::numTlsHistograms(
         *store_, [&mutex, &done, &num_tls_histograms](uint32_t num) {
-          absl::MutexLock lock(&mutex);
+          absl::MutexLock lock(mutex);
           num_tls_histograms = num;
           done = true;
         });
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     mutex.Await(absl::Condition(&done));
     return num_tls_histograms;
   }

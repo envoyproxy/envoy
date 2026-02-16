@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/json:json_rpc_parser_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )

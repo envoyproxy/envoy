@@ -15,9 +15,11 @@ envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  (void)extension_config_envoy_ptr;
   (void)name;
   (void)config;
+  // Signal init complete immediately since this no-op module does not require async initialization.
+  envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+      extension_config_envoy_ptr);
   // Return a dummy pointer.
   return (envoy_dynamic_module_type_bootstrap_extension_config_module_ptr)0x1;
 }
@@ -95,4 +97,26 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)headers_size;
   (void)body_chunks;
   (void)body_chunks_size;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)timer_ptr;
+}
+
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)method;
+  (void)path;
+  (void)body;
+  return 200;
 }

@@ -34,6 +34,7 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-openssl
     - check-coverage
     - check-runtime
     - check-san
@@ -110,6 +111,7 @@ checks:
     - precheck-external
     - precheck-format
     - precheck-publish
+    - precheck-publish-config
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -174,6 +176,9 @@ run:
     - source/**/*
     - test/**/*
   check-build:
+    paths:
+    - "**/*"
+  check-build-openssl:
     paths:
     - "**/*"
   check-coverage:
@@ -358,6 +363,9 @@ run:
   precheck-publish:
     paths:
     - "**/*"
+  precheck-publish-config:
+    paths:
+    - "**/*"
   release:
     paths:
     - .bazelrc
@@ -378,6 +386,8 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/_publish_verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

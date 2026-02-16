@@ -5,6 +5,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
@@ -16,7 +17,8 @@ using ProtoCommonGrpcAccessLogConfig =
     envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig;
 
 struct CommonPropertiesConfig {
-  CommonPropertiesConfig(const ProtoCommonGrpcAccessLogConfig& config);
+  CommonPropertiesConfig(const ProtoCommonGrpcAccessLogConfig& config,
+                         const Formatter::CommandParserPtrVector& command_parsers = {});
   absl::flat_hash_set<std::string> filter_states_to_log;
   std::vector<Tracing::CustomTagConstSharedPtr> custom_tags;
 };
