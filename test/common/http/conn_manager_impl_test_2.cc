@@ -1630,6 +1630,20 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
   doRemoteClose();
 }
 
+// Can happen if a network filter writes large payloads to downstream before the HTTP
+// filter gets data.
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarkLimitsNoCodec) {
+  // Not used in the test.
+  delete codec_;
+
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
+  setup();
+
+  // No-ops since no codec setup yet. Verify no crash.
+  conn_manager_->onAboveWriteBufferHighWatermark();
+  conn_manager_->onBelowWriteBufferLowWatermark();
+}
+
 TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   initial_buffer_limit_ = 100;
   setup();

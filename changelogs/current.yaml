@@ -58,6 +58,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
