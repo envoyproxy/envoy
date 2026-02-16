@@ -100,7 +100,10 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
             lifecycle_stats_handler_.getActiveVmCount());
 }
 
-void Wasm::error(std::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
+void Wasm::error(std::string_view message) {
+  ENVOY_LOG(error, "Wasm VM failed {}", message);
+  lifecycle_stats_handler_.onEvent(WasmEvent::RuntimeError);
+}
 
 void Wasm::setTimerPeriod(uint32_t context_id, std::chrono::milliseconds new_period) {
   auto& period = timer_period_[context_id];
