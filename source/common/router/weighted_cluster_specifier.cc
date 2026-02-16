@@ -387,7 +387,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
   //    random selection will naturally distribute retries across clusters, so
   //    zeroing out weights is unnecessary.
   const AttemptedClustersFilterState* attempted_clusters = nullptr;
-  if (retry_aware_lb_ && weighted_clusters_.size() > 1 && hash_value.has_value()) {
+  if (retry_aware_lb_ && weighted_clusters_.size() > 1) {
     attempted_clusters =
         stream_info.filterState().getDataReadOnly<AttemptedClustersFilterState>(
             kWeightedClusterAttemptedClustersKey);
