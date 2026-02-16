@@ -157,17 +157,11 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_X509_LOOKUP:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
-#ifdef ENVOY_SSL_OPENSSL
-    case SSL_ERROR_WANT_CLIENT_HELLO_CB:
-      state_ = Ssl::SocketState::HandshakeInProgress;
-      return PostIoAction::KeepOpen;
-#else
     case SSL_ERROR_PENDING_CERTIFICATE:
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
-#endif
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;
