@@ -1055,7 +1055,6 @@ TEST_F(A2aJsonParserTest, Reset) {
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "2");
 }
 
-// TODO(tyxia): Add support for parsing responses.
 TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   const std::string json = R"({
   "jsonrpc": "2.0",
@@ -1084,7 +1083,25 @@ TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
 
   ASSERT_TRUE(parser_.parse(json).ok());
   ASSERT_TRUE(parser_.finishParse().ok());
-  EXPECT_FALSE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
+}
+
+TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 102,
+    "result": null,
+    "error": {
+        "code": -32001,
+        "message": "Task not found",
+        "data": null
+    }
+    })";
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.metadata().fields().contains("error"));
 }
 
 } // namespace
