@@ -1892,6 +1892,41 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
 }
 
+// Test chooseHost returns nullptr when tenant isolation is enabled but cluster has no
+// tenant_id_format configured.
+TEST_F(ReverseConnectionClusterTest,
+       ChooseHostFailsWhenTenantIsolationEnabledButTenantIdFormatNotConfigured) {
+  // Create cluster without tenant_id_format (bootstrap has tenant isolation disabled by default).
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  // Enable tenant isolation on the extension (simulating a config mismatch that validation would
+  // normally prevent).
+  config_.mutable_enable_tenant_isolation()->set_value(true);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node-1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  EXPECT_EQ(result.host, nullptr);
+}
+
 // Test cluster uses non-scoped identifier when tenant isolation disabled.
 TEST_F(ReverseConnectionClusterTest, ClusterUsesNonScopedIdentifierWhenTenantIsolationDisabled) {
   const std::string yaml = R"EOF(
