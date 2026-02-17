@@ -24,6 +24,10 @@ constexpr size_t kTraceIdHexSize = 32;
 constexpr size_t kParentIdHexSize = 16;
 constexpr size_t kTraceFlagsHexSize = 2;
 
+// W3C Baggage constants
+constexpr size_t kMaxBaggageSize = 8192;
+constexpr size_t kMaxBaggageMembers = 64;
+
 bool isValidHex(absl::string_view input) {
   return std::all_of(input.begin(), input.end(),
                      [](unsigned char c) { return absl::ascii_isxdigit(c); });
@@ -46,20 +50,25 @@ bool isValidTraceStateKey(absl::string_view key) {
   // Simple keys or multi-tenant keys (tenant-id@system-id)
   auto at_pos = key.find('@');
   if (at_pos == absl::string_view::npos) {
-    if (!absl::ascii_islower(key[0]) && !absl::ascii_isdigit(key[0])) {
+    // simple key
+    if (!absl::ascii_islower(key[0])) {
+      // first char must be lowercase letter
       return false;
     }
     return std::all_of(key.begin(), key.end(), isValidTraceStateKeyChar);
   } else {
+    // multi-tenant key
     absl::string_view left = key.substr(0, at_pos);
     absl::string_view right = key.substr(at_pos + 1);
     if (left.empty() || left.size() > 241 || right.empty() || right.size() > 14) {
       return false;
     }
     if (!absl::ascii_islower(left[0]) && !absl::ascii_isdigit(left[0])) {
+      // first char of tenant-id must be lowercase letter or digit
       return false;
     }
-    if (!absl::ascii_islower(right[0]) && !absl::ascii_isdigit(right[0])) {
+    if (!absl::ascii_islower(right[0])) {
+      // first char of system-id must be lowercase letter
       return false;
     }
     return std::all_of(left.begin(), left.end(), isValidTraceStateKeyChar) &&
@@ -105,7 +114,9 @@ bool isValidBaggageValue(absl::string_view value) {
 
 } // namespace
 
-bool McpTracingValidation::isValidTraceParent(absl::string_view trace_parent) {
+namespace McpTracingValidation {
+
+bool isValidTraceParent(absl::string_view trace_parent) {
   if (trace_parent.size() != kTraceParentExpectedSize) {
     return false;
   }
@@ -130,6 +141,10 @@ bool McpTracingValidation::isValidTraceParent(absl::string_view trace_parent) {
     return false;
   }
 
+  if (version == "ff") {
+    return false;
+  }
+
   if (isAllZeros(trace_id) || isAllZeros(parent_id)) {
     return false;
   }
@@ -137,7 +152,7 @@ bool McpTracingValidation::isValidTraceParent(absl::string_view trace_parent) {
   return true;
 }
 
-bool McpTracingValidation::isValidTraceState(absl::string_view trace_state) {
+bool isValidTraceState(absl::string_view trace_state) {
   if (trace_state.empty()) {
     return true;
   }
@@ -172,15 +187,19 @@ bool McpTracingValidation::isValidTraceState(absl::string_view trace_state) {
   return true;
 }
 
-bool McpTracingValidation::isValidBaggage(absl::string_view baggage) {
+bool isValidBaggage(absl::string_view baggage) {
   if (baggage.empty()) {
     return true;
   }
-  if (baggage.size() > 8192) {
+  if (baggage.size() > kMaxBaggageSize) {
     return false;
   }
 
   std::vector<absl::string_view> members = absl::StrSplit(baggage, ',');
+  if (members.size() > kMaxBaggageMembers) {
+    return false;
+  }
+
   for (absl::string_view member : members) {
     absl::string_view trimmed_member = absl::StripAsciiWhitespace(member);
     if (trimmed_member.empty()) {
@@ -212,6 +231,7 @@ bool McpTracingValidation::isValidBaggage(absl::string_view baggage) {
   return true;
 }
 
+} // namespace McpTracingValidation
 } // namespace Mcp
 } // namespace HttpFilters
 } // namespace Extensions

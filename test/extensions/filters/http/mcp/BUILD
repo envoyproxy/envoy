@@ -58,6 +58,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/mcp:mcp_tracing_validation_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
