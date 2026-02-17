@@ -864,8 +864,12 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
-  worker_guard_dog_ = maybeCreateGuardDog("workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread", config_.mainThreadWatchdogConfig());
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.worker_threads_watchdog_fix")) {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.workerWatchdogConfig());
+  } else {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.mainThreadWatchdogConfig());
+  }
   return absl::OkStatus();
 }
 
