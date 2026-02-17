@@ -344,14 +344,13 @@ public:
   }
   void deferredDeleteRequest(HttpRequestInternal* req);
 
-  const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
-  StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
-
 private:
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);
     return has_destroyed_;
   };
+  const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
   Event::Dispatcher& getDispatcher() { return *dispatcher_; }
 
