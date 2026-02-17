@@ -130,11 +130,19 @@ bug_fixes:
     allowing query parameter injection attacks. Values from formatters like ``%REQ(header)%`` are now properly
     URL-encoded when added to the query string. This behavior is controlled by the runtime guard
     ``envoy.reloadable_features.header_mutation_url_encode_query_params``.
+- area: mcp_router
+  change: |
+    Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
+    headers. Previously this caused a spurious 500 error.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    in external languages (Rust, Go, C) via dynamic modules.
 - area: dynamic_modules
   change: |
     Added :ref:`TLS certificate validator

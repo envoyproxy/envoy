@@ -7,6 +7,7 @@
 pub mod access_log;
 pub mod buffer;
 pub mod cert_validator;
+pub mod matcher;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
