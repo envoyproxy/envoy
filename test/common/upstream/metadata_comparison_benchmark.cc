@@ -88,6 +88,10 @@ BENCHMARK(bmHashDifferent)->Args({1, 5})->Args({3, 10})->Args({5, 20})->Args({10
 void bmUpdateHostListEquivalent(::benchmark::State& state) {
   const int num_hosts = state.range(0);
   const int num_fields = state.range(1);
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 1000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
   std::vector<envoy::config::core::v3::Metadata> existing;
   std::vector<envoy::config::core::v3::Metadata> incoming;
   existing.reserve(num_hosts);
@@ -117,6 +121,10 @@ BENCHMARK(bmUpdateHostListEquivalent)
 void bmUpdateHostListHash(::benchmark::State& state) {
   const int num_hosts = state.range(0);
   const int num_fields = state.range(1);
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 1000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
   std::vector<envoy::config::core::v3::Metadata> existing;
   std::vector<envoy::config::core::v3::Metadata> incoming;
   existing.reserve(num_hosts);
@@ -148,6 +156,10 @@ BENCHMARK(bmUpdateHostListHash)
 void bmUpdateHostListCachedHash(::benchmark::State& state) {
   const int num_hosts = state.range(0);
   const int num_fields = state.range(1);
+  if (benchmark::skipExpensiveBenchmarks() && num_hosts > 1000) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
   std::vector<std::size_t> existing_hashes;
   std::vector<std::size_t> incoming_hashes;
   existing_hashes.reserve(num_hosts);
