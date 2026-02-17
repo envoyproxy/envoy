@@ -45,6 +45,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // If no valid host in the override host list, then the specified fallback load balancing policy is used. This allows load
 // balancing to degrade to a a built in policy (i.e. Round Robin) in case external endpoint picker fails.
 //
+// In addition to specifying ``override_host_sources``, the policy can be configured to inform downstream filters
+// of the selected endpoint through dynamic metadata or response headers through ``selected_endpoint_key``:
+//
+// .. code-block:: yaml
+//
+//    override_host_sources:
+//      - metadata:
+//          key: "envoy.lb"
+//          path:
+//          - key: "x-gateway-destination-endpoint"
+//    selected_endpoint_key:
+//      metadata_key: "envoy.lb"
+//
 // See the :ref:`load balancing architecture
 // overview<arch_overview_load_balancing_types>` for more information.
 //
@@ -63,6 +76,20 @@ message OverrideHost {
     type.metadata.v3.MetadataKey metadata = 2;
   }
 
+  message SelectedEndpointKey {
+    // The header to populate with the selected host address.
+    //
+    // Only one of the header or metadata field may be set.
+    string header = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // The metadata key to populate with the selected host address. If set this field will
+    // take precedence over the header field.
+    //
+    // Only one of the header or metadata field may be set.
+    type.metadata.v3.MetadataKey metadata = 2;
+  }
+
   // A list of sources to get host addresses from. The host sources are searched in the order
   // specified. The request is forwarded to the first address and subsequent addresses are used
   // for request retries or hedging.
@@ -71,6 +98,10 @@ message OverrideHost {
   // satisfy all retry attempts the fallback load balancing policy is used to pick a host.
   repeated OverrideHostSource override_host_sources = 1
       [(validate.rules).repeated = {min_items: 1}];
+
+  // The header or metadata key to populate with the selected host address. This is optional and
+  // may be used to inform downstream filters of the host address selected by load balancing policy.
+  SelectedEndpointKey selected_endpoint_key = 2;
 
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
