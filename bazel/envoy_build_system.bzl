@@ -37,6 +37,7 @@ load(
     _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
+    _envoy_select_enable_protovalidate = "envoy_select_enable_protovalidate",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
     _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
@@ -246,6 +247,7 @@ envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
+envoy_select_enable_protovalidate = _envoy_select_enable_protovalidate
 envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_disable_exceptions = _envoy_select_disable_exceptions
 envoy_select_enable_exceptions = _envoy_select_enable_exceptions

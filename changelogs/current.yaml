@@ -682,5 +682,11 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: api
+  change: |
+    Initial implementation of protovalidate added. Legacy protoc-gen-validate validation has been retained
+    pending migration of protos, and can be reverted by use of setting the runtime flag
+    ``envoy_reloadable_features_enable_protovalidate`` to ``false``. Please note that doing so may not
+    be compatible with our imminent migration to bzlmod.
 
 deprecated:
