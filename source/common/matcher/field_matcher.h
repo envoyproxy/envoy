@@ -149,7 +149,7 @@ public:
     if (current_match != MatchResult::Matched &&
         input.data_availability_ ==
             DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      return MatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
     return current_match;
