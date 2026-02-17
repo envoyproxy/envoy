@@ -148,7 +148,9 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
   if (read_disable_counter_ > 0) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-    sequencer()->SetUnblocked();
+    if (!quic_disable_data_read_immediately_ || !sequencer()->ignore_read_data()) {
+      sequencer()->SetUnblocked();
+    }
   }
 }
 
@@ -252,9 +254,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   }
   // If read has been disabled, QUIC should not deliver any more data upstream to increase the bytes
   // buffered/processed.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_disable_data_read_immediately") &&
-      read_disable_counter_ > 0) {
+  if (quic_disable_data_read_immediately_ && read_disable_counter_ > 0) {
     return;
   }
 

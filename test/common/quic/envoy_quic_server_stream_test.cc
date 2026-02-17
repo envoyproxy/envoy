@@ -586,6 +586,27 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, EnableReadAfterResetDoesNotPushData) {
+  quic_stream_->setQuicDisableDataReadImmediatelyForTest(true);
+
+  std::string first_part_request(1024, 'a');
+  std::string second_part_request = bodyToHttp3StreamPayload("bbb");
+
+  // Sending such large request will cause read to be disabled.
+  size_t payload_offset = receiveRequest(first_part_request, /*fin=*/false, 512);
+  quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
+  quic_stream_->OnStreamFrame(frame);
+  payload_offset += second_part_request.length();
+  // Unblock the stream asynchronously.
+  quic_stream_->readDisable(false);
+  // Reset the stream locally.
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+
+  // Expect no data to be decoded after local reset.
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponTrailers) {
   size_t payload_offset = receiveRequest(request_body_, false, request_body_.length() * 2);
   EXPECT_FALSE(quic_stream_->HasBytesToRead());

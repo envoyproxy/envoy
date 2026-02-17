@@ -88,6 +88,11 @@ public:
   // quic::QuicSpdyStream::MetadataVisitor
   void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 
+  // TODO(haoyuewang): Remove this function once the feature is default enabled.
+  void setQuicDisableDataReadImmediatelyForTest(bool value) {
+    quic_disable_data_read_immediately_ = value;
+  }
+
 protected:
   // EnvoyQuicStream
   void switchStreamBlockState() override;
@@ -129,6 +134,9 @@ private:
 
   // True if a :path header has been seen before.
   bool saw_path_{false};
+
+  bool quic_disable_data_read_immediately_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_disable_data_read_immediately");
 };
 
 } // namespace Quic
