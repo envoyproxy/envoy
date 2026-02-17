@@ -314,7 +314,7 @@ class RepoNotifier(runner.Runner):
                 ))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
-                text=(f"*Pending Deployments* (workflow runs that need manual approval from maintainer)\n<{"https://github.com/envoyproxy/envoy-ci-staging/actions/workflows/request.yml?query=is%3Aaction_required"}>"))
+                text=(f"*Pending Deployments* (workflow runs that need manual approval from maintainer)\n<{"https://github.com/envoyproxy/envoy/actions/workflows/request.yml?query=is%3Aaction_required"}>"))
             await self.send_message(
                 channel='#envoy-ci',
                 text=(
