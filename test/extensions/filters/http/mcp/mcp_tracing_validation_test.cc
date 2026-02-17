@@ -140,9 +140,14 @@ TEST(McpTracingValidationTest, BaggageValidation) {
 
   // Too many members in TraceState
   std::string too_many_members;
-  for (int i = 0; i < 65; ++i) {
-    absl::StrAppend(&too_many_members, "k", i, "=v,");
+  for (int i = 0; i < 63; ++i) {
+    absl::StrAppend(&too_many_members, "k", i+1, "=v,");
   }
+  // last member cannot have a comma
+  absl::StrAppend(&too_many_members, "k", 64, "=v");
+  EXPECT_TRUE(McpTracingValidation::isValidBaggage(too_many_members));
+  // With the 65th member, it's too large
+  absl::StrAppend(&too_many_members, ",k", 65, "=v");
   EXPECT_FALSE(McpTracingValidation::isValidBaggage(too_many_members));
 
   // Oversized baggage
