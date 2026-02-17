@@ -253,7 +253,7 @@ automatically constructs tenant-scoped identifiers using the formatted tenant ID
    When tenant isolation is enabled in the bootstrap configuration, ``tenant_id_format`` is **required**
    for all reverse connection clusters. Envoy will fail to start if tenant isolation is enabled but
    ``tenant_id_format`` is not configured in any reverse connection cluster. Additionally, the tenant
-   identifier must be inferrable from the request context (i.e., the formatter must evaluate to a non-empty
+   identifier must be inferable from the request context (i.e., the formatter must evaluate to a non-empty
    value) at runtime. If the tenant identifier cannot be inferred, host selection will fail and the request
    will not be routed. This ensures strict tenant isolation and prevents requests from being routed without
    proper tenant scoping.
