@@ -28,9 +28,9 @@ load("@envoy//bazel:python_dependencies.bzl", "envoy_python_dependencies")
 
 envoy_python_dependencies()
 
-load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
+# load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
-envoy_dependency_imports()
+# envoy_dependency_imports()
 
 load("@envoy//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
 
