@@ -69,7 +69,7 @@ build --incompatible_default_to_explicit_init_py
 build --define absl=1
 
 # Disable ICU linking for googleurl.
-build --@googleurl//build_config:system_icu=0
+# build --@googleurl//build_config:system_icu=0
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
