@@ -326,7 +326,7 @@ tunnel connection.
 For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
 includes a companion configuration
 :download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
-That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``. 
+That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``.
 
 The header priority order is:
 
