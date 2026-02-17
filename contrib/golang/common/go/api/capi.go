@@ -50,6 +50,7 @@ type HttpCAPI interface {
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
+	HttpGetStringsValue(r unsafe.Pointer, id int) ([]string, bool)
 
 	HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
@@ -62,28 +63,6 @@ type HttpCAPI interface {
 	HttpFinalize(r unsafe.Pointer, reason int)
 	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 	HttpSetDrainConnectionUponCompletion(r unsafe.Pointer)
-
-	/* SSL Connection APIs */
-	HttpGetDownstreamSslConnection(r unsafe.Pointer) bool
-	HttpSslPeerCertificatePresented(r unsafe.Pointer) bool
-	HttpSslPeerCertificateValidated(r unsafe.Pointer) bool
-	HttpSslSha256PeerCertificateDigest(r unsafe.Pointer) string
-	HttpSslSerialNumberPeerCertificate(r unsafe.Pointer) string
-	HttpSslSubjectPeerCertificate(r unsafe.Pointer) string
-	HttpSslIssuerPeerCertificate(r unsafe.Pointer) string
-	HttpSslSubjectLocalCertificate(r unsafe.Pointer) string
-	HttpSslUriSanPeerCertificate(r unsafe.Pointer) []string
-	HttpSslUriSanLocalCertificate(r unsafe.Pointer) []string
-	HttpSslDnsSansPeerCertificate(r unsafe.Pointer) []string
-	HttpSslDnsSansLocalCertificate(r unsafe.Pointer) []string
-	HttpSslValidFromPeerCertificate(r unsafe.Pointer) (uint64, bool)
-	HttpSslExpirationPeerCertificate(r unsafe.Pointer) (uint64, bool)
-	HttpSslTlsVersion(r unsafe.Pointer) string
-	HttpSslCiphersuiteString(r unsafe.Pointer) string
-	HttpSslCiphersuiteId(r unsafe.Pointer) (uint64, bool)
-	HttpSslSessionId(r unsafe.Pointer) string
-	HttpSslUrlEncodedPemEncodedPeerCertificate(r unsafe.Pointer) string
-	HttpSslUrlEncodedPemEncodedPeerCertificateChain(r unsafe.Pointer) string
 
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
