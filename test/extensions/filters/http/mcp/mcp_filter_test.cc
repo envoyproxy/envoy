@@ -1258,6 +1258,26 @@ TEST_F(McpFilterTest, PostWithJsonCharsetContentTypeAccepted) {
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+// Test REJECT_NO_MCP mode - allow DELETE with MCP-Session-Id (session termination)
+TEST_F(McpFilterTest, RejectModeAllowsDeleteWithSessionId) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"},
+                                         {"mcp-session-id", "session-abc-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+// Test REJECT_NO_MCP mode - reject DELETE without MCP-Session-Id (not session termination)
+TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 } // namespace
