@@ -52,12 +52,18 @@ envoy_proto_library(
     ],
 )
 
+envoy_proto_library(
+    name = "utility_test_protovalidate_proto",
+    srcs = ["utility_test_protovalidate.proto"],
+)
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     rbe_pool = "6gig",
     deps = [
         ":utility_test_protos_cc_proto",
+        ":utility_test_protovalidate_proto_cc_proto",
         "//source/common/config:api_version_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/stats:stat_test_utility_lib",

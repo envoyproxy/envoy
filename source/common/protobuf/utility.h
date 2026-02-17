@@ -309,7 +309,16 @@ public:
   /**
    * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
    */
-  static void recursivePgvCheck(const Protobuf::Message& message);
+  static void recursivePgvCheck(const Protobuf::Message& message, bool recurse_into_any = false);
+
+  /**
+   * Perform a protovalidate check on a given protobuf message.
+   * @param message message to validate.
+   * @param recurse_into_any whether to recurse into Any messages during validation.
+   * @throw EnvoyException if the message does not satisfy its protovalidate constraints.
+   */
+  static void validateWithProtovalidate(const Protobuf::Message& message,
+                                        bool recurse_into_any = false);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf as well as performing
@@ -325,6 +334,7 @@ public:
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        bool recurse_into_any = false) {
+
     // TODO(adisuissa): There are multiple recursive traversals done by the
     // calls in this function. This can be refactored into a single recursive
     // traversal that invokes the various validators.
@@ -337,23 +347,8 @@ public:
     // Throw an exception if the config has an invalid Duration field. This is needed
     // because Envoy validates the duration in a strict way that is not supported by PGV.
     validateDurationFields(message, recurse_into_any);
-
-    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
-    // we move to always recursing, satisfying the TODO below, we should merge into a single
-    // recursion for performance reasons.
-    if (recurse_into_any) {
-      return recursivePgvCheck(message);
-    }
-
-    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
-    // types, we can remove bottom up validation from the entire codebase and only validate
-    // at top level ingestion (bootstrap, discovery response). This is a large change and will be
-    // done as a separate PR. This change will also allow removing templating from most/all of
-    // related functions.
-    std::string err;
-    if (!Validate(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
-    }
+    validateWithProtovalidate(message, recurse_into_any);
+    recursivePgvCheck(message, recurse_into_any);
   }
 
 #ifdef ENVOY_ENABLE_YAML

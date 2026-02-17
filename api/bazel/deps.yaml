@@ -103,6 +103,28 @@ prometheus_metrics_model:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+protovalidate:
+  project_name: "protovalidate"
+  project_desc: "Protocol Buffer validation using CEL expressions"
+  project_url: "https://github.com/bufbuild/protovalidate"
+  release_date: "2025-09-12"
+  use_category:
+  - api
+  implied_untracked_deps:
+  - antlr4_runtimes
+  - antlr4_jar
+  - rules_java_builtin
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protovalidate/blob/v{version}/LICENSE"
+protovalidate_cc:
+  project_name: "protovalidate-cc"
+  project_desc: "Protocol Buffer validation for C++ using protovalidate"
+  project_url: "https://github.com/bufbuild/protovalidate-cc"
+  release_date: "2025-09-18"
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protovalidate-cc/blob/v{version}/LICENSE"
 rules_buf:
   project_name: "Bazel rules for Buf"
   project_desc: "Bazel rules for Buf"

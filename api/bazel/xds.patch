@@ -1,0 +1,641 @@
+diff --git a/bazel/api_build_system.bzl b/bazel/api_build_system.bzl
+index d754b0c..e759d51 100644
+--- a/bazel/api_build_system.bzl
++++ b/bazel/api_build_system.bzl
+@@ -1,6 +1,6 @@
+-load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+ load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+ load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
++load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+ load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+ load("@io_bazel_rules_go//go:def.bzl", "go_test")
+ load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
+@@ -26,7 +26,7 @@ _COMMON_PROTO_DEPS = [
+     "@com_google_protobuf//:wrappers_proto",
+     "@com_google_googleapis//google/api:http_proto",
+     "@com_google_googleapis//google/rpc:status_proto",
+-    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
++    "@protovalidate//proto/protovalidate/buf/validate:validate_proto",
+ ]
+ 
+ def _proto_mapping(dep, proto_dep_map, proto_suffix):
+@@ -67,14 +67,8 @@ def _xds_cc_py_proto_library(
+         visibility = visibility,
+     )
+     cc_proto_library_name = name + _CC_PROTO_SUFFIX
+-    pgv_cc_proto_library(
++    cc_proto_library(
+         name = cc_proto_library_name,
+-        linkstatic = linkstatic,
+-        cc_deps = [_cc_proto_mapping(dep) for dep in deps] + [
+-            "@com_google_googleapis//google/api:http_cc_proto",
+-            "@com_google_googleapis//google/api:httpbody_cc_proto",
+-            "@com_google_googleapis//google/rpc:status_cc_proto",
+-        ],
+         deps = [relative_name],
+         visibility = ["//visibility:public"],
+     )
+@@ -157,4 +151,3 @@ def udpa_cc_test(name, **kwargs):
+ 
+ def udpa_go_test(name, **kwargs):
+     xds_go_test(name, **kwargs)
+-
+diff --git a/udpa/data/orca/v1/orca_load_report.proto b/udpa/data/orca/v1/orca_load_report.proto
+index 5d36449..ed2ed13 100644
+--- a/udpa/data/orca/v1/orca_load_report.proto
++++ b/udpa/data/orca/v1/orca_load_report.proto
+@@ -11,7 +11,7 @@ option java_multiple_files = true;
+ option java_package = "com.github.udpa.udpa.data.orca.v1";
+ option go_package = "github.com/cncf/xds/go/udpa/data/orca/v1";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ // See section `ORCA load report format` of the design document in
+ // :ref:`https://github.com/envoyproxy/envoy/issues/6614`.
+@@ -19,11 +19,11 @@ import "validate/validate.proto";
+ message OrcaLoadReport {
+   // CPU utilization expressed as a fraction of available CPU resources. This
+   // should be derived from the latest sample or measurement.
+-  double cpu_utilization = 1 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
++  double cpu_utilization = 1 [(buf.validate.field).double.gte = 0, (buf.validate.field).double.lte = 1];
+ 
+   // Memory utilization expressed as a fraction of available memory
+   // resources. This should be derived from the latest sample or measurement.
+-  double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
++  double mem_utilization = 2 [(buf.validate.field).double.gte = 0, (buf.validate.field).double.lte = 1];
+ 
+   // Total RPS being served by an endpoint. This should cover all services that an endpoint is
+   // responsible for.
+@@ -36,5 +36,5 @@ message OrcaLoadReport {
+   // Resource utilization values. Each value is expressed as a fraction of total resources
+   // available, derived from the latest sample or measurement.
+   map<string, double> utilization = 5
+-      [(validate.rules).map.values.double.gte = 0, (validate.rules).map.values.double.lte = 1];
++      [(buf.validate.field).map.values.double.gte = 0, (buf.validate.field).map.values.double.lte = 1];
+ }
+diff --git a/xds/core/v3/authority.proto b/xds/core/v3/authority.proto
+index d666c38..f1a3dfe 100644
+--- a/xds/core/v3/authority.proto
++++ b/xds/core/v3/authority.proto
+@@ -4,7 +4,7 @@ package xds.core.v3;
+ 
+ import "xds/annotations/v3/status.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_outer_classname = "AuthorityProto";
+ option java_multiple_files = true;
+@@ -15,7 +15,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
+ 
+ // xDS authority information.
+ message Authority {
+-  string name = 1 [(validate.rules).string = {min_len: 1}];
++  string name = 1 [(buf.validate.field).string = {min_len: 1}];
+ 
+   // .. space reserved for additional authority addressing information, e.g. for
+   // resource signing, items such as CA trust chain, cert pinning may be added.
+diff --git a/xds/core/v3/cidr.proto b/xds/core/v3/cidr.proto
+index c40dab2..23fa7bc 100644
+--- a/xds/core/v3/cidr.proto
++++ b/xds/core/v3/cidr.proto
+@@ -5,7 +5,7 @@ package xds.core.v3;
+ import "xds/annotations/v3/status.proto";
+ import "google/protobuf/wrappers.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_outer_classname = "CidrRangeProto";
+ option java_multiple_files = true;
+@@ -18,8 +18,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
+ // the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
+ message CidrRange {
+   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
+-  string address_prefix = 1 [(validate.rules).string = {min_len: 1}];
++  string address_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
+ 
+   // Length of prefix, e.g. 0, 32. Defaults to 0 when unset.
+-  google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32 = {lte: 128}];
++  google.protobuf.UInt32Value prefix_len = 2 [(buf.validate.field).uint32 = {lte: 128}];
+ }
+diff --git a/xds/core/v3/collection_entry.proto b/xds/core/v3/collection_entry.proto
+index c844d61..1d9cc1f 100644
+--- a/xds/core/v3/collection_entry.proto
++++ b/xds/core/v3/collection_entry.proto
+@@ -7,7 +7,7 @@ import "google/protobuf/any.proto";
+ import "xds/annotations/v3/status.proto";
+ import "xds/core/v3/resource_locator.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_outer_classname = "CollectionEntryProto";
+ option java_multiple_files = true;
+@@ -33,7 +33,7 @@ message CollectionEntry {
+     // ``[a-zA-Z0-9_-\./]+`` (TODO(htuch): turn this into a PGV constraint once
+     // finalized, probably should be a RFC3986 pchar). This name allows
+     // reference via the #entry directive in ResourceLocator.
+-    string name = 1 [(validate.rules).string.pattern = "^[0-9a-zA-Z_\\-\\.~:]+$"];
++    string name = 1 [(buf.validate.field).string.pattern = "^[0-9a-zA-Z_\\-\\.~:]+$"];
+ 
+     // The resource's logical version. It is illegal to have the same named xDS
+     // resource name at a given version with different resource payloads.
+@@ -44,7 +44,7 @@ message CollectionEntry {
+   }
+ 
+   oneof resource_specifier {
+-    option (validate.required) = true;
++    option (buf.validate.oneof).required = true;
+ 
+     // A resource locator describing how the member resource is to be located.
+     ResourceLocator locator = 1;
+diff --git a/xds/core/v3/extension.proto b/xds/core/v3/extension.proto
+index dd489eb..aa9c001 100644
+--- a/xds/core/v3/extension.proto
++++ b/xds/core/v3/extension.proto
+@@ -7,14 +7,14 @@ option java_multiple_files = true;
+ option java_package = "com.github.xds.core.v3";
+ option go_package = "github.com/cncf/xds/go/xds/core/v3";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ import "google/protobuf/any.proto";
+ 
+ // Message type for extension configuration.
+ message TypedExtensionConfig {
+   // The name of an extension. This is not used to select the extension, instead
+   // it serves the role of an opaque identifier.
+-  string name = 1 [(validate.rules).string = {min_len: 1}];
++  string name = 1 [(buf.validate.field).string = {min_len: 1}];
+ 
+   // The typed config for the extension. The type URL will be used to identify
+   // the extension. In the case that the type URL is *xds.type.v3.TypedStruct*
+@@ -22,5 +22,5 @@ message TypedExtensionConfig {
+   // URL of *TypedStruct* will be utilized. See the
+   // :ref:`extension configuration overview
+   // <config_overview_extension_configuration>` for further details.
+-  google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
++  google.protobuf.Any typed_config = 2 [(buf.validate.field).required = true];
+ }
+diff --git a/xds/core/v3/resource_locator.proto b/xds/core/v3/resource_locator.proto
+index 9b40d52..810453e 100644
+--- a/xds/core/v3/resource_locator.proto
++++ b/xds/core/v3/resource_locator.proto
+@@ -5,7 +5,7 @@ package xds.core.v3;
+ import "xds/annotations/v3/status.proto";
+ import "xds/core/v3/context_params.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_outer_classname = "ResourceLocatorProto";
+ option java_multiple_files = true;
+@@ -39,7 +39,7 @@ message ResourceLocator {
+   }
+ 
+   // URI scheme.
+-  Scheme scheme = 1 [(validate.rules).enum = {defined_only: true}];
++  Scheme scheme = 1 [(buf.validate.field).enum = {defined_only: true}];
+ 
+   // Opaque identifier for the resource. Any '/' will not be escaped during URI
+   // encoding and will form part of the URI path. This may end
+@@ -54,7 +54,7 @@ message ResourceLocator {
+ 
+   // Fully qualified resource type (as in type URL without types.googleapis.com/
+   // prefix).
+-  string resource_type = 4 [(validate.rules).string = {min_len: 1}];
++  string resource_type = 4 [(buf.validate.field).string = {min_len: 1}];
+ 
+   oneof context_param_specifier {
+     // Additional parameters that can be used to select resource variants.
+@@ -89,7 +89,7 @@ message ResourceLocator {
+   // and reserved characters.
+   message Directive {
+     oneof directive {
+-      option (validate.required) = true;
++      option (buf.validate.oneof).required = true;
+ 
+       // An alternative resource locator for fallback if the resource is
+       // unavailable. For example, take the resource locator:
+@@ -106,7 +106,7 @@ message ResourceLocator {
+       // field specified. When specified, the entry directive allows
+       // ResourceLocator to directly reference these inlined resources, e.g.
+       // xdstp://.../foo#entry=bar.
+-      string entry = 2 [(validate.rules).string = {min_len: 1, pattern: "^[0-9a-zA-Z_\\-\\./~:]+$"}];
++      string entry = 2 [(buf.validate.field).string = {min_len: 1, pattern: "^[0-9a-zA-Z_\\-\\./~:]+$"}];
+     }
+   }
+ 
+diff --git a/xds/core/v3/resource_name.proto b/xds/core/v3/resource_name.proto
+index 0f3d997..eec1559 100644
+--- a/xds/core/v3/resource_name.proto
++++ b/xds/core/v3/resource_name.proto
+@@ -5,7 +5,7 @@ package xds.core.v3;
+ import "xds/annotations/v3/status.proto";
+ import "xds/core/v3/context_params.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_outer_classname = "ResourceNameProto";
+ option java_multiple_files = true;
+@@ -35,7 +35,7 @@ message ResourceName {
+ 
+   // Fully qualified resource type (as in type URL without types.googleapis.com/
+   // prefix).
+-  string resource_type = 3 [(validate.rules).string = {min_len: 1}];
++  string resource_type = 3 [(buf.validate.field).string = {min_len: 1}];
+ 
+   // Additional parameters that can be used to select resource variants.
+   ContextParams context = 4;
+diff --git a/xds/data/orca/v3/orca_load_report.proto b/xds/data/orca/v3/orca_load_report.proto
+index 1b08475..119aa88 100644
+--- a/xds/data/orca/v3/orca_load_report.proto
++++ b/xds/data/orca/v3/orca_load_report.proto
+@@ -7,7 +7,7 @@ option java_multiple_files = true;
+ option java_package = "com.github.xds.data.orca.v3";
+ option go_package = "github.com/cncf/xds/go/xds/data/orca/v3";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ // See section `ORCA load report format` of the design document in
+ // https://github.com/envoyproxy/envoy/issues/6614.
+@@ -17,11 +17,11 @@ message OrcaLoadReport {
+   // should be derived from the latest sample or measurement. The value may be
+   // larger than 1.0 when the usage exceeds the reporter dependent notion of
+   // soft limits.
+-  double cpu_utilization = 1 [(validate.rules).double.gte = 0];
++  double cpu_utilization = 1 [(buf.validate.field).double.gte = 0];
+ 
+   // Memory utilization expressed as a fraction of available memory
+   // resources. This should be derived from the latest sample or measurement.
+-  double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
++  double mem_utilization = 2 [(buf.validate.field).double.gte = 0, (buf.validate.field).double.lte = 1];
+ 
+   // Total RPS being served by an endpoint. This should cover all services that an endpoint is
+   // responsible for.
+@@ -35,15 +35,15 @@ message OrcaLoadReport {
+   // Resource utilization values. Each value is expressed as a fraction of total resources
+   // available, derived from the latest sample or measurement.
+   map<string, double> utilization = 5
+-      [(validate.rules).map.values.double.gte = 0, (validate.rules).map.values.double.lte = 1];
++      [(buf.validate.field).map.values.double.gte = 0, (buf.validate.field).map.values.double.lte = 1];
+ 
+   // Total RPS being served by an endpoint. This should cover all services that an endpoint is
+   // responsible for.
+-  double rps_fractional = 6 [(validate.rules).double.gte = 0];
++  double rps_fractional = 6 [(buf.validate.field).double.gte = 0];
+ 
+   // Total EPS (errors/second) being served by an endpoint. This should cover
+   // all services that an endpoint is responsible for.
+-  double eps = 7 [(validate.rules).double.gte = 0];
++  double eps = 7 [(buf.validate.field).double.gte = 0];
+ 
+   // Application specific opaque metrics.
+   map<string, double> named_metrics = 8;
+@@ -54,5 +54,5 @@ message OrcaLoadReport {
+   // This should be derived from the latest sample or measurement.
+   // The value may be larger than 1.0 when the usage exceeds the reporter
+   // dependent notion of soft limits.
+-  double application_utilization = 9 [(validate.rules).double.gte = 0];
++  double application_utilization = 9 [(buf.validate.field).double.gte = 0];
+ }
+diff --git a/xds/type/matcher/v3/cel.proto b/xds/type/matcher/v3/cel.proto
+index a45af95..9052427 100644
+--- a/xds/type/matcher/v3/cel.proto
++++ b/xds/type/matcher/v3/cel.proto
+@@ -3,7 +3,7 @@ syntax = "proto3";
+ package xds.type.matcher.v3;
+ 
+ import "xds/type/v3/cel.proto";
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "CelProto";
+@@ -29,7 +29,7 @@ option go_package = "github.com/cncf/xds/go/xds/type/matcher/v3";
+ // [#comment: envoy.matching.matchers.cel_matcher]
+ message CelMatcher {
+   // Either parsed or checked representation of the CEL program.
+-  type.v3.CelExpression expr_match = 1 [(validate.rules).message = {required: true}];
++  type.v3.CelExpression expr_match = 1 [(buf.validate.field).required = true];
+ 
+   // Free-form description of the CEL AST, e.g. the original expression text, to be
+   // used for debugging assistance.
+diff --git a/xds/type/matcher/v3/domain.proto b/xds/type/matcher/v3/domain.proto
+index 06f11d7..995c5c8 100644
+--- a/xds/type/matcher/v3/domain.proto
++++ b/xds/type/matcher/v3/domain.proto
+@@ -5,7 +5,7 @@ package xds.type.matcher.v3;
+ import "xds/annotations/v3/status.proto";
+ import "xds/type/matcher/v3/matcher.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "ServerNameMatcherProto";
+@@ -26,7 +26,7 @@ message ServerNameMatcher {
+   message DomainMatcher {
+     // A non-empty set of domain names with optional wildcards, e.g.
+     // ``www.example.com``, ``*.com``, or ``*``.
+-    repeated string domains = 1 [ (validate.rules).repeated = {min_items : 1} ];
++    repeated string domains = 1 [ (buf.validate.field).repeated = {min_items : 1} ];
+ 
+     // Match action to apply when the server name matches any of the domain
+     // names in the matcher.
+diff --git a/xds/type/matcher/v3/ip.proto b/xds/type/matcher/v3/ip.proto
+index ad3ab06..d0fff55 100644
+--- a/xds/type/matcher/v3/ip.proto
++++ b/xds/type/matcher/v3/ip.proto
+@@ -6,7 +6,7 @@ import "xds/annotations/v3/status.proto";
+ import "xds/core/v3/cidr.proto";
+ import "xds/type/matcher/v3/matcher.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "IPMatcherProto";
+@@ -22,7 +22,7 @@ message IPMatcher {
+   // Specifies a list of IP address ranges and a match action.
+   message IPRangeMatcher {
+     // A non-empty set of CIDR ranges.
+-    repeated core.v3.CidrRange ranges = 1 [(validate.rules).repeated = {min_items: 1}];
++    repeated core.v3.CidrRange ranges = 1 [(buf.validate.field).repeated = {min_items: 1}];
+ 
+     // Match action to apply when the IP address is within one of the CIDR ranges.
+     Matcher.OnMatch on_match = 2;
+diff --git a/xds/type/matcher/v3/matcher.proto b/xds/type/matcher/v3/matcher.proto
+index cc03ff6..f3e163e 100644
+--- a/xds/type/matcher/v3/matcher.proto
++++ b/xds/type/matcher/v3/matcher.proto
+@@ -5,7 +5,7 @@ package xds.type.matcher.v3;
+ import "xds/core/v3/extension.proto";
+ import "xds/type/matcher/v3/string.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "MatcherProto";
+@@ -23,7 +23,7 @@ message Matcher {
+   // What to do if a match is successful.
+   message OnMatch {
+     oneof on_match {
+-      option (validate.required) = true;
++      option (buf.validate.oneof).required = true;
+ 
+       // Nested matcher to evaluate.
+       // If the nested matcher does not match and does not specify
+@@ -55,10 +55,10 @@ message Matcher {
+       message SinglePredicate {
+         // Protocol-specific specification of input field to match on.
+         // [#extension-category: envoy.matching.common_inputs]
+-        core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
++        core.v3.TypedExtensionConfig input = 1 [(buf.validate.field).required = true];
+ 
+         oneof matcher {
+-          option (validate.required) = true;
++          option (buf.validate.oneof).required = true;
+ 
+           // Built-in string matcher.
+           type.matcher.v3.StringMatcher value_match = 2;
+@@ -71,11 +71,11 @@ message Matcher {
+ 
+       // A list of two or more matchers. Used to allow using a list within a oneof.
+       message PredicateList {
+-        repeated Predicate predicate = 1 [(validate.rules).repeated = {min_items: 2}];
++        repeated Predicate predicate = 1 [(buf.validate.field).repeated = {min_items: 2}];
+       }
+ 
+       oneof match_type {
+-        option (validate.required) = true;
++        option (buf.validate.oneof).required = true;
+ 
+         // A single predicate to evaluate.
+         SinglePredicate single_predicate = 1;
+@@ -94,30 +94,30 @@ message Matcher {
+     // An individual matcher.
+     message FieldMatcher {
+       // Determines if the match succeeds.
+-      Predicate predicate = 1 [(validate.rules).message = {required: true}];
++      Predicate predicate = 1 [(buf.validate.field).required = true];
+ 
+       // What to do if the match succeeds.
+-      OnMatch on_match = 2 [(validate.rules).message = {required: true}];
++      OnMatch on_match = 2 [(buf.validate.field).required = true];
+     }
+ 
+     // A list of matchers. First match wins.
+-    repeated FieldMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
++    repeated FieldMatcher matchers = 1 [(buf.validate.field).repeated = {min_items: 1}];
+   }
+ 
+   message MatcherTree {
+     // A map of configured matchers. Used to allow using a map within a oneof.
+     message MatchMap {
+-      map<string, OnMatch> map = 1 [(validate.rules).map = {min_pairs: 1}];
++      map<string, OnMatch> map = 1 [(buf.validate.field).map = {min_pairs: 1}];
+     }
+ 
+     // Protocol-specific specification of input field to match on.
+-    core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
++    core.v3.TypedExtensionConfig input = 1 [(buf.validate.field).required = true];
+ 
+     // Exact or prefix match maps in which to look up the input value.
+     // If the lookup succeeds, the match is considered successful, and
+     // the corresponding OnMatch is used.
+     oneof tree_type {
+-      option (validate.required) = true;
++      option (buf.validate.oneof).required = true;
+ 
+       MatchMap exact_match_map = 2;
+ 
+diff --git a/xds/type/matcher/v3/range.proto b/xds/type/matcher/v3/range.proto
+index 5834009..16a4279 100644
+--- a/xds/type/matcher/v3/range.proto
++++ b/xds/type/matcher/v3/range.proto
+@@ -5,7 +5,7 @@ package xds.type.matcher.v3;
+ import "xds/type/v3/range.proto";
+ import "xds/type/matcher/v3/matcher.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "RangeProto";
+@@ -21,7 +21,7 @@ message Int64RangeMatcher {
+   message RangeMatcher {
+     // A non-empty set of int64 ranges.
+     repeated xds.type.v3.Int64Range ranges = 1
+-        [(validate.rules).repeated = { min_items: 1 }];
++        [(buf.validate.field).repeated = { min_items: 1 }];
+ 
+     // Match action to apply when the input number is within one of the ranges.
+     Matcher.OnMatch on_match = 2;
+@@ -39,7 +39,7 @@ message Int32RangeMatcher {
+   message RangeMatcher {
+     // A non-empty set of int32 ranges.
+     repeated xds.type.v3.Int32Range ranges = 1
+-        [(validate.rules).repeated = { min_items: 1 }];
++        [(buf.validate.field).repeated = { min_items: 1 }];
+ 
+     // Match action to apply when the input number is within one of the ranges.
+     Matcher.OnMatch on_match = 2;
+@@ -57,7 +57,7 @@ message DoubleRangeMatcher {
+   message RangeMatcher {
+     // A non-empty set of double ranges.
+     repeated xds.type.v3.DoubleRange ranges = 1
+-        [(validate.rules).repeated = { min_items: 1 }];
++        [(buf.validate.field).repeated = { min_items: 1 }];
+ 
+     // Match action to apply when the input number is within one of the ranges.
+     Matcher.OnMatch on_match = 2;
+diff --git a/xds/type/matcher/v3/regex.proto b/xds/type/matcher/v3/regex.proto
+index 3ff4ca9..1bb4a4a 100644
+--- a/xds/type/matcher/v3/regex.proto
++++ b/xds/type/matcher/v3/regex.proto
+@@ -2,7 +2,7 @@ syntax = "proto3";
+ 
+ package xds.type.matcher.v3;
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "RegexProto";
+@@ -34,13 +34,13 @@ message RegexMatcher {
+   message GoogleRE2 {}
+ 
+   oneof engine_type {
+-    option (validate.required) = true;
++    option (buf.validate.oneof).required = true;
+ 
+     // Google's RE2 regex engine.
+-    GoogleRE2 google_re2 = 1 [ (validate.rules).message = {required : true} ];
++    GoogleRE2 google_re2 = 1;
+   }
+ 
+   // The regex match string. The string must be supported by the configured
+   // engine.
+-  string regex = 2 [ (validate.rules).string = {min_len : 1} ];
++  string regex = 2 [ (buf.validate.field).string = {min_len : 1} ];
+ }
+diff --git a/xds/type/matcher/v3/string.proto b/xds/type/matcher/v3/string.proto
+index e58cb41..3a4c724 100644
+--- a/xds/type/matcher/v3/string.proto
++++ b/xds/type/matcher/v3/string.proto
+@@ -5,7 +5,7 @@ package xds.type.matcher.v3;
+ import "xds/core/v3/extension.proto";
+ import "xds/type/matcher/v3/regex.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.matcher.v3";
+ option java_outer_classname = "StringProto";
+@@ -18,7 +18,7 @@ option go_package = "github.com/cncf/xds/go/xds/type/matcher/v3";
+ // [#next-free-field: 9]
+ message StringMatcher {
+   oneof match_pattern {
+-    option (validate.required) = true;
++    option (buf.validate.oneof).required = true;
+ 
+     // The input string must match exactly the string specified here.
+     //
+@@ -33,7 +33,7 @@ message StringMatcher {
+     // Examples:
+     //
+     // * *abc* matches the value *abc.xyz*
+-    string prefix = 2 [(validate.rules).string = {min_len: 1}];
++    string prefix = 2 [(buf.validate.field).string = {min_len: 1}];
+ 
+     // The input string must have the suffix specified here.
+     // Note: empty prefix is not allowed, please use regex instead.
+@@ -41,10 +41,10 @@ message StringMatcher {
+     // Examples:
+     //
+     // * *abc* matches the value *xyz.abc*
+-    string suffix = 3 [(validate.rules).string = {min_len: 1}];
++    string suffix = 3 [(buf.validate.field).string = {min_len: 1}];
+ 
+     // The input string must match the regular expression specified here.
+-    RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
++    RegexMatcher safe_regex = 5;
+ 
+     // The input string must have the substring specified here.
+     // Note: empty contains match is not allowed, please use regex instead.
+@@ -52,7 +52,7 @@ message StringMatcher {
+     // Examples:
+     //
+     // * *abc* matches the value *xyz.abc.def*
+-    string contains = 7 [(validate.rules).string = {min_len: 1}];
++    string contains = 7 [(buf.validate.field).string = {min_len: 1}];
+ 
+     // Use an extension as the matcher type.
+     // [#extension-category: envoy.string_matcher]
+@@ -67,5 +67,5 @@ message StringMatcher {
+ 
+ // Specifies a list of ways to match a string.
+ message ListStringMatcher {
+-  repeated StringMatcher patterns = 1 [(validate.rules).repeated = {min_items: 1}];
++  repeated StringMatcher patterns = 1 [(buf.validate.field).repeated = {min_items: 1}];
+ }
+diff --git a/xds/type/v3/cel.proto b/xds/type/v3/cel.proto
+index 0439904..0eb6825 100644
+--- a/xds/type/v3/cel.proto
++++ b/xds/type/v3/cel.proto
+@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
+ 
+ import "xds/annotations/v3/status.proto";
+ 
+-import "validate/validate.proto";
++import "buf/validate/validate.proto";
+ 
+ option java_package = "com.github.xds.type.v3";
+ option java_outer_classname = "CelProto";
+@@ -69,7 +69,7 @@ message CelExpression {
+ message CelExtractString {
+   // The CEL expression used to extract a string from the CEL environment.
+   // the "subject string") that should be replaced.
+-  CelExpression expr_extract = 1 [(validate.rules).message = {required: true}];
++  CelExpression expr_extract = 1 [(buf.validate.field).required = true];
+ 
+   // If CEL expression evaluates to an error, this value is be returned to the caller.
+   // If not set, the error is propagated to the caller.
+diff --git a/bazel/api_build_system.bzl b/bazel/api_build_system.bzl
+--- a/bazel/api_build_system.bzl
++++ b/bazel/api_build_system.bzl
+@@ -113,13 +113,17 @@ def xds_proto_package(
+         has_services = has_services,
+     )
+ 
+-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go"]
++    compilers = ["@io_bazel_rules_go//proto:go_proto"]
+     if has_services:
+-        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go"]
++        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2"]
++
++    # In bzlmod, gazelle auto-generates repo names from import paths
++    # In WORKSPACE mode, we use the explicit go_repository name
++    protovalidate_go_dep = "@protovalidate_go_gen//buf/validate"
+ 
+     # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
+     # which share the same go proto library, it causes duplicative dependencies.
+     # Thus, we use depset().to_list() to remove duplicated depenencies.
+     go_proto_library(
+         name = name + _GO_PROTO_SUFFIX,
+         compilers = compilers,
+@@ -128,7 +132,7 @@ def xds_proto_package(
+         proto = name,
+         visibility = ["//visibility:public"],
+         deps = depset([_go_proto_mapping(dep) for dep in deps] + [
+-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
++            protovalidate_go_dep,
+             "@org_golang_google_protobuf//types/known/anypb:go_default_library",
+             "@org_golang_google_protobuf//types/known/durationpb:go_default_library",
+             "@org_golang_google_protobuf//types/known/structpb:go_default_library",

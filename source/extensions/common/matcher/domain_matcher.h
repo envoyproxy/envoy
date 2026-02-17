@@ -8,7 +8,6 @@
 
 #include "absl/status/status.h"
 #include "xds/type/matcher/v3/domain.pb.h"
-#include "xds/type/matcher/v3/domain.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

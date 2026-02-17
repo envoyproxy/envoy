@@ -3,6 +3,15 @@
 #include <iostream>
 
 #include "google/protobuf/descriptor.h"
+#include "udpa/service/orca/v1/orca.grpc.pb.h"
+
+// Protovalidate is a runtime library
+// with no per-proto codegen, so protos only used as gRPC service dependencies
+// (not directly referenced in C++ code) need an explicit include and reference
+// to ensure their descriptors are registered for the FindMethodByName() checks
+// below. Any proto whose service methods are verified in this test but are not
+// otherwise transitively included will need similar treatment.
+const udpa::service::orca::v1::OrcaLoadReportRequest _orca_dummy;
 
 // Basic C++ build/link validation for the v2 xDS APIs.
 int main(int argc, char* argv[]) {

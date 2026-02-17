@@ -1,5 +1,6 @@
 version: v2
 deps:
+- buf.build/bufbuild/protovalidate
 - buf.build/cncf/xds
 - buf.build/envoyproxy/protoc-gen-validate
 - buf.build/gogo/protobuf

@@ -707,6 +707,7 @@ cmsghdr
 codebase
 codec
 codecs
+codegen
 codepath
 codepoints
 codings
@@ -1227,6 +1228,7 @@ protobufs
 protoc
 protodoc
 protos
+protovalidate
 protover
 protoxform
 proxied
@@ -1460,6 +1462,7 @@ superclass
 superroot
 superset
 supportability
+suppressions
 svc
 symlink
 symlinked
