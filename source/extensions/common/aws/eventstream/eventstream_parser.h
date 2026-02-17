@@ -114,9 +114,6 @@ struct ParseResult {
  * Parser for AWS Eventstream binary protocol.
  * Implements the specification: https://smithy.io/2.0/aws/amazon-eventstream.html
  *
- * This is a stateless parser with static methods, similar to SseParser.
- * Uses a single-pass design for efficiency.
- *
  * Example usage:
  *   std::string buffer; // accumulate incoming data here
  *   buffer.append(new_data);
