@@ -498,9 +498,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Register the wrapped socket for reuse under the provided identifiers.
   // Note: The socket manager is expected to be thread-safe.
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
-  const bool tenant_isolation_enabled = socket_manager != nullptr
-                                            ? socket_manager->tenantIsolationEnabled()
-                                            : false;
+  const bool tenant_isolation_enabled =
+      socket_manager != nullptr ? socket_manager->tenantIsolationEnabled() : false;
   const std::string socket_node_id =
       tenant_isolation_enabled
           ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::

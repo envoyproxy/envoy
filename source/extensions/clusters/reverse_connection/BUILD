@@ -22,9 +22,11 @@ envoy_cc_extension(
         "//source/common/upstream:upstream_includes",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/reverse_connection/v3:pkg_cc_proto",
     ],
 )

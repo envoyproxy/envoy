@@ -1892,27 +1892,27 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
 }
 
 class ReverseTunnelFilterWithTenantIsolationTest : public ReverseTunnelFilterUnitTest {
-  public:
-    void SetUp() override {
-      ReverseTunnelFilterUnitTest::SetUp();
-      // Enable tenant isolation in bootstrap config before setting up extension.
-      upstream_config_.mutable_enable_tenant_isolation()->set_value(true);
-      setupUpstreamExtension();
-      setupUpstreamThreadLocalSlot();
-      // Ensure tenant isolation is set on the socket manager.
-      if (upstream_thread_local_registry_ && upstream_thread_local_registry_->socketManager()) {
-        upstream_thread_local_registry_->socketManager()->setTenantIsolationEnabled(true);
-      }
+public:
+  void SetUp() override {
+    ReverseTunnelFilterUnitTest::SetUp();
+    // Enable tenant isolation in bootstrap config before setting up extension.
+    upstream_config_.mutable_enable_tenant_isolation()->set_value(true);
+    setupUpstreamExtension();
+    setupUpstreamThreadLocalSlot();
+    // Ensure tenant isolation is set on the socket manager.
+    if (upstream_thread_local_registry_ && upstream_thread_local_registry_->socketManager()) {
+      upstream_thread_local_registry_->socketManager()->setTenantIsolationEnabled(true);
     }
-  
-    void TearDown() override {
-      upstream_tls_slot_.reset();
-      upstream_thread_local_registry_.reset();
-      upstream_extension_.reset();
-      upstream_socket_interface_.reset();
-      ReverseTunnelFilterUnitTest::TearDown();
-    }
-  };
+  }
+
+  void TearDown() override {
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
+    upstream_socket_interface_.reset();
+    ReverseTunnelFilterUnitTest::TearDown();
+  }
+};
 
 // Test filter rejects delimiter in node ID when tenant isolation is enabled.
 TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
@@ -1929,9 +1929,8 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
 
   const std::string node_id_with_delimiter =
       absl::StrCat("node", ReverseTunnelFilterConfig::tenantDelimiter(), "foo");
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         node_id_with_delimiter, "cluster",
-                                                         "tenant"));
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
@@ -1954,9 +1953,8 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
 
   const std::string cluster_id_with_delimiter =
       absl::StrCat("cluster", ReverseTunnelFilterConfig::tenantDelimiter(), "bar");
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "node", cluster_id_with_delimiter,
-                                                         "tenant"));
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node", cluster_id_with_delimiter, "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
@@ -1979,8 +1977,8 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
 
   const std::string tenant_id_with_delimiter =
       absl::StrCat("tenant", ReverseTunnelFilterConfig::tenantDelimiter(), "baz");
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "node", "cluster", tenant_id_with_delimiter));
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node", "cluster", tenant_id_with_delimiter));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
@@ -2046,9 +2044,8 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFro
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   const std::string node_id_with_delimiter =
       absl::StrCat("node", ReverseTunnelFilterConfig::tenantDelimiter(), "foo");
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         node_id_with_delimiter, "cluster",
-                                                         "tenant"));
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");

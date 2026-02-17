@@ -783,8 +783,6 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsDecrement) {
   EXPECT_EQ(total_nodes, 0);
 }
 
-
-
 // Test extension initialization with tenant isolation enabled.
 TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithTenantIsolation) {
   envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
@@ -805,8 +803,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithoutTenantI
   default_config.set_stat_prefix("reverse_connections");
   // Don't set enable_tenant_isolation - should default to false.
 
-  auto default_extension =
-      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, default_config);
+  auto default_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, default_config);
 
   EXPECT_FALSE(default_extension->enableTenantIsolation());
 }
@@ -814,8 +812,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithoutTenantI
 // Test tenant isolation flag is propagated to socket manager during TLS initialization.
 TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToSocketManager) {
   config_.mutable_enable_tenant_isolation()->set_value(true);
-  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
-                                                                  config_);
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
 
   extension_->onServerInitialized();
 
@@ -825,7 +823,6 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToS
   ASSERT_NE(socket_manager, nullptr);
   EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
 }
-
 
 } // namespace ReverseConnection
 } // namespace Bootstrap
