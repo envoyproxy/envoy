@@ -8,13 +8,14 @@ namespace Envoy {
 namespace Stats {
 template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
 public:
-  StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
+  StatMatchingDataImpl(const StatType& metric, const SymbolTable& symbol_table)
+      : metric_(metric), symbol_table_(symbol_table) {}
 
   static std::string name() { return "stat_matching_data_impl"; }
 
   std::string fullName() const override { return metric_.name(); }
 
-  const SymbolTable& symbolTable() const override { return metric_.constSymbolTable(); }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
 
   std::string tagValue(const StatName& name) const override {
     std::string value;
@@ -30,6 +31,7 @@ public:
 
 private:
   const StatType& metric_;
+  const SymbolTable& symbol_table_;
 };
 
 } // namespace Stats

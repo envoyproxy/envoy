@@ -309,7 +309,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 
   if (rules_) {
     StatsAccessLogMetric metric(tags, scope.symbolTable());
-    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
+    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric, scope.symbolTable());
     const auto result = rules_->match(data);
     if (result.isMatch()) {
       if (const auto* action = dynamic_cast<

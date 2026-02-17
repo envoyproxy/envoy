@@ -28,7 +28,7 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
                                      /*service_name=*/""),
       server);
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
-      std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
+      std::make_shared<OtlpMetricsFlusherImpl>(otlp_options, server.scope().symbolTable());
 
   switch (sink_config.protocol_specifier_case()) {
   case SinkConfig::ProtocolSpecifierCase::kGrpcService: {

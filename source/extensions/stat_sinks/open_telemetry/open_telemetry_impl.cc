@@ -1,5 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
+#include "envoy/stats/primitive_stats.h"
+
 #include "source/common/stats/stat_matching_data_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
@@ -8,6 +10,28 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
+
+namespace {
+
+// StatMatchingDataImpl expects the underlying stat type to implement iterateTagStatNames.
+// Primitive stats do not implement this method. This wrapper is used to adapt primitive
+// stats to StatMatchingDataImpl, providing a dummy implementation of iterateTagStatNames
+// that triggers an ENVOY_BUG if called.
+template <class T> class PrimitiveStatSnapshotWrapper {
+public:
+  PrimitiveStatSnapshotWrapper(const T& stat) : stat_(stat) {}
+
+  const std::string& name() const { return stat_.name(); }
+
+  void iterateTagStatNames(const Stats::Metric::TagStatNameIterFn&) const {
+    ENVOY_BUG(false, "unexpected iterateTagStatNames call for primitive stats");
+  }
+
+private:
+  const T& stat_;
+};
+
+} // namespace
 
 using ::opentelemetry::proto::metrics::v1::AggregationTemporality;
 using ::opentelemetry::proto::metrics::v1::HistogramDataPoint;
@@ -275,26 +299,38 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
 template <class StatType>
 OtlpMetricsFlusherImpl::MetricConfig
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
-  Stats::StatMatchingDataImpl<StatType> data(stat);
-  const ::Envoy::Matcher::MatchResult result =
-      Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
-  ASSERT(result.isComplete());
-  if (result.isMatch()) {
-    if (dynamic_cast<const DropAction*>(result.action().get())) {
-      return {true, {}};
+  auto evaluate = [&](auto& data) -> MetricConfig {
+    const ::Envoy::Matcher::MatchResult result =
+        Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
+    ASSERT(result.isComplete());
+    if (result.isMatch()) {
+      if (dynamic_cast<const DropAction*>(result.action().get())) {
+        return {true, {}};
+      }
+
+      if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
+        return {false, *match_action->config()};
+      }
+
+      ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
+                result.action()->typeUrl());
     }
 
-    if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
-      return {false, *match_action->config()};
-    }
+    // By default, this stat will be converted to the metric without any
+    // customization.
+    return {false, {}};
+  };
 
-    ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
-              result.action()->typeUrl());
+  if constexpr (std::is_same_v<StatType, Stats::PrimitiveCounterSnapshot> ||
+                std::is_same_v<StatType, Stats::PrimitiveGaugeSnapshot>) {
+    PrimitiveStatSnapshotWrapper<StatType> wrapped(stat);
+    Stats::StatMatchingDataImpl<PrimitiveStatSnapshotWrapper<StatType>> data(wrapped,
+                                                                             symbol_table_);
+    return evaluate(data);
+  } else {
+    Stats::StatMatchingDataImpl<StatType> data(stat, symbol_table_);
+    return evaluate(data);
   }
-
-  // By default, this stat will be converted to the metric without any
-  // customization.
-  return {false, {}};
 }
 
 template <class StatType>
