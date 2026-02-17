@@ -475,6 +475,7 @@ func (s *sslConnection) CiphersuiteString() (string, bool) {
 }
 
 func (s *sslConnection) CiphersuiteId() (uint16, bool) {
+	// TLS cipher suite IDs are 16-bit values (RFC 5246), narrowing from uint64 is safe.
 	id, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslCiphersuiteId)
 	return uint16(id), ok
 }
