@@ -112,8 +112,7 @@ bool isValidTraceStateValue(absl::string_view value) {
   }
   // interior chars may include space (0x20)
   return std::all_of(value.begin(), value.end(),
-                     [](unsigned char c) { return isTraceStateValueChr(c);
-  });
+                     [](unsigned char c) { return isTraceStateValueChr(c); });
 }
 
 // Baggage validation helpers
