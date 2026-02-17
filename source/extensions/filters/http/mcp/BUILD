@@ -23,9 +23,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mcp_tracing_validation_lib",
-    srcs = ["mcp_tracing_validation.cc"],
-    hdrs = ["mcp_tracing_validation.h"],
+    name = "tracing_validation_lib",
+    srcs = ["tracing_validation.cc"],
+    hdrs = ["tracing_validation.h"],
     deps = [
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",

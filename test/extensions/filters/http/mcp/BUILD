@@ -53,10 +53,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "mcp_tracing_validation_test",
-    srcs = ["mcp_tracing_validation_test.cc"],
+    name = "tracing_validation_test",
+    srcs = ["tracing_validation_test.cc"],
     deps = [
-        "//source/extensions/filters/http/mcp:mcp_tracing_validation_lib",
+        "//source/extensions/filters/http/mcp:tracing_validation_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
     ],

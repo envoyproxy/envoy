@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/mcp/mcp_tracing_validation.h"
+#include "source/extensions/filters/http/mcp/tracing_validation.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -28,9 +28,11 @@ constexpr size_t kTraceFlagsHexSize = 2;
 constexpr size_t kMaxBaggageSize = 8192;
 constexpr size_t kMaxBaggageMembers = 64;
 
-bool isValidHex(absl::string_view input) {
+bool isValidLowercaseHex(absl::string_view input) {
   return std::all_of(input.begin(), input.end(),
-                     [](unsigned char c) { return absl::ascii_isxdigit(c); });
+                     [](unsigned char c) {
+                       return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+                     });
 }
 
 bool isAllZeros(absl::string_view input) {
@@ -47,41 +49,68 @@ bool isValidTraceStateKey(absl::string_view key) {
   if (key.empty() || key.size() > 256) {
     return false;
   }
-  // Simple keys or multi-tenant keys (tenant-id@system-id)
+
   auto at_pos = key.find('@');
   if (at_pos == absl::string_view::npos) {
-    // simple key
+    // simple-key = lcalpha 0*255( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )
     if (!absl::ascii_islower(key[0])) {
       // first char must be lowercase letter
       return false;
     }
     return std::all_of(key.begin(), key.end(), isValidTraceStateKeyChar);
   } else {
-    // multi-tenant key
-    absl::string_view left = key.substr(0, at_pos);
-    absl::string_view right = key.substr(at_pos + 1);
-    if (left.empty() || left.size() > 241 || right.empty() || right.size() > 14) {
+    // multi-tenant-key = tenant-id "@" system-id
+
+    // tenant-id = ( lcalpha / DIGIT ) 0*240( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )
+    absl::string_view tenant_id = key.substr(0, at_pos);
+    if (tenant_id.empty() || tenant_id.size() > 241) {
       return false;
     }
-    if (!absl::ascii_islower(left[0]) && !absl::ascii_isdigit(left[0])) {
+    if (!absl::ascii_islower(tenant_id[0]) && !absl::ascii_isdigit(tenant_id[0])) {
       // first char of tenant-id must be lowercase letter or digit
       return false;
     }
-    if (!absl::ascii_islower(right[0])) {
+    if (!std::all_of(tenant_id.begin(), tenant_id.end(), isValidTraceStateKeyChar)) {
+      return false;
+    }
+
+    // system-id = lcalpha 0*13( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )
+    absl::string_view system_id = key.substr(at_pos + 1);
+    if (system_id.empty() || system_id.size() > 14) {
+      return false;
+    }
+    if (!absl::ascii_islower(system_id[0])) {
       // first char of system-id must be lowercase letter
       return false;
     }
-    return std::all_of(left.begin(), left.end(), isValidTraceStateKeyChar) &&
-           std::all_of(right.begin(), right.end(), isValidTraceStateKeyChar);
+    if (!std::all_of(system_id.begin(), system_id.end(), isValidTraceStateKeyChar)) {
+      return false;
+    }
+    return true;
   }
 }
 
+// https://www.w3.org/TR/trace-context/#value
+// value    = 0*255(chr) nblk-chr
+// nblk-chr = %x21-2B / %x2D-3C / %x3E-7E
+// chr      = %x20 / nblk-chr
+inline bool isTraceStateValueNblkChr(char c) {
+  return (c >= 0x21 && c <= 0x2b) || (c >= 0x2d && c <= 0x3c) ||
+         (c >= 0x3e && c <= 0x7e);
+}
+inline bool isTraceStateValueChr(char c) {
+  return c == 0x20 || isTraceStateValueNblkChr(c);
+}
+
 bool isValidTraceStateValue(absl::string_view value) {
-  if (value.size() > 256) {
-    return false;
-  }
+  if (value.size() > 256) return false;
+  if (value.empty()) return true;
+  // last char must be nblk-chr
+  unsigned char last = value.back();
+  if (!isTraceStateValueNblkChr(last)) return false;
+  // interior chars may include space (0x20)
   return std::all_of(value.begin(), value.end(), [](unsigned char c) {
-    return c >= 0x21 && c <= 0x7e && c != ',' && c != '=';
+    return isTraceStateValueChr(c);
   });
 }
 
@@ -95,8 +124,8 @@ bool isTokenChar(char c) {
 }
 
 bool isBaggageOctet(char c) {
-  return (c >= 0x21 && c <= 0x2b) || (c >= 0x2d && c <= 0x3a) || (c >= 0x3c && c <= 0x5b) ||
-         (c >= 0x5d && c <= 0x7e);
+  return c == 0x21 || (c >= 0x23 && c <= 0x2b) || (c >= 0x2d && c <= 0x3a) ||
+         (c >= 0x3c && c <= 0x5b) || (c >= 0x5d && c <= 0x7e);
 }
 
 bool isValidBaggageKey(absl::string_view key) {
@@ -114,7 +143,7 @@ bool isValidBaggageValue(absl::string_view value) {
 
 } // namespace
 
-namespace McpTracingValidation {
+namespace TracingValidation {
 
 bool isValidTraceParent(absl::string_view trace_parent) {
   if (trace_parent.size() != kTraceParentExpectedSize) {
@@ -136,8 +165,8 @@ bool isValidTraceParent(absl::string_view trace_parent) {
     return false;
   }
 
-  if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(parent_id) ||
-      !isValidHex(flags)) {
+  if (!isValidLowercaseHex(version) || !isValidLowercaseHex(trace_id) ||
+      !isValidLowercaseHex(parent_id) || !isValidLowercaseHex(flags)) {
     return false;
   }
 
@@ -231,7 +260,7 @@ bool isValidBaggage(absl::string_view baggage) {
   return true;
 }
 
-} // namespace McpTracingValidation
+} // namespace TracingValidation
 } // namespace Mcp
 } // namespace HttpFilters
 } // namespace Extensions
