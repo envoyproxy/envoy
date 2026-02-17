@@ -10,7 +10,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-CODE_CHECKS=[
+CODE_CHECKS = [
     "changelog",
     "extensions_fuzzed",
     "extensions_metadata",
@@ -79,13 +79,14 @@ genrule(
         --extensions_build_config=$(location :extensions_build_config) \
         --extensions_fuzzed_count=%s \
         --path=%s \
-        "-c %s" % ",".join(CODE_CHECKS),
+        -c %s \
         -b shellcheck:$(location @shellcheck) \
         -b gofmt:$(location @go_sdk//:bin/gofmt) \
       > $@ 2>&1 || :
     """ % (
         FUZZ_FILTER_COUNT,
         PATH,
+        ",".join(CODE_CHECKS),
     ),
     tags = ["no-remote-exec"],
     tools = [
