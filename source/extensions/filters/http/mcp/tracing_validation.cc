@@ -29,10 +29,9 @@ constexpr size_t kMaxBaggageSize = 8192;
 constexpr size_t kMaxBaggageMembers = 64;
 
 bool isValidLowercaseHex(absl::string_view input) {
-  return std::all_of(input.begin(), input.end(),
-                     [](unsigned char c) {
-                       return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-                     });
+  return std::all_of(input.begin(), input.end(), [](unsigned char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+  });
 }
 
 bool isAllZeros(absl::string_view input) {
@@ -95,22 +94,25 @@ bool isValidTraceStateKey(absl::string_view key) {
 // nblk-chr = %x21-2B / %x2D-3C / %x3E-7E
 // chr      = %x20 / nblk-chr
 inline bool isTraceStateValueNblkChr(char c) {
-  return (c >= 0x21 && c <= 0x2b) || (c >= 0x2d && c <= 0x3c) ||
-         (c >= 0x3e && c <= 0x7e);
+  return (c >= 0x21 && c <= 0x2b) || (c >= 0x2d && c <= 0x3c) || (c >= 0x3e && c <= 0x7e);
 }
-inline bool isTraceStateValueChr(char c) {
-  return c == 0x20 || isTraceStateValueNblkChr(c);
-}
+inline bool isTraceStateValueChr(char c) { return c == 0x20 || isTraceStateValueNblkChr(c); }
 
 bool isValidTraceStateValue(absl::string_view value) {
-  if (value.size() > 256) return false;
-  if (value.empty()) return true;
+  if (value.size() > 256) {
+    return false;
+  }
+  if (value.empty()) {
+    return true;
+  }
   // last char must be nblk-chr
   unsigned char last = value.back();
-  if (!isTraceStateValueNblkChr(last)) return false;
+  if (!isTraceStateValueNblkChr(last)) {
+    return false;
+  }
   // interior chars may include space (0x20)
-  return std::all_of(value.begin(), value.end(), [](unsigned char c) {
-    return isTraceStateValueChr(c);
+  return std::all_of(value.begin(), value.end(),
+                     [](unsigned char c) { return isTraceStateValueChr(c);
   });
 }
 

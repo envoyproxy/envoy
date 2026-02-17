@@ -1,6 +1,6 @@
-#include "source/extensions/filters/http/mcp/tracing_validation.h"
-
 #include <string>
+
+#include "source/extensions/filters/http/mcp/tracing_validation.h"
 
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
@@ -87,8 +87,7 @@ TEST(TracingValidationTest, TraceStateValidation) {
   // simple keys
 
   // Allowed characters in simple keys
-  EXPECT_TRUE(TracingValidation::isValidTraceState(
-      "abcdefghijklmnopqrstuvwxyz0123456789_-*/=val"));
+  EXPECT_TRUE(TracingValidation::isValidTraceState("abcdefghijklmnopqrstuvwxyz0123456789_-*/=val"));
   // invalid start char (uppercase)
   EXPECT_FALSE(TracingValidation::isValidTraceState("0key=val")); // digits not allowed at start
   EXPECT_FALSE(TracingValidation::isValidTraceState("Key=val"));
@@ -105,7 +104,8 @@ TEST(TracingValidationTest, TraceStateValidation) {
   EXPECT_TRUE(TracingValidation::isValidTraceState(absl::StrCat(std::string(241, 'a'), "@s=v")));
   EXPECT_FALSE(TracingValidation::isValidTraceState(absl::StrCat(std::string(242, 'a'), "@s=v")));
   EXPECT_TRUE(TracingValidation::isValidTraceState(absl::StrCat("t@", std::string(14, 'a'), "=v")));
-  EXPECT_FALSE(TracingValidation::isValidTraceState(absl::StrCat("t@", std::string(15, 'a'), "=v")));
+  EXPECT_FALSE(
+      TracingValidation::isValidTraceState(absl::StrCat("t@", std::string(15, 'a'), "=v")));
 
   // system-id
   EXPECT_FALSE(TracingValidation::isValidTraceState("tenant@=val"));
@@ -197,7 +197,7 @@ TEST(TracingValidationTest, BaggageValidation) {
 TEST(TracingValidationTest, BaggageTooManyMembers) {
   std::string too_many_members;
   for (int i = 0; i < 63; ++i) {
-    absl::StrAppend(&too_many_members, "k", i+1, "=v,");
+    absl::StrAppend(&too_many_members, "k", i + 1, "=v,");
   }
   // last member cannot have a comma
   absl::StrAppend(&too_many_members, "k", 64, "=v");
