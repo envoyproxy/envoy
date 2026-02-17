@@ -2,9 +2,13 @@ syntax = "proto3";
 
 package envoymobile.extensions.filters.http.test_accessor;
 
+import "buf/validate/validate.proto";
+
 import "validate/validate.proto";
 
 message TestAccessor {
-  string accessor_name = 1 [(validate.rules).string.min_len = 1];
-  string expected_string = 2 [(validate.rules).string.min_len = 1];
+  string accessor_name = 1
+      [(validate.rules).string.min_len = 1, (buf.validate.field).string.min_len = 1];
+  string expected_string = 2
+      [(validate.rules).string.min_len = 1, (buf.validate.field).string.min_len = 1];
 }
