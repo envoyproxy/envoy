@@ -57,7 +57,7 @@ minor_behavior_changes:
     stopped reporting empty delta counters and histograms.
 - area: ext_proc
   change: |
-    added receoved_immediate_response flag in :ref:'FilterStats
+    added received_immediate_response flag in :ref:'FilterStats
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
 
 bug_fixes:
