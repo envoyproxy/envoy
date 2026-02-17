@@ -7,6 +7,7 @@
 pub mod access_log;
 pub mod buffer;
 pub mod cert_validator;
+pub mod matcher;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
@@ -9276,6 +9277,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain
     &**raw
   };
 
+  let envoy_cert_validator = cert_validator::EnvoyCertValidator::new(config_envoy_ptr);
+
   let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
   let cert_slices: Vec<&[u8]> = cert_buffers
     .iter()
@@ -9287,7 +9290,12 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain
     host_name.length,
   ));
 
-  let result = config.do_verify_cert_chain(&cert_slices, host_name_str, is_server);
+  let result = config.do_verify_cert_chain(
+    &envoy_cert_validator,
+    &cert_slices,
+    host_name_str,
+    is_server,
+  );
 
   // If the module provided error details, pass them to Envoy via the callback.
   // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
@@ -9359,6 +9367,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
 /// impl CertValidatorConfig for MyCertValidatorConfig {
 ///   fn do_verify_cert_chain(
 ///     &self,
+///     _envoy_cert_validator: &EnvoyCertValidator,
 ///     certs: &[&[u8]],
 ///     host_name: &str,
 ///     is_server: bool,

@@ -415,6 +415,407 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
 }
 
 // =============================================================================
+// Listener Filter Metrics FFI stubs for testing.
+// =============================================================================
+
+/// Tracks the metrics defined and manipulated by listener filter metrics stubs.
+struct ListenerFilterMetricEntry {
+  name: String,
+  value: u64,
+}
+
+static LISTENER_FILTER_COUNTERS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_GAUGES: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_HISTOGRAMS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn reset_listener_filter_metrics() {
+  LISTENER_FILTER_COUNTERS.lock().unwrap().clear();
+  LISTENER_FILTER_GAUGES.lock().unwrap().clear();
+  LISTENER_FILTER_HISTOGRAMS.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  let id = counters.len();
+  counters.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *counter_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_counter(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  if id >= counters.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  counters[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  let id = gauges.len();
+  gauges.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *gauge_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_set_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = gauges[id].value.saturating_sub(value);
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  let id = histograms.len();
+  histograms.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *histogram_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  if id >= histograms.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  histograms[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+// =============================================================================
+// Listener Filter Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_listener_filter_config_define_and_increment_counter() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let counter_id = config.define_counter("test_counter");
+  assert!(counter_id.is_ok());
+  let counter_id = counter_id.unwrap();
+
+  // Verify the counter was registered with the correct name.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters.len());
+    assert_eq!("test_counter", counters[0].name);
+    assert_eq!(0, counters[0].value);
+  }
+
+  // Increment the counter via the filter.
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let result = filter.increment_counter(counter_id, 5);
+  assert!(result.is_ok());
+
+  // Verify the counter value was incremented.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(5, counters[0].value);
+  }
+
+  // Increment again.
+  let result = filter.increment_counter(counter_id, 3);
+  assert!(result.is_ok());
+
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(8, counters[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_multiple_counters() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let id1 = config.define_counter("counter_a").unwrap();
+  let id2 = config.define_counter("counter_b").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  filter.increment_counter(id1, 10).unwrap();
+  filter.increment_counter(id2, 20).unwrap();
+
+  let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  assert_eq!(2, counters.len());
+  assert_eq!(10, counters[0].value);
+  assert_eq!(20, counters[1].value);
+}
+
+#[test]
+fn test_listener_filter_counter_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Incrementing a counter with an invalid ID should return an error.
+  let result = filter.increment_counter(EnvoyCounterId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_filter_config_define_and_manipulate_gauge() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("test_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge value.
+  filter.set_gauge(gauge_id, 42).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+  }
+
+  // Increase gauge.
+  filter.increase_gauge(gauge_id, 8).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(50, gauges[0].value);
+  }
+
+  // Decrease gauge.
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(40, gauges[0].value);
+  }
+
+  // Set gauge to a new value.
+  filter.set_gauge(gauge_id, 0).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_gauge_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // All gauge operations with an invalid ID should return an error.
+  assert!(filter.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_listener_filter_gauge_decrease_saturates_at_zero() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("saturating_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge to 5 and decrease by 10 - should saturate at 0.
+  filter.set_gauge(gauge_id, 5).unwrap();
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_and_record_histogram() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let histogram_id = config.define_histogram("test_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Record a value in the histogram.
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+  }
+
+  // Record another value.
+  filter.record_histogram_value(histogram_id, 250).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(250, histograms[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_histogram_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Recording a histogram value with an invalid ID should return an error.
+  let result = filter.record_histogram_value(EnvoyHistogramId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_filter_define_all_metric_types() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Define one of each metric type.
+  let counter_id = config.define_counter("my_counter").unwrap();
+  let gauge_id = config.define_gauge("my_gauge").unwrap();
+  let histogram_id = config.define_histogram("my_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Exercise all metric types.
+  filter.increment_counter(counter_id, 1).unwrap();
+  filter.set_gauge(gauge_id, 42).unwrap();
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+
+  // Verify all values.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters[0].value);
+    assert_eq!("my_counter", counters[0].name);
+  }
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+    assert_eq!("my_gauge", gauges[0].name);
+  }
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+    assert_eq!("my_histogram", histograms[0].name);
+  }
+}
+
+// =============================================================================
 // Network Filter Tests
 // =============================================================================
 
@@ -2431,5 +2832,312 @@ fn test_bootstrap_extension_admin_request_default() {
   // Clean up.
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+// =============================================================================
+// Cert Validator callback stubs.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_error_details(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _error_details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_set_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cert_validator_get_filter_state(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Cert Validator tests.
+// =============================================================================
+
+#[test]
+fn test_cert_validator_config_new_and_destroy() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  NEW_CERT_VALIDATOR_CONFIG_FUNCTION.get_or_init(|| {
+    |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
+      Some(Box::new(TestCertValidatorConfig))
+    }
+  });
+
+  let name = "test";
+  let config = b"config";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *const _,
+    length: name.len(),
+  };
+  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: config.as_ptr() as *const _,
+    length: config.len(),
+  };
+
+  let config_ptr = unsafe {
+    envoy_dynamic_module_on_cert_validator_config_new(std::ptr::null_mut(), name_buf, config_buf)
+  };
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_successful() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      certs: &[&[u8]],
+      host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      assert_eq!(certs.len(), 1);
+      assert_eq!(certs[0], b"cert_data");
+      assert_eq!(host_name, "example.com");
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Successful
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Validated
+  );
+  assert!(!result.has_tls_alert);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_do_verify_cert_chain_failed() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::failed(
+        cert_validator::ClientValidationStatus::Failed,
+        Some(42),
+        Some("test error".to_string()),
+      )
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let cert_data = b"cert_data";
+  let mut cert_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cert_data.as_ptr() as *const _,
+    length: cert_data.len(),
+  };
+  let host_name = "example.com";
+  let host_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: host_name.as_ptr() as *const _,
+    length: host_name.len(),
+  };
+
+  let result = unsafe {
+    envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+      std::ptr::null_mut(),
+      config_ptr,
+      &mut cert_buf as *mut _,
+      1,
+      host_name_buf,
+      false,
+    )
+  };
+  assert_eq!(
+    result.status,
+    abi::envoy_dynamic_module_type_cert_validator_validation_status::Failed
+  );
+  assert_eq!(
+    result.detailed_status,
+    abi::envoy_dynamic_module_type_cert_validator_client_validation_status::Failed
+  );
+  assert!(result.has_tls_alert);
+  assert_eq!(result.tls_alert, 42);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_filter_state_methods() {
+  // Test that EnvoyCertValidator filter state methods call the ABI functions correctly.
+  // In unit tests, the ABI functions are weak stubs that return false, so we verify
+  // the methods handle the failure case gracefully.
+  let envoy_validator = cert_validator::EnvoyCertValidator::new(std::ptr::null_mut());
+
+  // set_filter_state should return false because the weak stub returns false.
+  let result = envoy_validator.set_filter_state(b"key", b"value");
+  assert!(!result);
+
+  // get_filter_state should return None because the weak stub returns false.
+  let result = envoy_validator.get_filter_state(b"key");
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_cert_validator_get_ssl_verify_mode() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, handshaker_provides_certificates: bool) -> i32 {
+      if handshaker_provides_certificates {
+        0x01
+      } else {
+        0x03
+      }
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"test"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, false) };
+  assert_eq!(result, 0x03);
+
+  let result =
+    unsafe { envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(config_ptr, true) };
+  assert_eq!(result, 0x01);
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_cert_validator_update_digest() {
+  struct TestCertValidatorConfig;
+  impl cert_validator::CertValidatorConfig for TestCertValidatorConfig {
+    fn do_verify_cert_chain(
+      &self,
+      _envoy_cert_validator: &cert_validator::EnvoyCertValidator,
+      _certs: &[&[u8]],
+      _host_name: &str,
+      _is_server: bool,
+    ) -> cert_validator::ValidationResult {
+      cert_validator::ValidationResult::successful()
+    }
+    fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+      0x03
+    }
+    fn update_digest(&self) -> &[u8] {
+      b"my_digest_data"
+    }
+  }
+
+  let config: Box<dyn cert_validator::CertValidatorConfig> = Box::new(TestCertValidatorConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const ::std::os::raw::c_void;
+
+  let mut out_data = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_update_digest(config_ptr, &mut out_data);
+  }
+  assert!(!out_data.ptr.is_null());
+  assert_eq!(out_data.length, 14);
+  let digest = unsafe { std::slice::from_raw_parts(out_data.ptr as *const u8, out_data.length) };
+  assert_eq!(digest, b"my_digest_data");
+
+  unsafe {
+    envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
   }
 }

@@ -131,9 +131,17 @@ removed_config_or_runtime:
 new_features:
 - area: dynamic_modules
   change: |
+    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
     Added :ref:`TLS certificate validator
     <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`
     support for dynamic modules, enabling custom TLS certificate validation to be implemented in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added filter state read/write support for dynamic module cert validators, allowing modules to set and
+    get string values in the connection's filter state during certificate chain verification.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
@@ -315,6 +323,13 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``resources/list`` fanout aggregation.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlv_merge_policy
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy>`
+    to control how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state.
+    Supports ``ADD_IF_ABSENT`` (default), ``OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD``, and
+    ``APPEND_IF_EXISTS_OR_ADD``.
 - area: admin
   change: |
     Added ``filter`` query parameter support to the ``/clusters`` endpoint. The parameter accepts a RE2
@@ -324,6 +339,10 @@ new_features:
   change: |
     Added :ref:`statistics <config_http_filters_mcp_router_statistics>` to the MCP router filter for
     observability into request routing, fanout operations, and error conditions.
+- area: mcp
+  change: |
+    Added HTTP DELETE session termination support to the MCP filter. DELETE requests with an
+    ``MCP-Session-Id`` header are now recognized as valid MCP traffic in ``REJECT_NO_MCP`` mode.
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.

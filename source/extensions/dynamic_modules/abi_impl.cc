@@ -275,6 +275,22 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cert_validator_set_erro
                "not implemented in this context");
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_set_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_get_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
 // ---------------------- Bootstrap extension admin handler callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
@@ -430,6 +446,35 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstre
     envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header: "
+               "not implemented in this context");
+  return false;
+}
+
+// ---------------------- Matcher callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the matcher extension abi_impl.cc when the matcher extension is used.
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_matcher_get_headers_size(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_matcher_get_headers_size: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_matcher_get_headers(envoy_dynamic_module_type_matcher_input_envoy_ptr,
+                                                  envoy_dynamic_module_type_http_header_type,
+                                                  envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_matcher_get_headers: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_matcher_get_header_value(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr, envoy_dynamic_module_type_http_header_type,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_matcher_get_header_value: "
                "not implemented in this context");
   return false;
 }
