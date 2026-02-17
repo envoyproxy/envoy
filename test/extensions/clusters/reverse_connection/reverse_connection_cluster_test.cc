@@ -1599,6 +1599,26 @@ TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
     EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
                               "Not supported field in StreamInfo: INVALID_COMMAND");
   }
+
+  // Test invalid tenant_id_format.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%REQ(x-node-id)%"
+          tenant_id_format: "%INVALID_COMMAND()%"
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
+                              "Not supported field in StreamInfo: INVALID_COMMAND");
+  }
 }
 
 // Test concurrent host creation and caching
@@ -1971,6 +1991,40 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "tenant1"}, {"x-node-id", "node1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
+}
+
+// Test chooseHost uses requestStreamInfo when available.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterUsesRequestStreamInfoWhenAvailable) {
+  const std::string yaml = R"EOF(
+    name: name1
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("tenant1:node1", "tenant1:cluster1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestLoadBalancerContext lb_context(&connection, &stream_info);
   lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
       new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "tenant1"}, {"x-node-id", "node1"}}};
 
