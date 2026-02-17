@@ -1832,7 +1832,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node-1"}}};
 
   auto result = lb.chooseHost(&lb_context);
-  // Should fail because tenant_id must be inferable when tenant isolation is enabled.
+  // Should fail because tenant_id must be derivable when tenant isolation is enabled.
   ASSERT_EQ(result.host, nullptr);
 }
 

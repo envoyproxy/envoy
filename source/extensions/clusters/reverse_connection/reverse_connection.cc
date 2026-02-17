@@ -87,7 +87,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
                 "reverse_connection: tenant isolation enabled, using tenant-scoped identifier: {}",
                 final_host_id);
     } else {
-      // When tenant isolation is enabled, tenant_id must be inferable.
+      // When tenant isolation is enabled, tenant_id must be derivable.
       ENVOY_LOG(error,
                 "reverse_connection: tenant isolation enabled but tenant_id cannot be inferred "
                 "(formatter returned empty value)");
