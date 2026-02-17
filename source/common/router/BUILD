@@ -100,6 +100,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/extensions/matching/network/common:inputs_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/http/dynamic_modules/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
