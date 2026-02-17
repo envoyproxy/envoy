@@ -600,6 +600,9 @@ TEST_F(EnvoyQuicServerStreamTest, EnableReadAfterResetDoesNotPushData) {
   // Unblock the stream asynchronously.
   quic_stream_->readDisable(false);
   // Reset the stream locally.
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
 
   // Expect no data to be decoded after local reset.
