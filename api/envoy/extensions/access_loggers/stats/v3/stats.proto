@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
+import "envoy/data/accesslog/v3/accesslog.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -27,6 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
 
+// [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
@@ -91,6 +94,58 @@ message Config {
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
+  // Configuration for a gauge stat. Gauges can be used to add, subtract, or set
+  // values, and are useful for tracking concurrency or other mutable values
+  // over time.
+  // [#next-free-field: 6]
+  message Gauge {
+    // The Set operation config.
+    message Set {
+      // The access log type to trigger the operation.
+      data.accesslog.v3.AccessLogType log_type = 1 [(validate.rules).enum = {defined_only: true}];
+    }
+
+    // The PairedAddSubtract operation config.
+    // Usage restrictions:
+    //
+    // 1. We only support add first then subtract logic and we rely on the symmetrical log types
+    //    (e.g., DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
+    // 2. During runtime, sub_log_type will execute if and only if add_log_type operation has
+    //    been done, tracked by inflight counter in filter state.
+    // 3. If the add_log_type operation was executed, the sub_log_type will happen when the
+    //    stream/connection is closed, even if the configured log type didn't happen.
+    message PairedAddSubtract {
+      // The access log type to trigger the add operation.
+      data.accesslog.v3.AccessLogType add_log_type = 1
+          [(validate.rules).enum = {defined_only: true}];
+
+      // The access log type to trigger the subtract operation.
+      data.accesslog.v3.AccessLogType sub_log_type = 2
+          [(validate.rules).enum = {defined_only: true}];
+    }
+
+    // The name and tags of this gauge.
+    Stat stat = 1 [(validate.rules).message = {required: true}];
+
+    // The format string for the value of this gauge, using :ref:`command
+    // operators <config_access_log_command_operators>`. This must evaluate to a
+    // positive number.
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+
+    // A fixed value to add/subtract/set to this gauge.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
+    google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
+
+    // The PairedAddSubtract operation.
+    // Only one of PairedAddSubtract and Set can be defined.
+    PairedAddSubtract add_subtract = 4;
+
+    // The Set operation.
+    // Only one of PairedAddSubtract and Set can be defined.
+    Set set = 5;
+  }
+
   // The stat prefix for the generated stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -99,4 +154,7 @@ message Config {
 
   // The counters this logger will emit.
   repeated Counter counters = 4;
+
+  // The gauges this logger will emit.
+  repeated Gauge gauges = 5;
 }

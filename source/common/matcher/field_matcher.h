@@ -141,7 +141,6 @@ public:
   MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return MatchResult::InsufficientData;
     }
@@ -150,11 +149,9 @@ public:
     if (current_match != MatchResult::Matched &&
         input.data_availability_ ==
             DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
-      return MatchResult::InsufficientData;
+      return MatchResult::insufficientData();
     }
 
-    ENVOY_LOG(trace, "Match result: {}", MatchResultToString(current_match));
     return current_match;
   }
 

@@ -67,8 +67,10 @@ COPY --from=binary --chown=0:0 --chmod=755 \
     /etc/envoy /etc/envoy
 COPY --from=binary --chown=0:0 --chmod=644 \
     /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
+ARG ENVOY_BINARY=envoy
+ARG ENVOY_BINARY_PREFIX=
 COPY --from=binary --chown=0:0 --chmod=755 \
-    /usr/local/bin/envoy /usr/local/bin/
+    "/usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}" /usr/local/bin/envoy
 
 
 # STAGE: envoy-google-vrp-base
