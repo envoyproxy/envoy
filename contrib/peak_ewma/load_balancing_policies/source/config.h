@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
@@ -20,11 +18,9 @@ using PeakEwmaLbProto = envoy::extensions::load_balancing_policies::peak_ewma::v
 
 class TypedPeakEwmaLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  TypedPeakEwmaLbConfig(const PeakEwmaLbProto& lb_config, Event::Dispatcher& main_dispatcher)
-      : lb_config_(lb_config), main_dispatcher_(main_dispatcher) {}
+  explicit TypedPeakEwmaLbConfig(const PeakEwmaLbProto& lb_config) : lb_config_(lb_config) {}
 
   PeakEwmaLbProto lb_config_;
-  Event::Dispatcher& main_dispatcher_;
 };
 
 struct PeakEwmaCreator : public Logger::Loggable<Logger::Id::upstream> {
@@ -41,11 +37,10 @@ public:
   Factory() : FactoryBase("envoy.load_balancing_policies.peak_ewma") {}
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-  loadConfig(Server::Configuration::ServerFactoryContext& context,
+  loadConfig(Server::Configuration::ServerFactoryContext&,
              const Protobuf::Message& config) override {
     const auto& typed_config = dynamic_cast<const PeakEwmaLbProto&>(config);
-    return Upstream::LoadBalancerConfigPtr{
-        new TypedPeakEwmaLbConfig(typed_config, context.mainThreadDispatcher())};
+    return Upstream::LoadBalancerConfigPtr{new TypedPeakEwmaLbConfig(typed_config)};
   }
 };
 
