@@ -311,7 +311,6 @@ TEST_P(McpRouterIntegrationTest, InitializeFanoutToBothBackends) {
   test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
 }
 
-
 // Test tools/list request fans out to both backends and aggregates tools with prefixes
 TEST_P(McpRouterIntegrationTest, ToolsListFanoutAggregation) {
   initializeFilter();
@@ -2452,8 +2451,7 @@ TEST_P(McpRouterIntegrationTest, InitializeWithoutSessionIdsAndSubsequentToolsLi
   ASSERT_TRUE(tools_backend_request2->waitForEndStream(*dispatcher_));
 
   // Neither backend should receive mcp-session-id (backend_sessions_ is empty).
-  auto time_session =
-      time_backend_request2->headers().get(Http::LowerCaseString("mcp-session-id"));
+  auto time_session = time_backend_request2->headers().get(Http::LowerCaseString("mcp-session-id"));
   EXPECT_TRUE(time_session.empty());
 
   auto tools_session =
