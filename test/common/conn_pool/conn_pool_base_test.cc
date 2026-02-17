@@ -27,7 +27,9 @@ public:
         supports_early_data_(supports_early_data) {}
 
   void initializeReadFilters() override {}
-  void close() override { onEvent(Network::ConnectionEvent::LocalClose); }
+  void close(Network::ConnectionCloseType, absl::string_view) override {
+    onEvent(Network::ConnectionEvent::LocalClose);
+  }
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
@@ -289,7 +291,7 @@ TEST_F(ConnPoolImplBaseTest, PreconnectOnDisconnect) {
     pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
   }));
   EXPECT_CALL(pool_, instantiateActiveClient);
-  clients_[0]->close();
+  clients_[0]->close(Network::ConnectionCloseType::NoFlush, "test");
   CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
 
   EXPECT_CALL(pool_, onPoolFailure);

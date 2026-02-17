@@ -102,6 +102,9 @@ bug_fixes:
     to the client.
 - area: formatter
   change: |
+    Exposed ``UPSTREAM_LOCAL_CLOSE_REASON`` in the upstream connection stream info.
+- area: formatter
+  change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
 - area: spiffe

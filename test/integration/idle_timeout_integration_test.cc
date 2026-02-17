@@ -1,7 +1,15 @@
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/upstreams/tcp/v3/tcp_protocol_options.pb.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -586,6 +594,136 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
 
 // TODO(auni53) create a test filter that hangs and does not send data upstream, which would
 // trigger a configured request_timer
+
+class UpstreamIdleTimeoutVerifierFilter : public Network::ReadFilter,
+                                          public Network::ConnectionCallbacks,
+                                          public AccessLog::Instance {
+public:
+  UpstreamIdleTimeoutVerifierFilter(Stats::Scope& scope) : scope_(scope) {}
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onNewConnection() override {
+    if (!callbacks_->connection().streamInfo().upstreamInfo()) {
+      callbacks_->connection().streamInfo().setUpstreamInfo(
+          std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    }
+    return Network::FilterStatus::Continue;
+  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+    callbacks.connection().addConnectionCallbacks(*this);
+  }
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      Formatter::Context context(nullptr, nullptr, nullptr, {},
+                                 Envoy::Formatter::AccessLogType::NotSet, nullptr);
+      log(context, callbacks_->connection().streamInfo());
+    }
+  }
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  // AccessLog::Instance
+  void log(const AccessLog::LogContext& context,
+           const StreamInfo::StreamInfo& stream_info) override {
+    auto formatter_or_error = Formatter::FormatterImpl::create("%UPSTREAM_LOCAL_CLOSE_REASON%");
+    auto formatter = std::move(*formatter_or_error);
+    std::string reason = formatter->format(context, stream_info);
+    if (reason == "on_idle_timeout" || reason == "tcp_session_idle_timeout") {
+      scope_.counterFromString("upstream_idle_timeout_verifier.on_idle_timeout").inc();
+    }
+  }
+
+  Stats::Scope& scope_;
+  Network::ReadFilterCallbacks* callbacks_{};
+};
+
+class UpstreamIdleTimeoutVerifierFilterFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    Stats::Scope& scope = context.scope();
+    return [&scope](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<UpstreamIdleTimeoutVerifierFilter>(scope);
+      filter_manager.addReadFilter(filter);
+      filter_manager.addAccessLogHandler(filter);
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.test.upstream_idle_timeout_verifier"; }
+};
+
+class UpstreamHttpIdleTimeoutTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                    public HttpIntegrationTest {
+public:
+  UpstreamHttpIdleTimeoutTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), register_factory_(factory_) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      // Add custom upstream filter
+      auto* filter = cluster->add_filters();
+      filter->set_name("envoy.test.upstream_idle_timeout_verifier");
+      filter->mutable_typed_config()->PackFrom(Protobuf::Struct());
+
+      // Set idle timeout
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+      auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+      idle_time_out->set_seconds(1);
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  UpstreamIdleTimeoutVerifierFilterFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      register_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Params, UpstreamHttpIdleTimeoutTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UpstreamHttpIdleTimeoutTest, UpstreamConnectionIdleTimeout) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // Close downstream connection
+  codec_client_->close();
+
+  // Wait for upstream idle timeout
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Wait for stat
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_idle_timeout_verifier.on_idle_timeout",
+                                 1);
+}
 
 } // namespace
 } // namespace Envoy

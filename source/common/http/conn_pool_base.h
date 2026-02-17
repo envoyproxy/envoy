@@ -144,7 +144,9 @@ public:
 
   void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
-  void close() override { codec_client_->close(); }
+  void close(Network::ConnectionCloseType type, absl::string_view details) override {
+    codec_client_->close(type, details);
+  }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   virtual Http::RequestEncoder&
   newStreamEncoder(Http::ResponseDecoderHandlePtr response_decoder_handle) PURE;

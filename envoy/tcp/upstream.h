@@ -175,6 +175,11 @@ public:
    * @return the detected close type from socket.
    */
   virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
+
+  /**
+   * @return the failure reason of the local close.
+   */
+  virtual absl::string_view localCloseReason() { return ""; }
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

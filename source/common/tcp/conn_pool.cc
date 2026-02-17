@@ -67,7 +67,9 @@ void ActiveTcpClient::readEnableIfNew() {
   }
 }
 
-void ActiveTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void ActiveTcpClient::close(Network::ConnectionCloseType type, absl::string_view details) {
+  connection_->close(type, details);
+}
 
 void ActiveTcpClient::clearCallbacks() {
   if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
@@ -115,7 +117,8 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 void ActiveTcpClient::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "per client idle timeout", *connection_);
   parent_.host()->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
-  close();
+  close(Network::ConnectionCloseType::NoFlush,
+        StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout);
 }
 
 void ActiveTcpClient::disableIdleTimer() {
@@ -154,7 +157,7 @@ void ConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_b
 void ConnPoolImpl::closeConnections() {
   for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
     while (!list->empty()) {
-      list->front()->close();
+      list->front()->close(Network::ConnectionCloseType::NoFlush, "close_connections");
     }
   }
 }
