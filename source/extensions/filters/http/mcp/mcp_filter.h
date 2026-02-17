@@ -126,6 +126,7 @@ public:
 private:
   bool isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const;
+  bool isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const;
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 

@@ -49,19 +49,25 @@ public:
                   Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
       : client_secret_(
-            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(client_secret_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+            client_secret_provider
+                ? THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                            std::move(client_secret_provider), tls, api),
+                                        std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)
+                : nullptr),
         hmac_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
                                       std::move(hmac_secret_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
-  const std::string& clientSecret() const override { return client_secret_->secret(); }
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+        empty_client_secret_("") {}
+  const std::string& clientSecret() const override {
+    return client_secret_ ? client_secret_->secret() : empty_client_secret_;
+  }
   const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
 
 private:
   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> hmac_secret_;
+  const std::string empty_client_secret_;
 };
 
 /**
