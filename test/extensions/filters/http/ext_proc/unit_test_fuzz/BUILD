@@ -33,5 +33,6 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )

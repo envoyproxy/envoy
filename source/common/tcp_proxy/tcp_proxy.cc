@@ -40,6 +40,8 @@
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace TcpProxy {
 
@@ -120,7 +122,8 @@ Config::SharedConfig::SharedConfig(
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start()) {
+      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start()),
+      proxy_protocol_tlv_merge_policy_(config.proxy_protocol_tlv_merge_policy()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -675,18 +678,65 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
-  if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
-          Network::ProxyProtocolFilterState::key())) {
-    // Evaluate dynamic TLVs with the connection's stream info.
+
+  auto* existing_state = filter_state->getDataMutable<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key());
+
+  if (existing_state == nullptr) {
+    // No downstream proxy protocol state exists - create new state with tcp_proxy TLVs.
     const auto tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
     filter_state->setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+  } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() !=
+             envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT) {
+    // Existing state found and merge policy is not ADD_IF_ABSENT - merge TLVs.
+    const auto& existing_data = existing_state->value();
+    const auto configured_tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
+
+    Network::ProxyProtocolTLVVector merged_tlvs;
+
+    if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() ==
+        envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD) {
+      // Overwrite by type: configured TLVs take precedence for matching types.
+      absl::flat_hash_set<uint8_t> configured_tlv_types;
+      for (const auto& tlv : configured_tlvs) {
+        configured_tlv_types.insert(tlv.type);
+      }
+
+      for (const auto& tlv : configured_tlvs) {
+        merged_tlvs.push_back(tlv);
+      }
+
+      for (const auto& tlv : existing_data.tlv_vector_) {
+        if (!configured_tlv_types.contains(tlv.type)) {
+          merged_tlvs.push_back(tlv);
+        }
+      }
+    } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() ==
+               envoy::extensions::filters::network::tcp_proxy::v3::APPEND_IF_EXISTS_OR_ADD) {
+      // Append: preserve all existing TLVs, then add configured TLVs.
+      for (const auto& tlv : existing_data.tlv_vector_) {
+        merged_tlvs.push_back(tlv);
+      }
+
+      for (const auto& tlv : configured_tlvs) {
+        merged_tlvs.push_back(tlv);
+      }
+    }
+
+    // Update filter state with merged TLVs, preserving existing addresses and version.
+    filter_state->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+            {existing_data.src_addr_, existing_data.dst_addr_, merged_tlvs},
+            existing_data.version_}),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
+  // else: ADD_IF_ABSENT policy with existing state - keep existing state as-is.
   transport_socket_options_ =
       Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 

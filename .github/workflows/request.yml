@@ -41,6 +41,7 @@ jobs:
       ${{ github.event_name == 'pull_request_target'
           && github.event.pull_request.author_association != 'MEMBER'
           && github.event.pull_request.author_association != 'COLLABORATOR'
+          && github.event.pull_request.author_association != 'CONTRIBUTOR'
           && github.event.pull_request.author_association != 'OWNER'
           && 'external-contributors'
           || '' }}

@@ -7,6 +7,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -80,6 +81,10 @@ DEFINE_PROTO_FUZZER(
   if (input.response().ByteSizeLong() > max_body_size) {
     return;
   }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;

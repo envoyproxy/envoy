@@ -2877,8 +2877,8 @@ void envoy_dynamic_module_callback_network_get_socket_options(
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size is called by the module
  * to get the number of chunks in the current read data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks, this can be used to iterate
- * over all chunks in the read buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * over all chunks in the read buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the read buffer. 0 if the buffer is not available or empty.
@@ -2888,8 +2888,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_size is called by the module to
- * get the total size of the current read data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the total size of the current read data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the read buffer. 0 if the buffer is not available or empty.
  */
@@ -2898,8 +2899,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks is called by the module to
- * get the current read data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_read callback.
+ * get the current read data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -2920,8 +2921,8 @@ bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size is called by the module
  * to get the number of chunks in the current write data buffer. Combined with
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks, this can be used to iterate
- * over all chunks in the write buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * over all chunks in the write buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the number of chunks in the write buffer. 0 if the buffer is not available or empty.
@@ -2931,8 +2932,9 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_size is called by the module to
- * get the total size of the current write data buffer. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the total size of the current write data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @return the total size of the write buffer. 0 if the buffer is not available or empty.
  */
@@ -2941,8 +2943,8 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks is called by the module to
- * get the current write data buffer as chunks. This is only valid during the
- * envoy_dynamic_module_on_network_filter_write callback.
+ * get the current write data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
  *
  * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
  * to store all the chunks. The module can use
@@ -3474,6 +3476,27 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
 // ---------------------- Upstream Host Access Callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_cluster_host_count retrieves the host counts for
+ * a cluster by name. This provides visibility into the cluster's health state and can be used to
+ * implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * found).
+ */
+bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_upstream_host_address is called by the module
@@ -5721,6 +5744,19 @@ typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionTimer class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when the timer is no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -5863,6 +5899,22 @@ void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
     uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new fires on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param timer_ptr is the pointer to the timer that fired. The module can re-enable this timer
+ * by calling envoy_dynamic_module_callback_bootstrap_extension_timer_enable again.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
@@ -5972,6 +6024,29 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - Init Manager Integration
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete is called by the
+ * module to signal that the bootstrap extension has completed its initialization. Envoy
+ * automatically registers an init target for every bootstrap extension, blocking traffic until
+ * the module signals readiness by calling this function.
+ *
+ * The module must call this exactly once during or after
+ * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
+ * require asynchronous initialization, it should call this immediately during config creation.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
 // -------------------- Bootstrap Extension Callbacks - Stats Access --------------------
 
 /**
@@ -6074,6 +6149,338 @@ typedef envoy_dynamic_module_type_stats_iteration_action (
 void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
+
+// -------------------- Bootstrap Extension Callbacks - Metrics Define/Update --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter is called by the
+ * module to increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge is called by the module
+ * during initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge together
+ * with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge is called by the module to
+ * set the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge is called by the module
+ * to increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge is called by the module
+ * to decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram is called by the
+ * module during initialization to create a template for generating Stats::Histograms with the given
+ * name and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// -------------------- Bootstrap Extension Callbacks - Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new is called by the module to create a
+ * new timer on the main thread dispatcher. The timer is not enabled upon creation; the module must
+ * call envoy_dynamic_module_callback_bootstrap_extension_timer_enable to arm it.
+ *
+ * When the timer fires, envoy_dynamic_module_on_bootstrap_extension_timer_fired is called on the
+ * main thread.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is the pointer to the
+ * created timer.
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable is called by the module to enable
+ * the timer with a given delay. If the timer is already enabled, it will be reset to the new delay.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_disable is called by the module to
+ * disable the timer without destroying it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enabled is called by the module to check
+ * whether the timer is currently armed.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete is called by the module to delete
+ * a timer created by envoy_dynamic_module_callback_bootstrap_extension_timer_new. The timer is
+ * automatically disabled before deletion.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request is called when an admin endpoint
+ * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
+ * requested.
+ *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param method is the HTTP method of the request (e.g. "GET", "POST").
+ * @param path is the full path and query string of the request.
+ * @param body is the request body. May be empty.
+ * @return the HTTP status code to send back to the client. This corresponds to the numeric
+ * value of the HTTP status code (e.g. 200, 404, 500).
+ */
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
+ * module to register a custom admin HTTP endpoint. When the endpoint is requested, the
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request event hook will be invoked.
+ *
+ * This must be called on the main thread (e.g. during on_server_initialized or from a
+ * scheduled event on the main thread).
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix to handle (e.g. "/admin/my_module/status").
+ * @param help_text is the help text for the handler displayed in the admin console.
+ * @param removable if true, allows the handler to be removed later via
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler.
+ * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
+ * endpoints).
+ * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
+ * not available or the prefix is already taken).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler is called by the
+ * module to remove a previously registered admin HTTP endpoint.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix of the handler to remove.
+ * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
+ * was not found or is not removable).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
@@ -6369,6 +6776,344 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+// =============================================================================
+// Matcher Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleInputMatcher class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_config_module_ptr is a pointer to an in-module matcher
+ * configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_input_envoy_ptr is a raw pointer to the matcher input in Envoy.
+ * This represents the matching data available during a single match evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the match event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_config_new is called when a new matcher configuration
+ * is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleInputMatcher object.
+ * @param name is the matcher config name.
+ * @param config is the configuration for the matcher.
+ * @return a pointer to the in-module matcher configuration. Returning nullptr
+ *         indicates a failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_config_module_ptr envoy_dynamic_module_on_matcher_config_new(
+    envoy_dynamic_module_type_matcher_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_config_destroy is called when the matcher configuration
+ * is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module matcher configuration.
+ */
+void envoy_dynamic_module_on_matcher_config_destroy(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_match is called when a match evaluation occurs.
+ * This is called on worker threads.
+ *
+ * The matcher_input_envoy_ptr is only valid during this callback. The module must not store
+ * this pointer or use it after the callback returns. The module can use the matcher
+ * callbacks (e.g. envoy_dynamic_module_callback_matcher_get_header_value) to access the
+ * matching data during this callback.
+ *
+ * @param config_module_ptr is the pointer to the in-module matcher configuration.
+ * @param matcher_input_envoy_ptr is the pointer to the Envoy matcher input (valid during this
+ *        call only).
+ * @return true if the input matches, false otherwise.
+ */
+bool envoy_dynamic_module_on_matcher_match(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Callbacks
+// =============================================================================
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_matcher_get_headers_size(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * PRECONDITION: The module must ensure that result_headers is valid and has enough length to
+ * store all the headers. Use envoy_dynamic_module_callback_matcher_get_headers_size to get
+ * the number of headers before calling this function.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param result_headers is the pointer to the array where headers will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_headers(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value.
+ * This returns the total number of values for the given key via total_count_out, so it can
+ * be used to iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for
+ *        the given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_header_value(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// =============================================================================
+// ============================ Cert Validator ==================================
+// =============================================================================
+//
+// This extension enables custom TLS certificate validation via dynamic modules.
+// It integrates with Envoy's custom_validator_config in CertificateValidationContext,
+// registered under the envoy.tls.cert_validator category.
+//
+// The module receives DER-encoded certificates during validation and returns
+// a result indicating success or failure with optional TLS alert and error details.
+
+// =============================================================================
+// Cert Validator Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is a pointer to the
+ * DynamicModuleCertValidatorConfig object in Envoy. This is passed to the module during config
+ * creation and cert chain verification.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_cert_validator_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr is a pointer to the in-module cert
+ * validator configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cert_validator_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_status represents the status of the
+ * certificate chain validation. This corresponds to ValidationResults::ValidationStatus in
+ * cert_validator.h.
+ *
+ * Note: Pending (asynchronous) validation is not supported.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_validation_status {
+  envoy_dynamic_module_type_cert_validator_validation_status_Successful = 0,
+  envoy_dynamic_module_type_cert_validator_validation_status_Failed = 1,
+} envoy_dynamic_module_type_cert_validator_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_client_validation_status represents the detailed client
+ * validation status. This corresponds to Ssl::ClientValidationStatus in
+ * ssl_socket_extended_info.h.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_client_validation_status {
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NotValidated = 0,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NoClientCertificate = 1,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Validated = 2,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Failed = 3,
+} envoy_dynamic_module_type_cert_validator_client_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_result is the result of a certificate chain
+ * verification. Returned by the envoy_dynamic_module_on_cert_validator_do_verify_cert_chain event
+ * hook.
+ *
+ * Error details, if any, should be set via the
+ * envoy_dynamic_module_callback_cert_validator_set_error_details callback before returning.
+ */
+typedef struct envoy_dynamic_module_type_cert_validator_validation_result {
+  // The overall validation status (Successful or Failed).
+  envoy_dynamic_module_type_cert_validator_validation_status status;
+  // The detailed client validation status.
+  envoy_dynamic_module_type_cert_validator_client_validation_status detailed_status;
+  // The TLS alert code to send on failure (e.g. SSL_AD_BAD_CERTIFICATE).
+  uint8_t tls_alert;
+  // Whether the tls_alert field is set.
+  bool has_tls_alert;
+} envoy_dynamic_module_type_cert_validator_validation_result;
+
+// =============================================================================
+// Cert Validator Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_new is called by the main thread when the cert
+ * validator config is loaded. The function returns a
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr for given name and config.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object for the
+ * corresponding config.
+ * @param name is the name of the validator owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_cert_validator_config_module_ptr is the pointer to the
+ * in-module cert validator configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the cert validator configuration will be rejected.
+ */
+envoy_dynamic_module_type_cert_validator_config_module_ptr
+envoy_dynamic_module_on_cert_validator_config_new(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_destroy is called when the cert validator
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module cert validator configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module cert validator configuration whose
+ * corresponding Envoy cert validator configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_cert_validator_config_destroy(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain is called to verify a certificate
+ * chain during a TLS handshake. The certificates are provided as DER-encoded buffers. The first
+ * certificate (index 0) is the leaf certificate.
+ *
+ * The certs array and its buffer contents are owned by Envoy and are valid only for the duration
+ * of this event hook call.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param certs is an array of DER-encoded certificate buffers.
+ * @param certs_count is the number of certificates in the array.
+ * @param host_name is the SNI host name for validation.
+ * @param is_server is true if the validation is on the server side (validating client certs).
+ * @return envoy_dynamic_module_type_cert_validator_validation_result is the validation result.
+ */
+envoy_dynamic_module_type_cert_validator_validation_result
+envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer* certs, size_t certs_count,
+    envoy_dynamic_module_type_envoy_buffer host_name, bool is_server);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode is called during SSL context
+ * initialization to get the SSL verify mode flags that should be applied to SSL contexts.
+ *
+ * The return value should be a combination of SSL_VERIFY_* flags (e.g. SSL_VERIFY_PEER,
+ * SSL_VERIFY_FAIL_IF_NO_PEER_CERT). Returning 0 means SSL_VERIFY_NONE.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param handshaker_provides_certificates is true if the handshaker provides certificates itself.
+ * @return int the SSL verify mode flags.
+ */
+int envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    bool handshaker_provides_certificates);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_update_digest is called to contribute to the session
+ * context hash. The module should provide bytes that uniquely identify its validation configuration
+ * so that configuration changes invalidate existing TLS sessions. The output buffer must remain
+ * valid until the end of this event hook.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param out_data is a pointer to a buffer that the module should fill with the digest data.
+ * The module should set the ptr and length fields.
+ */
+void envoy_dynamic_module_on_cert_validator_update_digest(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_module_buffer* out_data);
+
+// =============================================================================
+// Cert Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_error_details is called by the module during
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain to set error details for a failed
+ * validation. Envoy copies the provided buffer immediately, so the module does not need to keep
+ * the buffer alive after this call returns.
+ *
+ * This must only be called from within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param error_details is the error details string owned by the module.
+ */
+void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer error_details);
+
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_filter_state is called by the module to
+ * set a string value in filter state with Connection life span. This must only be called from
+ * within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
+ * @return true if the operation was successful, false otherwise (e.g. no connection context
+ * available or the key already exists and is read-only).
+ */
+bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_get_filter_state is called by the module to
+ * get a string value from filter state. This must only be called from within the
+ * do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 #ifdef __cplusplus
 }
