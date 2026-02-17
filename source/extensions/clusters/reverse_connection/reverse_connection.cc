@@ -259,16 +259,16 @@ RevConClusterFactory::createClusterWithConfig(
                     extension_name));
   }
 
-  // Validate that if tenant isolation is enabled in bootstrap config, tenant_id_format is configured.
-  const auto& bootstrap = context.serverFactoryContext().options().configProto();
+  // Validate that if tenant isolation is enabled in bootstrap config, tenant_id_format is
+  // configured.
+  const auto& bootstrap = context.serverFactoryContext().bootstrap();
   for (const auto& extension : bootstrap.bootstrap_extensions()) {
     if (extension.name() == extension_name && extension.has_typed_config()) {
       envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
           UpstreamReverseConnectionSocketInterface upstream_config;
       if (extension.typed_config().UnpackTo(&upstream_config)) {
-        const bool tenant_isolation_enabled =
-            upstream_config.has_enable_tenant_isolation() &&
-            upstream_config.enable_tenant_isolation().value();
+        const bool tenant_isolation_enabled = upstream_config.has_enable_tenant_isolation() &&
+                                              upstream_config.enable_tenant_isolation().value();
         if (tenant_isolation_enabled && proto_config.tenant_id_format().empty()) {
           return absl::InvalidArgumentError(fmt::format(
               "tenant_id_format must be configured for reverse connection cluster '{}' when "

@@ -98,9 +98,11 @@ public:
     config_.set_stat_prefix("test_prefix");
 
     // Set up bootstrap config with the upstream socket interface extension.
+    // Both options_.config_proto_ and bootstrap_ are populated since validation may use either.
     auto* bootstrap_extension = server_context_.options_.config_proto_.add_bootstrap_extensions();
     bootstrap_extension->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
     bootstrap_extension->mutable_typed_config()->PackFrom(config_);
+    *server_context_.bootstrap_.add_bootstrap_extensions() = *bootstrap_extension;
   }
 
   ~ReverseConnectionClusterTest() override = default;
@@ -1740,8 +1742,8 @@ public:
     ReverseConnectionClusterTest::SetUp();
     // Enable tenant isolation in bootstrap config.
     config_.mutable_enable_tenant_isolation()->set_value(true);
-    // Update the bootstrap config proto to reflect the change.
-    auto& bootstrap = server_context_.options_.config_proto_;
+    // Update both bootstrap configs to reflect the change (validation uses bootstrap()).
+    auto& bootstrap = server_context_.bootstrap_;
     for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
       if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
         extension.mutable_typed_config()->PackFrom(config_);
@@ -1755,8 +1757,9 @@ public:
       auto* registered_socket_interface =
           Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
       if (registered_socket_interface) {
-        auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
-            const_cast<Network::SocketInterface*>(registered_socket_interface));
+        auto* registered_acceptor =
+            dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+                const_cast<Network::SocketInterface*>(registered_socket_interface));
         if (registered_acceptor) {
           registered_acceptor->extension_ = extension_.get();
         }

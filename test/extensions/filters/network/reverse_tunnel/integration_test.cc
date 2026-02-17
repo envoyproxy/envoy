@@ -1235,10 +1235,10 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
-  std::string http_request = createHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "node1", "cluster1", "tenant1");
+  std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                            "node1", "cluster1", "tenant1");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(http_request));
@@ -1285,7 +1285,7 @@ cluster_type:
   initialize();
 
   test_server_->waitUntilListenersReady();
-  test_server_->waitForGaugeGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   std::string http_request_tenant_a = createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "node-a", "cluster-a", "tenant-a");
