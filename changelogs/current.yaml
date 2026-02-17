@@ -509,6 +509,14 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: api
+  change: |
+    Initial implementation of protovalidate added. Legacy protoc-gen-validate validation has been retained
+    pending migration of protos, and can be reverted by use of setting the runtime flag
+    ``envoy_reloadable_features_enable_protovalidate`` to ``false``. Please note that doing so may not
+    be compatible with our imminent migration to bzlmod.
+
+>>>>>>> 45aca27966 (deps/api: Initial protovalidate implementation)
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header

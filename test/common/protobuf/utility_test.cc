@@ -20,6 +20,7 @@
 #include "test/common/protobuf/utility_test_file_wip.pb.h"
 #include "test/common/protobuf/utility_test_file_wip_2.pb.h"
 #include "test/common/protobuf/utility_test_message_field_wip.pb.h"
+#include "test/common/protobuf/utility_test_protovalidate.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -2475,6 +2476,65 @@ TEST_F(ProtobufUtilityTest, ValidateRecurseIntoAnyUnresolvableType) {
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(bootstrap, /*recurse_into_any=*/true),
                           EnvoyException,
                           "Invalid type_url.*some.nonexistent.Type.*during traversal");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateSuccess) {
+  utility_test::protovalidate::MessageWithStringConstraint msg;
+  msg.set_name("valid");
+  EXPECT_NO_THROW(MessageUtil::validateWithProtovalidate(msg));
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateViolation) {
+  utility_test::protovalidate::MessageWithStringConstraint msg;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::validateWithProtovalidate(msg), ProtoValidationException,
+                          "protovalidate violations");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateRecurseIntoAnyFalse) {
+  udpa::type::v1::TypedStruct typed_struct;
+  typed_struct.set_type_url("typexx");
+  EXPECT_NO_THROW(MessageUtil::validateWithProtovalidate(typed_struct, false));
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateNestedMessageNoTopLevelViolation) {
+  utility_test::protovalidate::OuterMessage outer;
+  outer.mutable_inner()->set_name("valid");
+  EXPECT_NO_THROW(MessageUtil::validateWithProtovalidate(outer));
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateSuppressRequiredViolationInOneofWithBool) {
+  utility_test::protovalidate::MessageWithRequiredAnyInOneofWithBool msg;
+  EXPECT_NO_THROW(MessageUtil::validateWithProtovalidate(msg));
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateRequiredAnyNotInOneofThrows) {
+  utility_test::protovalidate::MessageWithRequiredAnyField msg;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::validateWithProtovalidate(msg), ProtoValidationException,
+                          "protovalidate violations");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateRequiredAnyInOneofNoBoolThrows) {
+  utility_test::protovalidate::MessageWithRequiredAnyInOneofNoBool msg;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::validateWithProtovalidate(msg), ProtoValidationException,
+                          "protovalidate violations");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateCelViolationNoFieldPath) {
+  utility_test::protovalidate::MessageWithCelMessageConstraint msg;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::validateWithProtovalidate(msg), ProtoValidationException,
+                          "protovalidate violations");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateViolationFieldPath) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  bootstrap.mutable_static_resources()->add_clusters();
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(bootstrap), EnvoyException,
+                          "(Proto constraint validation failed|protovalidate)");
+}
+
+TEST_F(ProtobufUtilityTest, ValidateWithProtovalidateValidMessage) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  EXPECT_NO_THROW(TestUtility::validate(bootstrap));
 }
 
 } // namespace Envoy
