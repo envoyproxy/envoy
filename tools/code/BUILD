@@ -48,7 +48,7 @@ py_console_script_binary(
         "--extensions_build_config=$(location :extensions_build_config)",
         "--extensions_fuzzed_count=%s" % FUZZ_FILTER_COUNT,
         "--path=%s" % PATH,
-        "-c %s" % ",".join(CODE_CHECKS),
+        "-c %s" % " ".join(CODE_CHECKS),
         "-b shellcheck:$(location @shellcheck)",
         "-b gofmt:$(location @go_sdk//:bin/gofmt)",
         "-x bazel/repo.bzl",
@@ -86,7 +86,7 @@ genrule(
     """ % (
         FUZZ_FILTER_COUNT,
         PATH,
-        ",".join(CODE_CHECKS),
+        " ".join(CODE_CHECKS),
     ),
     tags = ["no-remote-exec"],
     tools = [
