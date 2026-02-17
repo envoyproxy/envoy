@@ -43,43 +43,50 @@ func (f *sslFilter) DecodeHeaders(headers api.RequestHeaderMap, endStream bool) 
 	}
 
 	// Test 3-12: Peer certificate string fields
-	digest := ssl.Sha256PeerCertificateDigest()
-	headers.Set("x-cert-digest", digest)
+	if digest, ok := ssl.Sha256PeerCertificateDigest(); ok {
+		headers.Set("x-cert-digest", digest)
+	}
 
-	serial := ssl.SerialNumberPeerCertificate()
-	headers.Set("x-cert-serial", serial)
+	if serial, ok := ssl.SerialNumberPeerCertificate(); ok {
+		headers.Set("x-cert-serial", serial)
+	}
 
-	subject := ssl.SubjectPeerCertificate()
-	headers.Set("x-cert-subject", subject)
+	if subject, ok := ssl.SubjectPeerCertificate(); ok {
+		headers.Set("x-cert-subject", subject)
+	}
 
-	issuer := ssl.IssuerPeerCertificate()
-	headers.Set("x-cert-issuer", issuer)
+	if issuer, ok := ssl.IssuerPeerCertificate(); ok {
+		headers.Set("x-cert-issuer", issuer)
+	}
 
-	subjectLocal := ssl.SubjectLocalCertificate()
-	headers.Set("x-cert-subject-local", subjectLocal)
+	if subjectLocal, ok := ssl.SubjectLocalCertificate(); ok {
+		headers.Set("x-cert-subject-local", subjectLocal)
+	}
 
-	urlEncodedPem := ssl.UrlEncodedPemEncodedPeerCertificate()
-	if len(urlEncodedPem) > 0 {
+	if urlEncodedPem, ok := ssl.UrlEncodedPemEncodedPeerCertificate(); ok && len(urlEncodedPem) > 0 {
 		headers.Set("x-cert-pem-length", fmt.Sprintf("%d", len(urlEncodedPem)))
 	}
 
-	urlEncodedChain := ssl.UrlEncodedPemEncodedPeerCertificateChain()
-	if len(urlEncodedChain) > 0 {
+	if urlEncodedChain, ok := ssl.UrlEncodedPemEncodedPeerCertificateChain(); ok && len(urlEncodedChain) > 0 {
 		headers.Set("x-cert-chain-length", fmt.Sprintf("%d", len(urlEncodedChain)))
 	}
 
 	// Test 13-16: Subject Alternative Names (arrays)
-	dnsSansPeer := ssl.DnsSansPeerCertificate()
-	headers.Set("x-cert-dns-sans-peer-count", fmt.Sprintf("%d", len(dnsSansPeer)))
+	if dnsSansPeer, ok := ssl.DnsSansPeerCertificate(); ok {
+		headers.Set("x-cert-dns-sans-peer-count", fmt.Sprintf("%d", len(dnsSansPeer)))
+	}
 
-	dnsSansLocal := ssl.DnsSansLocalCertificate()
-	headers.Set("x-cert-dns-sans-local-count", fmt.Sprintf("%d", len(dnsSansLocal)))
+	if dnsSansLocal, ok := ssl.DnsSansLocalCertificate(); ok {
+		headers.Set("x-cert-dns-sans-local-count", fmt.Sprintf("%d", len(dnsSansLocal)))
+	}
 
-	uriSansPeer := ssl.UriSanPeerCertificate()
-	headers.Set("x-cert-uri-sans-peer-count", fmt.Sprintf("%d", len(uriSansPeer)))
+	if uriSansPeer, ok := ssl.UriSanPeerCertificate(); ok {
+		headers.Set("x-cert-uri-sans-peer-count", fmt.Sprintf("%d", len(uriSansPeer)))
+	}
 
-	uriSansLocal := ssl.UriSanLocalCertificate()
-	headers.Set("x-cert-uri-sans-local-count", fmt.Sprintf("%d", len(uriSansLocal)))
+	if uriSansLocal, ok := ssl.UriSanLocalCertificate(); ok {
+		headers.Set("x-cert-uri-sans-local-count", fmt.Sprintf("%d", len(uriSansLocal)))
+	}
 
 	// Test 17-18: Certificate validity timestamps
 	if validFrom, ok := ssl.ValidFromPeerCertificate(); ok {
@@ -95,11 +102,11 @@ func (f *sslFilter) DecodeHeaders(headers api.RequestHeaderMap, endStream bool) 
 	headers.Set("x-tls-version", tlsVersion)
 
 	// Test 20-21: Cipher suite
-	cipherSuite := ssl.CiphersuiteString()
-	headers.Set("x-cipher-suite", cipherSuite)
+	if cipherSuite, ok := ssl.CiphersuiteString(); ok {
+		headers.Set("x-cipher-suite", cipherSuite)
+	}
 
-	cipherID := ssl.CiphersuiteId()
-	if cipherID != 0xffff {
+	if cipherID, ok := ssl.CiphersuiteId(); ok {
 		headers.Set("x-cipher-id", fmt.Sprintf("%d", cipherID))
 	}
 

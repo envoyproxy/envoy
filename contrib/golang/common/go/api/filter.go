@@ -352,45 +352,43 @@ type SslConnection interface {
 	PeerCertificateValidated() bool
 
 	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate
-	Sha256PeerCertificateDigest() string
+	Sha256PeerCertificateDigest() (string, bool)
 	// SerialNumberPeerCertificate returns the serial number of the peer certificate
-	SerialNumberPeerCertificate() string
+	SerialNumberPeerCertificate() (string, bool)
 	// SubjectPeerCertificate returns the subject field of the peer certificate
-	SubjectPeerCertificate() string
+	SubjectPeerCertificate() (string, bool)
 	// IssuerPeerCertificate returns the issuer field of the peer certificate
-	IssuerPeerCertificate() string
+	IssuerPeerCertificate() (string, bool)
 	// SubjectLocalCertificate returns the subject field of the local certificate
-	SubjectLocalCertificate() string
+	SubjectLocalCertificate() (string, bool)
 
 	// UriSanPeerCertificate returns the URI SANs of the peer certificate
-	UriSanPeerCertificate() []string
+	UriSanPeerCertificate() ([]string, bool)
 	// UriSanLocalCertificate returns the URI SANs of the local certificate
-	UriSanLocalCertificate() []string
+	UriSanLocalCertificate() ([]string, bool)
 	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate
-	DnsSansPeerCertificate() []string
+	DnsSansPeerCertificate() ([]string, bool)
 	// DnsSansLocalCertificate returns the DNS SANs of the local certificate
-	DnsSansLocalCertificate() []string
+	DnsSansLocalCertificate() ([]string, bool)
 
 	// ValidFromPeerCertificate returns the validity start time of the peer certificate as Unix timestamp
-	// The second return value indicates whether the value is available
 	ValidFromPeerCertificate() (uint64, bool)
 	// ExpirationPeerCertificate returns the expiration time of the peer certificate as Unix timestamp
-	// The second return value indicates whether the value is available
 	ExpirationPeerCertificate() (uint64, bool)
 
 	// TlsVersion returns the TLS version (e.g., "TLSv1.3")
 	TlsVersion() string
 	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA")
-	CiphersuiteString() string
+	CiphersuiteString() (string, bool)
 	// CiphersuiteId returns the ciphersuite ID
-	CiphersuiteId() uint16
+	CiphersuiteId() (uint16, bool)
 	// SessionId returns the TLS session ID
 	SessionId() string
 
 	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate
-	UrlEncodedPemEncodedPeerCertificate() string
+	UrlEncodedPemEncodedPeerCertificate() (string, bool)
 	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain
-	UrlEncodedPemEncodedPeerCertificateChain() string
+	UrlEncodedPemEncodedPeerCertificateChain() (string, bool)
 }
 
 type SecretManager interface {

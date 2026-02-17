@@ -106,6 +106,8 @@ CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, in
 CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
+CAPIStatus envoyGoFilterHttpGetStringsValue(void* r, int id, uint64_t* value_data, int* value_len,
+                                            int* count);
 
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name_data, int name_len,
                                                uint64_t* value_data, int* value_len);
@@ -124,35 +126,6 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
 CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
                                             uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r);
-
-/* SSL Connection APIs */
-CAPIStatus envoyGoFilterHttpGetDownstreamSslConnection(void* r, uint64_t* ssl_exists);
-CAPIStatus envoyGoFilterHttpSslPeerCertificatePresented(void* r, int* presented);
-CAPIStatus envoyGoFilterHttpSslPeerCertificateValidated(void* r, int* validated);
-CAPIStatus envoyGoFilterHttpSslSha256PeerCertificateDigest(void* r, uint64_t* value_data,
-                                                           int* value_len);
-CAPIStatus envoyGoFilterHttpSslSerialNumberPeerCertificate(void* r, uint64_t* value_data,
-                                                           int* value_len);
-CAPIStatus envoyGoFilterHttpSslSubjectPeerCertificate(void* r, uint64_t* value_data,
-                                                      int* value_len);
-CAPIStatus envoyGoFilterHttpSslIssuerPeerCertificate(void* r, uint64_t* value_data, int* value_len);
-CAPIStatus envoyGoFilterHttpSslSubjectLocalCertificate(void* r, uint64_t* value_data,
-                                                       int* value_len);
-CAPIStatus envoyGoFilterHttpSslUriSanPeerCertificate(void* r, uint64_t* buf_data, int* buf_len);
-CAPIStatus envoyGoFilterHttpSslUriSanLocalCertificate(void* r, uint64_t* buf_data, int* buf_len);
-CAPIStatus envoyGoFilterHttpSslDnsSansPeerCertificate(void* r, uint64_t* buf_data, int* buf_len);
-CAPIStatus envoyGoFilterHttpSslDnsSansLocalCertificate(void* r, uint64_t* buf_data, int* buf_len);
-CAPIStatus envoyGoFilterHttpSslValidFromPeerCertificate(void* r, uint64_t* timestamp);
-CAPIStatus envoyGoFilterHttpSslExpirationPeerCertificate(void* r, uint64_t* timestamp);
-CAPIStatus envoyGoFilterHttpSslTlsVersion(void* r, uint64_t* value_data, int* value_len);
-CAPIStatus envoyGoFilterHttpSslCiphersuiteString(void* r, uint64_t* value_data, int* value_len);
-CAPIStatus envoyGoFilterHttpSslCiphersuiteId(void* r, uint64_t* cipher_id);
-CAPIStatus envoyGoFilterHttpSslSessionId(void* r, uint64_t* value_data, int* value_len);
-CAPIStatus envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificate(void* r, uint64_t* value_data,
-                                                                   int* value_len);
-CAPIStatus envoyGoFilterHttpSslUrlEncodedPemEncodedPeerCertificateChain(void* r,
-                                                                        uint64_t* value_data,
-                                                                        int* value_len);
 
 /* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
