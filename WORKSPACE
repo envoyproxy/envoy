@@ -32,6 +32,6 @@ envoy_python_dependencies()
 
 # envoy_dependency_imports()
 
-load("@envoy//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
+# load("@envoy//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
 
-envoy_dependency_imports_extra()
+# envoy_dependency_imports_extra()
