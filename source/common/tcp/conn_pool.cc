@@ -157,7 +157,7 @@ void ConnPoolImpl::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_b
 void ConnPoolImpl::closeConnections() {
   for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
     while (!list->empty()) {
-      list->front()->close(Network::ConnectionCloseType::NoFlush, "close_connections");
+      list->front()->close();
     }
   }
 }

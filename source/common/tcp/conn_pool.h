@@ -122,7 +122,7 @@ public:
     if (callbacks_) {
       callbacks_->onUpstreamData(data, end_stream);
     } else {
-      close(Envoy::Network::ConnectionCloseType::NoFlush, "");
+      close();
     }
   }
   virtual void clearCallbacks();
