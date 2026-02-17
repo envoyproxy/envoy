@@ -57,7 +57,7 @@ minor_behavior_changes:
     stopped reporting empty delta counters and histograms.
 - area: happy_eyeballs
   change: |
-    Happy Eyeballs handles interleaving of non-IP addresses. The restriction against `additional_addresses`
+    Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
     containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
     guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
 
