@@ -2000,8 +2000,7 @@ TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
 }
 
 // Test chooseHost uses requestStreamInfo when available.
-TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
-       ClusterUsesRequestStreamInfoWhenAvailable) {
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest, ClusterUsesRequestStreamInfoWhenAvailable) {
   const std::string yaml = R"EOF(
     name: name1
     connect_timeout: 0.25s
