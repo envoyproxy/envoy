@@ -413,6 +413,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov

@@ -50,6 +50,8 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         ":extension_lib",
+        "//envoy/server:admin_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",

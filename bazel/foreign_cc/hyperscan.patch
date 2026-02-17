@@ -80,7 +80,7 @@ index 895610c..6be61fd 100755
  PREFIX=$1
  KEEPSYMS_IN=$2
  shift 2
-+
++set -e
 +if [ -n "$EXT_BUILD_ROOT" ]; then
 +    if [ -n "$NM" ]; then
 +        case "$NM" in

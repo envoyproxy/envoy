@@ -6399,6 +6399,89 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
 
+// -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request is called when an admin endpoint
+ * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
+ * requested.
+ *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param method is the HTTP method of the request (e.g. "GET", "POST").
+ * @param path is the full path and query string of the request.
+ * @param body is the request body. May be empty.
+ * @return the HTTP status code to send back to the client. This corresponds to the numeric
+ * value of the HTTP status code (e.g. 200, 404, 500).
+ */
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
+ * module to register a custom admin HTTP endpoint. When the endpoint is requested, the
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request event hook will be invoked.
+ *
+ * This must be called on the main thread (e.g. during on_server_initialized or from a
+ * scheduled event on the main thread).
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix to handle (e.g. "/admin/my_module/status").
+ * @param help_text is the help text for the handler displayed in the admin console.
+ * @param removable if true, allows the handler to be removed later via
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler.
+ * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
+ * endpoints).
+ * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
+ * not available or the prefix is already taken).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler is called by the
+ * module to remove a previously registered admin HTTP endpoint.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix of the handler to remove.
+ * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
+ * was not found or is not removable).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix);
+
 // =============================================================================
 // =============================== Load Balancer ===============================
 // =============================================================================
@@ -6695,6 +6778,134 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
 // =============================================================================
+// Matcher Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleInputMatcher class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_config_module_ptr is a pointer to an in-module matcher
+ * configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_input_envoy_ptr is a raw pointer to the matcher input in Envoy.
+ * This represents the matching data available during a single match evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the match event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_config_new is called when a new matcher configuration
+ * is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleInputMatcher object.
+ * @param name is the matcher config name.
+ * @param config is the configuration for the matcher.
+ * @return a pointer to the in-module matcher configuration. Returning nullptr
+ *         indicates a failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_config_module_ptr envoy_dynamic_module_on_matcher_config_new(
+    envoy_dynamic_module_type_matcher_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_config_destroy is called when the matcher configuration
+ * is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module matcher configuration.
+ */
+void envoy_dynamic_module_on_matcher_config_destroy(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_match is called when a match evaluation occurs.
+ * This is called on worker threads.
+ *
+ * The matcher_input_envoy_ptr is only valid during this callback. The module must not store
+ * this pointer or use it after the callback returns. The module can use the matcher
+ * callbacks (e.g. envoy_dynamic_module_callback_matcher_get_header_value) to access the
+ * matching data during this callback.
+ *
+ * @param config_module_ptr is the pointer to the in-module matcher configuration.
+ * @param matcher_input_envoy_ptr is the pointer to the Envoy matcher input (valid during this
+ *        call only).
+ * @return true if the input matches, false otherwise.
+ */
+bool envoy_dynamic_module_on_matcher_match(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Callbacks
+// =============================================================================
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_matcher_get_headers_size(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * PRECONDITION: The module must ensure that result_headers is valid and has enough length to
+ * store all the headers. Use envoy_dynamic_module_callback_matcher_get_headers_size to get
+ * the number of headers before calling this function.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param result_headers is the pointer to the array where headers will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_headers(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value.
+ * This returns the total number of values for the given key via total_count_out, so it can
+ * be used to iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for
+ *        the given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_header_value(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// =============================================================================
 // ============================ Cert Validator ==================================
 // =============================================================================
 //
@@ -6872,6 +7083,37 @@ void envoy_dynamic_module_on_cert_validator_update_digest(
 void envoy_dynamic_module_callback_cert_validator_set_error_details(
     envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer error_details);
+
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_filter_state is called by the module to
+ * set a string value in filter state with Connection life span. This must only be called from
+ * within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
+ * @return true if the operation was successful, false otherwise (e.g. no connection context
+ * available or the key already exists and is read-only).
+ */
+bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_get_filter_state is called by the module to
+ * get a string value from filter state. This must only be called from within the
+ * do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 #ifdef __cplusplus
 }
