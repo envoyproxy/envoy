@@ -58,6 +58,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/network/dynamic_modules:config",

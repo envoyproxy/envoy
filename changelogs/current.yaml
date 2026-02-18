@@ -228,6 +228,11 @@ new_features:
   change: |
     Added support for MCP client-to-server notification methods ``notifications/cancelled``
     and ``notifications/roots/list_changed``.
+- area: dynamic_modules
+  change: |
+    Added typed filter state support for dynamic module HTTP and network filters. This allows modules
+    to set and get filter state objects using registered ``StreamInfo::FilterState::ObjectFactory``
+    instances, enabling interoperability with built-in Envoy filters that expect specific typed objects.
 - area: mcp_router
   change: |
     Added support for MCP completion method ``completion/complete`` with routing based on
