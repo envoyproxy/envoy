@@ -107,7 +107,7 @@ OverrideHostLbConfig::makeSelectedEndpointKey(
     return absl::InvalidArgumentError("Empty selected endpoint key");
   }
   if (selected_endpoint_key.header_name.has_value() && selected_endpoint_key.metadata_key.has_value()) {
-    return absl::InvalidArgumentError("Only one selected endpoint key source must be set");
+    return absl::InvalidArgumentError("Only one selected endpoint key must be set");
   }
 
   return absl::optional<OverrideSource>(std::move(selected_endpoint_key));

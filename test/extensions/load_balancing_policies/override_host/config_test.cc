@@ -229,7 +229,11 @@ TEST(OverrideHostLbConfigTest, ValidSelectedEndpointKey) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
-  config_msg.add_selected_endpoint_key()->set_metadata("x-selected-endpoint");
+  config_msg.add_override_host_sources()->set_header("x-foo");
+
+  auto* metadata_key = config_msg.mutable_selected_endpoint_key()->mutable_metadata();
+  metadata_key->set_key("x-bar");
+  metadata_key->add_path()->set_key("a/b/c");
 
   Config fallback_picker_config;
   auto* typed_extension_config =
@@ -251,7 +255,7 @@ TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameSelectedEndpointKey) {
   config_msg.add_override_host_sources()->set_header("x-foo");
 
   // Do not set either host or metadata keys
-  auto* primary_selected_endpoint_key = config_msg.add_selected_endpoint_key();
+  auto* primary_selected_endpoint_key = config_msg.mutable_selected_endpoint_key();
   primary_selected_endpoint_key->set_header("x-selected-endpoint");
   auto* metadata_key = primary_selected_endpoint_key->mutable_metadata();
   metadata_key->set_key("x-bar");
