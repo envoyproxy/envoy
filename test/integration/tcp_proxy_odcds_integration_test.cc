@@ -562,7 +562,7 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
 
   // Complete the requests to the upstreams. There may be a race between the 2
   // connections, so we make the expected streamed bytes the same to avoid
-  // overcomplicating the test.
+  // over-complicating the test.
   FakeRawConnectionPtr fake_upstream_connection1, fake_upstream_connection2;
   ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection1));
   ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection2));
