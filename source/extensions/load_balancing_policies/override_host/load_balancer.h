@@ -58,6 +58,8 @@ class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
   struct OverrideSource {
     static OverrideSource make(const OverrideHost::OverrideHostSource& config);
+    static OverrideSource make(const OverrideHost::SelectedEndpointKey& config);
+
     absl::optional<Http::LowerCaseString> header_name;
     absl::optional<Config::MetadataKey> metadata_key;
   };
@@ -70,14 +72,17 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
+  const std::optional<OverrideSource>& selectedEndpointKey() const { return selected_endpoint_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                       absl::optional<OverrideSource>&& static_endpoint_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
   static absl::StatusOr<std::vector<OverrideSource>> makeOverrideSources(
       const Protobuf::RepeatedPtrField<OverrideHost::OverrideHostSource>& override_sources);
+  static absl::StatusOr<absl::optional<OverrideSource>> makeSelectedEndpoinKey(Const OverrideHost& config);
 
   // Group the factory and config together to make them const in the
   // configuration object.
@@ -88,6 +93,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
+  const std::optional<OverrideSource> selected_endpoint_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
