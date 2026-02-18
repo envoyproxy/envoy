@@ -196,9 +196,10 @@ class OtlpMetricsFlusherImpl : public OtlpMetricsFlusher,
                                public Logger::Loggable<Logger::Id::stats> {
 public:
   OtlpMetricsFlusherImpl(
-      const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
-                                             [](const auto& metric) { return metric.used(); })
-      : config_(config), predicate_(predicate) {}
+      const OtlpOptionsSharedPtr config, const Stats::SymbolTable& symbol_table,
+      std::function<bool(const Stats::Metric&)> predicate =
+          [](const auto& metric) { return metric.used(); })
+      : config_(config), symbol_table_(symbol_table), predicate_(predicate) {}
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
                                 int64_t cumulative_start_time_ns) const override;
@@ -241,6 +242,7 @@ private:
                        int64_t snapshot_time_ns, const Stats::Metric& stat) const;
 
   const OtlpOptionsSharedPtr config_;
+  const Stats::SymbolTable& symbol_table_;
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 

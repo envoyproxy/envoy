@@ -7,6 +7,7 @@ import "envoy/data/accesslog/v3/accesslog.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -49,6 +50,13 @@ message Config {
 
     // The tags for the stat.
     repeated Tag tags = 2;
+
+    // The custom rules to generate the stats. Currently, the only
+    // supported input is
+    // ``envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput``.
+    // The supported actions are
+    // - ``envoy.extensions.matching.actions.transform_stat.v3.TransformStat``.
+    xds.type.matcher.v3.Matcher rules = 3;
   }
 
   // Configuration for a histogram stat.

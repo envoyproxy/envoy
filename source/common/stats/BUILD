@@ -33,6 +33,7 @@ envoy_cc_library(
         ":stats_matcher_lib",
         "//envoy/registry",
         "//envoy/stats:stats_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/stats/v3:pkg_cc_proto",
     ],
 )
@@ -280,6 +281,15 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "stat_matching_data_impl_lib",
+    hdrs = ["stat_matching_data_impl.h"],
     deps = [
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
