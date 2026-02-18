@@ -24,7 +24,7 @@ void DynamicModuleBootstrapExtension::destroy() {
   destroyed_ = true;
 }
 
-void DynamicModuleBootstrapExtension::onServerInitialized() {
+void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance&) {
   if (in_module_extension_ == nullptr) {
     return;
   }
