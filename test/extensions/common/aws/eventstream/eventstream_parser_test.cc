@@ -350,6 +350,7 @@ TEST_F(EventstreamParserTest, ParseMessagePayloadExceedsMax) {
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
   EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kResourceExhausted);
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Payload exceeds maximum"));
 }
 
@@ -377,6 +378,34 @@ TEST_F(EventstreamParserTest, ParseMessageTotalLengthTooSmall) {
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
   EXPECT_FALSE(result.ok());
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid message length"));
+}
+
+// Test total_length exceeds MAX_TOTAL_LENGTH
+TEST_F(EventstreamParserTest, ParseMessageTotalLengthExceedsMax) {
+  uint8_t buffer[16] = {0};
+  // total_length = MAX_TOTAL_LENGTH + 1
+  uint32_t total = MAX_TOTAL_LENGTH + 1;
+  buffer[0] = (total >> 24) & 0xFF;
+  buffer[1] = (total >> 16) & 0xFF;
+  buffer[2] = (total >> 8) & 0xFF;
+  buffer[3] = total & 0xFF;
+  // headers_length = 0
+  buffer[4] = 0;
+  buffer[5] = 0;
+  buffer[6] = 0;
+  buffer[7] = 0;
+  // prelude_crc
+  uint32_t prelude_crc = testComputeCrc32(absl::string_view(reinterpret_cast<char*>(buffer), 8));
+  buffer[8] = (prelude_crc >> 24) & 0xFF;
+  buffer[9] = (prelude_crc >> 16) & 0xFF;
+  buffer[10] = (prelude_crc >> 8) & 0xFF;
+  buffer[11] = prelude_crc & 0xFF;
+
+  auto result =
+      EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kResourceExhausted);
+  EXPECT_TRUE(absl::StrContains(result.status().message(), "Message length exceeds maximum"));
 }
 
 // Test headers_length exceeds available space
@@ -430,6 +459,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeadersLengthExceedsMax) {
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
   EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kResourceExhausted);
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Headers length exceeds maximum"));
 }
 
@@ -633,13 +663,13 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedUuidValue) {
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Header truncated"));
 }
 
-// Test header value too long (> MAX_HEADER_VALUE_LENGTH)
+// Test header value too long (> MAX_HEADER_STRING_LENGTH)
 TEST_F(EventstreamParserTest, ParseMessageHeaderValueTooLong) {
   std::vector<uint8_t> header_bytes;
   header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('s'); // name = "s"
   header_bytes.push_back(7);   // type = String
-  // length = MAX_HEADER_VALUE_LENGTH + 1 = 32768
+  // length = MAX_HEADER_STRING_LENGTH + 1 = 32768
   header_bytes.push_back(0x80);
   header_bytes.push_back(0x00);
 
@@ -651,66 +681,38 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderValueTooLong) {
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Header value too long"));
 }
 
-// Test string with length 0 (allowed for interoperability)
+// Test string with length 0 (spec requires minimum length 1)
 TEST_F(EventstreamParserTest, ParseMessageHeaderStringLengthZero) {
   std::vector<uint8_t> header_bytes;
   header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('s'); // name = "s"
   header_bytes.push_back(7);   // type = String
   header_bytes.push_back(0);
-  header_bytes.push_back(0); // length = 0
-
-  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
-  std::string msg = createEventstreamMessage(headers_data, "");
-
-  auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_TRUE(result->message.has_value());
-  ASSERT_EQ(result->message->headers.size(), 1);
-  EXPECT_EQ(result->message->headers[0].name, "s");
-  EXPECT_EQ(absl::get<std::string>(result->message->headers[0].value.value), "");
-}
-
-// Test byte_array with length 0 (allowed for interoperability)
-TEST_F(EventstreamParserTest, ParseMessageHeaderByteArrayLengthZero) {
-  std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);   // name_length = 1
-  header_bytes.push_back('b'); // name = "b"
-  header_bytes.push_back(6);   // type = ByteArray
-  header_bytes.push_back(0);
-  header_bytes.push_back(0); // length = 0
-
-  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
-  std::string msg = createEventstreamMessage(headers_data, "");
-
-  auto result = EventstreamParser::parseMessage(msg);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_TRUE(result->message.has_value());
-  ASSERT_EQ(result->message->headers.size(), 1);
-  EXPECT_EQ(result->message->headers[0].name, "b");
-  EXPECT_EQ(absl::get<std::string>(result->message->headers[0].value.value), "");
-}
-
-// Test duplicate header names
-TEST_F(EventstreamParserTest, ParseMessageDuplicateHeaderNames) {
-  std::vector<uint8_t> header_bytes;
-
-  // First header: "x" = true
-  header_bytes.push_back(1);
-  header_bytes.push_back('x');
-  header_bytes.push_back(0); // BoolTrue
-
-  // Duplicate header: "x" = false
-  header_bytes.push_back(1);
-  header_bytes.push_back('x');
-  header_bytes.push_back(1); // BoolFalse
+  header_bytes.push_back(0); // length = 0 (invalid per spec)
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string msg = createEventstreamMessage(headers_data, "");
 
   auto result = EventstreamParser::parseMessage(msg);
   EXPECT_FALSE(result.ok());
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Duplicate header name"));
+  EXPECT_TRUE(absl::StrContains(result.status().message(), "must not be empty"));
+}
+
+// Test byte_array with length 0 (spec requires minimum length 1)
+TEST_F(EventstreamParserTest, ParseMessageHeaderByteArrayLengthZero) {
+  std::vector<uint8_t> header_bytes;
+  header_bytes.push_back(1);   // name_length = 1
+  header_bytes.push_back('b'); // name = "b"
+  header_bytes.push_back(6);   // type = ByteArray
+  header_bytes.push_back(0);
+  header_bytes.push_back(0); // length = 0 (invalid per spec)
+
+  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
+  std::string msg = createEventstreamMessage(headers_data, "");
+
+  auto result = EventstreamParser::parseMessage(msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(absl::StrContains(result.status().message(), "must not be empty"));
 }
 
 // Test CRC errors return DataLoss status code

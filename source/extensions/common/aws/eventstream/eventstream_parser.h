@@ -30,7 +30,7 @@ constexpr uint32_t MAX_HEADERS_SIZE = 128 * 1024;                  // 128 KB
 // prelude CRC (which is not a MAC), an attacker could craft a message with an absurd total_length.
 constexpr uint32_t MAX_TOTAL_LENGTH =
     PRELUDE_SIZE + MAX_HEADERS_SIZE + MAX_PAYLOAD_SIZE + TRAILER_SIZE;
-constexpr uint16_t MAX_HEADER_VALUE_LENGTH = 32767;
+constexpr uint16_t MAX_HEADER_STRING_LENGTH = 32767; // 2^15 - 1
 
 // Prelude field offsets.
 constexpr size_t TOTAL_LENGTH_OFFSET = 0;
