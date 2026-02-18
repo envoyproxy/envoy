@@ -1,5 +1,6 @@
 #include <cassert>
 #include <iostream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -373,6 +374,47 @@ public:
     if (auto val = handle_.getMetadataNumber("ns_res_body", "key"); val) {
       assert(false && "metadata type mismatch");
     }
+
+    // Test bool metadata.
+    handle_.setMetadata("ns_res_body_bool", "bool_key", true);
+    if (auto val = handle_.getMetadataBool("ns_res_body_bool", "bool_key"); !val || *val != true) {
+      assert(false && "bool metadata mismatch");
+    }
+    // Set false.
+    handle_.setMetadata("ns_res_body_bool", "bool_key", false);
+    if (auto val = handle_.getMetadataBool("ns_res_body_bool", "bool_key"); !val || *val != false) {
+      assert(false && "bool metadata mismatch for false");
+    }
+    // Try getting bool as string (should fail).
+    if (auto val = handle_.getMetadataString("ns_res_body_bool", "bool_key"); val) {
+      assert(false && "bool/string type mismatch not detected");
+    }
+    // Try getting bool as number (should fail).
+    if (auto val = handle_.getMetadataNumber("ns_res_body_bool", "bool_key"); val) {
+      assert(false && "bool/number type mismatch not detected");
+    }
+
+    // Test getMetadataKeys.
+    handle_.setMetadata("ns_keys_test", "k1", "v1");
+    handle_.setMetadata("ns_keys_test", "k2", 2.0);
+    handle_.setMetadata("ns_keys_test", "k3", true);
+    auto keys = handle_.getMetadataKeys("ns_keys_test");
+    assert(keys.size() == 3 && "expected 3 keys");
+    std::set<std::string> key_set(keys.begin(), keys.end());
+    assert(key_set.count("k1") && key_set.count("k2") && key_set.count("k3") &&
+           "missing expected keys");
+
+    // Non-existing namespace returns empty.
+    auto empty_keys = handle_.getMetadataKeys("non_existing_ns");
+    assert(empty_keys.empty() && "expected empty keys for non-existing namespace");
+
+    // Test getMetadataNamespaces.
+    auto namespaces = handle_.getMetadataNamespaces();
+    assert(!namespaces.empty() && "expected at least one namespace");
+    std::set<std::string> ns_set(namespaces.begin(), namespaces.end());
+    assert(ns_set.count("ns_keys_test") && "missing ns_keys_test in namespaces");
+    assert(ns_set.count("ns_res_body_bool") && "missing ns_res_body_bool in namespaces");
+
     return BodyStatus::Continue;
   }
 
