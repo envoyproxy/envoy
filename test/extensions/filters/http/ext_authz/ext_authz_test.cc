@@ -1219,6 +1219,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
   failure_mode_allow_header_add: true
+  emit_filter_state_stats: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -1250,6 +1251,13 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
+
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  ASSERT_NE(logging_info, nullptr);
+  EXPECT_TRUE(logging_info->failedOpen().has_value());
+  EXPECT_TRUE(logging_info->failedOpen().value());
 }
 
 // Test error response with custom headers and body.

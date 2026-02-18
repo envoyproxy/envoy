@@ -71,6 +71,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   // Gets the gRPC status returned by the authorization server when it is making a gRPC call.
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
+  const absl::optional<bool> failedOpen() const { return failed_open_; }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -83,6 +84,7 @@ public:
   }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
   void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
+  void setFailedOpen() { failed_open_ = true; }
 
   bool hasFieldSupport() const override { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType
@@ -114,6 +116,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The gRPC status returned by the authorization server when it is making a gRPC call.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  // True if the call failed open.
+  absl::optional<bool> failed_open_;
 };
 
 /**
