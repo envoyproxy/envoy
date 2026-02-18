@@ -667,6 +667,7 @@ bulkstring
 bulkstrings
 bursty
 bytecode
+bytearray
 bytestream
 bytestring
 cacert
@@ -840,6 +841,7 @@ evbuffers
 evconnlistener
 evented
 eventfd
+eventstream
 evwatch
 exe
 execlp
