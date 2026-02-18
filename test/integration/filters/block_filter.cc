@@ -19,7 +19,7 @@ namespace Envoy {
 /**
  * A test filter that blocks the thread for a configured duration in decodeHeaders.
  * This is useful for triggering watchdog events in integration tests.
- * Note that the filter uses real threwad sleep to make sure the watchdog thread
+ * Note that the filter uses real thread sleep to make sure the watchdog thread
  * picks up the issue).
  */
 class BlockFilter : public Http::PassThroughFilter {
