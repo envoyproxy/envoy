@@ -46,7 +46,8 @@ SessionCodec::parseCompositeSessionId(const std::string& composite) {
   result.subject = Base64::decode(parts[1]);
 
   if (parts[2].empty()) {
-    return absl::InvalidArgumentError("Empty backend sessions");
+    // No backend sessions (all backends are session-less).
+    return result;
   }
 
   std::vector<std::string> backend_parts = absl::StrSplit(parts[2], ',');
