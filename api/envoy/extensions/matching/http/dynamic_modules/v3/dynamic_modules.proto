@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.http.dynamic_modules.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.http.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/http/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules HTTP Match Input]
+// [#extension: envoy.matching.inputs.dynamic_module_data_input]
+
+// Configuration for the dynamic modules HTTP match input. This input extracts HTTP request and
+// response data from the matching context and makes it available to the dynamic module matcher
+// via ABI callbacks during match evaluation.
+//
+// This data input should be used together with the
+// :ref:`dynamic modules input matcher
+// <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
+message HttpDynamicModuleMatchInput {
+}

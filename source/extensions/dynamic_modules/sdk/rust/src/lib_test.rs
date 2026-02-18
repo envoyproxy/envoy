@@ -415,6 +415,407 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
 }
 
 // =============================================================================
+// Listener Filter Metrics FFI stubs for testing.
+// =============================================================================
+
+/// Tracks the metrics defined and manipulated by listener filter metrics stubs.
+struct ListenerFilterMetricEntry {
+  name: String,
+  value: u64,
+}
+
+static LISTENER_FILTER_COUNTERS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_GAUGES: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+static LISTENER_FILTER_HISTOGRAMS: std::sync::Mutex<Vec<ListenerFilterMetricEntry>> =
+  std::sync::Mutex::new(Vec::new());
+
+fn reset_listener_filter_metrics() {
+  LISTENER_FILTER_COUNTERS.lock().unwrap().clear();
+  LISTENER_FILTER_GAUGES.lock().unwrap().clear();
+  LISTENER_FILTER_HISTOGRAMS.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  let id = counters.len();
+  counters.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *counter_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_counter(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  if id >= counters.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  counters[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  let id = gauges.len();
+  gauges.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *gauge_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_set_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_increment_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value += value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+  if id >= gauges.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  gauges[id].value = gauges[id].value.saturating_sub(value);
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const u8,
+      name.length,
+    ))
+  };
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  let id = histograms.len();
+  histograms.push(ListenerFilterMetricEntry {
+    name: name_str.to_string(),
+    value: 0,
+  });
+  unsafe {
+    *histogram_id_ptr = id;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  id: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let mut histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+  if id >= histograms.len() {
+    return abi::envoy_dynamic_module_type_metrics_result::MetricNotFound;
+  }
+  histograms[id].value = value;
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+// =============================================================================
+// Listener Filter Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_listener_filter_config_define_and_increment_counter() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let counter_id = config.define_counter("test_counter");
+  assert!(counter_id.is_ok());
+  let counter_id = counter_id.unwrap();
+
+  // Verify the counter was registered with the correct name.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters.len());
+    assert_eq!("test_counter", counters[0].name);
+    assert_eq!(0, counters[0].value);
+  }
+
+  // Increment the counter via the filter.
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let result = filter.increment_counter(counter_id, 5);
+  assert!(result.is_ok());
+
+  // Verify the counter value was incremented.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(5, counters[0].value);
+  }
+
+  // Increment again.
+  let result = filter.increment_counter(counter_id, 3);
+  assert!(result.is_ok());
+
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(8, counters[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_multiple_counters() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let id1 = config.define_counter("counter_a").unwrap();
+  let id2 = config.define_counter("counter_b").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  filter.increment_counter(id1, 10).unwrap();
+  filter.increment_counter(id2, 20).unwrap();
+
+  let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+  assert_eq!(2, counters.len());
+  assert_eq!(10, counters[0].value);
+  assert_eq!(20, counters[1].value);
+}
+
+#[test]
+fn test_listener_filter_counter_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Incrementing a counter with an invalid ID should return an error.
+  let result = filter.increment_counter(EnvoyCounterId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_filter_config_define_and_manipulate_gauge() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("test_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge value.
+  filter.set_gauge(gauge_id, 42).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+  }
+
+  // Increase gauge.
+  filter.increase_gauge(gauge_id, 8).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(50, gauges[0].value);
+  }
+
+  // Decrease gauge.
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(40, gauges[0].value);
+  }
+
+  // Set gauge to a new value.
+  filter.set_gauge(gauge_id, 0).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_gauge_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // All gauge operations with an invalid ID should return an error.
+  assert!(filter.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(filter.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_listener_filter_gauge_decrease_saturates_at_zero() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let gauge_id = config.define_gauge("saturating_gauge").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Set gauge to 5 and decrease by 10 - should saturate at 0.
+  filter.set_gauge(gauge_id, 5).unwrap();
+  filter.decrease_gauge(gauge_id, 10).unwrap();
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(0, gauges[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_config_define_and_record_histogram() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let histogram_id = config.define_histogram("test_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Record a value in the histogram.
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+  }
+
+  // Record another value.
+  filter.record_histogram_value(histogram_id, 250).unwrap();
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(250, histograms[0].value);
+  }
+}
+
+#[test]
+fn test_listener_filter_histogram_invalid_id() {
+  reset_listener_filter_metrics();
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Recording a histogram value with an invalid ID should return an error.
+  let result = filter.record_histogram_value(EnvoyHistogramId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_listener_filter_define_all_metric_types() {
+  reset_listener_filter_metrics();
+  let mut config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Define one of each metric type.
+  let counter_id = config.define_counter("my_counter").unwrap();
+  let gauge_id = config.define_gauge("my_gauge").unwrap();
+  let histogram_id = config.define_histogram("my_histogram").unwrap();
+
+  let filter = EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Exercise all metric types.
+  filter.increment_counter(counter_id, 1).unwrap();
+  filter.set_gauge(gauge_id, 42).unwrap();
+  filter.record_histogram_value(histogram_id, 100).unwrap();
+
+  // Verify all values.
+  {
+    let counters = LISTENER_FILTER_COUNTERS.lock().unwrap();
+    assert_eq!(1, counters[0].value);
+    assert_eq!("my_counter", counters[0].name);
+  }
+  {
+    let gauges = LISTENER_FILTER_GAUGES.lock().unwrap();
+    assert_eq!(42, gauges[0].value);
+    assert_eq!("my_gauge", gauges[0].name);
+  }
+  {
+    let histograms = LISTENER_FILTER_HISTOGRAMS.lock().unwrap();
+    assert_eq!(100, histograms[0].value);
+    assert_eq!("my_histogram", histograms[0].name);
+  }
+}
+
+// =============================================================================
 // Network Filter Tests
 // =============================================================================
 
