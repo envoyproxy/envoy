@@ -147,12 +147,12 @@ bool isValidBaggageValue(absl::string_view value) {
 namespace TracingValidation {
 
 bool isValidTraceParent(absl::string_view trace_parent) {
-  if (trace_parent.size() != kTraceParentExpectedSize) {
+  if (trace_parent.size() < kTraceParentExpectedSize) {
     return false;
   }
 
   std::vector<absl::string_view> components = absl::StrSplit(trace_parent, '-');
-  if (components.size() != 4) {
+  if (components.size() < 4) {
     return false;
   }
 

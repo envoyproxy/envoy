@@ -19,9 +19,10 @@ TEST(TracingValidationTest, TraceParentValidation) {
   // Invalid sizes (must be exactly 55)
   EXPECT_FALSE(TracingValidation::isValidTraceParent(""));
   EXPECT_FALSE(TracingValidation::isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra"));
-  EXPECT_FALSE(TracingValidation::isValidTraceParent(
       "0-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
+  // Unknown fields are not validated.
+  EXPECT_TRUE(TracingValidation::isValidTraceParent(
+      "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra"));
 
   // Component size checks (all sum to 55 total but individual sizes are wrong)
   // 1-32-16-2 flags is wrong
