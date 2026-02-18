@@ -1186,6 +1186,13 @@ envoy.matching.matchers.cel_matcher:
   status: stable
   type_urls:
   - xds.type.matcher.v3.CelMatcher
+envoy.matching.matchers.dynamic_modules:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1785,6 +1792,13 @@ envoy.matching.inputs.cel_data_input:
   status: stable
   type_urls:
   - xds.type.matcher.v3.HttpAttributesCelMatchInput
+envoy.matching.inputs.dynamic_module_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

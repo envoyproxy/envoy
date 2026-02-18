@@ -57,9 +57,7 @@ TEST(SessionCodecTest, SubjectWithAtSymbol) {
 
 TEST(SessionCodecTest, ParseInvalidCustomFormat) {
   const std::vector<std::string> invalid_inputs = {
-      "invalid",
-      "no_backends@user",
-      "route@user@",         // Empty backends
+      "invalid", "no_backends@user",
       "route@user@backend",  // Missing colon
       "route@user@:session", // Empty backend name
   };
@@ -67,6 +65,18 @@ TEST(SessionCodecTest, ParseInvalidCustomFormat) {
   for (const auto& input : invalid_inputs) {
     EXPECT_FALSE(SessionCodec::parseCompositeSessionId(input).ok()) << "Input: " << input;
   }
+}
+
+// Backends that don't return mcp-session-id are session-less.
+TEST(SessionCodecTest, ParseEmptyBackendSessions) {
+  std::string composite = absl::StrCat("route1@", SessionCodec::encode("user1"), "@");
+
+  auto result = SessionCodec::parseCompositeSessionId(composite);
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result->route, "route1");
+  EXPECT_EQ(result->subject, "user1");
+  EXPECT_TRUE(result->backend_sessions.empty());
 }
 
 } // namespace

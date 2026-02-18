@@ -544,6 +544,46 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
       "not implemented in this context");
 }
 
+// =====================================================================
+// Matcher weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for matcher_get_headers_size triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, MatcherGetHeadersSizeEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_matcher_get_headers_size(
+            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for matcher_get_headers triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, MatcherGetHeadersEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_matcher_get_headers(
+            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for matcher_get_header_value triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, MatcherGetHeaderValueEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer key = {"test-key", 8};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_matcher_get_header_value(
+            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 0,
+            nullptr);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions
