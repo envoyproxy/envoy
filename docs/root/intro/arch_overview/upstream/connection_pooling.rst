@@ -99,7 +99,7 @@ by specifying additional IP addresses for a host using the
 The addresses specified in this field will be appended in a list to the one specified in
 :ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`.
 
-The list of all addresses will be sorted according the the Happy Eyeballs specification. Non-IP address types
+The list of all addresses will be sorted according to the Happy Eyeballs specification. Non-IP address types
 (e.g. :ref:`internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>` and
 :ref:`pipe <envoy_v3_api_msg_config.core.v3.Pipe>`) are treated as separate address families for the purposes
 of interleaving. A :ref:`Happy Eyeballs configuration <envoy_v3_api_msg_config.cluster.v3.UpstreamConnectionOptions.HappyEyeballsConfig>`

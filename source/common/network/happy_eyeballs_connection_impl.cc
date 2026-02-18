@@ -128,17 +128,17 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
   // the bucket of addresses with that address family.
   std::vector<std::pair<AddressFamily, uint32_t>> family_order;
   std::map<AddressFamily, std::vector<Address::InstanceConstSharedPtr>> buckets;
-  std::set<AddressFamily> seen_families;
   for (const auto& addr : in) {
     AddressFamily family = getFamily(addr);
-    if (seen_families.insert(family).second) {
+    auto& bucket = buckets[family];
+    if (bucket.empty()) {
       if (family == preferred_family) {
         family_order.insert(family_order.begin(), {family, 0});
       } else {
         family_order.push_back({family, 0});
       }
     }
-    buckets[family].push_back(addr);
+    bucket.push_back(addr);
   }
 
   const auto first_address_family_count =
@@ -147,8 +147,8 @@ std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::so
   // Loop through address families.
   for (int i = 0; address_list.size() < in.size(); i = (i + 1) % family_order.size()) {
     std::vector<Address::InstanceConstSharedPtr>& bucket = buckets[family_order[i].first];
-    // Push first_address_family_count addresses for the preferred family. We can't just check if i
-    // == 0 because the preferred family may not be present.
+    // Push first_address_family_count addresses for the preferred family. We can't just check if
+    // i == 0 because the preferred family may not be present.
     int num_addrs_to_push =
         (family_order[i].first == preferred_family) ? first_address_family_count : 1;
     for (int j = 0; family_order[i].second < bucket.size() && j < num_addrs_to_push; ++j) {

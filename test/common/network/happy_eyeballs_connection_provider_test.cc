@@ -176,6 +176,13 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithNonIpFamilies) {
               ip_v6_3, ip_v4_3, pipe_3, internal_3, ip_v6_4, ip_v4_4, pipe_4, internal_4};
   EXPECT_EQ(expected, HappyEyeballsConnectionProvider::sortAddresses(mixed, config));
 
+  // Non-IP address as first address.
+  mixed = {internal_1, internal_2, internal_3, ip_v4_1, ip_v4_2,
+           ip_v6_1,    ip_v4_3,    ip_v6_2,    ip_v6_3};
+  expected = {internal_1, ip_v4_1,    ip_v6_1, internal_2, ip_v4_2,
+              ip_v6_2,    internal_3, ip_v4_3, ip_v6_3};
+  EXPECT_EQ(expected, HappyEyeballsConnectionProvider::sortAddresses(mixed, config));
+
   // Change preferred to IPv4, count=2.
   config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
