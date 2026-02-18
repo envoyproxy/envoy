@@ -22,6 +22,38 @@ using proto_processing_lib::proto_scrubber::FieldCheckResults;
 using proto_processing_lib::proto_scrubber::FieldFilters;
 using proto_processing_lib::proto_scrubber::ScrubberContext;
 
+class CompositeFieldChecker : public FieldCheckerInterface,
+                              public Logger::Loggable<Logger::Id::filter> {
+public:
+  CompositeFieldChecker() = default;
+
+  void addChecker(std::unique_ptr<FieldCheckerInterface> checker) {
+    checkers_.push_back(std::move(checker));
+  }
+
+  using FieldCheckerInterface::CheckField;
+
+  FieldCheckResults CheckField(const std::vector<std::string>& path, const Protobuf::Field* field,
+                               const int field_depth,
+                               const Protobuf::Type* parent_type) const override {
+    FieldCheckResults result = FieldCheckResults::kInclude;
+    for (const auto& checker : checkers_) {
+      const FieldCheckResults checker_result =
+          checker->CheckField(path, field, field_depth, parent_type);
+      if (checker_result == FieldCheckResults::kExclude) {
+        return FieldCheckResults::kExclude;
+      }
+      if (checker_result == FieldCheckResults::kPartial) {
+        result = FieldCheckResults::kPartial;
+      }
+    }
+    return result;
+  }
+
+private:
+  std::vector<std::unique_ptr<FieldCheckerInterface>> checkers_;
+};
+
 /**
  * FieldChecker class encapsulates the scrubbing logic of `ProtoApiScrubber` filter.
  * This `FieldChecker` would be integrated with `proto_processing_lib::proto_scrubber` library for
@@ -119,6 +151,27 @@ private:
   // Cache to store match results.
   mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*, Matcher::MatchResult>
       match_result_cache_;
+};
+
+class UnknownFieldChecker : public FieldCheckerInterface,
+                            public Logger::Loggable<Logger::Id::filter> {
+public:
+  UnknownFieldChecker() = default;
+
+  // This type is neither copyable nor movable.
+  UnknownFieldChecker(const UnknownFieldChecker&) = delete;
+  UnknownFieldChecker& operator=(const UnknownFieldChecker&) = delete;
+  ~UnknownFieldChecker() override {}
+
+  using FieldCheckerInterface::CheckField;
+
+  FieldCheckResults CheckField(const std::vector<std::string>&, const Protobuf::Field* field,
+                               const int, const Protobuf::Type*) const override {
+    if (field == nullptr) {
+      return FieldCheckResults::kExclude;
+    }
+    return FieldCheckResults::kInclude;
+  }
 };
 
 } // namespace ProtoApiScrubber

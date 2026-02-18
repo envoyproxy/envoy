@@ -41,6 +41,9 @@ message ProtoApiScrubberConfig {
 
   // Specifies the filtering mode of this filter.
   FilteringMode filtering_mode = 3;
+
+  // If true, the filter will scrub unknown fields from the protobuf messages.
+  bool scrub_unknown_fields = 4;
 }
 
 // Specifies the descriptor set for proto services.
