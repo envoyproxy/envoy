@@ -79,15 +79,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   // Set trace id(s)
   if (trace_id_128bit_) {
-    if (timestamp_trace_ids_) {
-      // 128-bit: low 64 random, high 64 timestamp-prefixed
-      span_ptr->setTraceId(random_number);
-      span_ptr->setTraceIdHigh(generateTraceId());
-    } else {
-      // Legacy behavior: 64-bit trace id equals span id; high 64 random
-      span_ptr->setTraceId(random_number);
-      span_ptr->setTraceIdHigh(random_generator_.random());
-    }
+    span_ptr->setTraceId(random_number);
+    span_ptr->setTraceIdHigh(generateTraceId());
   } else {
     if (timestamp_trace_ids_) {
       // 64-bit: timestamp-prefixed
