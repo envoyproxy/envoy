@@ -145,6 +145,10 @@ TEST_P(McpRouterIntegrationTest, PingReturnsEmptyResult) {
   EXPECT_THAT(response->body(), testing::HasSubstr("\"jsonrpc\":\"2.0\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"id\":3"));
   EXPECT_THAT(response->body(), testing::HasSubstr("\"result\":{}"));
+
+  // Verify stats: ping is a direct response
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
 }
 
 // Test notifications/initialized request returns 202 Accepted
@@ -171,6 +175,11 @@ TEST_P(McpRouterIntegrationTest, NotificationInitializedReturns202) {
   // Notification should return 202 Accepted immediately
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("202", response->headers().getStatusValue());
+
+  // Verify stats: notification is a direct response with fanout
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_direct_response", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
 }
 
 // Test invalid JSON returns 400
@@ -296,6 +305,95 @@ TEST_P(McpRouterIntegrationTest, InitializeFanoutToBothBackends) {
 
   EXPECT_THAT(response->body(), testing::HasSubstr("protocolVersion"));
   EXPECT_THAT(response->body(), testing::HasSubstr("envoy-mcp-gateway"));
+
+  // Verify stats: initialize is a fanout operation
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
+}
+
+// Test initialize succeeds when backends don't return mcp-session-id headers (session-less mode)
+TEST_P(McpRouterIntegrationTest, InitializeWithoutSessionIds) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "id": 1,
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": {"name": "test-client", "version": "1.0"}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Wait for request on time backend (fake_upstreams_[0])
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Wait for request on tools backend (fake_upstreams_[1])
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Send response from time backend WITHOUT mcp-session-id
+  const std::string time_response = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "serverInfo": {"name": "time-server", "version": "1.0"},
+      "capabilities": {"tools": {}}
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl time_body(time_response);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Send response from tools backend WITHOUT mcp-session-id
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "serverInfo": {"name": "tools-server", "version": "1.0"},
+      "capabilities": {"tools": {}}
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify response does NOT have mcp-session-id header when no backends returned one
+  auto session_header = response->headers().get(Http::LowerCaseString("mcp-session-id"));
+  EXPECT_TRUE(session_header.empty());
+
+  // Verify the response body contains gateway capabilities
+  EXPECT_THAT(response->body(), testing::HasSubstr("protocolVersion"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("envoy-mcp-gateway"));
+
+  // Verify stats
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_fanout", 1);
 }
 
 // Test tools/list request fans out to both backends and aggregates tools with prefixes
@@ -422,6 +520,10 @@ TEST_P(McpRouterIntegrationTest, ToolCallRoutesToCorrectBackend) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), testing::HasSubstr("2023-10-27T10:00:00Z"));
+
+  // Verify stats: tool call with body rewrite
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_body_rewrite", 1);
 }
 
 // Test tools/call routes to the second backend (tools) based on prefix
@@ -847,9 +949,12 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Unknown backend prefix should return 400 Bad Request
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
+
+  // Verify stats: unknown backend
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_unknown_backend", 1);
 }
 
 // Test tools/call with SSE response from backend returns SSE to client
@@ -1980,6 +2085,10 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMismatchReturns403) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
+
+  // Verify stats: auth failure (subject mismatch)
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_total", 1);
+  test_server_->waitForCounterEq("http.config_test.mcp_router.rq_auth_failure", 1);
 }
 
 // Missing auth header returns 403
