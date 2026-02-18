@@ -31,6 +31,7 @@ public:
   MOCK_METHOD(std::string, version, ());
   MOCK_METHOD(Thread::BasicLockable&, logLock, ());
   MOCK_METHOD(Thread::BasicLockable&, accessLogLock, ());
+  MOCK_METHOD(bool, isInitializing, (), (const, override));
   MOCK_METHOD(Stats::Allocator&, statsAllocator, ());
 
 private:

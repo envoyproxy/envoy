@@ -57,6 +57,9 @@ message ServerInfo {
 
   // Populated node identity of this server.
   config.core.v3.Node node = 7;
+
+  // Whether the server is currently initializing during a hot restart.
+  bool hot_restart_initializing = 8;
 }
 
 // [#next-free-field: 43]
