@@ -1,5 +1,6 @@
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -30,6 +31,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "load_balancer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +50,7 @@ using ::Envoy::Upstream::LoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
-                                           absl::optional<OverrideSource>&& static_endpoint_key,
+                                           absl::optional<OverrideSource>&& selected_endpoint_key,
                                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                            LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
@@ -93,19 +95,22 @@ OverrideHostLbConfig::makeOverrideSources(
   return result;
 }
 
-absl::StatusOr<absl::optional<OverrideSource>>
-OverrideHostLbConfig::makeSelectedEndpoinKey(
+absl::StatusOr<absl::optional<OverrideHostLbConfig::OverrideSource>>
+OverrideHostLbConfig::makeSelectedEndpointKey(
       const OverrideHost& config) {
-  absl::optional<OverrideSource> result;
   if (!config.has_selected_endpoint_key()) {
     return absl::nullopt;
   }
-  const auto& key = config.selected_endpoint_key();
-  auto result = absl::optional<OverrideSource>(OverrideSource::make(key));
+  OverrideHostLbConfig::OverrideSource selected_endpoint_key = OverrideSource::make(config.selected_endpoint_key());
 
-  // TODO Ensure only one of the metadata key or header is present
+  if (!selected_endpoint_key.header_name.has_value() && !selected_endpoint_key.metadata_key.has_value()) {
+    return absl::InvalidArgumentError("Empty selected endpoint key");
+  }
+  if (selected_endpoint_key.header_name.has_value() && selected_endpoint_key.metadata_key.has_value()) {
+    return absl::InvalidArgumentError("Only one selected endpoint key source must be set");
+  }
 
-  return result;
+  return absl::optional<OverrideSource>(std::move(selected_endpoint_key));
 }
 
 absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>>
@@ -114,6 +119,9 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
   absl::StatusOr<std::vector<OverrideSource>> override_host_sources =
       makeOverrideSources(config.override_host_sources());
   RETURN_IF_NOT_OK(override_host_sources.status());
+  absl::StatusOr<absl::optional<OverrideSource>> selected_endpoint_key =
+      makeSelectedEndpointKey(config);
+  RETURN_IF_NOT_OK(selected_endpoint_key.status());
   ASSERT(config.has_fallback_policy());
   absl::InlinedVector<absl::string_view, 4> missing_policies;
   for (const auto& policy : config.fallback_policy().policies()) {
@@ -130,7 +138,9 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
       return std::unique_ptr<OverrideHostLbConfig>(
-          new OverrideHostLbConfig(std::move(override_host_sources).value(), factory,
+          new OverrideHostLbConfig(std::move(override_host_sources).value(),
+                                   std::move(selected_endpoint_key).value(),
+                                   factory,
                                    std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());

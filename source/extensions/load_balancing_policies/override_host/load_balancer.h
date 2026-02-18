@@ -78,13 +78,13 @@ public:
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
-                       absl::optional<OverrideSource>&& static_endpoint_key,
+                       absl::optional<OverrideSource>&& selected_endpoint_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
   static absl::StatusOr<std::vector<OverrideSource>> makeOverrideSources(
       const Protobuf::RepeatedPtrField<OverrideHost::OverrideHostSource>& override_sources);
-  static absl::StatusOr<absl::optional<OverrideSource>> makeSelectedEndpoinKey(
+  static absl::StatusOr<absl::optional<OverrideSource>> makeSelectedEndpointKey(
       const OverrideHost& config);
 
   // Group the factory and config together to make them const in the
@@ -96,7 +96,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
-  const ::optional<OverrideSource> selected_endpoint_key_;
+  const absl::optional<OverrideSource> selected_endpoint_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint

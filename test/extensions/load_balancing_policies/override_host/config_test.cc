@@ -232,7 +232,7 @@ TEST(OverrideHostLbConfigTest, ValidSelectedEndpointKey) {
   config_msg.add_selected_endpoint_key()->set_metadata("x-selected-endpoint");
 
   Config fallback_picker_config;
-  typed_extension_config =
+  auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
@@ -252,13 +252,13 @@ TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameSelectedEndpointKey) {
 
   // Do not set either host or metadata keys
   auto* primary_selected_endpoint_key = config_msg.add_selected_endpoint_key();
-  primary_host_source->set_header("x-selected-endpoint");
+  primary_selected_endpoint_key->set_header("x-selected-endpoint");
   auto* metadata_key = primary_selected_endpoint_key->mutable_metadata();
   metadata_key->set_key("x-bar");
   metadata_key->add_path()->set_key("a/b/c");
 
   Config fallback_picker_config;
-  typed_extension_config =
+  auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
