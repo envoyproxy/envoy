@@ -281,6 +281,71 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
 }
 
 /**
+ * Helper to get the metadata object from the stream info.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source the location of the metadata to use.
+ * @return the metadata object if it exists, nullptr otherwise.
+ */
+const envoy::config::core::v3::Metadata*
+getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+            envoy_dynamic_module_type_metadata_source metadata_source) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (!callbacks) {
+    return nullptr;
+  }
+  auto& stream_info = callbacks->streamInfo();
+
+  switch (metadata_source) {
+  case envoy_dynamic_module_type_metadata_source_Dynamic: {
+    return &stream_info.dynamicMetadata();
+  }
+  case envoy_dynamic_module_type_metadata_source_Route: {
+    auto route = stream_info.route();
+    if (route) {
+      return &route->metadata();
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_metadata_source_Cluster: {
+    auto clusterInfo = callbacks->clusterInfo();
+    if (clusterInfo) {
+      return &clusterInfo->metadata();
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_metadata_source_Host: {
+    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
+    if (upstreamInfo) {
+      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
+      if (hostInfo) {
+        Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
+        if (md) {
+          return md.get();
+        }
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_metadata_source_HostLocality: {
+    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
+    if (upstreamInfo) {
+      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
+      if (hostInfo) {
+        Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
+        if (md) {
+          return md.get();
+        }
+      }
+    }
+    break;
+  }
+  }
+  return nullptr;
+}
+
+/**
  * Helper to get the dynamic metadata namespace from the stream info. if the namespace does not
  * exist, it will be create, assuming stream info is available.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
@@ -905,6 +970,95 @@ bool envoy_dynamic_module_callback_http_get_metadata_string(
   return true;
 }
 
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value) {
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
+    // TODO(wbpcode): this should never happen and we should simplify this.
+    return;
+  }
+  absl::string_view key_view{key.ptr, key.length};
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_bool_value(value);
+  metadata_namespace->MergeFrom(metadata_value);
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool* result) {
+  const auto key_metadata = getMetadataValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!key_metadata) {
+    return false;
+  }
+  if (!key_metadata->has_bool_value()) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+        fmt::format("key {} is not a bool", absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  *result = key_metadata->bool_value();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_http_get_metadata_keys_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns) {
+  const auto metadata_namespace = getMetadataNamespace(filter_envoy_ptr, metadata_source, ns);
+  if (!metadata_namespace) {
+    return 0;
+  }
+  return metadata_namespace->fields().size();
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_keys(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  const auto metadata_namespace = getMetadataNamespace(filter_envoy_ptr, metadata_source, ns);
+  if (!metadata_namespace) {
+    return false;
+  }
+  size_t i = 0;
+  for (const auto& field : metadata_namespace->fields()) {
+    result_buffer_vector[i] = {field.first.data(), field.first.size()};
+    i++;
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source) {
+  const auto metadata = getMetadata(filter_envoy_ptr, metadata_source);
+  if (!metadata) {
+    return 0;
+  }
+  return metadata->filter_metadata().size();
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_namespaces(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  const auto metadata = getMetadata(filter_envoy_ptr, metadata_source);
+  if (!metadata) {
+    return false;
+  }
+  size_t i = 0;
+  for (const auto& ns : metadata->filter_metadata()) {
+    result_buffer_vector[i] = {ns.first.data(), ns.first.size()};
+    i++;
+  }
+  return true;
+}
+
 bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
@@ -1234,6 +1388,27 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
+  }
+  return ok;
+}
+
+bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_ConnectionMtls: {
+    const auto connection = filter->connection();
+    if (connection.has_value() && connection->ssl()) {
+      *result = connection->ssl()->peerCertificatePresented();
+      ok = true;
+    }
+    break;
+  }
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Unsupported attribute ID {} as bool", static_cast<int64_t>(attribute_id));
   }
   return ok;
 }

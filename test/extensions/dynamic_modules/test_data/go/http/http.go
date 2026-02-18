@@ -334,6 +334,64 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 	if _, ok := p.handle.GetMetadataNumber(shared.MetadataSourceTypeDynamic, "ns_res_body", "key"); ok {
 		panic("metadata type mismatch")
 	}
+
+	// Test bool metadata.
+	p.handle.SetMetadata("ns_res_body_bool", "bool_key", true)
+	if val, ok := p.handle.GetMetadataBool(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); !ok || val != true {
+		panic("bool metadata mismatch")
+	}
+	// Set false.
+	p.handle.SetMetadata("ns_res_body_bool", "bool_key", false)
+	if val, ok := p.handle.GetMetadataBool(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); !ok || val != false {
+		panic("bool metadata mismatch for false")
+	}
+	// Try getting bool as string (should fail).
+	if _, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); ok {
+		panic("bool/string type mismatch not detected")
+	}
+	// Try getting bool as number (should fail).
+	if _, ok := p.handle.GetMetadataNumber(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); ok {
+		panic("bool/number type mismatch not detected")
+	}
+
+	// Test GetMetadataKeys.
+	p.handle.SetMetadata("ns_keys_test", "k1", "v1")
+	p.handle.SetMetadata("ns_keys_test", "k2", 2.0)
+	p.handle.SetMetadata("ns_keys_test", "k3", true)
+	keys := p.handle.GetMetadataKeys(shared.MetadataSourceTypeDynamic, "ns_keys_test")
+	if len(keys) != 3 {
+		panic(fmt.Sprintf("expected 3 keys, got %d", len(keys)))
+	}
+	keySet := make(map[string]bool)
+	for _, k := range keys {
+		keySet[k] = true
+	}
+	if !keySet["k1"] || !keySet["k2"] || !keySet["k3"] {
+		panic(fmt.Sprintf("missing expected keys: %v", keys))
+	}
+
+	// Non-existing namespace returns nil.
+	if keys := p.handle.GetMetadataKeys(shared.MetadataSourceTypeDynamic, "non_existing_ns"); keys != nil {
+		panic("expected nil keys for non-existing namespace")
+	}
+
+	// Test GetMetadataNamespaces - we've set metadata in multiple namespaces across phases.
+	namespaces := p.handle.GetMetadataNamespaces(shared.MetadataSourceTypeDynamic)
+	if len(namespaces) == 0 {
+		panic("expected at least one namespace")
+	}
+	nsSet := make(map[string]bool)
+	for _, ns := range namespaces {
+		nsSet[ns] = true
+	}
+	// We set "ns_keys_test" and "ns_res_body_bool" above in this phase.
+	if !nsSet["ns_keys_test"] {
+		panic(fmt.Sprintf("missing ns_keys_test in namespaces: %v", namespaces))
+	}
+	if !nsSet["ns_res_body_bool"] {
+		panic(fmt.Sprintf("missing ns_res_body_bool in namespaces: %v", namespaces))
+	}
+
 	return shared.BodyStatusContinue
 }
 
