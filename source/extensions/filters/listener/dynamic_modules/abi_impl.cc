@@ -381,15 +381,6 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 }
 
 void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
-  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->callbacks();
-  if (callbacks != nullptr) {
-    callbacks->socket().ioHandle().close();
-  }
-}
-
-void envoy_dynamic_module_callback_listener_filter_close_socket_with_details(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer details) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);

@@ -6156,12 +6156,9 @@ pub trait EnvoyListenerFilter {
   /// Get the index of the current worker thread.
   fn get_worker_index(&self) -> u32;
 
-  /// Close the socket immediately.
-  fn close_socket(&mut self);
-
-  /// Close the socket immediately with a specific termination reason.
-  /// The details are set on the connection's stream info before closing.
-  fn close_socket_with_details(&mut self, details: &str);
+  /// Close the socket immediately. If details is provided, the termination reason is set on the
+  /// connection's stream info before closing.
+  fn close_socket<'a>(&mut self, details: Option<&'a str>);
 
   /// Write data directly to the raw socket.
   /// This is useful for protocol negotiation at the listener filter level,
@@ -6774,17 +6771,16 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
   }
 
-  fn close_socket(&mut self) {
+  fn close_socket(&mut self, details: Option<&str>) {
     unsafe {
-      abi::envoy_dynamic_module_callback_listener_filter_close_socket(self.raw);
-    }
-  }
-
-  fn close_socket_with_details(&mut self, details: &str) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_listener_filter_close_socket_with_details(
+      abi::envoy_dynamic_module_callback_listener_filter_close_socket(
         self.raw,
-        str_to_module_buffer(details),
+        details.map(str_to_module_buffer).unwrap_or(
+          abi::envoy_dynamic_module_type_module_buffer {
+            ptr: std::ptr::null_mut(),
+            length: 0,
+          },
+        ),
       );
     }
   }

@@ -842,19 +842,6 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) 
 // Tests for close_socket.
 // =============================================================================
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketNullCallbacks) {
-  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->onAccept(callbacks_);
-  filter->setCallbacksForTest(nullptr);
-
-  // Should not crash.
-  envoy_dynamic_module_callback_listener_filter_close_socket(static_cast<void*>(filter.get()));
-}
-
-// =============================================================================
-// Tests for close_socket_with_details.
-// =============================================================================
-
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetails) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
@@ -865,10 +852,10 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetails) {
 
   char details[] = "connection_rejected";
   envoy_dynamic_module_type_module_buffer details_buf = {details, 19};
-  envoy_dynamic_module_callback_listener_filter_close_socket_with_details(filterPtr(), details_buf);
+  envoy_dynamic_module_callback_listener_filter_close_socket(filterPtr(), details_buf);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetailsEmptyDetails) {
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketEmptyDetails) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, close())
@@ -877,10 +864,10 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetailsEmptyDe
   EXPECT_CALL(callbacks_.stream_info_, setConnectionTerminationDetails(testing::_)).Times(0);
 
   envoy_dynamic_module_type_module_buffer details_buf = {nullptr, 0};
-  envoy_dynamic_module_callback_listener_filter_close_socket_with_details(filterPtr(), details_buf);
+  envoy_dynamic_module_callback_listener_filter_close_socket(filterPtr(), details_buf);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetailsNullCallbacks) {
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
@@ -888,8 +875,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetailsNullCal
   char details[] = "connection_rejected";
   envoy_dynamic_module_type_module_buffer details_buf = {details, 19};
   // Should not crash.
-  envoy_dynamic_module_callback_listener_filter_close_socket_with_details(
-      static_cast<void*>(filter.get()), details_buf);
+  envoy_dynamic_module_callback_listener_filter_close_socket(static_cast<void*>(filter.get()),
+                                                             details_buf);
 }
 
 // =============================================================================

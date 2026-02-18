@@ -4281,22 +4281,13 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
- * the socket immediately.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- */
-void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
-
-/**
- * envoy_dynamic_module_callback_listener_filter_close_socket_with_details is called by the module
- * to close the socket immediately with a specific termination reason. The details are set on the
+ * the socket immediately. If details is non-empty, the termination reason is set on the
  * connection's stream info before closing.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param details is the termination reason string owned by the module. Can be empty.
+ * @param details is the optional termination reason string owned by the module. Can be empty.
  */
-void envoy_dynamic_module_callback_listener_filter_close_socket_with_details(
+void envoy_dynamic_module_callback_listener_filter_close_socket(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer details);
 
