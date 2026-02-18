@@ -167,6 +167,11 @@ new_features:
   change: |
     Added filter state read/write support for dynamic module cert validators, allowing modules to set and
     get string values in the connection's filter state during certificate chain verification.
+- area: dynamic_modules
+  change: |
+    Added HTTP callout support for dynamic module listener filters, enabling listener filters to initiate
+    asynchronous HTTP requests to upstream clusters and receive responses via the ``send_http_callout`` ABI
+    callback and ``on_listener_filter_http_callout_done`` event hook.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
