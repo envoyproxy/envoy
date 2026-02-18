@@ -128,7 +128,8 @@ bug_fixes:
   change: |
     Published contrib binaries now include the ``-contrib`` suffix in their version string.
 
-removed_config_or_runtime: # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
 - area: dynamic_modules
