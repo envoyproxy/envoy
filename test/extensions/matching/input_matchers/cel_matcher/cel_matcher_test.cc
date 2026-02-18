@@ -371,6 +371,24 @@ TEST_F(CelMatcherTest, CelMatcherWithResponseShortCircuitedWithMatchingRequest) 
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
+TEST_F(CelMatcherTest, CelMatcherNoMatchRequestButOrResponseMatches) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderOrPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/bar"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
 TEST_F(CelMatcherTest, CelMatcherWithResponseShortCircuitedWithNonMatchingRequest) {
   auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
 
