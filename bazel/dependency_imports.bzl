@@ -102,6 +102,9 @@ def envoy_dependency_imports(
         sum = "h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=",
         version = "v1.68.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
+        ],
     )
     go_repository(
         name = "org_golang_x_net",
@@ -123,6 +126,9 @@ def envoy_dependency_imports(
         sum = "h1:+2XxjfsAu6vqFxwGBRcHiMaDCuZiqXGDUDVWVtrFAnE=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
+        ],
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_rpc",
