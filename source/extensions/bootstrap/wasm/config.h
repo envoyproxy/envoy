@@ -43,7 +43,7 @@ public:
     ASSERT(plugin_config_ != nullptr);
     return *plugin_config_;
   }
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override {};
 
 private:
