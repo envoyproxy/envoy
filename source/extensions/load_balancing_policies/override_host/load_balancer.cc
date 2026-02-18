@@ -48,14 +48,26 @@ using ::Envoy::Upstream::LoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                                           absl::optional<OverrideSource>&& static_endpoint_key,
                                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                            LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
                                  std::move(fallback_load_balancer_config)},
-      override_host_sources_(std::move(override_host_sources)) {}
+      override_host_sources_(std::move(override_host_sources)),
+      selected_endpoint_key_(std::move(selected_endpoint_key)) {}
 
 OverrideHostLbConfig::OverrideSource
 OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
+  return OverrideHostLbConfig::OverrideSource{
+      !config.header().empty()
+          ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(config.header()))
+          : absl::nullopt,
+      config.has_metadata() ? absl::optional<Config::MetadataKey>(config.metadata())
+                            : absl::nullopt};
+}
+
+OverrideHostLbConfig::OverrideSource
+OverrideHostLbConfig::OverrideSource::make(const OverrideHost::SelectedEndpointKey& config) {
   return OverrideHostLbConfig::OverrideSource{
       !config.header().empty()
           ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(config.header()))
@@ -78,6 +90,21 @@ OverrideHostLbConfig::makeOverrideSources(
       return absl::InvalidArgumentError("Only one override source must be set");
     }
   }
+  return result;
+}
+
+absl::StatusOr<absl::optional<OverrideSource>>
+OverrideHostLbConfig::makeSelectedEndpoinKey(
+      const OverrideHost& config) {
+  absl::optional<OverrideSource> result;
+  if (!config.has_selected_endpoint_key()) {
+    return absl::nullopt;
+  }
+  const auto& key = config.selected_endpoint_key();
+  auto result = absl::optional<OverrideSource>(OverrideSource::make(key));
+
+  // TODO Ensure only one of the metadata key or header is present
+
   return result;
 }
 
