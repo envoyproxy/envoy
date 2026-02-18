@@ -116,7 +116,7 @@ public:
   // Helper method to set up upstream thread local slot for testing.
   void setupUpstreamThreadLocalSlot() {
     // Call onServerInitialized to set up the extension references properly.
-        NiceMock<Server::MockInstance> instance;
+    NiceMock<Server::MockInstance> instance;
     upstream_extension_->onServerInitialized(instance);
 
     // Create a thread local registry for upstream with the dispatcher.

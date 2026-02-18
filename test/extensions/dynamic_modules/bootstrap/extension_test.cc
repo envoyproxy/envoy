@@ -1,10 +1,10 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/server/instance.h"
 
 #include "gtest/gtest.h"
 

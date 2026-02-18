@@ -190,7 +190,7 @@ public:
 
     // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
     // event creation.
-        NiceMock<Server::MockInstance> instance;
+    NiceMock<Server::MockInstance> instance;
     extension_->onServerInitialized(instance);
   }
 
