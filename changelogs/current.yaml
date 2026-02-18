@@ -7,6 +7,12 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
+- area: health_check
+  change: |
+    Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
+    were fetched, causing intermittent health check failures `#43116 <https://github.com/envoyproxy/envoy/issues/43116>`_.
+    This fix can be disabled by setting runtime guard ``envoy.reloadable_features.health_check_after_cluster_warming``
+    to ``false``.
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 removed_config_or_runtime:

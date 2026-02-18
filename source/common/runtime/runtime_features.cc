@@ -49,6 +49,7 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_aborted_can_not_continue);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
 RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
+RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_allow_cr_or_lf_at_request_start);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
@@ -115,7 +116,6 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_prevent_resource_copy);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
-RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -181,10 +181,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
-
-// TODO(yavlasov): Enabling by default will be hugely disruptive to existing traffic.
-// Replace with a config option (default off) post CVE release.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_reject_early_connect_data);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
