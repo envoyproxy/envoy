@@ -136,7 +136,7 @@ def envoy_copts(repository, test = False):
 # This replaces the need for native.bind() calls and //external: references.
 EXTERNAL_DEPS_MAP = {
     # Abseil
-    "abseil_strings": "@com_google_absl//absl/strings",
+    "abseil_strings": "@abseil-cpp//absl/strings",
     # gRPC transcoding
     "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
     "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",

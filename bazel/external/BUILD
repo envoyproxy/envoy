@@ -14,8 +14,8 @@ cc_library(
     srcs = [":empty.cc"],
     tags = ["skip_on_windows"],
     deps = [
-        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
-        "@com_google_googletest//:gtest",
+        "@dd-trace-cpp//:dd_trace_cpp",
+        "@googletest//:gtest",
     ],
 )
 

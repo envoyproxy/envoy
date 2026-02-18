@@ -1,0 +1,20 @@
+# Docs-specific dependencies
+envoy.docs.sphinx_runner>=0.2.9
+sphinx>=8.1.3,<9
+sphinxcontrib-applehelp>=1.0.8
+sphinxcontrib-devhelp>=1.0.6
+sphinxcontrib.googleanalytics
+sphinxcontrib-htmlhelp>=2.0.5
+sphinxcontrib-qthelp>=1.0.7
+sphinxcontrib-serializinghtml>=1.1.10
+sphinx-rtd-theme>=3.0.2
+
+# Shared dependencies (also in main workspace)
+aio.run.runner
+envoy.base.utils>=0.5.10
+envoy.code.check>=0.5.12
+frozendict>=2.3.7
+jinja2
+packaging
+pyyaml
+uvloop==0.20.0

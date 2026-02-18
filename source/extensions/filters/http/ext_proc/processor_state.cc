@@ -572,7 +572,7 @@ QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data
 
 void ProcessorState::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
   onFinishProcessorCall(call_status);
-  if (chunkQueue().receivedData().length() > 0) {
+  if (!chunkQueue().empty()) {
     const auto& all_data = consolidateStreamedChunks();
     ENVOY_STREAM_LOG(trace, "Injecting leftover buffer of {} bytes", *filter_callbacks_,
                      chunkQueue().receivedData().length());

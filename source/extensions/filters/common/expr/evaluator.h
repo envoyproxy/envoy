@@ -15,13 +15,13 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
+#include "envoy/config/core/v3/cel.pb.h"
+
+#include "cel/expr/syntax.pb.h"
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
-
 #include "xds/type/v3/cel.pb.h"
-#include "cel/expr/syntax.pb.h"
-#include "envoy/config/core/v3/cel.pb.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop

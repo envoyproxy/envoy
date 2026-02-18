@@ -29,9 +29,9 @@ envoy_cc_library(
     deps = [
         "//bazel:ssl",
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -42,6 +42,6 @@ envoy_cc_library(
         "simple_lru_cache_inl.h",
     ],
     deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

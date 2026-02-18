@@ -23,6 +23,9 @@
 #include "source/common/network/socket_interface.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "fmt/format.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -55,6 +58,14 @@ public:
    */
   UpstreamSocketManager* socketManager() { return socket_manager_.get(); }
   const UpstreamSocketManager* socketManager() const { return socket_manager_.get(); }
+
+  // Per-worker tracking of unique clusters and nodes (no mutex needed - single worker thread).
+  // Maps track connection counts per cluster/node. Size of map = number of unique clusters/nodes.
+  absl::flat_hash_map<std::string, uint64_t> cluster_connection_counts_;
+  absl::flat_hash_map<std::string, uint64_t> node_connection_counts_;
+  // Per-worker aggregate metrics gauges.
+  Stats::Gauge* total_clusters_gauge_{nullptr};
+  Stats::Gauge* total_nodes_gauge_{nullptr};
 
 private:
   // Thread-local dispatcher.
@@ -218,6 +229,16 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   ReverseTunnelReporterPtr reporter_{nullptr};
+
+  /**
+   * Update per-worker aggregate metrics (total_clusters and total_nodes).
+   * This is an internal function called only from updateConnectionStats.
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
+   */
+  void updatePerWorkerAggregateMetrics(const std::string& node_id, const std::string& cluster_id,
+                                       bool increment);
 
   /**
    * Update per-worker connection stats for debugging.
