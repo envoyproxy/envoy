@@ -13,8 +13,8 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 
