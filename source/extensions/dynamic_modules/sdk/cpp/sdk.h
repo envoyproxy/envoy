@@ -426,6 +426,11 @@ public:
    */
   virtual void setMetadata(absl::string_view ns, absl::string_view key, bool value) = 0;
 
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  void setMetadata(absl::string_view ns, absl::string_view key, const char* value) {
+    setMetadata(ns, key, absl::string_view(value));
+  }
+
   /**
    * Retrieves the serialized filter state value of the stream.
    * @param key The filter state key.
