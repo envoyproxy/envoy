@@ -46,6 +46,13 @@ minor_behavior_changes:
     Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
     instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
     This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
+- area: upstream
+  change: |
+    EDS host metadata comparison during ``updateDynamicHostList`` now uses a cached metadata hash
+    instead of ``MessageDifferencer::Equivalent``. The hash is computed once when metadata is set,
+    making per-host comparison O(1). In rare cases where two semantically equivalent metadata messages
+    have different serializations, this may cause a spurious metadata update (false positive) but will
+    never miss an actual change.
 - area: histograms
   change: |
     Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
@@ -55,9 +62,17 @@ minor_behavior_changes:
   change: |
     OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
     stopped reporting empty delta counters and histograms.
+- area: ext_proc
+  change: |
+    added received_immediate_response flag in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dynamic_modules
+  change: |
+    Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
+    resolves an error when a dynamic modules network filter closes a connection that has an HTTP filter present.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
@@ -124,6 +139,12 @@ bug_fixes:
 - area: release
   change: |
     Published contrib binaries now include the ``-contrib`` suffix in their version string.
+- area: header_mutation
+  change: |
+    Fixed an issue where query parameter values added via ``query_parameter_mutations`` were not URL-encoded,
+    allowing query parameter injection attacks. Values from formatters like ``%REQ(header)%`` are now properly
+    URL-encoded when added to the query string. This behavior is controlled by the runtime guard
+    ``envoy.reloadable_features.header_mutation_url_encode_query_params``.
 - area: mcp_router
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
