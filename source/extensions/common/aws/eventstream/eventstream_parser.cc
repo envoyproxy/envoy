@@ -2,9 +2,10 @@
 
 #include <zlib.h>
 
-#include <cstring>
+#include "source/common/common/safe_memcpy.h"
 
 #include "absl/base/internal/endian.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 
 namespace Envoy {
@@ -14,8 +15,8 @@ namespace Aws {
 namespace Eventstream {
 
 absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view buffer) {
-  // Need at least minimum message size to read prelude
-  if (buffer.size() < MIN_MESSAGE_SIZE) {
+  // Need at least the prelude to read total_length and validate prelude CRC
+  if (buffer.size() < PRELUDE_SIZE) {
     return ParseResult{absl::nullopt, 0};
   }
 
@@ -26,8 +27,8 @@ absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view bu
   const uint32_t headers_length = absl::big_endian::Load32(data + HEADERS_LENGTH_OFFSET);
   const uint32_t prelude_crc = absl::big_endian::Load32(data + PRELUDE_CRC_OFFSET);
 
-  // Validate total_length is reasonable
-  if (total_length < MIN_MESSAGE_SIZE || total_length > MAX_MESSAGE_SIZE) {
+  // Validate total_length bounds to prevent unbounded buffering
+  if (total_length < MIN_MESSAGE_SIZE || total_length > MAX_TOTAL_LENGTH) {
     return absl::InvalidArgumentError("Invalid message length");
   }
 
@@ -40,10 +41,16 @@ absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view bu
     return absl::InvalidArgumentError("Headers length exceeds maximum");
   }
 
+  // Validate payload doesn't exceed maximum (24 MB)
+  const uint32_t payload_length = total_length - PRELUDE_SIZE - headers_length - TRAILER_SIZE;
+  if (payload_length > MAX_PAYLOAD_SIZE) {
+    return absl::InvalidArgumentError("Payload exceeds maximum size");
+  }
+
   // Verify prelude CRC (covers first 8 bytes: total_length + headers_length)
   const uint32_t computed_prelude_crc = computeCrc32(buffer.substr(0, PRELUDE_CRC_OFFSET));
   if (computed_prelude_crc != prelude_crc) {
-    return absl::InvalidArgumentError("Prelude CRC mismatch");
+    return absl::DataLossError("Prelude CRC mismatch");
   }
 
   // Check if we have the complete message
@@ -55,11 +62,8 @@ absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view bu
   const uint32_t message_crc = absl::big_endian::Load32(data + total_length - TRAILER_SIZE);
   const uint32_t computed_message_crc = computeCrc32(buffer.substr(0, total_length - TRAILER_SIZE));
   if (computed_message_crc != message_crc) {
-    return absl::InvalidArgumentError("Message CRC mismatch");
+    return absl::DataLossError("Message CRC mismatch");
   }
-
-  // Calculate payload length
-  const uint32_t payload_length = total_length - PRELUDE_SIZE - headers_length - TRAILER_SIZE;
 
   // Parse headers
   absl::string_view headers_bytes = buffer.substr(PRELUDE_SIZE, headers_length);
@@ -69,11 +73,11 @@ absl::StatusOr<ParseResult> EventstreamParser::parseMessage(absl::string_view bu
   }
 
   // Extract payload
-  absl::string_view payload_bytes = buffer.substr(PRELUDE_SIZE + headers_length, payload_length);
+  absl::string_view payload_data = buffer.substr(PRELUDE_SIZE + headers_length, payload_length);
 
   ParsedMessage parsed;
   parsed.headers = std::move(headers_result.value());
-  parsed.payload = std::string(payload_bytes);
+  parsed.payload_bytes = std::string(payload_data);
 
   return ParseResult{std::move(parsed), total_length};
 }
@@ -88,10 +92,11 @@ EventstreamParser::parseHeaders(absl::string_view headers_bytes) {
 
   const uint8_t* data = reinterpret_cast<const uint8_t*>(headers_bytes.data());
   size_t remaining = headers_bytes.size();
+  absl::flat_hash_set<std::string> seen_names;
 
   while (remaining > 0) {
     const uint8_t name_length = data[0];
-    if (name_length == 0 || name_length > MAX_HEADER_NAME_LENGTH) {
+    if (name_length == 0) {
       return absl::InvalidArgumentError("Invalid header name length");
     }
 
@@ -102,11 +107,13 @@ EventstreamParser::parseHeaders(absl::string_view headers_bytes) {
 
     Header header;
     header.name = std::string(reinterpret_cast<const char*>(data + NAME_LENGTH_SIZE), name_length);
-    const uint8_t type_byte = data[NAME_LENGTH_SIZE + name_length];
 
-    if (type_byte > static_cast<uint8_t>(HeaderValueType::Uuid)) {
-      return absl::InvalidArgumentError("Unknown header value type");
+    // Check for duplicate header names
+    if (!seen_names.insert(header.name).second) {
+      return absl::InvalidArgumentError("Duplicate header name");
     }
+
+    const uint8_t type_byte = data[NAME_LENGTH_SIZE + name_length];
 
     header.value.type = static_cast<HeaderValueType>(type_byte);
     const size_t value_offset = NAME_LENGTH_SIZE + name_length + TYPE_SIZE;
@@ -127,7 +134,7 @@ EventstreamParser::parseHeaders(absl::string_view headers_bytes) {
       if (remaining < value_offset + BYTE_VALUE_SIZE) {
         return absl::InvalidArgumentError("Header truncated: missing byte value");
       }
-      header.value.value = data[value_offset];
+      header.value.value = static_cast<int8_t>(data[value_offset]);
       bytes_consumed = value_offset + BYTE_VALUE_SIZE;
       break;
 
@@ -179,11 +186,14 @@ EventstreamParser::parseHeaders(absl::string_view headers_bytes) {
         return absl::InvalidArgumentError("Header truncated: missing uuid value");
       }
       std::array<uint8_t, 16> uuid;
-      std::memcpy(uuid.data(), data + value_offset, UUID_VALUE_SIZE);
+      safeMemcpyUnsafeSrc(&uuid, data + value_offset);
       header.value.value = uuid;
       bytes_consumed = value_offset + UUID_VALUE_SIZE;
       break;
     }
+
+    default:
+      return absl::InvalidArgumentError("Unknown header value type");
     }
 
     headers.push_back(std::move(header));

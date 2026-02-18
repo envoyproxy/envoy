@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -8,7 +9,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "absl/types/span.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -24,9 +24,12 @@ namespace Eventstream {
 constexpr uint32_t PRELUDE_SIZE = 12; // total_length(4) + headers_length(4) + prelude_crc(4)
 constexpr uint32_t TRAILER_SIZE = 4;  // message_crc(4)
 constexpr uint32_t MIN_MESSAGE_SIZE = PRELUDE_SIZE + TRAILER_SIZE; // 16 bytes minimum
-constexpr uint32_t MAX_MESSAGE_SIZE = 24 * 1024 * 1024;            // 24 MB
+constexpr uint32_t MAX_PAYLOAD_SIZE = 24 * 1024 * 1024;            // 24 MB
 constexpr uint32_t MAX_HEADERS_SIZE = 128 * 1024;                  // 128 KB
-constexpr uint8_t MAX_HEADER_NAME_LENGTH = 127;
+// Upper bound on the total_length wire field to prevent unbounded buffering. Even with a valid
+// prelude CRC (which is not a MAC), an attacker could craft a message with an absurd total_length.
+constexpr uint32_t MAX_TOTAL_LENGTH =
+    PRELUDE_SIZE + MAX_HEADERS_SIZE + MAX_PAYLOAD_SIZE + TRAILER_SIZE;
 constexpr uint16_t MAX_HEADER_VALUE_LENGTH = 32767;
 
 // Prelude field offsets.
@@ -69,7 +72,7 @@ enum class HeaderValueType : uint8_t {
 struct HeaderValue {
   HeaderValueType type;
   absl::variant<bool,                   // BoolTrue, BoolFalse
-                uint8_t,                // Byte
+                int8_t,                 // Byte
                 int16_t,                // Short
                 int32_t,                // Int32
                 int64_t,                // Int64, Timestamp
@@ -92,7 +95,7 @@ struct Header {
  */
 struct ParsedMessage {
   std::vector<Header> headers;
-  std::string payload;
+  std::string payload_bytes; // Arbitrary bytes; not necessarily UTF-8.
 };
 
 /**
@@ -115,11 +118,10 @@ struct ParseResult {
  * Implements the specification: https://smithy.io/2.0/aws/amazon-eventstream.html
  *
  * Example usage:
- *   std::string buffer; // accumulate incoming data here
- *   buffer.append(new_data);
+ *   absl::string_view remaining = buffer;
  *
  *   while (true) {
- *     auto result = EventstreamParser::parseMessage(buffer);
+ *     auto result = EventstreamParser::parseMessage(remaining);
  *     if (!result.ok()) {
  *       // Handle error (corrupt data)
  *       break;
@@ -128,8 +130,8 @@ struct ParseResult {
  *       // Incomplete - wait for more data
  *       break;
  *     }
- *     // Process result->message->headers and result->message->payload
- *     buffer.erase(0, result->bytes_consumed);
+ *     // Process result->message->headers and result->message->payload_bytes
+ *     remaining.remove_prefix(result->bytes_consumed);
  *   }
  */
 class EventstreamParser {
@@ -139,7 +141,8 @@ public:
    * Single-pass design: checks for completeness and parses in one call.
    * Validates both prelude CRC and message CRC.
    *
-   * @param buffer the buffer containing incoming data (may be incomplete).
+   * @param buffer contiguous bytes containing incoming data (may be incomplete).
+   *               Callers should ensure the buffer is linearized before passing.
    * @return ParseResult with message if complete, nullopt if incomplete, or error status.
    */
   static absl::StatusOr<ParseResult> parseMessage(absl::string_view buffer);

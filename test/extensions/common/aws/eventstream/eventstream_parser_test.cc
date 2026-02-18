@@ -66,7 +66,7 @@ class EventstreamParserTest : public testing::Test {};
 
 // Test parseMessage with buffer too small for prelude
 TEST_F(EventstreamParserTest, ParseMessageTooSmall) {
-  const std::string buffer(10, '\0'); // Less than 16 bytes minimum
+  const std::string buffer(10, '\0'); // Less than 12 bytes (prelude size)
   auto result = EventstreamParser::parseMessage(buffer);
   ASSERT_TRUE(result.ok());
   EXPECT_FALSE(result->message.has_value());
@@ -135,7 +135,7 @@ TEST_F(EventstreamParserTest, ParseMessageMinimal) {
   ASSERT_TRUE(result.ok()) << result.status().message();
   ASSERT_TRUE(result->message.has_value());
   EXPECT_TRUE(result->message->headers.empty());
-  EXPECT_TRUE(result->message->payload.empty());
+  EXPECT_TRUE(result->message->payload_bytes.empty());
   EXPECT_EQ(result->bytes_consumed, msg.size());
 }
 
@@ -147,7 +147,7 @@ TEST_F(EventstreamParserTest, ParseMessageWithPayload) {
   ASSERT_TRUE(result.ok()) << result.status().message();
   ASSERT_TRUE(result->message.has_value());
   EXPECT_TRUE(result->message->headers.empty());
-  EXPECT_EQ(result->message->payload, payload);
+  EXPECT_EQ(result->message->payload_bytes, payload);
   EXPECT_EQ(result->bytes_consumed, msg.size());
 }
 
@@ -176,7 +176,7 @@ TEST_F(EventstreamParserTest, ParseMessageWithHeadersAndPayload) {
   ASSERT_EQ(result->message->headers.size(), 1);
   EXPECT_EQ(result->message->headers[0].name, ":message-type");
   EXPECT_EQ(absl::get<std::string>(result->message->headers[0].value.value), "event");
-  EXPECT_EQ(result->message->payload, payload);
+  EXPECT_EQ(result->message->payload_bytes, payload);
   EXPECT_EQ(result->bytes_consumed, msg.size());
 }
 
@@ -207,11 +207,11 @@ TEST_F(EventstreamParserTest, ParseMessageAllHeaderTypes) {
   header_bytes.push_back('f');
   header_bytes.push_back(1); // BoolFalse
 
-  // Byte header
+  // Byte header (signed: -2 = 0xFE)
   header_bytes.push_back(1);
   header_bytes.push_back('b');
   header_bytes.push_back(2); // Byte
-  header_bytes.push_back(0x42);
+  header_bytes.push_back(0xFE);
 
   // Short header
   header_bytes.push_back(1);
@@ -282,7 +282,7 @@ TEST_F(EventstreamParserTest, ParseMessageAllHeaderTypes) {
 
   EXPECT_EQ(headers[2].name, "b");
   EXPECT_EQ(headers[2].value.type, HeaderValueType::Byte);
-  EXPECT_EQ(absl::get<uint8_t>(headers[2].value.value), 0x42);
+  EXPECT_EQ(absl::get<int8_t>(headers[2].value.value), -2);
 
   EXPECT_EQ(headers[3].name, "s");
   EXPECT_EQ(headers[3].value.type, HeaderValueType::Short);
@@ -314,7 +314,7 @@ TEST_F(EventstreamParserTest, ParseMessageMultipleMessages) {
   auto result1 = EventstreamParser::parseMessage(buffer);
   ASSERT_TRUE(result1.ok());
   ASSERT_TRUE(result1->message.has_value());
-  EXPECT_EQ(result1->message->payload, "first");
+  EXPECT_EQ(result1->message->payload_bytes, "first");
   EXPECT_EQ(result1->bytes_consumed, msg1.size());
 
   // Parse remaining buffer
@@ -322,24 +322,35 @@ TEST_F(EventstreamParserTest, ParseMessageMultipleMessages) {
   auto result2 = EventstreamParser::parseMessage(remaining);
   ASSERT_TRUE(result2.ok());
   ASSERT_TRUE(result2->message.has_value());
-  EXPECT_EQ(result2->message->payload, "second");
+  EXPECT_EQ(result2->message->payload_bytes, "second");
   EXPECT_EQ(result2->bytes_consumed, msg2.size());
 }
 
-// Test with maximum size edge cases
-TEST_F(EventstreamParserTest, ParseMessageMaxSizeExceeded) {
+// Test payload exceeds maximum size (24 MB)
+TEST_F(EventstreamParserTest, ParseMessagePayloadExceedsMax) {
   uint8_t buffer[16] = {0};
-  // total_length = MAX_MESSAGE_SIZE + 1 (too large)
-  uint32_t too_large = MAX_MESSAGE_SIZE + 1;
-  buffer[0] = (too_large >> 24) & 0xFF;
-  buffer[1] = (too_large >> 16) & 0xFF;
-  buffer[2] = (too_large >> 8) & 0xFF;
-  buffer[3] = too_large & 0xFF;
+  // total_length = MAX_PAYLOAD_SIZE + PRELUDE_SIZE + TRAILER_SIZE + 1 (payload 1 byte over limit)
+  uint32_t total = MAX_PAYLOAD_SIZE + PRELUDE_SIZE + TRAILER_SIZE + 1;
+  buffer[0] = (total >> 24) & 0xFF;
+  buffer[1] = (total >> 16) & 0xFF;
+  buffer[2] = (total >> 8) & 0xFF;
+  buffer[3] = total & 0xFF;
+  // headers_length = 0
+  buffer[4] = 0;
+  buffer[5] = 0;
+  buffer[6] = 0;
+  buffer[7] = 0;
+  // prelude_crc
+  uint32_t prelude_crc = testComputeCrc32(absl::string_view(reinterpret_cast<char*>(buffer), 8));
+  buffer[8] = (prelude_crc >> 24) & 0xFF;
+  buffer[9] = (prelude_crc >> 16) & 0xFF;
+  buffer[10] = (prelude_crc >> 8) & 0xFF;
+  buffer[11] = prelude_crc & 0xFF;
 
   auto result =
       EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
   EXPECT_FALSE(result.ok());
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid message length"));
+  EXPECT_TRUE(absl::StrContains(result.status().message(), "Payload exceeds maximum"));
 }
 
 // Test total_length smaller than minimum
@@ -431,7 +442,7 @@ TEST_F(EventstreamParserTest, ParseMessageBedrockLikePayload) {
   auto result = EventstreamParser::parseMessage(msg);
   ASSERT_TRUE(result.ok());
   ASSERT_TRUE(result->message.has_value());
-  EXPECT_EQ(result->message->payload, payload);
+  EXPECT_EQ(result->message->payload_bytes, payload);
 }
 
 // Test header with name_length = 0
@@ -447,25 +458,12 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderNameLengthZero) {
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid header name length"));
 }
 
-// Test header with name_length > MAX_HEADER_NAME_LENGTH (127)
-TEST_F(EventstreamParserTest, ParseMessageHeaderNameLengthTooLong) {
-  std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(128); // name_length = 128 (exceeds max of 127)
-
-  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
-  std::string msg = createEventstreamMessage(headers_data, "");
-
-  auto result = EventstreamParser::parseMessage(msg);
-  EXPECT_FALSE(result.ok());
-  EXPECT_TRUE(absl::StrContains(result.status().message(), "Invalid header name length"));
-}
-
 // Test header with unknown type
 TEST_F(EventstreamParserTest, ParseMessageHeaderUnknownType) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('x'); // name = "x"
-  header_bytes.push_back(10); // type = 10 (invalid, max is 9)
+  header_bytes.push_back(10);  // type = 10 (invalid, max is 9)
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string msg = createEventstreamMessage(headers_data, "");
@@ -478,9 +476,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderUnknownType) {
 // Test Int32 header type
 TEST_F(EventstreamParserTest, ParseMessageHeaderInt32) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('i'); // name = "i"
-  header_bytes.push_back(4);  // type = Int32
+  header_bytes.push_back(4);   // type = Int32
   // Value: 0x12345678
   header_bytes.push_back(0x12);
   header_bytes.push_back(0x34);
@@ -502,7 +500,7 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderInt32) {
 // Test header truncation: missing name or type
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedName) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(5);  // name_length = 5, but only provide 2 chars
+  header_bytes.push_back(5); // name_length = 5, but only provide 2 chars
   header_bytes.push_back('a');
   header_bytes.push_back('b');
 
@@ -517,9 +515,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedName) {
 // Test header truncation: missing byte value
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedByteValue) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('b'); // name = "b"
-  header_bytes.push_back(2);  // type = Byte
+  header_bytes.push_back(2);   // type = Byte
   // Missing: the actual byte value
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
@@ -533,9 +531,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedByteValue) {
 // Test header truncation: missing short value
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedShortValue) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
-  header_bytes.push_back('s'); // name = "s"
-  header_bytes.push_back(3);  // type = Short
+  header_bytes.push_back(1);    // name_length = 1
+  header_bytes.push_back('s');  // name = "s"
+  header_bytes.push_back(3);    // type = Short
   header_bytes.push_back(0x12); // Only 1 byte, need 2
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
@@ -549,9 +547,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedShortValue) {
 // Test header truncation: missing int32 value
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt32Value) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('i'); // name = "i"
-  header_bytes.push_back(4);  // type = Int32
+  header_bytes.push_back(4);   // type = Int32
   header_bytes.push_back(0x12);
   header_bytes.push_back(0x34); // Only 2 bytes, need 4
 
@@ -566,9 +564,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt32Value) {
 // Test header truncation: missing int64 value
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt64Value) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('l'); // name = "l"
-  header_bytes.push_back(5);  // type = Int64
+  header_bytes.push_back(5);   // type = Int64
   header_bytes.push_back(0x12);
   header_bytes.push_back(0x34);
   header_bytes.push_back(0x56);
@@ -585,10 +583,10 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedInt64Value) {
 // Test header truncation: missing string length
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringLength) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('s'); // name = "s"
-  header_bytes.push_back(7);  // type = String
-  header_bytes.push_back(0);  // Only 1 byte of length, need 2
+  header_bytes.push_back(7);   // type = String
+  header_bytes.push_back(0);   // Only 1 byte of length, need 2
 
   std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
   std::string msg = createEventstreamMessage(headers_data, "");
@@ -601,9 +599,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringLength) {
 // Test header truncation: missing string data
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringData) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('s'); // name = "s"
-  header_bytes.push_back(7);  // type = String
+  header_bytes.push_back(7);   // type = String
   header_bytes.push_back(0);
   header_bytes.push_back(10); // length = 10
   header_bytes.push_back('a');
@@ -620,9 +618,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedStringData) {
 // Test header truncation: missing uuid value
 TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedUuidValue) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('u'); // name = "u"
-  header_bytes.push_back(9);  // type = UUID
+  header_bytes.push_back(9);   // type = UUID
   for (int i = 0; i < 8; i++) {
     header_bytes.push_back(i); // Only 8 bytes, need 16
   }
@@ -638,9 +636,9 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderTruncatedUuidValue) {
 // Test header value too long (> MAX_HEADER_VALUE_LENGTH)
 TEST_F(EventstreamParserTest, ParseMessageHeaderValueTooLong) {
   std::vector<uint8_t> header_bytes;
-  header_bytes.push_back(1);  // name_length = 1
+  header_bytes.push_back(1);   // name_length = 1
   header_bytes.push_back('s'); // name = "s"
-  header_bytes.push_back(7);  // type = String
+  header_bytes.push_back(7);   // type = String
   // length = MAX_HEADER_VALUE_LENGTH + 1 = 32768
   header_bytes.push_back(0x80);
   header_bytes.push_back(0x00);
@@ -651,6 +649,96 @@ TEST_F(EventstreamParserTest, ParseMessageHeaderValueTooLong) {
   auto result = EventstreamParser::parseMessage(msg);
   EXPECT_FALSE(result.ok());
   EXPECT_TRUE(absl::StrContains(result.status().message(), "Header value too long"));
+}
+
+// Test string with length 0 (allowed for interoperability)
+TEST_F(EventstreamParserTest, ParseMessageHeaderStringLengthZero) {
+  std::vector<uint8_t> header_bytes;
+  header_bytes.push_back(1);   // name_length = 1
+  header_bytes.push_back('s'); // name = "s"
+  header_bytes.push_back(7);   // type = String
+  header_bytes.push_back(0);
+  header_bytes.push_back(0); // length = 0
+
+  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
+  std::string msg = createEventstreamMessage(headers_data, "");
+
+  auto result = EventstreamParser::parseMessage(msg);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_TRUE(result->message.has_value());
+  ASSERT_EQ(result->message->headers.size(), 1);
+  EXPECT_EQ(result->message->headers[0].name, "s");
+  EXPECT_EQ(absl::get<std::string>(result->message->headers[0].value.value), "");
+}
+
+// Test byte_array with length 0 (allowed for interoperability)
+TEST_F(EventstreamParserTest, ParseMessageHeaderByteArrayLengthZero) {
+  std::vector<uint8_t> header_bytes;
+  header_bytes.push_back(1);   // name_length = 1
+  header_bytes.push_back('b'); // name = "b"
+  header_bytes.push_back(6);   // type = ByteArray
+  header_bytes.push_back(0);
+  header_bytes.push_back(0); // length = 0
+
+  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
+  std::string msg = createEventstreamMessage(headers_data, "");
+
+  auto result = EventstreamParser::parseMessage(msg);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_TRUE(result->message.has_value());
+  ASSERT_EQ(result->message->headers.size(), 1);
+  EXPECT_EQ(result->message->headers[0].name, "b");
+  EXPECT_EQ(absl::get<std::string>(result->message->headers[0].value.value), "");
+}
+
+// Test duplicate header names
+TEST_F(EventstreamParserTest, ParseMessageDuplicateHeaderNames) {
+  std::vector<uint8_t> header_bytes;
+
+  // First header: "x" = true
+  header_bytes.push_back(1);
+  header_bytes.push_back('x');
+  header_bytes.push_back(0); // BoolTrue
+
+  // Duplicate header: "x" = false
+  header_bytes.push_back(1);
+  header_bytes.push_back('x');
+  header_bytes.push_back(1); // BoolFalse
+
+  std::string headers_data(reinterpret_cast<char*>(header_bytes.data()), header_bytes.size());
+  std::string msg = createEventstreamMessage(headers_data, "");
+
+  auto result = EventstreamParser::parseMessage(msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(absl::StrContains(result.status().message(), "Duplicate header name"));
+}
+
+// Test CRC errors return DataLoss status code
+TEST_F(EventstreamParserTest, ParseMessageCrcErrorsReturnDataLoss) {
+  // Bad prelude CRC
+  {
+    uint8_t buffer[16] = {0};
+    buffer[3] = 16;
+    buffer[8] = 0xFF;
+    buffer[9] = 0xFF;
+    buffer[10] = 0xFF;
+    buffer[11] = 0xFF;
+
+    auto result =
+        EventstreamParser::parseMessage(absl::string_view(reinterpret_cast<char*>(buffer), 16));
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kDataLoss);
+  }
+
+  // Bad message CRC
+  {
+    std::string msg = createEventstreamMessage("", "payload");
+    msg[msg.size() - 1] ^= 0xFF;
+
+    auto result = EventstreamParser::parseMessage(msg);
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kDataLoss);
+  }
 }
 
 } // namespace

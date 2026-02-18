@@ -15,11 +15,12 @@ envoy_cc_library(
     deps = [
         "//bazel:zlib",
         "//source/common/common:assert_lib",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/common:statusor_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/types:span",
     ],
 )
