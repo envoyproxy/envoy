@@ -6775,12 +6775,12 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_close_socket(
         self.raw,
-        details.map(str_to_module_buffer).unwrap_or(
-          abi::envoy_dynamic_module_type_module_buffer {
+        details
+          .map(str_to_module_buffer)
+          .unwrap_or(abi::envoy_dynamic_module_type_module_buffer {
             ptr: std::ptr::null_mut(),
             length: 0,
-          },
-        ),
+          }),
       );
     }
   }
