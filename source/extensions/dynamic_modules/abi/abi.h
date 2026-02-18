@@ -4137,6 +4137,155 @@ void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer hash);
 
+// --------------------- Socket Property Getters (Protocol Detection & SSL) ----
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the connection socket. This returns the value
+ * previously set by a listener filter (e.g., TLS inspector).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol is called by the
+ * module to get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the protocol string owned by Envoy will be stored.
+ * @return true if the transport protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size is called
+ * by the module to get the count of requested application protocols (ALPN) from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of application protocols, or 0 if none are available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols is called by
+ * the module to get the requested application protocols (ALPN) from the connection socket. The
+ * module should first call get_requested_application_protocols_size to get the count and allocate
+ * the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocols_out is a pre-allocated array owned by the module where Envoy will populate the
+ *   protocol strings. The module must allocate this array with at least the size returned by
+ *   get_requested_application_protocols_size.
+ * @return true if the protocols were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja3_hash` is called by the module to get the
+ * `JA3` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja4_hash` is called by the module to get the
+ * `JA4` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_ssl is called by the module to check if the
+ * connection has SSL/TLS information available on the socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if SSL/TLS connection information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of URI SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of DNS SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
 // --------------------------- Address Operations -----------------------------
 
 /**
