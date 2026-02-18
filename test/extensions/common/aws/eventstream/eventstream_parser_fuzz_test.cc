@@ -18,7 +18,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   if (parse_result.ok() && parse_result->message.has_value()) {
     // Try parsing remaining data
     if (parse_result->bytes_consumed < input.size()) {
-      EventstreamParser::parseMessage(input.substr(parse_result->bytes_consumed));
+      static_cast<void>(
+          EventstreamParser::parseMessage(input.substr(parse_result->bytes_consumed)));
     }
   }
 
@@ -26,7 +27,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   if (len > 32) {
     // Try parsing from different offsets
     for (size_t offset = 0; offset < len && offset < 100; offset += 16) {
-      EventstreamParser::parseMessage(input.substr(offset));
+      static_cast<void>(EventstreamParser::parseMessage(input.substr(offset)));
     }
   }
 }
