@@ -48,6 +48,21 @@ public:
 
 REGISTER_FACTORY(HttpTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+// A filter state object that does not support serialization. This is used to test the
+// `get_filter_state_typed` fallback when `serializeAsString()` returns nullopt.
+class HttpNonSerializableObject : public StreamInfo::FilterState::Object {};
+
+class HttpNonSerializableObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.http_non_serializable_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view) const override {
+    return std::make_unique<HttpNonSerializableObject>();
+  }
+};
+
+REGISTER_FACTORY(HttpNonSerializableObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 } // namespace
 
 class DynamicModuleHttpFilterTest : public testing::Test {
@@ -970,6 +985,28 @@ TEST(ABIImpl, filter_state_typed_non_existing_key) {
   filter.setDecoderFilterCallbacks(callbacks);
 
   const std::string key_str = "envoy.test.http_typed_object";
+  envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_typed(
+      &filter, {key_str.data(), key_str.size()}, &result_buffer));
+}
+
+TEST(ABIImpl, filter_state_typed_non_serializable) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // Set a non-serializable typed object via the factory.
+  const std::string key_str = "envoy.test.http_non_serializable_object";
+  const std::string value_str = "any_value";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_typed(
+      &filter, {key_str.data(), key_str.size()}, {value_str.data(), value_str.size()}));
+
+  // Attempting to get the value should fail because serializeAsString() returns nullopt.
   envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_typed(
       &filter, {key_str.data(), key_str.size()}, &result_buffer));
