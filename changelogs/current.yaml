@@ -202,7 +202,7 @@ new_features:
   change: |
     Added support for dynamic modules authors to register any combination of http, network, listener,
     udp listener, and bootstrap filters in the rust SDK.
-- area: dynamic_modules
+- area: dynamic modules
   change: |
     Added connection state and flow control ABI callbacks for the dynamic module network filter,
     including ``read_disable``, ``read_enabled``, ``get_connection_state``, ``enable_half_close``,
