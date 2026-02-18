@@ -883,7 +883,7 @@ class FormatChecker:
         error_messages = []
         if self.run_code_validation:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
-        if not file_path.endswith(self.config.suffixes["proto"]):
+        if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
         error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
