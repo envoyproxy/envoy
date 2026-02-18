@@ -1,6 +1,7 @@
 #include <chrono>
 #include <vector>
 
+#include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -10,8 +11,12 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 
@@ -63,7 +68,7 @@ public:
 
     auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
-        *stats_.rootScope(), main_thread_dispatcher_);
+        cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -78,6 +83,7 @@ public:
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
   Stats::IsolatedStoreImpl stats_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleListenerFilter> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
@@ -1688,6 +1694,315 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetWorkerIndex) {
   uint32_t worker_index =
       envoy_dynamic_module_callback_listener_filter_get_worker_index(filterPtr());
   EXPECT_EQ(0u, worker_index);
+}
+
+// =============================================================================
+// Tests for HTTP callouts.
+// =============================================================================
+
+class DynamicModuleListenerFilterHttpCalloutTest : public testing::Test {
+public:
+  void SetUp() override {
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
+    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+
+    ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
+
+    filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+    filter_->onAccept(callbacks_);
+  }
+
+  void TearDown() override { filter_.reset(); }
+
+  void* filterPtr() { return static_cast<void*>(filter_.get()); }
+
+  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  DynamicModuleListenerFilterConfigSharedPtr filter_config_;
+  std::shared_ptr<DynamicModuleListenerFilter> filter_;
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
+};
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutClusterNotFound) {
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("nonexistent_cluster"))
+      .WillOnce(testing::Return(nullptr));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"nonexistent_cluster", 19}, headers.data(), headers.size(),
+      {nullptr, 0}, 5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound, result);
+  EXPECT_EQ(0, callout_id);
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutMissingRequiredHeaders) {
+  uint64_t callout_id = 0;
+  // Missing :method header.
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders, result);
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutCannotCreateRequest) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(nullptr));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest, result);
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccess) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(&request));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "POST", .value_length = 4},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/api/v1/data", .value_length = 12},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "api.example.com", .value_length = 15},
+      {.key_ptr = "content-type",
+       .key_length = 12,
+       .value_ptr = "application/json",
+       .value_length = 16},
+  };
+
+  const char* body_data = R"({"key": "value"})";
+  envoy_dynamic_module_type_module_buffer body = {body_data, strlen(body_data)};
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), body, 5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  EXPECT_GT(callout_id, 0);
+
+  EXPECT_CALL(request, cancel());
+  filter_.reset();
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutSuccessWithCallback) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  EXPECT_GT(callout_id, 0);
+  EXPECT_NE(nullptr, captured_callback);
+
+  // Simulate a successful response.
+  Http::ResponseMessagePtr response =
+      std::make_unique<Http::ResponseMessageImpl>(Http::ResponseHeaderMapImpl::create());
+  response->headers().setStatus(200);
+  response->body().add("response body");
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onSuccess(request, std::move(response));
+
+  filter_.reset();
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, SendHttpCalloutFailureReset) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  EXPECT_NE(nullptr, captured_callback);
+
+  // Simulate a failure with Reset reason.
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+  filter_.reset();
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest,
+       SendHttpCalloutFailureExceedResponseBufferLimit) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  EXPECT_NE(nullptr, captured_callback);
+
+  // Simulate a failure with ExceedResponseBufferLimit reason.
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onFailure(request, Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
+
+  filter_.reset();
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, OnBeforeFinalizeUpstreamSpanNoop) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  ASSERT_NE(nullptr, captured_callback);
+
+  // No-op path: should be safe to call and not crash.
+  Envoy::Tracing::MockSpan span;
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onBeforeFinalizeUpstreamSpan(span, nullptr);
+
+  EXPECT_CALL(request, cancel());
+  filter_.reset();
+}
+
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, FilterDestructionCancelsPendingCallouts) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(&request));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+
+  EXPECT_CALL(request, cancel());
+  // Destroy the filter. This should cancel all pending callouts.
+  filter_.reset();
 }
 
 } // namespace ListenerFilters

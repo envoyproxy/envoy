@@ -4,6 +4,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -780,6 +781,45 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
   }
   histogram->recordValue(value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// -----------------------------------------------------------------------------
+// HTTP Callout Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_listener_filter_http_callout(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+
+  // Build the request message.
+  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+
+  // Add headers.
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = headers[i];
+    message->headers().addCopy(
+        Http::LowerCaseString(std::string(header.key_ptr, header.key_length)),
+        std::string(header.value_ptr, header.value_length));
+  }
+
+  // Add body if present.
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(body.ptr, body.length);
+  }
+
+  // Validate required headers.
+  if (message->headers().Method() == nullptr || message->headers().Path() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  // Send the callout.
+  return filter->sendHttpCallout(callout_id_out, std::string(cluster_name.ptr, cluster_name.length),
+                                 std::move(message), timeout_milliseconds);
 }
 
 // -----------------------------------------------------------------------------

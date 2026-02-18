@@ -25,6 +25,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -56,6 +57,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:io_socket_error_lib",
         "//source/common/router:string_accessor_lib",
@@ -63,6 +65,9 @@ envoy_cc_test(
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
