@@ -28,8 +28,16 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 
   // Register this socket manager instance for rebalancing.
-  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
-  UpstreamSocketManager::socket_managers_.push_back(this);
+  // Only worker threads should handle data plane connections.
+  const std::string& dispatcher_name = dispatcher_.name();
+  if (dispatcher_name != "main_thread") {
+    absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
+    UpstreamSocketManager::socket_managers_.push_back(this);
+    ENVOY_LOG(debug, "reverse_tunnel: registered socket manager for dispatcher: {}",
+              dispatcher_name);
+  } else {
+    ENVOY_LOG(debug, "reverse_tunnel: skipping socket manager registration for main thread");
+  }
 }
 
 UpstreamSocketManager&
