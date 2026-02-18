@@ -470,6 +470,38 @@ TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
   }
 }
 
+TEST_F(EdsTest, AllowNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  // Add dual stack endpoint
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("::1");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()
+      ->mutable_additional_addresses()
+      ->Add()
+      ->mutable_address()
+      ->mutable_envoy_internal_address()
+      ->set_server_listener_name("internal_address");
+
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+
+  initialize();
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "true"}});
+  (void)eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+
+  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[0]->asString(), "[::1]:80");
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[1]->asString(), "envoy://internal_address/");
+}
+
 // Verify that failure to initialize the base class results in an error not a crash.
 // Note that this test is depending on the current implementation of how EDS inherits from
 // `BaseDynamicClusterImpl` and how `BaseDynamicClusterImpl` does error handling to have a
