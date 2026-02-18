@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/mcp/tracing_validation.h"
+#include "source/common/tracing/tracing_validation.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -11,9 +11,7 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace Mcp {
+namespace Tracing {
 
 namespace {
 
@@ -144,8 +142,6 @@ bool isValidBaggageValue(absl::string_view value) {
 
 } // namespace
 
-namespace TracingValidation {
-
 bool isValidTraceParent(absl::string_view trace_parent) {
   if (trace_parent.size() < kTraceParentExpectedSize) {
     return false;
@@ -261,8 +257,5 @@ bool isValidBaggage(absl::string_view baggage) {
   return true;
 }
 
-} // namespace TracingValidation
-} // namespace Mcp
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Tracing
 } // namespace Envoy

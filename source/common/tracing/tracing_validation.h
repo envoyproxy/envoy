@@ -3,15 +3,12 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace Mcp {
+namespace Tracing {
 
 /**
  * Utilities for validating W3C tracing-related headers.
  * See: https://www.w3.org/TR/trace-context/ and https://www.w3.org/TR/baggage/
  */
-namespace TracingValidation {
 
 /**
  * Verifies that the given string is a valid traceparent header.
@@ -28,8 +25,5 @@ bool isValidTraceState(absl::string_view trace_state);
  */
 bool isValidBaggage(absl::string_view baggage);
 
-} // namespace TracingValidation
-} // namespace Mcp
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Tracing
 } // namespace Envoy
