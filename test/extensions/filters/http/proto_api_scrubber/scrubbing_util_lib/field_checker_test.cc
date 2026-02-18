@@ -1317,6 +1317,7 @@ TEST_F(FieldCheckerTest, NoMatchFoundForMessageField) {
 // during request scrubbing.
 TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
   ProtoApiScrubberConfig config;
+  config.set_scrub_unknown_fields(true);
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
@@ -1332,6 +1333,7 @@ TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
 // during response scrubbing.
 TEST_F(FieldCheckerTest, UnknownFieldIsNullResponseScrubbing) {
   ProtoApiScrubberConfig config;
+  config.set_scrub_unknown_fields(true);
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
@@ -1341,6 +1343,22 @@ TEST_F(FieldCheckerTest, UnknownFieldIsNullResponseScrubbing) {
   // Pass nullptr to simulate an unknown field.
   EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
             FieldCheckResults::kExclude);
+}
+
+// Tests that when `field` is nullptr (indicating an unknown field) and scrub_unknown_fields is
+// false, CheckField returns kInclude during request scrubbing.
+TEST_F(FieldCheckerTest, UnknownFieldScrubbingDisabled) {
+  ProtoApiScrubberConfig config;
+  config.set_scrub_unknown_fields(false);
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
+
+  // Pass nullptr to simulate an unknown field.
+  EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
+            FieldCheckResults::kInclude);
 }
 
 } // namespace
