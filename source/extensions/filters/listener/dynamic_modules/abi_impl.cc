@@ -3,6 +3,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -627,12 +628,38 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 }
 
 void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
-  if (callbacks != nullptr) {
-    callbacks->socket().ioHandle().close();
+  if (callbacks == nullptr) {
+    return;
   }
+  if (details.ptr != nullptr && details.length > 0) {
+    callbacks->streamInfo().setConnectionTerminationDetails(
+        absl::string_view(details.ptr, details.length));
+  }
+  callbacks->socket().ioHandle().close();
+}
+
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return -1;
+  }
+  if (data.ptr == nullptr || data.length == 0) {
+    return -1;
+  }
+  Buffer::OwnedImpl buffer;
+  buffer.add(data.ptr, data.length);
+  Api::IoCallUint64Result result = callbacks->socket().ioHandle().write(buffer);
+  if (result.ok()) {
+    return static_cast<int64_t>(result.return_value_);
+  }
+  return -1;
 }
 
 int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(

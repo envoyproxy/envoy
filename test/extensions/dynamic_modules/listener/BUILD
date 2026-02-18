@@ -59,6 +59,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:io_socket_error_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",

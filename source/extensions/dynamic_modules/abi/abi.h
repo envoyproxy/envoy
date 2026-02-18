@@ -4509,12 +4509,28 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
- * the socket immediately.
+ * the socket immediately. If details is non-empty, the termination reason is set on the
+ * connection's stream info before closing.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param details is the optional termination reason string owned by the module. Can be empty.
  */
 void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_write_to_socket is called by the module to write
+ * data directly to the raw socket. This is useful for protocol negotiation at the listener filter
+ * level, such as writing SSL support responses in Postgres or MySQL handshake packets.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param data is the data to write owned by the module.
+ * @return the number of bytes written, or -1 if the write failed or callbacks are not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
 
 // ---------------------- Socket Option Callbacks ------------------------------
 

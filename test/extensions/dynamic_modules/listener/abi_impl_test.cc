@@ -3,6 +3,7 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -1269,13 +1270,121 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) 
 // Tests for close_socket.
 // =============================================================================
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetails) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, close())
+      .WillOnce(testing::Return(testing::ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setConnectionTerminationDetails(absl::string_view("connection_rejected")));
+
+  char details[] = "connection_rejected";
+  envoy_dynamic_module_type_module_buffer details_buf = {details, 19};
+  envoy_dynamic_module_callback_listener_filter_close_socket(filterPtr(), details_buf);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketEmptyDetails) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, close())
+      .WillOnce(testing::Return(testing::ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  // Empty details should not call setConnectionTerminationDetails.
+  EXPECT_CALL(callbacks_.stream_info_, setConnectionTerminationDetails(testing::_)).Times(0);
+
+  envoy_dynamic_module_type_module_buffer details_buf = {nullptr, 0};
+  envoy_dynamic_module_callback_listener_filter_close_socket(filterPtr(), details_buf);
+}
+
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
 
+  char details[] = "connection_rejected";
+  envoy_dynamic_module_type_module_buffer details_buf = {details, 19};
   // Should not crash.
-  envoy_dynamic_module_callback_listener_filter_close_socket(static_cast<void*>(filter.get()));
+  envoy_dynamic_module_callback_listener_filter_close_socket(static_cast<void*>(filter.get()),
+                                                             details_buf);
+}
+
+// =============================================================================
+// Tests for write_to_socket.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketSuccess) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, write(testing::_))
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        uint64_t len = buffer.length();
+        buffer.drain(len);
+        return Api::IoCallUint64Result(len, Api::IoError::none());
+      }));
+
+  char data[] = "S";
+  envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
+  int64_t result =
+      envoy_dynamic_module_callback_listener_filter_write_to_socket(filterPtr(), data_buf);
+  EXPECT_EQ(1, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketMultipleBytes) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, write(testing::_))
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        uint64_t len = buffer.length();
+        buffer.drain(len);
+        return Api::IoCallUint64Result(len, Api::IoError::none());
+      }));
+
+  char data[] = "hello world";
+  envoy_dynamic_module_type_module_buffer data_buf = {data, 11};
+  int64_t result =
+      envoy_dynamic_module_callback_listener_filter_write_to_socket(filterPtr(), data_buf);
+  EXPECT_EQ(11, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketNullData) {
+  envoy_dynamic_module_type_module_buffer data_buf = {nullptr, 5};
+  int64_t result =
+      envoy_dynamic_module_callback_listener_filter_write_to_socket(filterPtr(), data_buf);
+  EXPECT_EQ(-1, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketZeroLength) {
+  char data[] = "hello";
+  envoy_dynamic_module_type_module_buffer data_buf = {data, 0};
+  int64_t result =
+      envoy_dynamic_module_callback_listener_filter_write_to_socket(filterPtr(), data_buf);
+  EXPECT_EQ(-1, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  char data[] = "S";
+  envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
+  int64_t result = envoy_dynamic_module_callback_listener_filter_write_to_socket(
+      static_cast<void*>(filter.get()), data_buf);
+  EXPECT_EQ(-1, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, write(testing::_))
+      .WillOnce(testing::Invoke([](Buffer::Instance&) -> Api::IoCallUint64Result {
+        return Api::IoCallUint64Result(0, Network::IoSocketError::create(ECONNRESET));
+      }));
+
+  char data[] = "S";
+  envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
+  int64_t result =
+      envoy_dynamic_module_callback_listener_filter_write_to_socket(filterPtr(), data_buf);
+  EXPECT_EQ(-1, result);
 }
 
 // =============================================================================
