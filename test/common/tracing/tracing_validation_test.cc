@@ -125,19 +125,6 @@ TEST(TracingValidationTest, TraceStateValidation) {
   EXPECT_FALSE(isValidTraceState("k=v=v"));
 }
 
-TEST(TracingValidationTest, TraceStateSizeLimit) {
-  const std::string long_value(255, 'a');
-  std::string long_ts;
-  absl::StrAppend(&long_ts, "key", 1, "=", long_value, ",");
-  absl::StrAppend(&long_ts, "key", 2, "=", long_value, ",");
-  absl::StrAppend(&long_ts, "key", 3, "=", long_value);
-  ASSERT_LE(long_ts.size(), 1024);
-  EXPECT_TRUE(isValidTraceState(long_ts));
-  // Append more to exceed 1024
-  absl::StrAppend(&long_ts, ",key", 3, "=", long_value);
-  EXPECT_FALSE(isValidTraceState(long_ts));
-}
-
 TEST(TracingValidationTest, TraceStateTooManyListMembers) {
   std::string ts_too_many_members;
   for (int i = 0; i < 32; ++i) {

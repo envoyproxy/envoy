@@ -182,9 +182,6 @@ bool isValidTraceState(absl::string_view trace_state) {
   if (trace_state.empty()) {
     return true;
   }
-  if (trace_state.size() > 1024) {
-    return false;
-  }
 
   std::vector<absl::string_view> members = absl::StrSplit(trace_state, ',');
   if (members.size() > 32) {
