@@ -426,6 +426,7 @@ public:
     }
   }
 
+protected:
   bool use_multiple_listeners_{false};
 };
 
