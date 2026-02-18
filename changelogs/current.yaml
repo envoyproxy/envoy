@@ -207,6 +207,12 @@ new_features:
   change: |
     Added support for dynamic modules authors to register any combination of http, network, listener,
     udp listener, and bootstrap filters in the rust SDK.
+- area: dynamic modules
+  change: |
+    Added socket property getter and SSL/TLS information ABI callbacks for the dynamic module listener
+    filter, including ``get_requested_server_name``, ``get_detected_transport_protocol``,
+    ``get_requested_application_protocols``, ``get_ja3_hash``, ``get_ja4_hash``, ``is_ssl``,
+    ``get_ssl_uri_sans``, ``get_ssl_dns_sans``, and ``get_ssl_subject``.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,

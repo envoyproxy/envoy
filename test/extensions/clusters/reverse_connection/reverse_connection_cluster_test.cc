@@ -190,7 +190,8 @@ public:
 
     // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
     // event creation.
-    extension_->onServerInitialized();
+    NiceMock<Server::MockInstance> instance;
+    extension_->onServerInitialized(instance);
   }
 
   // Helper to add a socket to the manager for testing.
@@ -1117,7 +1118,8 @@ public:
     }
 
     // Let the extension create and manage its own TLS slot and timer.
-    extension_->onServerInitialized();
+    NiceMock<Server::MockInstance> instance;
+    extension_->onServerInitialized(instance);
 
     // Get the registered socket interface from the global registry and set up its extension.
     auto* registered_socket_interface =
