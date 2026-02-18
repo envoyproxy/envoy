@@ -167,6 +167,12 @@ new_features:
   change: |
     Added filter state read/write support for dynamic module cert validators, allowing modules to set and
     get string values in the connection's filter state during certificate chain verification.
+- area: ext_authz
+  change: |
+    Added :ref:`path_override <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.path_override>`
+    to the HTTP ext_authz filter. When set, the request path sent to the authorization service is replaced
+    entirely by this value. Only one of ``path_prefix`` or ``path_override`` may be set; validation fails
+    at config load if both are specified.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
