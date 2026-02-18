@@ -1343,6 +1343,7 @@ message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";
 
+  // [#comment: Keep this list of address types in sync with api/config/core/v3/address.proto.]
   enum FirstAddressFamilyVersion {
     // Use the first address family encountered in the address list.
     DEFAULT = 0;
