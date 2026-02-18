@@ -1820,8 +1820,15 @@ void ConnectionManagerImpl::ActiveStream::refreshTracing() {
   filter_manager_.streamInfo().setTraceReason(trace_reason);
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
-  if (active_span_->useLocalDecision()) {
-    active_span_->setSampled(tracing_decision.traced);
+  // Only call setSampled() when the decision is to drop the trace.
+  // When traced=true, we intentionally do NOT call setSampled(true) to match
+  // the semantics of startSpan(). In startSpan(), traced=true leaves the
+  // tracer's sampling priority unset, allowing the tracer's own sampler
+  // (e.g., the Datadog agent) to make the final decision. Calling
+  // setSampled(true) here would escalate the priority to USER_KEEP in the
+  // Datadog tracer, which prevents the agent from downsampling.
+  if (active_span_->useLocalDecision() && !tracing_decision.traced) {
+    active_span_->setSampled(false);
   }
 
   if (hasCachedRoute()) {

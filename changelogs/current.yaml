@@ -58,6 +58,15 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tracing
+  change: |
+    Fixed ``refreshTracing()`` to not call ``setSampled(true)`` when the trace decision is to keep the
+    trace. Previously, the route refresh tracing logic would call ``setSampled(true)`` which in the
+    Datadog tracer maps to ``USER_KEEP`` priority, preventing the Datadog agent from downsampling.
+    This did not match ``startSpan()`` semantics, which intentionally leaves the sampling priority
+    unset when ``traced=true`` so the tracer's own sampler can make the final decision. Now
+    ``refreshTracing()`` only calls ``setSampled(false)`` when the decision is to drop the trace,
+    matching ``startSpan()`` behavior.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
