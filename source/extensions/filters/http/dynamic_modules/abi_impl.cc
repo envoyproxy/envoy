@@ -209,78 +209,6 @@ const Protobuf::Struct* getMetadataNamespaceImpl(const envoy::config::core::v3::
 }
 
 /**
- * Helper to get the metadata namespace from the stream info.
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @param metadata_source the location of the metadata to use.
- * @param namespace_ptr is the namespace of the metadata.
- * @param namespace_length is the length of the namespace.
- * @return the metadata namespace if it exists, nullptr otherwise.
- */
-const Protobuf::Struct*
-getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-                     envoy_dynamic_module_type_metadata_source metadata_source,
-                     envoy_dynamic_module_type_module_buffer ns) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->callbacks();
-  if (!callbacks) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "callbacks are not available");
-    return nullptr;
-  }
-  auto& stream_info = callbacks->streamInfo();
-
-  switch (metadata_source) {
-  case envoy_dynamic_module_type_metadata_source_Dynamic: {
-    return getMetadataNamespaceImpl(stream_info.dynamicMetadata(), ns);
-  }
-  case envoy_dynamic_module_type_metadata_source_Route: {
-    auto route = stream_info.route();
-    if (route) {
-      return getMetadataNamespaceImpl(route->metadata(), ns);
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_metadata_source_Cluster: {
-    auto clusterInfo = callbacks->clusterInfo();
-    if (clusterInfo) {
-      return getMetadataNamespaceImpl(clusterInfo->metadata(), ns);
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_metadata_source_Host: {
-    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
-    if (upstreamInfo) {
-      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
-      if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
-        if (md) {
-          return getMetadataNamespaceImpl(*md, ns);
-        }
-      }
-    }
-    break;
-  }
-  case envoy_dynamic_module_type_metadata_source_HostLocality: {
-    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
-    if (upstreamInfo) {
-      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
-      if (hostInfo) {
-        Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
-        if (md) {
-          return getMetadataNamespaceImpl(*md, ns);
-        }
-      }
-    }
-    break;
-  }
-  }
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                      "metadata is not available");
-  return nullptr;
-}
-
-/**
  * Helper to get the metadata object from the stream info.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -293,6 +221,8 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "callbacks are not available");
     return nullptr;
   }
   auto& stream_info = callbacks->streamInfo();
@@ -342,7 +272,29 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     break;
   }
   }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                      "metadata is not available");
   return nullptr;
+}
+
+/**
+ * Helper to get the metadata namespace from the stream info. Uses getMetadata() to resolve
+ * the metadata source, then looks up the namespace within it.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source the location of the metadata to use.
+ * @param ns is the namespace of the metadata.
+ * @return the metadata namespace if it exists, nullptr otherwise.
+ */
+const Protobuf::Struct*
+getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                     envoy_dynamic_module_type_metadata_source metadata_source,
+                     envoy_dynamic_module_type_module_buffer ns) {
+  const auto* metadata = getMetadata(filter_envoy_ptr, metadata_source);
+  if (!metadata) {
+    return nullptr;
+  }
+  return getMetadataNamespaceImpl(*metadata, ns);
 }
 
 /**
