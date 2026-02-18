@@ -247,7 +247,7 @@ void envoy_dynamic_module_callback_network_filter_close(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_connection_close_type close_type) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  filter->connection().close(toEnvoyCloseType(close_type));
+  filter->connection().close(toEnvoyCloseType(close_type), "dynamic_module_close");
 }
 
 uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
@@ -312,11 +312,11 @@ void envoy_dynamic_module_callback_network_filter_close_with_details(
     envoy_dynamic_module_type_network_connection_close_type close_type,
     envoy_dynamic_module_type_module_buffer details) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  if (details.ptr != nullptr && details.length > 0) {
-    filter->connection().streamInfo().setConnectionTerminationDetails(
-        absl::string_view(details.ptr, details.length));
-  }
-  filter->connection().close(toEnvoyCloseType(close_type));
+  absl::string_view details_view = (details.ptr != nullptr && details.length > 0)
+                                       ? absl::string_view(details.ptr, details.length)
+                                       : "dynamic_module_close";
+  filter->connection().streamInfo().setConnectionTerminationDetails(details_view);
+  filter->connection().close(toEnvoyCloseType(close_type), details_view);
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_requested_server_name(
@@ -829,6 +829,36 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
 // -----------------------------------------------------------------------------
 // Upstream Host Access Callbacks
 // -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto* tl_cluster = filter->getFilterConfig().cluster_manager_.getThreadLocalCluster(
+      absl::string_view(cluster_name.ptr, cluster_name.length));
+  if (tl_cluster == nullptr) {
+    return false;
+  }
+  const auto& priority_set = tl_cluster->prioritySet();
+  if (priority >= priority_set.hostSetsPerPriority().size()) {
+    return false;
+  }
+  const auto& host_set = priority_set.hostSetsPerPriority()[priority];
+  if (host_set == nullptr) {
+    return false;
+  }
+  if (total_count != nullptr) {
+    *total_count = host_set->hosts().size();
+  }
+  if (healthy_count != nullptr) {
+    *healthy_count = host_set->healthyHosts().size();
+  }
+  if (degraded_count != nullptr) {
+    *degraded_count = host_set->degradedHosts().size();
+  }
+  return true;
+}
 
 bool envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,

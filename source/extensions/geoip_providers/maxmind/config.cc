@@ -28,7 +28,7 @@ public:
                                      Server::Configuration::FactoryContext& context) {
     std::shared_ptr<GeoipProvider> driver;
     const uint64_t key = MessageUtil::hash(proto_config);
-    absl::MutexLock lock(&mu_);
+    absl::MutexLock lock(mu_);
     auto it = drivers_.find(key);
     if (it != drivers_.end()) {
       driver = it->second.lock();

@@ -478,31 +478,36 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ContinueReading) {
 // =============================================================================
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseFlushWrite) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_FlushWrite);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseNoFlush) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseFlushWriteAndDelay) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWriteAndDelay));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWriteAndDelay,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_FlushWriteAndDelay);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseAbort) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::Abort,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_Abort);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseAbortReset) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::AbortReset));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::AbortReset,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_AbortReset);
 }
@@ -648,7 +653,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithDetails) {
   const std::string details = "auth_failed";
   EXPECT_CALL(connection_.stream_info_,
               setConnectionTerminationDetails(absl::string_view(details)));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::NoFlush, absl::string_view(details)));
 
   envoy_dynamic_module_callback_network_filter_close_with_details(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush,
@@ -656,8 +662,10 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithDetails) {
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithNullDetails) {
-  EXPECT_CALL(connection_.stream_info_, setConnectionTerminationDetails(testing::_)).Times(0);
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_.stream_info_,
+              setConnectionTerminationDetails(absl::string_view("dynamic_module_close")));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush,
+                                 absl::string_view("dynamic_module_close")));
 
   envoy_dynamic_module_callback_network_filter_close_with_details(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush, {nullptr, 0});
@@ -1583,6 +1591,115 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, FilterDestructionCancelsPendin
   EXPECT_CALL(request, cancel());
   // Destroy the filter. This should cancel all pending callouts.
   filter_.reset();
+}
+
+// =============================================================================
+// Tests for cluster host count.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountClusterNotFound) {
+  std::string cluster_name = "nonexistent_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountInvalidPriority) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  // Priority 99 should exceed available priorities.
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 99, &total, &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountSuccess) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  // Set up hosts in the mock host set.
+  auto* mock_host_set = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(5);
+  mock_host_set->healthy_hosts_.resize(3);
+  mock_host_set->degraded_hosts_.resize(1);
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 3);
+  EXPECT_EQ(degraded, 1);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountNullOutputParams) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+
+  auto* mock_host_set = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(10);
+  mock_host_set->healthy_hosts_.resize(8);
+  mock_host_set->degraded_hosts_.resize(2);
+
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+
+  // Call with nullptr for some output params - should still succeed.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, nullptr, nullptr, nullptr));
+
+  // Call with only total.
+  size_t total = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, nullptr, nullptr));
+  EXPECT_EQ(total, 10);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetClusterHostCountDifferentPriority) {
+  std::string cluster_name = "test_cluster";
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+
+  // Set up priority 0 with 5 hosts.
+  auto* mock_host_set_0 = thread_local_cluster.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set_0->hosts_.resize(5);
+  mock_host_set_0->healthy_hosts_.resize(5);
+  mock_host_set_0->degraded_hosts_.resize(0);
+
+  // Set up priority 1 with 3 hosts.
+  auto* mock_host_set_1 = thread_local_cluster.cluster_.priority_set_.getMockHostSet(1);
+  mock_host_set_1->hosts_.resize(3);
+  mock_host_set_1->healthy_hosts_.resize(2);
+  mock_host_set_1->degraded_hosts_.resize(1);
+
+  envoy_dynamic_module_type_module_buffer name_buf = {cluster_name.data(), cluster_name.size()};
+
+  // Check priority 0.
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 5);
+  EXPECT_EQ(degraded, 0);
+
+  // Check priority 1.
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+      filterPtr(), name_buf, 1, &total, &healthy, &degraded));
+  EXPECT_EQ(total, 3);
+  EXPECT_EQ(healthy, 2);
+  EXPECT_EQ(degraded, 1);
 }
 
 // =============================================================================
