@@ -106,7 +106,7 @@ message ServerInfo {
   //   skips validation of the mcp-protocol-version header on subsequent requests.
   //
   // Example values: ["2025-11-25", "2025-06-18"]
-  repeated string supported_protocol_version = 1;
+  repeated string supported_protocol_versions = 1;
 
   // Optional description of the server.
   string description = 2;
@@ -128,7 +128,7 @@ message ServerToolConfig {
   //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
   // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
   //   extension or the backend itself to handle the tools/list request if they support it.
-  HttpRule tool_list_url_remap = 3;
+  HttpRule tool_list_http_rule = 3;
 }
 
 // Configuration for a specific MCP tool.
@@ -160,22 +160,25 @@ message HttpRule {
   // Each template variable MUST correspond to a field in the JSON-RPC "arguments".
   // Use dot-notation to access fields within nested objects (e.g., "user.id" maps the value of the
   // "id" field inside "user").
-  oneof pattern {
-    // Maps to HTTP GET.
-    string get = 1;
+  //
+  // To support backward compatibility with future methods, these are defined as individual fields
+  // rather than a "oneof". If multiple fields are present, the one with the highest field number
+  // highest priority) is the effective method.
+  //
+  // Maps to HTTP GET.
+  string get = 1;
 
-    // Maps to HTTP PUT.
-    string put = 2;
+  // Maps to HTTP PUT.
+  string put = 2;
 
-    // Maps to HTTP POST.
-    string post = 3;
+  // Maps to HTTP POST.
+  string post = 3;
 
-    // Maps to HTTP DELETE.
-    string delete = 4;
+  // Maps to HTTP DELETE.
+  string delete = 4;
 
-    // Maps to HTTP PATCH.
-    string patch = 5;
-  }
+  // Maps to HTTP PATCH.
+  string patch = 5;
 
   // The name of the request field whose value is mapped to the HTTP request body.
   //
