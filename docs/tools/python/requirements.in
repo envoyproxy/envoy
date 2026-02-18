@@ -17,4 +17,4 @@ frozendict>=2.3.7
 jinja2
 packaging
 pyyaml
-uvloop==0.20.0
+uvloop==0.22.1
