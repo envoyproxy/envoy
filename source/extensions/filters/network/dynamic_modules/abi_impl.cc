@@ -247,7 +247,7 @@ void envoy_dynamic_module_callback_network_filter_close(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_connection_close_type close_type) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  filter->connection().close(toEnvoyCloseType(close_type));
+  filter->connection().close(toEnvoyCloseType(close_type), "dynamic_module_close");
 }
 
 uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
@@ -312,11 +312,11 @@ void envoy_dynamic_module_callback_network_filter_close_with_details(
     envoy_dynamic_module_type_network_connection_close_type close_type,
     envoy_dynamic_module_type_module_buffer details) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  if (details.ptr != nullptr && details.length > 0) {
-    filter->connection().streamInfo().setConnectionTerminationDetails(
-        absl::string_view(details.ptr, details.length));
-  }
-  filter->connection().close(toEnvoyCloseType(close_type));
+  absl::string_view details_view = (details.ptr != nullptr && details.length > 0)
+                                       ? absl::string_view(details.ptr, details.length)
+                                       : "dynamic_module_close";
+  filter->connection().streamInfo().setConnectionTerminationDetails(details_view);
+  filter->connection().close(toEnvoyCloseType(close_type), details_view);
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_requested_server_name(
