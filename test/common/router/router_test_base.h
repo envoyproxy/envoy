@@ -70,6 +70,7 @@ public:
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
   void expectResponseTimerCreate();
+  void expectResponseHeadersTimerCreate();
   void expectPerTryTimerCreate();
   void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);
   void expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec);
@@ -119,6 +120,7 @@ public:
   FilterConfigSharedPtr config_;
   std::unique_ptr<RouterTestFilter> router_;
   Event::MockTimer* response_timeout_{};
+  Event::MockTimer* response_headers_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Event::MockTimer* per_try_idle_timeout_{};
   Event::MockTimer* max_stream_duration_timer_{};

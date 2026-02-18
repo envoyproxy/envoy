@@ -108,6 +108,7 @@ public:
   uint64_t requestBodyBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
+  absl::optional<std::chrono::milliseconds> responseHeadersTimeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;
   absl::optional<std::chrono::milliseconds> flushTimeout() const override;
   bool usingNewTimeouts() const override;
