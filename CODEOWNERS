@@ -240,7 +240,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
-/*/extensions/filters/http/mcp @botengyao @yanavlasov
+/*/extensions/filters/http/mcp @botengyao @yanavlasov @wdauchy
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
 # HTTP A2A filter

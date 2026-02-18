@@ -478,31 +478,36 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ContinueReading) {
 // =============================================================================
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseFlushWrite) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_FlushWrite);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseNoFlush) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseFlushWriteAndDelay) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWriteAndDelay));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWriteAndDelay,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_FlushWriteAndDelay);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseAbort) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::Abort,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_Abort);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseAbortReset) {
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::AbortReset));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::AbortReset,
+                                 absl::string_view("dynamic_module_close")));
   envoy_dynamic_module_callback_network_filter_close(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_AbortReset);
 }
@@ -648,7 +653,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithDetails) {
   const std::string details = "auth_failed";
   EXPECT_CALL(connection_.stream_info_,
               setConnectionTerminationDetails(absl::string_view(details)));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::NoFlush, absl::string_view(details)));
 
   envoy_dynamic_module_callback_network_filter_close_with_details(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush,
@@ -656,8 +662,10 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithDetails) {
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, CloseWithNullDetails) {
-  EXPECT_CALL(connection_.stream_info_, setConnectionTerminationDetails(testing::_)).Times(0);
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_.stream_info_,
+              setConnectionTerminationDetails(absl::string_view("dynamic_module_close")));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush,
+                                 absl::string_view("dynamic_module_close")));
 
   envoy_dynamic_module_callback_network_filter_close_with_details(
       filterPtr(), envoy_dynamic_module_type_network_connection_close_type_NoFlush, {nullptr, 0});
