@@ -32,8 +32,9 @@ public:
       // We use sleep_for here instead of advanceTimeWait because the watchdog runs on its own
       // thread and needs real time to elapse to trigger a miss/megamiss event when it checks
       // on the responsiveness of the worker threads.
-      // std::this_thread::sleep_for(block_duration_);
+      ENVOY_LOG_MISC(info, "BlockFilter: starting sleep for {}ms", block_duration_.count());
       absl::SleepFor(absl::Milliseconds(block_duration_.count()));
+      ENVOY_LOG_MISC(info, "BlockFilter: finished sleep");
     }
     return Http::FilterHeadersStatus::Continue;
   }
