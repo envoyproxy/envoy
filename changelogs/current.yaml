@@ -62,6 +62,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tracing
+  change: |
+    Fixed route refresh tracing to not override the tracer's sampling decision when the trace is
+    kept. Previously, a route refresh could escalate the sampling priority, preventing downstream
+    trace collectors from applying their own sampling rates.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
