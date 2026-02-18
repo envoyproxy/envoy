@@ -156,7 +156,8 @@ public:
              is supported for this upstream.
    */
   virtual Tcp::ConnectionPool::ConnectionData*
-  onDownstreamEvent(Network::ConnectionEvent event) PURE;
+  onDownstreamEvent(Network::ConnectionEvent event,
+                    absl::string_view downstream_local_close_reason = "") PURE;
 
   /* Called to convert underlying transport socket from non-secure mode
    * to secure mode. Implemented only by start_tls transport socket.
@@ -179,7 +180,7 @@ public:
   /**
    * @return the failure reason of the local close.
    */
-  virtual absl::string_view localCloseReason() { return ""; }
+  virtual absl::string_view localCloseReason() const { return ""; }
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

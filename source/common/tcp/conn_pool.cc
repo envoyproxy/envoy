@@ -117,8 +117,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 void ActiveTcpClient::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "per client idle timeout", *connection_);
   parent_.host()->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
-  close(Network::ConnectionCloseType::NoFlush,
-        StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout);
+  close();
 }
 
 void ActiveTcpClient::disableIdleTimer() {

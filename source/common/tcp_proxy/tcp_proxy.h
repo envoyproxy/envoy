@@ -754,6 +754,7 @@ protected:
   bool initial_data_received_{false};
   bool read_disabled_due_to_buffer_{false}; // Track if we disabled reading due to buffer overflow.
   uint32_t max_buffered_bytes_{65536};      // Default 64KB.
+  bool idle_timeout_triggered_{false};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
