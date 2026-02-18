@@ -62,6 +62,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tracing/datadog
+  change: |
+    Fixed the Datadog tracer's ``setSampled(true)`` to not override the sampling priority, matching
+    the ``startSpan()`` behavior of leaving the priority unset so the Datadog agent can apply its
+    own sampling rate. Previously, ``setSampled(true)`` would set ``USER_KEEP`` priority which
+    prevented the agent from downsampling, causing a significant increase in trace volume when
+    combined with route cache refreshes in Envoy 1.36.
 - area: dynamic_modules
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
