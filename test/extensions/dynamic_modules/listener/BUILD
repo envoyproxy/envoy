@@ -66,8 +66,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
