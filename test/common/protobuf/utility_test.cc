@@ -1661,13 +1661,22 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
 TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.set_flags_path("foo");
-  EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
+  EXPECT_EQ("{\"flags_path\": foo}",
+            MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
 }
 
 TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.set_flags_path("foo");
-  EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+  EXPECT_EQ("\"flags_path\": foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetYamlStringFromMessageWithChallengingKey) {
+  Protobuf::Value value;
+  value.set_number_value(2);
+  Protobuf::Struct msg;
+  (*msg.mutable_fields())["--- {... Z,<}g"] = value;
+  EXPECT_EQ("\"--- {... Z,<}g\": 2", MessageUtil::getYamlStringFromMessage(msg));
 }
 
 TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
@@ -1677,12 +1686,12 @@ TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
   bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
 
   const std::string expected_yaml = R"EOF(
-node:
+"node":
   {}
-static_resources:
-  listeners:
-    - name: http
-flags_path: foo)EOF";
+"static_resources":
+  "listeners":
+    - "name": http
+"flags_path": foo)EOF";
   EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
 }
 
