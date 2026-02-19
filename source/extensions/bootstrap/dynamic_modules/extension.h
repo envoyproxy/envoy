@@ -28,7 +28,7 @@ public:
   void initializeInModuleExtension();
 
   // Server::BootstrapExtension
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override;
 
   /**
