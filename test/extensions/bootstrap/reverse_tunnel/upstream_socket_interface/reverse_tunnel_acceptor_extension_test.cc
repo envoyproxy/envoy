@@ -816,7 +816,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToS
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
 
-  extension_->onServerInitialized();
+  extension_->onServerInitialized(server_);
 
   auto* registry = extension_->getLocalRegistry();
   ASSERT_NE(registry, nullptr);
