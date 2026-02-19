@@ -254,6 +254,7 @@ HDS
 HMAC
 HOL
 HPACK
+HRW
 HTAB
 HTML
 HTTP
@@ -1080,6 +1081,7 @@ msec
 msg
 msghdr
 msgpack
+mult
 multi
 multicast
 multikill
@@ -1606,6 +1608,7 @@ xform
 xhtml
 xid
 xmodem
+xorshift
 xxhash
 xxs
 xyz
