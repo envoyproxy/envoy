@@ -1723,6 +1723,47 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_typed is called by the module to set the
+ * typed filter state with the given key. Unlike set_filter_state_bytes which stores a raw
+ * StringAccessor, this uses the registered ObjectFactory for the key to create a properly typed
+ * filter state object via createFromBytes. This is required for interoperability with built-in
+ * Envoy filters that read filter state as typed objects (e.g., tcp_proxy reads
+ * PerConnectionCluster).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the stream info is not available, no
+ * ObjectFactory is registered for the key, the factory fails to create the object, or the key
+ * already exists and is marked as read-only.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_typed is called by the module to get the
+ * serialized bytes value of a typed filter state object with the given key. This retrieves the
+ * object generically and calls serializeAsString to get the bytes representation. This works with
+ * any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
 /**
@@ -3272,6 +3313,44 @@ bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_typed is called by the module to set
+ * typed filter state using the registered ObjectFactory for the key. Unlike set_filter_state_bytes
+ * which stores a raw StringAccessor, this creates a properly typed filter state object via
+ * ObjectFactory::createFromBytes. This is required for interoperability with built-in Envoy
+ * filters that read filter state as typed objects (e.g., tcp_proxy reads PerConnectionCluster
+ * via the key "envoy.tcp_proxy.cluster").
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if no ObjectFactory is registered for the
+ * key, the factory fails to create the object, or the key already exists and is marked as
+ * read-only.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_typed is called by the module to get
+ * the serialized bytes value of a typed filter state object with the given key. This retrieves
+ * the object generically and calls serializeAsString to get the bytes representation. This works
+ * with any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the serialized value owned by Envoy will be stored.
+ * @return true if the key exists and the object supports serialization, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // ---------------------------- Dynamic Metadata Callbacks ---------------------
 
 /**
@@ -4018,6 +4097,32 @@ void envoy_dynamic_module_on_listener_filter_config_scheduled(
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_module_ptr,
     uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_on_listener_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a listener filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param filter_module_ptr is the pointer to the in-module listener filter created by
+ * envoy_dynamic_module_on_listener_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_listener_filter_http_callout_done(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
 // =============================================================================
 // Listener Filter Callbacks
 // =============================================================================
@@ -4110,6 +4215,155 @@ void envoy_dynamic_module_callback_listener_filter_set_ja3_hash(
 void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer hash);
+
+// --------------------- Socket Property Getters (Protocol Detection & SSL) ----
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the connection socket. This returns the value
+ * previously set by a listener filter (e.g., TLS inspector).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol is called by the
+ * module to get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the protocol string owned by Envoy will be stored.
+ * @return true if the transport protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size is called
+ * by the module to get the count of requested application protocols (ALPN) from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of application protocols, or 0 if none are available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols is called by
+ * the module to get the requested application protocols (ALPN) from the connection socket. The
+ * module should first call get_requested_application_protocols_size to get the count and allocate
+ * the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocols_out is a pre-allocated array owned by the module where Envoy will populate the
+ *   protocol strings. The module must allocate this array with at least the size returned by
+ *   get_requested_application_protocols_size.
+ * @return true if the protocols were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja3_hash` is called by the module to get the
+ * `JA3` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja4_hash` is called by the module to get the
+ * `JA4` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_ssl is called by the module to check if the
+ * connection has SSL/TLS information available on the socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if SSL/TLS connection information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of URI SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of DNS SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
 
 // --------------------------- Address Operations -----------------------------
 
@@ -4255,12 +4509,28 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
- * the socket immediately.
+ * the socket immediately. If details is non-empty, the termination reason is set on the
+ * connection's stream info before closing.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param details is the optional termination reason string owned by the module. Can be empty.
  */
 void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_write_to_socket is called by the module to write
+ * data directly to the raw socket. This is useful for protocol negotiation at the listener filter
+ * level, such as writing SSL support responses in Postgres or MySQL handshake packets.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param data is the data to write owned by the module.
+ * @return the number of bytes written, or -1 if the write failed or callbacks are not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
 
 // ---------------------- Socket Option Callbacks ------------------------------
 
@@ -4544,6 +4814,32 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value);
+
+// ---------------------- Listener Filter Callbacks - HTTP Callout ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_http_callout is called by the module to initiate an
+ * HTTP callout. The callout is initiated by the listener filter and the response is received in
+ * envoy_dynamic_module_on_listener_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_listener_filter_http_callout(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 // ---------------------- Listener filter scheduler callbacks -----------------
 
