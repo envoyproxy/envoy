@@ -64,22 +64,15 @@ OTelSpanKind getSpanKind(const Tracing::Config& config) {
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-               Server::Configuration::TracerFactoryContext& context)
-    : Driver(opentelemetry_config, context, ResourceProviderImpl{}) {}
-
-Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
                Server::Configuration::TracerFactoryContext& context,
-               const ResourceProvider& resource_provider)
+               std::shared_ptr<ResourceProvider> resource_provider)
     : tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()),
       tracing_stats_{OPENTELEMETRY_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
+          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))},
+      resource_provider_(resource_provider) {
   auto& factory_context = context.serverFactoryContext();
 
-  Resource resource = resource_provider.getResource(
-      opentelemetry_config.resource_detectors(), context.serverFactoryContext(),
-      opentelemetry_config.service_name().empty() ? kDefaultServiceName
-                                                  : opentelemetry_config.service_name());
-  ResourceConstSharedPtr resource_ptr = std::make_shared<Resource>(std::move(resource));
+  ResourceConstSharedPtr resource_ptr = resource_provider->getResource();
 
   if (opentelemetry_config.has_grpc_service() && opentelemetry_config.has_http_service()) {
     throw EnvoyException(
@@ -110,10 +103,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     // Get the max cache size from config
     uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, max_cache_size,
                                                               DEFAULT_MAX_CACHE_SIZE);
-    TracerPtr tracer =
-        std::make_unique<Tracer>(std::move(exporter), factory_context.timeSource(),
-                                 factory_context.api().randomGenerator(), factory_context.runtime(),
-                                 dispatcher, tracing_stats_, resource_ptr, sampler, max_cache_size);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
+        factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
+        max_cache_size, resource_provider_);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }

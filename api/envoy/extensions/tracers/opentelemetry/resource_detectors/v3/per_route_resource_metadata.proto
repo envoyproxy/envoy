@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.resource_detectors.v3;
+
+message PerRouteResourceMetadata {
+  // Schema URL of the resource. Optional.
+  string schema_url = 1;
+  // Custom Resource attributes to be included.
+  map<string, string> attributes = 2;
+}

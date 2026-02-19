@@ -31,12 +31,8 @@ using testing::ReturnRef;
 
 class MockResourceProvider : public ResourceProvider {
 public:
-  MOCK_METHOD(Resource, getResource,
-              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
-                   resource_detectors,
-               Server::Configuration::ServerFactoryContext& context,
-               absl::string_view service_name),
-              (const));
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (), (const));
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (const StreamInfo::StreamInfo&), (const));
 };
 
 class OpenTelemetryDriverTest : public testing::Test {
@@ -55,11 +51,12 @@ public:
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
     ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
-    Resource resource;
-    resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
+    auto resource = std::make_shared<Resource>();
+    resource->attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
 
-    auto mock_resource_provider = NiceMock<MockResourceProvider>();
-    EXPECT_CALL(mock_resource_provider, getResource(_, _, _)).WillRepeatedly(Return(resource));
+    auto mock_resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+    EXPECT_CALL(*mock_resource_provider, getResource()).WillRepeatedly(Return(resource));
+    EXPECT_CALL(*mock_resource_provider, getResource(_)).WillRepeatedly(Return(resource));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
@@ -13,6 +14,7 @@
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
@@ -32,6 +34,8 @@ struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class Span;
+
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.
  */
@@ -40,21 +44,26 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size,
+         std::shared_ptr<ResourceProvider> resource_provider);
 
-  void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
+  void sendSpan(::opentelemetry::proto::trace::v1::Span&& span);
+  void sendSpanWithResource(ResourceConstSharedPtr resource,
+                            ::opentelemetry::proto::trace::v1::Span&& span);
 
-  Tracing::SpanPtr startSpan(const std::string& operation_name,
-                             const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                             Tracing::Decision tracing_decision,
-                             OptRef<const Tracing::TraceContext> trace_context,
-                             OTelSpanKind span_kind);
+  std::unique_ptr<Span> startSpan(const std::string& operation_name,
+                                  const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
+                                  Tracing::Decision tracing_decision,
+                                  OptRef<const Tracing::TraceContext> trace_context,
+                                  OTelSpanKind span_kind);
 
-  Tracing::SpanPtr startSpan(const std::string& operation_name,
-                             const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                             const SpanContext& previous_span_context,
-                             OptRef<const Tracing::TraceContext> trace_context,
-                             OTelSpanKind span_kind);
+  std::unique_ptr<Span> startSpan(const std::string& operation_name,
+                                  const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
+                                  const SpanContext& previous_span_context,
+                                  OptRef<const Tracing::TraceContext> trace_context,
+                                  OTelSpanKind span_kind);
+
+  const ResourceProvider& resourceProvider() const { return *resource_provider_; }
 
 private:
   /**
@@ -70,12 +79,16 @@ private:
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;
   std::vector<::opentelemetry::proto::trace::v1::Span> span_buffer_;
+  absl::flat_hash_map<ResourceConstSharedPtr, std::vector<::opentelemetry::proto::trace::v1::Span>>
+      per_tenant_span_buffer_;
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
   const ResourceConstSharedPtr resource_;
+  const std::shared_ptr<ResourceProvider> resource_provider_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  uint64_t span_count_ = 0;
 };
 
 /**
@@ -171,11 +184,14 @@ public:
    */
   const ::opentelemetry::proto::trace::v1::Span& spanForTest() const { return span_; }
 
+  void setResource(ResourceConstSharedPtr resource) { resource_ = resource; }
+
 private:
   ::opentelemetry::proto::trace::v1::Span span_;
   const StreamInfo::StreamInfo& stream_info_;
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
+  ResourceConstSharedPtr resource_;
   bool sampled_;
   const bool use_local_decision_{false};
 };
