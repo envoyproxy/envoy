@@ -7,6 +7,7 @@ namespace InputMatchers {
 namespace DynamicModules {
 
 using ::Envoy::Extensions::Matching::Http::DynamicModules::DynamicModuleMatchData;
+using ::Envoy::Matcher::MatchResult;
 
 DynamicModuleInputMatcher::DynamicModuleInputMatcher(
     DynamicModuleSharedPtr module, OnMatcherConfigDestroyType on_config_destroy,
@@ -21,13 +22,13 @@ DynamicModuleInputMatcher::~DynamicModuleInputMatcher() {
   }
 }
 
-bool DynamicModuleInputMatcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
+MatchResult DynamicModuleInputMatcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
   if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
       ptr != nullptr) {
     auto* dynamic_module_data = dynamic_cast<DynamicModuleMatchData*>((*ptr).get());
     if (dynamic_module_data == nullptr) {
       ENVOY_LOG(debug, "dynamic module matcher received non-DynamicModuleMatchData input");
-      return false;
+      return MatchResult::NoMatch;
     }
 
     // Build the match context with header pointers from the matching data.
@@ -36,10 +37,12 @@ bool DynamicModuleInputMatcher::match(const ::Envoy::Matcher::MatchingDataType& 
     context.response_headers = dynamic_module_data->response_headers_;
     context.response_trailers = dynamic_module_data->response_trailers_;
 
-    return on_match_(in_module_config_, static_cast<void*>(&context));
+    if (on_match_(in_module_config_, static_cast<void*>(&context))) {
+      return MatchResult::Matched;
+    }
   }
 
-  return false;
+  return MatchResult::NoMatch;
 }
 
 } // namespace DynamicModules
