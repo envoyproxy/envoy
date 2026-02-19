@@ -67,12 +67,33 @@ protected:
     )EOF";
   }
 
+  std::string localSignerConfig() const {
+    return R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        key_type: KEY_TYPE_RSA
+        rsa_key_bits: 2048
+        signature_hash: SIGNATURE_HASH_SHA256
+        not_before_backdate_seconds: 60
+        hostname_validation: HOSTNAME_VALIDATION_PERMISSIVE
+        runtime_key_prefix: test.local_signer
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF";
+  }
+
 protected:
   bool disable_stateless_resumption_{true};
   bool disable_stateful_resumption_{true};
 };
 
 TEST_F(OnDemandTest, BasicLoadTest) { EXPECT_OK(create(defaultConfig())); }
+
+TEST_F(OnDemandTest, BasicLoadTestLocalSigner) { EXPECT_OK(create(localSignerConfig())); }
 
 TEST_F(OnDemandTest, BasicLoadTestQuic) {
   EXPECT_THAT(create(defaultConfig(), true), StatusIs(absl::StatusCode::kInvalidArgument));
@@ -86,6 +107,224 @@ TEST_F(OnDemandTest, BasicLoadTestStatelessResumption) {
 TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
   disable_stateful_resumption_ = false;
   EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, MustConfigureSourceOrLocalSigner) {
+  EXPECT_THAT(create(R"EOF(
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRequiresPaths) {
+  EXPECT_THROW_WITH_REGEX(
+      {
+        auto ignored = create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF");
+        (void)ignored;
+      },
+      ProtoValidationException,
+      "Proto constraint validation failed.*CaKeyPath: value length must be at least 1 characters.*");
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsWeakRsaKeyBits) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        key_type: KEY_TYPE_RSA
+        rsa_key_bits: 1024
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownSignatureHash) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        signature_hash: 99
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownEcdsaCurve) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        ecdsa_curve: 99
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerEcdsaConfigLoads) {
+  EXPECT_OK(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        key_type: KEY_TYPE_ECDSA
+        ecdsa_curve: ECDSA_CURVE_P384
+        signature_hash: SIGNATURE_HASH_SHA384
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownKeyType) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        key_type: 99
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownHostnameValidation) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        hostname_validation: 99
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownCaReloadFailurePolicy) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        ca_reload_failure_policy: 99
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerFailOpenReloadPolicyLoads) {
+  EXPECT_OK(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        ca_reload_failure_policy: CA_RELOAD_FAILURE_POLICY_FAIL_OPEN
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownKeyUsage) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        key_usages: [99]
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsUnknownExtendedKeyUsage) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        extended_key_usages: [99]
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerRejectsEmptyAdditionalDnsSan) {
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        additional_dns_sans: [""]
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, LocalSignerPhase4ProfileConfigLoads) {
+  EXPECT_OK(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+        include_primary_dns_san: true
+        additional_dns_sans: ["api.internal.local", "api.mesh.local"]
+        key_usages: [KEY_USAGE_DIGITAL_SIGNATURE, KEY_USAGE_KEY_ENCIPHERMENT]
+        extended_key_usages: [EXTENDED_KEY_USAGE_SERVER_AUTH, EXTENDED_KEY_USAGE_CLIENT_AUTH]
+        basic_constraints_ca: false
+        subject_common_name: api.internal.local
+        subject_organizational_unit: platform
+        subject_country: US
+        subject_state_or_province: CA
+        subject_locality: SF
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"));
 }
 
 TEST_F(OnDemandTest, QuicCall) {
