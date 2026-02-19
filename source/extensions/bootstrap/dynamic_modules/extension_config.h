@@ -2,13 +2,18 @@
 
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -36,6 +41,10 @@ using OnBootstrapExtensionConfigScheduledType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_scheduled);
 using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
+using OnBootstrapExtensionTimerFiredType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionAdminRequestType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 
 class DynamicModuleBootstrapExtension;
 
@@ -90,6 +99,13 @@ public:
   sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
+  /**
+   * Signals that the module's initialization is complete. This unblocks the init manager and
+   * allows Envoy to start accepting traffic. An init target is automatically registered for every
+   * bootstrap extension, so the module must call this exactly once to unblock startup.
+   */
+  void signalInitComplete();
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -106,6 +122,8 @@ public:
   OnBootstrapExtensionShutdownType on_bootstrap_extension_shutdown_ = nullptr;
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
+  OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -120,6 +138,193 @@ public:
 
   // The stats store for accessing metrics.
   Stats::Store& stats_store_;
+
+  // The init target for blocking Envoy startup until the module signals readiness.
+  // Created during config construction and registered with the init manager.
+  std::unique_ptr<Init::TargetImpl> init_target_;
+
+  // ----------------------------- Metrics Support -----------------------------
+  // Handle classes for storing defined metrics. These follow the same pattern as the HTTP
+  // filter config metrics support.
+
+  class ModuleCounterHandle {
+  public:
+    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
+    void add(uint64_t value) const { counter_.add(value); }
+
+  private:
+    Stats::Counter& counter_;
+  };
+
+  class ModuleCounterVecHandle {
+  public:
+    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
+        : name_(name), label_names_(label_names) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+  };
+
+  class ModuleGaugeHandle {
+  public:
+    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
+    void add(uint64_t value) const { gauge_.add(value); }
+    void sub(uint64_t value) const { gauge_.sub(value); }
+    void set(uint64_t value) const { gauge_.set(value); }
+
+  private:
+    Stats::Gauge& gauge_;
+  };
+
+  class ModuleGaugeVecHandle {
+  public:
+    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                         Stats::Gauge::ImportMode import_mode)
+        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
+    }
+    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
+    }
+    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Gauge::ImportMode import_mode_;
+  };
+
+  class ModuleHistogramHandle {
+  public:
+    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
+    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
+
+  private:
+    Stats::Histogram& histogram_;
+  };
+
+  class ModuleHistogramVecHandle {
+  public:
+    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                             Stats::Histogram::Unit unit)
+        : name_(name), label_names_(label_names), unit_(unit) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t value) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Histogram::Unit unit_;
+  };
+
+  size_t addCounter(ModuleCounterHandle&& counter) {
+    size_t id = counters_.size();
+    counters_.push_back(std::move(counter));
+    return id;
+  }
+
+  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
+    size_t id = counter_vecs_.size();
+    counter_vecs_.push_back(std::move(counter_vec));
+    return id;
+  }
+
+  size_t addGauge(ModuleGaugeHandle&& gauge) {
+    size_t id = gauges_.size();
+    gauges_.push_back(std::move(gauge));
+    return id;
+  }
+
+  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
+    size_t id = gauge_vecs_.size();
+    gauge_vecs_.push_back(std::move(gauge_vec));
+    return id;
+  }
+
+  size_t addHistogram(ModuleHistogramHandle&& histogram) {
+    size_t id = histograms_.size();
+    histograms_.push_back(std::move(histogram));
+    return id;
+  }
+
+  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
+    size_t id = histogram_vecs_.size();
+    histogram_vecs_.push_back(std::move(histogram_vec));
+    return id;
+  }
+
+  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
+    if (id >= counters_.size()) {
+      return {};
+    }
+    return counters_[id];
+  }
+
+  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
+    if (id >= counter_vecs_.size()) {
+      return {};
+    }
+    return counter_vecs_[id];
+  }
+
+  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
+    if (id >= gauges_.size()) {
+      return {};
+    }
+    return gauges_[id];
+  }
+
+  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
+    if (id >= gauge_vecs_.size()) {
+      return {};
+    }
+    return gauge_vecs_[id];
+  }
+
+  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
+    if (id >= histograms_.size()) {
+      return {};
+    }
+    return histograms_[id];
+  }
+
+  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
+    if (id >= histogram_vecs_.size()) {
+      return {};
+    }
+    return histogram_vecs_[id];
+  }
+
+  // Stats scope for metric creation.
+  const Stats::ScopeSharedPtr stats_scope_;
+  Stats::StatNamePool stat_name_pool_;
+
+  // Temporary storage for the admin response body. Set by the
+  // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
+  // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
+  std::string admin_response_body_;
 
 private:
   /**
@@ -155,6 +360,14 @@ private:
   absl::flat_hash_map<uint64_t,
                       std::unique_ptr<DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback>>
       http_callouts_;
+
+  // Metric storage.
+  std::vector<ModuleCounterHandle> counters_;
+  std::vector<ModuleCounterVecHandle> counter_vecs_;
+  std::vector<ModuleGaugeHandle> gauges_;
+  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
+  std::vector<ModuleHistogramHandle> histograms_;
+  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -186,6 +399,36 @@ private:
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
   // The dispatcher is used to post the event to the main thread.
   Event::Dispatcher& dispatcher_;
+};
+
+/**
+ * This class wraps an Envoy timer for use by bootstrap extension dynamic modules. It is created via
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new and deleted via
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete.
+ *
+ * When the timer fires, it invokes the on_bootstrap_extension_timer_fired event hook on the main
+ * thread if the config is still alive.
+ */
+class DynamicModuleBootstrapExtensionTimer {
+public:
+  explicit DynamicModuleBootstrapExtensionTimer(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
+      : config_(std::move(config)) {}
+
+  /**
+   * Set the underlying Envoy timer. This is separated from construction to allow the timer
+   * callback to capture a stable pointer to this object.
+   */
+  void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
+
+  Event::Timer& timer() { return *timer_; }
+
+private:
+  // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily
+  // extending the lifetime of the config.
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
+  // The underlying Envoy timer.
+  Event::TimerPtr timer_;
 };
 
 /**

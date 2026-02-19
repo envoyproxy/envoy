@@ -43,7 +43,7 @@ public:
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override;
 
   // Envoy::Matcher::InputMatcher
-  bool match(const ::Envoy::Matcher::MatchingDataType& input) override;
+  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::MatchingDataType& input) override;
 
   const std::string& pattern() const override { return EMPTY_STRING; }
 

@@ -720,6 +720,13 @@ envoy.filters.http.stateful_session:
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+envoy.filters.http.sse_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http
@@ -1179,6 +1186,13 @@ envoy.matching.matchers.cel_matcher:
   status: stable
   type_urls:
   - xds.type.matcher.v3.CelMatcher
+envoy.matching.matchers.dynamic_modules:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1419,6 +1433,11 @@ envoy.string_matcher.lua:
   status: alpha
   type_urls:
   - envoy.extensions.string_matcher.lua.v3.Lua
+envoy.tls.cert_validator.dynamic_modules:
+  categories:
+  - envoy.tls.cert_validator
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tls.cert_validator.spiffe:
   categories:
   - envoy.tls.cert_validator
@@ -1773,6 +1792,13 @@ envoy.matching.inputs.cel_data_input:
   status: stable
   type_urls:
   - xds.type.matcher.v3.HttpAttributesCelMatchInput
+envoy.matching.inputs.dynamic_module_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

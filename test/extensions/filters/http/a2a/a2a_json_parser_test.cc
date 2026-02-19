@@ -409,7 +409,7 @@ TEST_F(A2aJsonParserTest, ParseMessageSend) {
             "text/plain");
 }
 
-TEST_F(A2aJsonParserTest, ParseMessageSendChunks) {
+TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
   const std::string part1 = R"({
     "jsonrpc": "2.0",
     "method": "message/send",
@@ -439,23 +439,27 @@ TEST_F(A2aJsonParserTest, ParseMessageSendChunks) {
 
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "message/send");
+  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
+  EXPECT_EQ(parser_.metadata().fields().at("method").string_value(), "message/send");
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "123");
 
-  // Verify some fields to ensure partial parsing worked
   EXPECT_EQ(
       parser_.metadata().fields().at("params").struct_value().fields().at("taskId").string_value(),
       "task-abc-987");
-  EXPECT_EQ(parser_.metadata()
-                .fields()
-                .at("params")
-                .struct_value()
-                .fields()
-                .at("message")
-                .struct_value()
-                .fields()
-                .at("taskId")
-                .string_value(),
-            "task1");
+
+  const auto& message =
+      parser_.metadata().fields().at("params").struct_value().fields().at("message").struct_value();
+  EXPECT_EQ(message.fields().at("taskId").string_value(), "task1");
+  EXPECT_EQ(message.fields().at("contextId").string_value(), "context1");
+  EXPECT_EQ(message.fields().at("messageId").string_value(), "msg1");
+  EXPECT_EQ(message.fields().at("role").string_value(), "user");
+
+  EXPECT_TRUE(message.fields().at("parts").has_list_value());
+  EXPECT_EQ(message.fields().at("parts").list_value().values_size(), 1);
+  const auto& part0 = message.fields().at("parts").list_value().values(0).struct_value();
+  EXPECT_EQ(part0.fields().at("type").string_value(), "text");
+  EXPECT_EQ(part0.fields().at("text").string_value(),
+            "Can you analyze the attached CSV for Q3 sales trends?");
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksGet) {
@@ -1051,7 +1055,6 @@ TEST_F(A2aJsonParserTest, Reset) {
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "2");
 }
 
-// TODO(tyxia): Add support for parsing responses.
 TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   const std::string json = R"({
   "jsonrpc": "2.0",
@@ -1080,7 +1083,62 @@ TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
 
   ASSERT_TRUE(parser_.parse(json).ok());
   ASSERT_TRUE(parser_.finishParse().ok());
-  EXPECT_FALSE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
+  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
+  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
+  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
+  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
+  EXPECT_TRUE(parser_.metadata().fields().at("result").has_struct_value());
+
+  const auto& result = parser_.metadata().fields().at("result").struct_value().fields();
+  EXPECT_EQ(result.at("kind").string_value(), "task");
+  EXPECT_EQ(result.at("id").string_value(), "run-uuid");
+  EXPECT_EQ(result.at("contextId").string_value(), "f5bd2a40-74b6-4f7a-b649-ea3f09890003");
+
+  const auto& status = result.at("status").struct_value().fields();
+  EXPECT_EQ(status.at("state").string_value(), "completed");
+
+  const auto& artifacts = result.at("artifacts").list_value();
+  ASSERT_EQ(artifacts.values_size(), 1);
+  const auto& artifact = artifacts.values(0).struct_value().fields();
+  EXPECT_EQ(artifact.at("artifactId").string_value(), "artifact-uuid");
+  EXPECT_EQ(artifact.at("name").string_value(), "Assistant Response");
+
+  const auto& parts = artifact.at("parts").list_value();
+  ASSERT_EQ(parts.values_size(), 1);
+  const auto& part = parts.values(0).struct_value().fields();
+  EXPECT_EQ(part.at("kind").string_value(), "text");
+  EXPECT_EQ(part.at("text").string_value(), "Hello back");
+}
+
+TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 102,
+    "result": null,
+    "error": {
+        "code": -32001,
+        "message": "Task not found",
+        "data": null
+    }
+    })";
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
+  EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
+  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
+  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 102);
+  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
+  EXPECT_EQ(parser_.metadata().fields().at("result").null_value(), Protobuf::NULL_VALUE);
+  EXPECT_TRUE(parser_.metadata().fields().contains("error"));
+  EXPECT_TRUE(parser_.metadata().fields().at("error").has_struct_value());
+
+  const auto& error = parser_.metadata().fields().at("error").struct_value().fields();
+  EXPECT_EQ(error.at("code").number_value(), -32001);
+  EXPECT_EQ(error.at("message").string_value(), "Task not found");
+  EXPECT_EQ(error.at("data").null_value(), Protobuf::NULL_VALUE);
 }
 
 } // namespace

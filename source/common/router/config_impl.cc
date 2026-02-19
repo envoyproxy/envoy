@@ -1852,7 +1852,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    Matcher::MatchResult match_result =
+    Matcher::ActionMatchResult match_result =
         Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match_result.isMatch()) {

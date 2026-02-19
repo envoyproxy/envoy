@@ -81,6 +81,7 @@ protected:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<Server::MockInstance> server_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
@@ -124,7 +125,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, OnWorkerThreadInitialized) {
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, OnServerInitializedSetsExtensionReference) {
-  extension_->onServerInitialized();
+  extension_->onServerInitialized(server_);
   EXPECT_EQ(socket_interface_->getExtension(), extension_.get());
 }
 
@@ -201,7 +202,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
       *socket_interface_, context_, no_stats_config);
 
   // Call onServerInitialized to set up the extension reference properly.
-  no_stats_extension->onServerInitialized();
+  no_stats_extension->onServerInitialized(server_);
 
   // Set up thread local slot so aggregate metrics can be initialized.
   auto no_stats_registry =
@@ -586,7 +587,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithReporterConfig) {
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
-  extension_->onServerInitialized();
+  extension_->onServerInitialized(server_);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, InvalidReverseTunnelReporter) {
