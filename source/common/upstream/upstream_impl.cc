@@ -481,8 +481,9 @@ HostDescriptionImplBase::HostDescriptionImplBase(
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
-      endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
-      locality_(std::move(locality)),
+      endpoint_metadata_(endpoint_metadata),
+      endpoint_metadata_hash_(endpoint_metadata ? MessageUtil::hash(*endpoint_metadata) : 0),
+      locality_metadata_(locality_metadata), locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
       socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
@@ -2343,14 +2344,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
 
-      // Did metadata change?
-      bool metadata_changed = true;
-      if (host->metadata() && existing_host->second->metadata()) {
-        metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
-            *host->metadata(), *existing_host->second->metadata());
-      } else if (!host->metadata() && !existing_host->second->metadata()) {
-        metadata_changed = false;
-      }
+      // Did metadata change? Compare cached hashes for O(1) comparison.
+      const bool metadata_changed = host->metadataHash() != existing_host->second->metadataHash();
 
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.

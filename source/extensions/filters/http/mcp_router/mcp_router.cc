@@ -806,21 +806,31 @@ void McpRouterFilter::handleInitialize() {
     }
     std::string response_body = self->aggregateInitialize(responses);
 
+    // Collect session IDs from successful backends that returned one.
     absl::flat_hash_map<std::string, std::string> sessions;
+    bool any_success = false;
     for (const auto& resp : responses) {
-      if (resp.success && !resp.session_id.empty()) {
-        sessions[resp.backend_name] = resp.session_id;
+      if (resp.success) {
+        any_success = true;
+        if (!resp.session_id.empty()) {
+          sessions[resp.backend_name] = resp.session_id;
+        }
       }
     }
 
-    if (sessions.empty()) {
+    if (!any_success) {
       self->sendHttpError(500, "All backends failed to initialize");
       return;
     }
 
-    std::string composite =
-        SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
-    std::string encoded_session = SessionCodec::encode(composite);
+    // Only build a composite session if at least one backend returned a session ID.
+    // If all backends are session-less, don't return a session ID to the client.
+    std::string encoded_session;
+    if (!sessions.empty()) {
+      std::string composite =
+          SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
+      encoded_session = SessionCodec::encode(composite);
+    }
 
     self->sendJsonResponse(response_body, encoded_session);
   });

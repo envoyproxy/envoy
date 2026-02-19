@@ -127,7 +127,7 @@ public:
   /**
    * Called when the server is initialized.
    */
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
 
   /**
    * Called when a worker thread is initialized.

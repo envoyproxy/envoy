@@ -14,8 +14,9 @@ namespace ListenerFilters {
 DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
-    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher)
-    : main_thread_dispatcher_(main_thread_dispatcher),
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+    Event::Dispatcher& main_thread_dispatcher)
+    : cluster_manager_(cluster_manager), main_thread_dispatcher_(main_thread_dispatcher),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {}
@@ -35,7 +36,8 @@ void DynamicModuleListenerFilterConfig::onScheduled(uint64_t event_id) {
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
-    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher) {
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+    Event::Dispatcher& main_thread_dispatcher) {
 
   // Resolve the symbols for the listener filter using graceful error handling.
   auto on_config_new =
@@ -73,6 +75,11 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
       "envoy_dynamic_module_on_listener_filter_destroy");
   RETURN_IF_NOT_OK_REF(on_destroy.status());
 
+  // Optional: modules that don't need HTTP callout don't need to implement this.
+  auto on_http_callout_done =
+      dynamic_module->getFunctionPointer<OnListenerFilterHttpCalloutDoneType>(
+          "envoy_dynamic_module_on_listener_filter_http_callout_done");
+
   auto on_scheduled = dynamic_module->getFunctionPointer<OnListenerFilterScheduledType>(
       "envoy_dynamic_module_on_listener_filter_scheduled");
   RETURN_IF_NOT_OK_REF(on_scheduled.status());
@@ -83,8 +90,8 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
           "envoy_dynamic_module_on_listener_filter_config_scheduled");
 
   auto config = std::make_shared<DynamicModuleListenerFilterConfig>(
-      filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
-      main_thread_dispatcher);
+      filter_name, filter_config, metrics_namespace, std::move(dynamic_module), cluster_manager,
+      stats_scope, main_thread_dispatcher);
 
   // Store the resolved function pointers.
   config->on_listener_filter_config_destroy_ = on_config_destroy.value();
@@ -94,6 +101,8 @@ absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListe
   config->on_listener_filter_on_close_ = on_close.value();
   config->on_listener_filter_get_max_read_bytes_ = on_get_max_read_bytes.value();
   config->on_listener_filter_destroy_ = on_destroy.value();
+  config->on_listener_filter_http_callout_done_ =
+      on_http_callout_done.ok() ? on_http_callout_done.value() : nullptr;
   config->on_listener_filter_scheduled_ = on_scheduled.value();
   if (on_config_scheduled.ok()) {
     config->on_listener_filter_config_scheduled_ = on_config_scheduled.value();
