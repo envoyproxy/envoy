@@ -251,6 +251,14 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: cel
+  change: |
+    Added functionality to reevaluate CEL expressions that attempt to read response path data on the
+    request path once the data is available. Allows CEL matching based on both request and response
+    headers. This may cause a behavior change for matchers that previously would silently fail to
+    match due to attempting to match response headers in the request path. This behavior can be
+    toggled off by setting runtime guard
+    ``envoy.reloadable_features.enable_cel_response_path_matching`` to false.
 - area: access_log
   change: |
     Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.

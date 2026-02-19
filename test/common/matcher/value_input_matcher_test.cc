@@ -1,3 +1,5 @@
+#include "envoy/matcher/matcher.h"
+
 #include "source/common/matcher/value_input_matcher.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -14,9 +16,9 @@ TEST(ValueInputMatcher, TestMatch) {
 
   StringInputMatcher matcher(matcher_proto, context);
 
-  EXPECT_TRUE(matcher.match(MatchingDataType("exact")));
-  EXPECT_FALSE(matcher.match(MatchingDataType("not")));
-  EXPECT_FALSE(matcher.match(MatchingDataType(absl::monostate())));
+  EXPECT_EQ(matcher.match(MatchingDataType("exact")), Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher.match(MatchingDataType("not")), Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher.match(MatchingDataType(absl::monostate())), Matcher::MatchResult::NoMatch);
 }
 
 } // namespace Matcher
