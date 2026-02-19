@@ -151,6 +151,9 @@ def envoy_dependency_imports(
         sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
         version = "v0.0.0-20251110193048-8bfbf64dc13e",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/api/expr/v1alpha1 @org_golang_google_genproto_googleapis_api//expr/v1alpha1",
+        ],
     )
     go_repository(
         name = "dev_cel_expr",
