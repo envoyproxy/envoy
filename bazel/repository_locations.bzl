@@ -165,8 +165,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
     ),
     tcmalloc = dict(
-        version = "1ac44428cd63fef2c44a7302c6fe33a7d5a28eeb",
-        sha256 = "5172d0cdfe975b9253a67eefa6e19fa6e4f23b596f0d9247959941adf0d57c6c",
+        version = "12f255231938d30493186b0a037feedd70f5a1c1",
+        sha256 = "2a6bef88f8cccda4a63a2f4bb09e655b3ee5ea0a2ce68d16e6ea2d5f5c4be9c1",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
     ),
