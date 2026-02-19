@@ -81,6 +81,10 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
 
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the end of the current event hook.
+  absl::optional<std::string> last_serialized_filter_state_;
+
   /**
    * Helper to get the correct callbacks.
    */

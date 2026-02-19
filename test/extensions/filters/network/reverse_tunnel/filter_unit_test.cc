@@ -15,8 +15,8 @@
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -116,7 +116,8 @@ public:
   // Helper method to set up upstream thread local slot for testing.
   void setupUpstreamThreadLocalSlot() {
     // Call onServerInitialized to set up the extension references properly.
-    upstream_extension_->onServerInitialized();
+    NiceMock<Server::MockInstance> instance;
+    upstream_extension_->onServerInitialized(instance);
 
     // Create a thread local registry for upstream with the dispatcher.
     upstream_thread_local_registry_ =

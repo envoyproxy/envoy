@@ -10,6 +10,8 @@ export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
+CI_TARGET=$1
+
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
@@ -25,6 +27,21 @@ else
   # Fall back to use the ENVOY_BUILD_ARCH itself.
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
+
+# Portable realpath alternative since macOS realpath does not support -m.
+_realpath() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        cd "$path" && pwd
+    elif [[ "$path" != /* ]]; then
+        echo "${PWD}/${path}"
+    else
+        echo "$path"
+    fi
+}
+
+ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
+ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 
 setup_clang_toolchain() {
     local config
@@ -245,7 +262,6 @@ function bazel_envoy_api_go_build() {
     done
 }
 
-CI_TARGET=$1
 shift
 
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
@@ -323,10 +339,18 @@ case $CI_TARGET in
             echo "ENVOY_CACHE_ROOT not set" >&2
             exit 1
         fi
+        ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
+        # workaround rules_rust bug for docs and external workspaces
+        if [[ "${ENVOY_CACHE_OUTPUT_BASE}" == "docs" || "${ENVOY_CACHE_OUTPUT_BASE}" == "external" ]]; then
+            export CARGO_BAZEL_REPIN=true
+        fi
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
+        if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
+            cd "${ENVOY_CACHE_WORKING_DIR}"
+        fi
         bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
-              --output_base="${ENVOY_CACHE_ROOT}/base" \
+              --output_base="${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}" \
               --nowrite_command_log \
               aquery "deps(${ENVOY_CACHE_TARGETS})" \
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
@@ -430,6 +454,35 @@ case $CI_TARGET in
             -c fastbuild \
             @envoy//source/exe:envoy-static
         collect_build_profile build
+        ;;
+
+    config)
+        setup_clang_toolchain
+        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
+            echo "running static config validation"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
+        fi
+        if [[ -e repo.bazelrc ]]; then
+            cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
+        fi
+        pushd "$ENVOY_DOCS_PATH"
+        ENVOY_CONFIG_CONTRIB_LIB="${ENVOY_CONFIG_CONTRIB_LIB:-@envoy//contrib:contrib_test_lib}"
+        ENVOY_CONFIGS_CORE="${ENVOY_CONFIGS_CORE:-//test/config:configs}"
+        ENVOY_CONFIGS_CONTRIB="${ENVOY_CONFIGS_CONTRIB:-//test/config:contrib_configs}"
+        if [[ -z "$ENVOY_SKIP_CORE_CONFIGS" ]]; then
+            echo "validating core configs..."
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                  @envoy//test/config_test \
+                  --@envoy//test/config_test:configs="$ENVOY_CONFIGS_CORE"
+        fi
+        if [[ -z "$ENVOY_SKIP_CONTRIB_CONFIGS" ]]; then
+             echo "validating contrib configs..."
+             bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                   @envoy//test/config_test \
+                   --@envoy//test/config_test:configs="$ENVOY_CONFIGS_CONTRIB" \
+                   --@envoy//test/config_test:test_lib="$ENVOY_CONFIG_CONTRIB_LIB"
+        fi
+        popd
         ;;
 
     coverage|fuzz_coverage)
@@ -632,23 +685,28 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        DOCS_OUTPUT_DIR="$(_realpath "$DOCS_OUTPUT_DIR")"
         rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -e repo.bazelrc ]]; then
+            cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
+        fi
+        pushd "$ENVOY_DOCS_PATH"
         if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
             export SPHINX_RUNNER_ARGS="-v warn"
             BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
         fi
         if [[ -n "${DOCS_BUILD_RST}" ]]; then
-            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //:rst
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
             exit 0
         fi
-        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --//tools/tarball:target=//docs:html \
-              //tools/tarball:unpack \
+              --@envoy//tools/tarball:target=//:html \
+              @envoy//tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
+        popd
         ;;
 
     external)
@@ -656,10 +714,11 @@ case $CI_TARGET in
         echo "Testing external workspace build..."
         if [[ -e repo.bazelrc ]]; then
             cp -a repo.bazelrc "${ENVOY_SRCDIR}/bazel/tests/external"
+            cp -a repo.bazelrc "${ENVOY_SRCDIR}/docs"
         fi
         pushd "${ENVOY_SRCDIR}/bazel/tests/external"
-        export CARGO_BAZEL_REPIN=true
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy//docs
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy//source/common/common:assert_lib
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy-docs
         popd
         ;;
 
@@ -713,6 +772,10 @@ case $CI_TARGET in
             test --config=msan \
                 "${BAZEL_BUILD_OPTIONS[@]}" \
                 -- "${TEST_TARGETS[@]}"
+        ;;
+
+    openssl)
+        echo "Nothing to do right now, this is a placeholder for any OpenSSL-specific build or test steps that may be needed in the future."
         ;;
 
     publish)
@@ -873,18 +936,27 @@ case $CI_TARGET in
         ;;
 
     verify-distroless)
-        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
         docker run --rm distroless-testing
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
+        docker run --rm distroless-contrib-testing
         ;;
 
     verify_examples)
+        if [[ -e repo.bazelrc ]]; then
+            cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
+        fi
+        pushd "$ENVOY_DOCS_PATH"
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="CARGO_BAZEL_REPIN=true" \
+                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples
+        popd
         ;;
 
     verify.trigger)

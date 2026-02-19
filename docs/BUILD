@@ -4,7 +4,6 @@ load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 licenses(["notice"])  # Apache 2
 
 exports_files([
-    "protodoc_manifest.yaml",
     "v2_mapping.json",
     "empty_extensions.json",
     "redirects.txt",
@@ -38,7 +37,7 @@ filegroup(
             "root/configuration/security/_include/sds-source-example.yaml",
         ],
     ) + select({
-        "//bazel:windows_x86_64": [],
+        "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/intro/arch_overview/security/_include/ssl.yaml",
@@ -53,7 +52,7 @@ filegroup(
         "root/configuration/http/http_filters/_include/checksum_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
     ] + select({
-        "//bazel:windows_x86_64": [],
+        "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": glob(["root/_configs/go/*.yaml"]),
     }),
     visibility = ["//visibility:public"],
@@ -68,29 +67,29 @@ filegroup(
 genrule(
     name = "extensions_security_rst",
     srcs = [
-        "//source/extensions:extensions_metadata.yaml",
-        "//contrib:extensions_metadata.yaml",
+        "@envoy//source/extensions:extensions_metadata.yaml",
+        "@envoy//contrib:extensions_metadata.yaml",
     ],
     outs = ["extensions_security_rst.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_extensions_security_rst) \\
-        $(location //source/extensions:extensions_metadata.yaml) \\
-        $(location //contrib:extensions_metadata.yaml) $@
+    $(location //tools:generate_extensions_security_rst) \\
+        $(location @envoy//source/extensions:extensions_metadata.yaml) \\
+        $(location @envoy//contrib:extensions_metadata.yaml) $@
     """,
-    tools = ["//tools/docs:generate_extensions_security_rst"],
+    tools = ["//tools:generate_extensions_security_rst"],
 )
 
 genrule(
     name = "external_deps_rst",
     outs = ["external_deps_rst.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_external_deps_rst) \
-        $(location //bazel:all_repository_locations) \
+    $(location //tools:generate_external_deps_rst) \
+        $(location @envoy//bazel:all_repository_locations) \
         $@
     """,
     tools = [
-        "//bazel:all_repository_locations",
-        "//tools/docs:generate_external_deps_rst",
+        "//tools:generate_external_deps_rst",
+        "@envoy//bazel:all_repository_locations",
     ],
 )
 
@@ -139,10 +138,10 @@ genrule(
     ],
     outs = ["api_rst.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_api_rst) \\
+    $(location //tools:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
     """,
-    tools = ["//tools/docs:generate_api_rst"],
+    tools = ["//tools:generate_api_rst"],
 )
 
 pkg_files(
@@ -152,7 +151,6 @@ pkg_files(
         ":redirects.txt",
         ":versions.yaml",
     ],
-    strip_prefix = "/docs",
 )
 
 pkg_files(
@@ -171,7 +169,7 @@ pkg_files(
         "root/**/*.svg",
         "root/**/*.yaml",
     ]) + ["root/_pygments/style.py"],
-    strip_prefix = "/docs/root",
+    strip_prefix = "/root",
 )
 
 pkg_files(
@@ -184,28 +182,31 @@ genrule(
     name = "version_histories",
     outs = ["version_histories.tar.gz"],
     cmd = """
-    $(location //tools/docs:generate_version_histories) --path=$$(dirname $(location //:VERSION.txt)) $@
+    $(location //tools:generate_version_histories) \
+        --path=$$(dirname $(location @envoy//:VERSION.txt)) \
+        --versions=$(location :versions.yaml) \
+        $@
     """,
     tools = [
         ":versions.yaml",
-        "//:VERSION.txt",
-        "//changelogs",
-        "//changelogs:sections.yaml",
-        "//tools/docs:generate_version_histories",
+        "//tools:generate_version_histories",
+        "@envoy//:VERSION.txt",
+        "@envoy//changelogs",
+        "@envoy//changelogs:sections.yaml",
     ],
 )
 
 # TODO(phlax): this appears unused, fix or remove
 pkg_files(
     name = "google_vrp_config",
-    srcs = ["//configs:google-vrp/envoy-edge.yaml"],
+    srcs = ["@envoy//configs:google-vrp/envoy-edge.yaml"],
     prefix = "config/best_practices",
     strip_prefix = "/configs",
 )
 
 pkg_files(
     name = "repo_configs",
-    srcs = ["//configs"],
+    srcs = ["@envoy//configs:files"],
     prefix = "_configs/repo",
     strip_prefix = "/configs",
 )
@@ -249,13 +250,13 @@ genrule(
     # The Envoy workspace will provide this on stamped builds. For external builds
     # you must either pass an env var or pass it through the workspace's status.
     cmd = """
-    . $(location //bazel:volatile_env) \
+    . $(location @envoy//bazel:volatile_env) \
     && _BUILD_SHA=$${BUILD_DOCS_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
-    && $(location //tools/docs:sphinx_runner) \
+    && $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
          --build_sha="$$_BUILD_SHA" \
          --docs_tag="$${BUILD_DOCS_TAG:-}" \
-         --version_file=$(location //:VERSION.txt) \
+         --version_file=$(location @envoy//:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location rst) \
          $@
@@ -263,9 +264,9 @@ genrule(
     stamp = 1,
     tools = [
         ":rst",
-        "//:VERSION.txt",
-        "//bazel:volatile_env",
-        "//tools/docs:sphinx_runner",
+        "//tools:sphinx_runner",
+        "@envoy//:VERSION.txt",
+        "@envoy//bazel:volatile_env",
         "@envoy_api//:v3_proto_set",
     ],
     visibility = ["//visibility:public"],
@@ -276,25 +277,25 @@ genrule(
     name = "html",
     outs = ["html.tar.gz"],
     cmd = """
-    $(location //tools/docs:sphinx_runner) \
+    $(location //tools:sphinx_runner) \
          $${SPHINX_RUNNER_ARGS:-} \
          --build_sha="$${BUILD_DOCS_SHA:-}" \
-         --version_file=$(location //:VERSION.txt) \
+         --version_file=$(location @envoy//:VERSION.txt) \
          --descriptor_path=$(location @envoy_api//:v3_proto_set) \
          $(location :rst) \
          $@
     """,
     tools = [
         ":rst",
-        "//:VERSION.txt",
-        "//tools/docs:sphinx_runner",
+        "//tools:sphinx_runner",
+        "@envoy//:VERSION.txt",
         "@envoy_api//:v3_proto_set",
     ],
     visibility = ["//visibility:public"],
 )
 
 alias(
-    name = "docs",
+    name = "envoy-docs",
     actual = ":html_release",
     visibility = ["//visibility:public"],
 )

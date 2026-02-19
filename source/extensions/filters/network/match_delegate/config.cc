@@ -104,7 +104,7 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
   }
 
   ASSERT(matching_data_ != nullptr);
-  const Matcher::MatchResult match_result =
+  const Matcher::ActionMatchResult match_result =
       Matcher::evaluateMatch<Envoy::Network::MatchingData>(*match_tree_, *matching_data_);
 
   match_tree_evaluated_ = match_result.isComplete();
