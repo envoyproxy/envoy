@@ -1040,7 +1040,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error",
                        *decoder_callbacks_);
       stats_.failure_mode_allowed_.inc();
-      if (config_->emitFilterStateStats() && logging_info_ != nullptr){
+      if (config_->emitFilterStateStats() && logging_info_ != nullptr) {
         logging_info_->setFailedOpen();
       }
       if (cluster_) {
