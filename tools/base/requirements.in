@@ -43,5 +43,4 @@ setuptools
 slack_sdk
 thrift
 verboselogs
-yapf
 yarl>=1.17.2

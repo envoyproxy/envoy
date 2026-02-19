@@ -87,6 +87,7 @@ public:
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(std::size_t, metadataHash, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
@@ -169,6 +170,7 @@ public:
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(std::size_t, metadataHash, (), (const));
   MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));

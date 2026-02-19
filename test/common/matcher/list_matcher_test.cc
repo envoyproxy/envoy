@@ -97,7 +97,7 @@ TEST(ListMatcherTest, KeepMatchingWithRecursion) {
   SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
-  MatchResult result = matcher.match(TestData(), skipped_match_cb);
+  ActionMatchResult result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("match 2"));
   EXPECT_THAT(skipped_results,
               ElementsAre(IsStringAction("sub match keep_matching"), IsStringAction("match 1")));
@@ -133,7 +133,7 @@ TEST(ListMatcherTest, KeepMatchingWithRecursiveOnNoMatch) {
   SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
-  MatchResult result = matcher.match(TestData(), skipped_match_cb);
+  ActionMatchResult result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("on_no_match sub on_no_match"));
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("sub match keep_matching"),
                                            IsStringAction("sub on_no_match keep_matching"),
