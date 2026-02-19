@@ -52,6 +52,9 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  bool extractTraceContext() const { return extract_trace_context_; }
+  bool extractBaggage() const { return extract_baggage_; }
+
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
@@ -74,6 +77,8 @@ public:
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
+  const bool extract_trace_context_;
+  const bool extract_baggage_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const std::string metadata_namespace_;

@@ -487,6 +487,147 @@ TEST_P(McpFilterIntegrationTest, ChunkByChunkBodyParsing) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test that tracing headers are correctly injected when enabled.
+TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      extract_trace_context: true
+      extract_baggage: true
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  auto tp = upstream_request_->headers().get(Http::LowerCaseString("traceparent"));
+  ASSERT_FALSE(tp.empty());
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            tp[0]->value().getStringView());
+
+  auto ts = upstream_request_->headers().get(Http::LowerCaseString("tracestate"));
+  ASSERT_FALSE(ts.empty());
+  EXPECT_EQ("rojo=00f067aa0ba902b7",
+            ts[0]->value().getStringView());
+
+  auto bg = upstream_request_->headers().get(Http::LowerCaseString("baggage"));
+  ASSERT_FALSE(bg.empty());
+  EXPECT_EQ("userId=alice",
+            bg[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that tracing headers are NOT injected when disabled.
+TEST_P(McpFilterIntegrationTest, TracingHeadersDisabled) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      extract_trace_context: false
+      extract_baggage: false
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("tracestate")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("baggage")).empty());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that invalid tracing headers are NOT injected.
+TEST_P(McpFilterIntegrationTest, InvalidTracingHeadersNotInjected) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      extract_trace_context: true
+      extract_baggage: true
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "invalid",
+        "baggage": "invalid"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("baggage")).empty());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

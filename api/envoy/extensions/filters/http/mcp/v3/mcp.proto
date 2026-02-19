@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -77,6 +77,15 @@ message Mcp {
   // Controls whether attributes are written to dynamic metadata, filter state, or both.
   // Default is DYNAMIC_METADATA when unspecified.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If true, extract W3C trace context from params._meta.traceparent and params._meta.tracestate
+  // according to https://www.w3.org/TR/trace-context/ and inject them as headers.
+  // If false, do not extract or inject trace context.
+  bool extract_trace_context = 6;
+
+  // Whether to extract W3C baggage from params._meta.baggage and inject it as a header.
+  // If false, do not extract or inject baggage.
+  bool extract_baggage = 7;
 }
 
 // Parser configuration with method-specific rules.
