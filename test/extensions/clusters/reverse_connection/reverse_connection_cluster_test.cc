@@ -175,6 +175,18 @@ public:
   void TearDown() override {
     // Do not assert on timer teardown; allow destructor-time disable.
 
+    // Clear extension from registered acceptor before destroying it to avoid dangling pointer
+    // when the next test runs (getExtension() would otherwise return stale pointer).
+    auto* registered_socket_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    if (registered_socket_interface) {
+      auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+          const_cast<Network::SocketInterface*>(registered_socket_interface));
+      if (registered_acceptor) {
+        registered_acceptor->extension_ = nullptr;
+      }
+    }
+
     // Clean up thread local resources if they were set up.
     if (tls_slot_) {
       tls_slot_.reset();

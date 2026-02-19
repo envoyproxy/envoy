@@ -5,12 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
@@ -261,24 +259,14 @@ RevConClusterFactory::createClusterWithConfig(
 
   // Validate that if tenant isolation is enabled in bootstrap config, tenant_id_format is
   // configured.
-  const auto& bootstrap = context.serverFactoryContext().bootstrap();
-  for (const auto& extension : bootstrap.bootstrap_extensions()) {
-    if (extension.name() == extension_name && extension.has_typed_config()) {
-      envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
-          UpstreamReverseConnectionSocketInterface upstream_config;
-      if (extension.typed_config().UnpackTo(&upstream_config)) {
-        const bool tenant_isolation_enabled = upstream_config.has_enable_tenant_isolation() &&
-                                              upstream_config.enable_tenant_isolation().value();
-        if (tenant_isolation_enabled && proto_config.tenant_id_format().empty()) {
-          return absl::InvalidArgumentError(fmt::format(
-              "tenant_id_format must be configured for reverse connection cluster '{}' when "
-              "tenant isolation is enabled in the bootstrap configuration. Please configure "
-              "tenant_id_format in the reverse connection cluster configuration.",
-              cluster.name()));
-        }
-        break;
-      }
-    }
+  auto* extension = upstream_socket_interface->getExtension();
+  if (extension != nullptr && extension->enableTenantIsolation() &&
+      proto_config.tenant_id_format().empty()) {
+    return absl::InvalidArgumentError(
+        fmt::format("tenant_id_format must be configured for reverse connection cluster '{}' when "
+                    "tenant isolation is enabled in the bootstrap configuration. Please configure "
+                    "tenant_id_format in the reverse connection cluster configuration.",
+                    cluster.name()));
   }
 
   // Validate the host_id_format early to catch formatter errors.
