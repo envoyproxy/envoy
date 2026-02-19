@@ -307,6 +307,10 @@ std::string print(CelValue value) {
     if (value.IsNull()) {
       return "NULL";
     }
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.cel_message_serialize_text_format")) {
+      return value.MessageOrDie()->ShortDebugString();
+    }
     std::string textproto;
     Protobuf::TextFormat::Printer printer;
     printer.SetSingleLineMode(true);

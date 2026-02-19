@@ -131,7 +131,9 @@ bug_fixes:
     Fixed message-valued CEL attribute serialization (for example
     ``xds.virtual_host_metadata``) to use protobuf text format instead of debug string output.
     This restores ext_proc compatibility with protobuf 30+ where debug-string output is
-    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes).
+    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
+    be reverted by setting runtime guard
+    ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
