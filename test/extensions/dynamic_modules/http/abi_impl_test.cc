@@ -940,8 +940,7 @@ TEST(ABIImpl, metadata_keys) {
   envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, {namespace_str.data(), namespace_str.size()}, {"key1", 4}, 1.0);
   envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
-      &filter, {namespace_str.data(), namespace_str.size()}, {"key2", 4},
-      {"val", 3});
+      &filter, {namespace_str.data(), namespace_str.size()}, {"key2", 4}, {"val", 3});
   envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
       &filter, {namespace_str.data(), namespace_str.size()}, {"key3", 4}, true);
 
@@ -995,12 +994,12 @@ TEST(ABIImpl, metadata_namespaces) {
             0);
 
   // Set keys in multiple namespaces.
-  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
-      &filter, {"ns1", 3}, {"key", 3}, 1.0);
-  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
-      &filter, {"ns2", 3}, {"key", 3}, {"val", 3});
-  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
-      &filter, {"ns3", 3}, {"key", 3}, true);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(&filter, {"ns1", 3}, {"key", 3},
+                                                                 1.0);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(&filter, {"ns2", 3}, {"key", 3},
+                                                                 {"val", 3});
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(&filter, {"ns3", 3}, {"key", 3},
+                                                               true);
 
   // Should have 3 namespaces.
   EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
@@ -1033,16 +1032,14 @@ TEST(ABIImpl, attribute_bool) {
 
   // No connection.
   auto no_connection = OptRef<const Network::Connection>();
-  EXPECT_CALL(callbacks, connection())
-      .WillRepeatedly(testing::Return(no_connection));
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(no_connection));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
 
   // With connection, no SSL.
   NiceMock<Network::MockConnection> connection;
   auto conn_ref = OptRef<const Network::Connection>(connection);
-  EXPECT_CALL(callbacks, connection())
-      .WillRepeatedly(testing::Return(conn_ref));
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(conn_ref));
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
