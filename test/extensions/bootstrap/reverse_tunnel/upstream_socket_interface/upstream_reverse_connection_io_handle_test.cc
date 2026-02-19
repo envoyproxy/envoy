@@ -7,6 +7,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
@@ -74,11 +75,12 @@ protected:
     if (!extension_) {
       return;
     }
-    extension_->onServerInitialized();
+    extension_->onServerInitialized(instance_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<Server::MockInstance> instance_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
 

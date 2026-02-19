@@ -1663,6 +1663,7 @@ effective_cpus
 cpus
 ja3
 ja4
+jsonl
 HBONE
 waypoint
 ztunnel

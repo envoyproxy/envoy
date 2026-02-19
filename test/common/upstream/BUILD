@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
@@ -168,6 +169,7 @@ envoy_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -757,6 +759,17 @@ envoy_cc_benchmark_binary(
         "//source/common/upstream:scheduler_lib",
         "@benchmark",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "metadata_comparison_benchmark",
+    srcs = ["metadata_comparison_benchmark.cc"],
+    deps = ["//source/common/protobuf:utility_lib"],
+)
+
+envoy_benchmark_test(
+    name = "metadata_comparison_benchmark_test",
+    benchmark_binary = "metadata_comparison_benchmark",
 )
 
 envoy_cc_test(
