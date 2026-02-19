@@ -13,6 +13,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        "//envoy/filesystem:filesystem_interface",
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:handshaker_interface",
@@ -23,6 +24,7 @@ envoy_cc_extension(
         "//source/common/tls:server_context_lib",
         "//source/extensions/filters/network/set_filter_state:config",
         "//source/server:generic_factory_context_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],
 )

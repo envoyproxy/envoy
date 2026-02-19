@@ -259,29 +259,18 @@ UdpProxyFilter::ActiveSession*
 UdpProxyFilter::createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                               const Upstream::HostConstSharedPtr& optional_host,
                               bool defer_socket_creation) {
-  if (defer_socket_creation) {
-    ASSERT(!optional_host);
-    return createSessionWithOptionalHost(std::move(addresses), nullptr);
-  }
-
   if (optional_host) {
     return createSessionWithOptionalHost(std::move(addresses), optional_host);
   }
 
-  ClusterInfo* cluster = getClusterInfo(addresses);
-  if (cluster == nullptr) {
-    return nullptr;
+  // Defer host selection until session initialization so load balancer context
+  // has access to per-session StreamInfo (required for ORIGINAL_DST clusters).
+  // This preserves explicit host routing paths while fixing transparent UDP
+  // interception where initial host selection had no downstream connection info.
+  if (defer_socket_creation) {
+    ASSERT(!optional_host);
   }
-
-  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
-      cluster->chooseHost(addresses.peer_, nullptr));
-  if (host == nullptr) {
-    ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
-    return nullptr;
-  }
-
-  return createSessionWithOptionalHost(std::move(addresses), host);
+  return createSessionWithOptionalHost(std::move(addresses), nullptr);
 }
 
 UdpProxyFilter::ActiveSession*

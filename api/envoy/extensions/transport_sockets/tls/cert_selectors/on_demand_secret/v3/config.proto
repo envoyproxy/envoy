@@ -27,7 +27,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
 message Config {
   // Defines the configuration source of the secrets.
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  // If ``local_signer`` is set, this field is ignored.
+  config.core.v3.ConfigSource config_source = 1;
 
   // Extension point to specify a function to compute the secret name. The extension is called
   // during the TLS handshake after receiving the *CLIENT HELLO* message from the client for the
@@ -41,4 +42,141 @@ message Config {
   // requests). The parent resource initializes immediately without waiting for the fetch to
   // complete.
   repeated string prefetch_secret_names = 3;
+
+  // Local CA signer mode to mint leaf certs on-demand inside Envoy.
+  // When set, Envoy derives secret names via ``certificate_mapper`` and generates
+  // leaf certificates using this CA instead of subscribing to SDS.
+  message LocalSigner {
+    enum KeyType {
+      KEY_TYPE_UNSPECIFIED = 0;
+      KEY_TYPE_RSA = 1;
+      KEY_TYPE_ECDSA = 2;
+    }
+
+    enum EcdsaCurve {
+      ECDSA_CURVE_UNSPECIFIED = 0;
+      ECDSA_CURVE_P256 = 1;
+      ECDSA_CURVE_P384 = 2;
+    }
+
+    enum SignatureHash {
+      SIGNATURE_HASH_UNSPECIFIED = 0;
+      SIGNATURE_HASH_SHA256 = 1;
+      SIGNATURE_HASH_SHA384 = 2;
+      SIGNATURE_HASH_SHA512 = 3;
+    }
+
+    enum HostnameValidation {
+      HOSTNAME_VALIDATION_UNSPECIFIED = 0;
+      HOSTNAME_VALIDATION_PERMISSIVE = 1;
+      HOSTNAME_VALIDATION_STRICT = 2;
+    }
+
+    enum CaReloadFailurePolicy {
+      CA_RELOAD_FAILURE_POLICY_UNSPECIFIED = 0;
+      CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED = 1;
+      CA_RELOAD_FAILURE_POLICY_FAIL_OPEN = 2;
+    }
+
+    enum KeyUsage {
+      KEY_USAGE_UNSPECIFIED = 0;
+      KEY_USAGE_DIGITAL_SIGNATURE = 1;
+      KEY_USAGE_CONTENT_COMMITMENT = 2;
+      KEY_USAGE_KEY_ENCIPHERMENT = 3;
+      KEY_USAGE_DATA_ENCIPHERMENT = 4;
+      KEY_USAGE_KEY_AGREEMENT = 5;
+      KEY_USAGE_KEY_CERT_SIGN = 6;
+      KEY_USAGE_CRL_SIGN = 7;
+    }
+
+    enum ExtendedKeyUsage {
+      EXTENDED_KEY_USAGE_UNSPECIFIED = 0;
+      EXTENDED_KEY_USAGE_SERVER_AUTH = 1;
+      EXTENDED_KEY_USAGE_CLIENT_AUTH = 2;
+      EXTENDED_KEY_USAGE_CODE_SIGNING = 3;
+      EXTENDED_KEY_USAGE_EMAIL_PROTECTION = 4;
+      EXTENDED_KEY_USAGE_TIME_STAMPING = 5;
+      EXTENDED_KEY_USAGE_OCSP_SIGNING = 6;
+    }
+
+    // PEM-encoded CA certificate file used as issuer for generated leaf certs.
+    string ca_cert_path = 1 [(validate.rules).string = {min_len: 1}];
+
+    // PEM-encoded CA private key file used to sign generated leaf certs.
+    string ca_key_path = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Validity period for generated leaf certificates.
+    // Default is 30 days if unset or zero.
+    uint32 cert_ttl_days = 3;
+
+    // Organization value included in generated leaf certificate subjects.
+    // Defaults to ``Envoy`` if unset.
+    string subject_organization = 4;
+
+    // Leaf private key type to generate. Defaults to RSA.
+    KeyType key_type = 5;
+
+    // RSA key size for generated leaves. Defaults to 2048 when key_type=RSA.
+    uint32 rsa_key_bits = 6;
+
+    // ECDSA curve for generated leaves. Defaults to P-256 when key_type=ECDSA.
+    EcdsaCurve ecdsa_curve = 7;
+
+    // Signature hash algorithm for CA signing. Defaults to SHA-256.
+    SignatureHash signature_hash = 8;
+
+    // notBefore skew in seconds to tolerate clock skew. Defaults to 60s.
+    uint32 not_before_backdate_seconds = 9;
+
+    // Hostname validation policy for derived names.
+    // Defaults to PERMISSIVE for backward compatibility.
+    HostnameValidation hostname_validation = 10;
+
+    // Runtime key prefix for optional runtime (RTDS/layered runtime) overrides.
+    // If unset, defaults to ``envoy.tls.cert_selectors.on_demand_secret.local_signer``.
+    //
+    // Supported runtime keys:
+    // - ``<prefix>.cert_ttl_days``
+    // - ``<prefix>.not_before_backdate_seconds``
+    // - ``<prefix>.rsa_key_bits``
+    // - ``<prefix>.key_type`` (enum numeric)
+    // - ``<prefix>.ecdsa_curve`` (enum numeric)
+    // - ``<prefix>.signature_hash`` (enum numeric)
+    // - ``<prefix>.hostname_validation`` (enum numeric)
+    string runtime_key_prefix = 11;
+
+    // Behavior when CA file reload fails after an initial successful load.
+    // - FAIL_CLOSED: fail certificate minting until CA files are fixed.
+    // - FAIL_OPEN: keep serving with the last successfully loaded CA.
+    // Defaults to FAIL_CLOSED.
+    CaReloadFailurePolicy ca_reload_failure_policy = 12;
+
+    // Include the mapped host as DNS SAN entry. Defaults to true.
+    optional bool include_primary_dns_san = 13;
+
+    // Additional DNS SAN values to include in generated certs.
+    repeated string additional_dns_sans = 14;
+
+    // Optional keyUsage extension values for generated leaf certs.
+    repeated KeyUsage key_usages = 15;
+
+    // Optional extendedKeyUsage extension values for generated leaf certs.
+    repeated ExtendedKeyUsage extended_key_usages = 16;
+
+    // Optional basicConstraints CA value for generated certs.
+    // If unset, the extension is not added.
+    optional bool basic_constraints_ca = 17;
+
+    // Optional subject field overrides for generated certs.
+    // If ``subject_common_name`` is unset, mapped host is used as CN.
+    // If ``subject_organization`` is unset, legacy ``subject_organization`` field is used.
+    string subject_common_name = 18;
+    string subject_organizational_unit = 19;
+    string subject_country = 20;
+    string subject_state_or_province = 21;
+    string subject_locality = 22;
+  }
+
+  // Optional local certificate signer configuration.
+  LocalSigner local_signer = 4;
 }
