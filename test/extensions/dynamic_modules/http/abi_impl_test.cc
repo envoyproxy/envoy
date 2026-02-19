@@ -904,6 +904,15 @@ TEST(ABIImpl, metadata_bool) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
       &result_buffer));
+
+  // Type mismatch: set number, try get as bool.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
+      42.0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
+      {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
+      &result_bool));
 }
 
 TEST(ABIImpl, metadata_keys) {
@@ -916,6 +925,11 @@ TEST(ABIImpl, metadata_keys) {
                 &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
                 {namespace_str.data(), namespace_str.size()}),
             0);
+  // No stream info: get_metadata_keys returns false.
+  std::vector<envoy_dynamic_module_type_envoy_buffer> no_keys(1);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_keys(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
+      {namespace_str.data(), namespace_str.size()}, no_keys.data()));
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
@@ -974,6 +988,10 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_EQ(envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
                 &filter, envoy_dynamic_module_type_metadata_source_Dynamic),
             0);
+  // No stream info: get_metadata_namespaces returns false.
+  std::vector<envoy_dynamic_module_type_envoy_buffer> no_ns(1);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_namespaces(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, no_ns.data()));
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
