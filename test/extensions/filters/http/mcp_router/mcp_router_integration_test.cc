@@ -2232,8 +2232,8 @@ TEST_P(McpRouterIntegrationTest, ToolsListSseStreamingWithIntermediateEvents) {
 }
 
 // Test initialize with mixed session modes: one backend returns mcp-session-id, the other doesn't.
-// The composite session encodes only the session-ful backend. On a subsequent tools/list, the
-// session-ful backend gets its session header while the session-less backend gets none.
+// The composite session encodes only the stateful backend. On a subsequent tools/list, the
+// stateful backend gets its session header while the stateless backend gets none.
 TEST_P(McpRouterIntegrationTest, InitializeMixedSessionAndSessionless) {
   initializeFilter();
 
