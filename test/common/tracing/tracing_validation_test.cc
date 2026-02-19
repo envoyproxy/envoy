@@ -82,6 +82,9 @@ TEST(TracingValidationTest, TraceStateValidation) {
   EXPECT_TRUE(isValidTraceState("congo=t61rcWkgMzE,,rojo=00f067aa0ba902b7"));
   EXPECT_TRUE(isValidTraceState("key="));
   EXPECT_TRUE(isValidTraceState("key= "));
+  // spaces allowed in value, spaces at end of value are ignored.
+  EXPECT_TRUE(isValidTraceState("key=hello world"));
+  EXPECT_TRUE(isValidTraceState("key=trailing "));
 
   // simple keys
 
