@@ -16,7 +16,7 @@ that the dynamic module can call to interact with Envoy.
 
 Implementing the ABI from scratch requires an extensive understanding of the Envoy internals. For users, we provide an
 official SDK that abstracts these details and provides a high-level API to implement dynamic modules. The SDK is currently
-available in Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
+available in C++, Go, and Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
 Future development may include support for other languages.
 
 Currently, dynamic modules are supported at the following extension points:

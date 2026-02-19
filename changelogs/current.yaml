@@ -62,10 +62,20 @@ minor_behavior_changes:
   change: |
     OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
     stopped reporting empty delta counters and histograms.
+- area: mcp
+  change: |
+    Relaxed the MCP filter POST Content-Type check from an exact match on ``application/json`` to a
+    prefix match, so that ``application/json; charset=utf-8`` and similar media-type parameters are
+    accepted.
 - area: ext_proc
   change: |
     added received_immediate_response flag in :ref:'FilterStats
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
+- area: happy_eyeballs
+  change: |
+    Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
+    containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -251,6 +261,14 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: cel
+  change: |
+    Added functionality to reevaluate CEL expressions that attempt to read response path data on the
+    request path once the data is available. Allows CEL matching based on both request and response
+    headers. This may cause a behavior change for matchers that previously would silently fail to
+    match due to attempting to match response headers in the request path. This behavior can be
+    toggled off by setting runtime guard
+    ``envoy.reloadable_features.enable_cel_response_path_matching`` to false.
 - area: access_log
   change: |
     Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
