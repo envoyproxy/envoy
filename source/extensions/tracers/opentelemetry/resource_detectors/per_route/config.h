@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_CONFIG_H_
-#define THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_CONFIG_H_
-
 #include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_detector.pb.h"
 
 #include "source/extensions/tracers/opentelemetry/resource_detectors/per_route/per_route_resource_detector.h"
@@ -43,5 +40,3 @@ public:
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_CONFIG_H_

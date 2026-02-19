@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_RESOURCE_TYPED_METADATA_H_
-#define THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_RESOURCE_TYPED_METADATA_H_
-
 #include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_metadata.pb.h"
 #include "envoy/router/router.h"
 
@@ -41,5 +38,3 @@ public:
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_RESOURCE_TYPED_METADATA_H_
