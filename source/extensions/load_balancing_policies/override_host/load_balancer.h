@@ -157,6 +157,8 @@ private:
     HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
 
+    void addSelectedEndpointKey(LoadBalancerContext* context, HostSelectionResponse& response);
+
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header or in the request metadata.
     // TODO(wbpcode): will absl::InlinedVector be used here be better?

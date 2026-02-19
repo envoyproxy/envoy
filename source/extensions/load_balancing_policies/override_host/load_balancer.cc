@@ -203,12 +203,16 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
   }
 
   if (override_host_state->empty()) {
-    ENVOY_LOG(trace, "No overriden hosts were found. Using fallback LB policy.");
-    return fallback_picker_lb_->chooseHost(context);
+    ENVOY_LOG(trace, "No overridden hosts were found. Using fallback LB policy.");
+    auto response = fallback_picker_lb_->chooseHost(context);
+    addSelectedEndpointKey(context, response);
+    return response;
   }
 
   if (HostConstSharedPtr host = getEndpoint(*override_host_state); host != nullptr) {
-    return {host};
+    HostSelectionResponse response{host};
+    addSelectedEndpointKey(context, response);
+    return response;
   }
 
   // If some endpoints were found, but none of them are available in
@@ -217,7 +221,37 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
   // policy.
   ENVOY_LOG(trace, "Failed to find any endpoints from metadata in the cluster. "
                    "Using fallback LB policy.");
-  return fallback_picker_lb_->chooseHost(context);
+  auto response = fallback_picker_lb_->chooseHost(context);
+  addSelectedEndpointKey(context, response);
+  return response;
+}
+
+void
+OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
+    LoadBalancerContext* context, HostSelectionResponse& response) {
+  if (!config_.selectedEndpointKey().has_value()) {
+    return;
+  }
+
+  if (response.host == nullptr) {
+    return;
+  }
+
+  const std::string selected_endpoint = response.host->address()->asString();
+  const auto& selected_endpoint_key = config_.selectedEndpointKey().value();
+  if (!selected_endpoint_key.metadata_key.has_value()) {
+    ASSERT(selected_endpoint_key.header_name.has_value() != selected_endpoint_key.metadata_key.has_value());
+
+    const Config::MetadataKey& metadata_key = selected_endpoint_key.metadata_key.value();
+
+    Protobuf::Struct selected_endpoint_metadata;
+    (*selected_endpoint_metadata.mutable_fields())[metadata_key.path_[0]]
+        .set_string_value(selected_endpoint);
+
+    // Set the value of the metadata key to be the host:port
+    context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, selected_endpoint_metadata);
+    // TODO(ericdbishop): Add the selected endpoint to the header if configured to do so.
+  }
 }
 
 absl::optional<absl::string_view>
