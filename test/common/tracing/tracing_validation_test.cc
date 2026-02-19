@@ -2,8 +2,8 @@
 
 #include "source/common/tracing/tracing_validation.h"
 
-#include "gtest/gtest.h"
 #include "absl/strings/str_cat.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -11,66 +11,52 @@ namespace {
 
 TEST(TracingValidationTest, TraceParentValidation) {
   // Valid traceparent
-  EXPECT_TRUE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
+  EXPECT_TRUE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
 
   // Invalid sizes (must be exactly 55)
   EXPECT_FALSE(isValidTraceParent(""));
-  EXPECT_FALSE(isValidTraceParent(
-      "0-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
+  EXPECT_FALSE(isValidTraceParent("0-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
   // Unknown fields are not validated.
-  EXPECT_TRUE(isValidTraceParent(
-      "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra"));
+  EXPECT_TRUE(isValidTraceParent("01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra"));
 
   // Component size checks (all sum to 55 total but individual sizes are wrong)
   // 1-32-16-2 flags is wrong
-  EXPECT_FALSE(isValidTraceParent(
-      "0-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-012"));
+  EXPECT_FALSE(isValidTraceParent("0-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-012"));
   // 2-31-16-2 trace_id is wrong
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e473-00f067aa0ba902b7-012"));
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e473-00f067aa0ba902b7-012"));
   // 2-32-15-2 parent_id is wrong
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b-012"));
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b-012"));
   // 2-32-16-1 flags is wrong
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-1"));
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-1"));
 
   // Invalid dash placement (sums to same length, same component count, but sizes wrong)
-  EXPECT_FALSE(isValidTraceParent(
-      "0004bf92f3577b34da6a3ce-929d0e0e4736-00f067aa0ba902b7-01"));
+  EXPECT_FALSE(isValidTraceParent("0004bf92f3577b34da6a3ce-929d0e0e4736-00f067aa0ba902b7-01"));
 
   // 55 chars but no dashes
-  EXPECT_FALSE(isValidTraceParent(
-      "00.4bf92f3577b34da6a3ce929d0e0e4736.00f067aa0ba902b7.01"));
+  EXPECT_FALSE(isValidTraceParent("00.4bf92f3577b34da6a3ce929d0e0e4736.00f067aa0ba902b7.01"));
 
   // Uppercase hex is not allowed
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01"));
+  EXPECT_FALSE(isValidTraceParent("00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01"));
 
   // Invalid version
-  EXPECT_FALSE(isValidTraceParent(
-      "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
+  EXPECT_FALSE(isValidTraceParent("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
 
   // Invalid hex
-  EXPECT_FALSE(isValidTraceParent(
-      "gg-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")); // version
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01")); // traceid
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902bg-01")); // parentid
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-0g")); // flags
+  // version
+  EXPECT_FALSE(isValidTraceParent("gg-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"));
+  // traceid
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01"));
+  // parentid
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902bg-01"));
+  // flags
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-0g"));
 
   // All zeros
-  EXPECT_FALSE(isValidTraceParent(
-      "00-00000000000000000000000000000000-00f067aa0ba902b7-01"));
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01"));
+  EXPECT_FALSE(isValidTraceParent("00-00000000000000000000000000000000-00f067aa0ba902b7-01"));
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01"));
 
   // Wrong number of components
-  EXPECT_FALSE(isValidTraceParent(
-      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7"));
+  EXPECT_FALSE(isValidTraceParent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7"));
 }
 
 TEST(TracingValidationTest, TraceStateValidation) {
@@ -106,8 +92,7 @@ TEST(TracingValidationTest, TraceStateValidation) {
   EXPECT_TRUE(isValidTraceState(absl::StrCat(std::string(241, 'a'), "@s=v")));
   EXPECT_FALSE(isValidTraceState(absl::StrCat(std::string(242, 'a'), "@s=v")));
   EXPECT_TRUE(isValidTraceState(absl::StrCat("t@", std::string(14, 'a'), "=v")));
-  EXPECT_FALSE(
-      isValidTraceState(absl::StrCat("t@", std::string(15, 'a'), "=v")));
+  EXPECT_FALSE(isValidTraceState(absl::StrCat("t@", std::string(15, 'a'), "=v")));
 
   // system-id
   EXPECT_FALSE(isValidTraceState("tenant@=val"));
