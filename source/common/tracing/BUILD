@@ -143,7 +143,6 @@ envoy_cc_library(
     name = "tracing_validation_lib",
     srcs = ["tracing_validation.cc"],
     hdrs = ["tracing_validation.h"],
-    visibility = ["//third_party/envoy:envoy_visible"],
     deps = [
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
