@@ -2,9 +2,20 @@ syntax = "proto3";
 
 package envoy.extensions.tracers.opentelemetry.resource_detectors.v3;
 
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.resource_detectors.v3";
+option java_outer_classname = "PerRouteResourceMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/resource_detectors/v3;resource_detectorsv3";
+
+// [#protodoc-title: PerRoute Resource Metadata]
+
+// Per route metadata to specify a custom resource on the route.
+//
+// [#extension: envoy.tracers.opentelemetry.resource_typed_metadata]
 message PerRouteResourceMetadata {
   // Schema URL of the resource. Optional.
   string schema_url = 1;
+
   // Custom Resource attributes to be included.
   map<string, string> attributes = 2;
 }

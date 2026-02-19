@@ -1,6 +1,17 @@
 syntax = "proto3";
 
 package envoy.extensions.tracers.opentelemetry.resource_detectors.v3;
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.resource_detectors.v3";
+option java_outer_classname = "PerRouteResourceMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/resource_detectors/v3;resource_detectorsv3";
 
+// [#protodoc-title: PerRoute Resource Detectory Config]
+
+// Configuration for the PerRoute resource detector extension.
+// If configured on the OTel Tracer, this resource detector will
+// use route metadata in order to deduce the Resource for the span.
+//
+// [#extension: envoy.tracers.opentelemetry.resource_detectors.per_route]
 message PerRouteResourceDetectorConfig {
 }
