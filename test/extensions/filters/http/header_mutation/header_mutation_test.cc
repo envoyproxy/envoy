@@ -906,6 +906,58 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
   }
 }
 
+// Test that query parameter values are URL-encoded to prevent injection attacks.
+TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
+  const std::string config_yaml = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "user"
+          value: "%REQ(X-User)%"
+        action: "APPEND_IF_EXISTS_OR_ADD"
+  )EOF";
+
+  Server::Configuration::MockServerFactoryContext context;
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+
+  absl::Status creation_status = absl::OkStatus();
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
+
+  {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+    HeaderMutation filter{global_config};
+    filter.setDecoderFilterCallbacks(decoder_callbacks);
+    filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
+        .WillOnce(
+            Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+
+    // Malicious header value attempting to inject an "admin=true" parameter.
+    Envoy::Http::TestRequestHeaderMapImpl headers = {{"x-user", "injected&admin=true"},
+                                                     {":method", "GET"},
+                                                     {":path", "/path"},
+                                                     {":scheme", "http"},
+                                                     {":authority", "host"}};
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(headers, true));
+
+    auto params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+
+    // The "user" parameter should contain the full URL-decoded value.
+    EXPECT_EQ("injected&admin=true", params.data().at("user").front());
+    // There should be NO "admin" parameter - the injection should have been prevented.
+    EXPECT_FALSE(params.data().contains("admin"));
+  }
+}
+
 } // namespace
 } // namespace HeaderMutation
 } // namespace HttpFilters

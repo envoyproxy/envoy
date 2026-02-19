@@ -80,11 +80,11 @@ private:
    * Returns absl error if there's any issue while evaluating the match.
    * Otherwise, returns the match result.
    */
-  absl::StatusOr<Matcher::MatchResult>
+  absl::StatusOr<Matcher::ActionMatchResult>
   tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const;
 
   FieldCheckResults
-  matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::MatchResult>& match_result,
+  matchResultStatusToFieldCheckResult(absl::StatusOr<Matcher::ActionMatchResult>& match_result,
                                       absl::string_view field_mask) const;
 
   // Resolves the string name of an Enum value.
@@ -117,7 +117,8 @@ private:
   mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
 
   // Cache to store match results.
-  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*, Matcher::MatchResult>
+  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*,
+                              Matcher::ActionMatchResult>
       match_result_cache_;
 };
 
