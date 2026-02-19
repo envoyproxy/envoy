@@ -25,7 +25,8 @@ ResourceTypedRouteMetadataFactory::parse(const Protobuf::Any& data) const {
   return std::make_unique<ResourceTypedMetadata>(proto);
 }
 
-static Registry::RegisterFactory<ResourceTypedRouteMetadataFactory, Config::TypedMetadataFactory>
+static Registry::RegisterFactory<ResourceTypedRouteMetadataFactory,
+                                 Router::HttpRouteTypedMetadataFactory>
     register_;
 
 } // namespace OpenTelemetry

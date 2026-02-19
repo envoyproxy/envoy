@@ -3,10 +3,10 @@
 #ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_CONFIG_H_
 #define THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_TRACERS_OPENTELEMETRY_RESOURCE_DETECTORS_PER_ROUTE_CONFIG_H_
 
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_detector.pb.h"
+
 #include "source/extensions/tracers/opentelemetry/resource_detectors/per_route/per_route_resource_detector.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
-
-#include "api/envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_detector.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +24,8 @@ public:
    * @return ResourceDetectorPtr
    */
   ResourceDetectorPtr
-  createResourceDetector(const Protobuf::Message& message,
-                         Server::Configuration::ServerFactoryContext& context) override {
+  createResourceDetector(const Protobuf::Message&,
+                         Server::Configuration::ServerFactoryContext&) override {
     return std::make_unique<PerRouteResourceDetector>();
   }
 

@@ -13,7 +13,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    deps = [":per_route_resource_detector"],
+    deps = [
+        ":per_route_resource_detector",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
+    ],
+    alwayslink = True,
 )
 
 envoy_cc_library(
@@ -34,5 +38,6 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
     ],
 )

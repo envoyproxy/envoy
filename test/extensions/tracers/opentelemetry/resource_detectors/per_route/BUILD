@@ -24,6 +24,11 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/opentelemetry/resource_detectors/per_route:resource_typed_metadata",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "//third_party/opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
+        "@opentelemetry-cpp//api",
+        "@opentelemetry-proto//:trace_proto_cc",
+        "@opentelemetry-proto//:trace_service_proto_cc",
     ],
 )

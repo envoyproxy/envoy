@@ -1,14 +1,16 @@
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_detector.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_metadata.pb.h"
+
 #include "source/extensions/tracers/opentelemetry/resource_detectors/per_route/resource_typed_metadata.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
-#include "api/envoy/config/trace/v3/opentelemetry.pb.h"
-#include "api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "api/envoy/extensions/tracers/opentelemetry/resource_detectors/v3/per_route_resource_metadata.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +56,6 @@ public:
       *static_layer = otel_runtime_config_;
 
       ConfigHelper::setHttp2(*grpc_receiver_cluster);
-      ConfigHelper::setHttp2(*grpc_receiver_cluster);
     });
 
     config_helper_.addConfigModifier([&](HttpConnectionManager& hcm) -> void {
@@ -72,7 +73,7 @@ public:
       resource_detector->set_name("envoy.tracers.opentelemetry.resource_detectors.per_route");
       resource_detector->mutable_typed_config()->PackFrom(
           envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
-              PerRouteResourceMetadata());
+              PerRouteResourceDetectorConfig());
 
       tracing.mutable_provider()->set_name("envoy.tracers.opentelemetry");
       tracing.mutable_provider()->mutable_typed_config()->PackFrom(otel_config);
@@ -93,7 +94,7 @@ public:
 TEST_F(PerRouteResourceDetectorIntegrationTest, PerRouteResource) {
   PerRouteResourceMetadata metadata;
   metadata.mutable_attributes()->insert({"key", "value"});
-  ProtobufWkt::Any packed_metadata;
+  Protobuf::Any packed_metadata;
   packed_metadata.PackFrom(metadata);
 
   config_helper_.addConfigModifier([&](HttpConnectionManager& hcm) -> void {
@@ -148,12 +149,12 @@ TEST_F(PerRouteResourceDetectorIntegrationTest, MultipleRoutes) {
 
   PerRouteResourceMetadata metadata_1;
   metadata_1.mutable_attributes()->insert({"route", "1"});
-  ProtobufWkt::Any packed_metadata_1;
+  Protobuf::Any packed_metadata_1;
   packed_metadata_1.PackFrom(metadata_1);
 
   PerRouteResourceMetadata metadata_2;
   metadata_2.mutable_attributes()->insert({"route", "2"});
-  ProtobufWkt::Any packed_metadata_2;
+  Protobuf::Any packed_metadata_2;
   packed_metadata_2.PackFrom(metadata_2);
 
   config_helper_.addConfigModifier([&](HttpConnectionManager& hcm) -> void {
@@ -189,7 +190,6 @@ TEST_F(PerRouteResourceDetectorIntegrationTest, MultipleRoutes) {
   ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream_1, timeout));
   ExportTraceServiceRequest req_1;
   ASSERT_TRUE(stream_1->waitForGrpcMessage(*dispatcher_, req_1, timeout));
-
   bool found_1 = false;
   for (const auto& attribute : req_1.resource_spans(0).resource().attributes()) {
     if (attribute.key() == "route" && attribute.value().string_value() == "1") {
