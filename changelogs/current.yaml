@@ -416,5 +416,14 @@ new_features:
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+- area: overload_manager
+  change: |
+    Added configurable parameters for the ``envoy.overload_actions.shrink_heap`` action via
+    :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>`. Users can now
+    configure :ref:`timer_interval <envoy_v3_api_field_config.overload.v3.ShrinkHeapConfig.timer_interval>`
+    to control how often heap shrinking is checked (default 10 seconds), and
+    :ref:`max_unfreed_memory_bytes <envoy_v3_api_field_config.overload.v3.ShrinkHeapConfig.max_unfreed_memory_bytes>`
+    to set the threshold for releasing memory back to the system (default 100MB). This enables
+    fine-tuning of memory management behavior under memory pressure conditions.
 
 deprecated:

@@ -3,12 +3,15 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/load_shed_point.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -106,6 +109,13 @@ public:
    * about overload state changes.
    */
   virtual void stop() PURE;
+
+  /**
+   * Get the configuration for the ShrinkHeap overload action.
+   * @return optional config, empty if no ShrinkHeap action is configured or has no typed_config.
+   */
+  virtual absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const PURE;
 };
 
 } // namespace Server

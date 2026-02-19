@@ -14,16 +14,19 @@ namespace Memory {
 
 namespace {
 #if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
-// TODO(zyfjeff): Make max unfreed memory byte configurable
-constexpr uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
+constexpr uint64_t kDefaultMaxUnfreedMemoryBytes = 100 * 1024 * 1024;
 #endif
 } // namespace
 
-void Utils::releaseFreeMemory() {
+void Utils::releaseFreeMemory(uint64_t max_unfreed_bytes) {
 #if defined(TCMALLOC)
-  tcmalloc::MallocExtension::ReleaseMemoryToSystem(MAX_UNFREED_MEMORY_BYTE);
+  uint64_t threshold = max_unfreed_bytes > 0 ? max_unfreed_bytes : kDefaultMaxUnfreedMemoryBytes;
+  tcmalloc::MallocExtension::ReleaseMemoryToSystem(threshold);
 #elif defined(GPERFTOOLS_TCMALLOC)
+  UNREFERENCED_PARAMETER(max_unfreed_bytes);
   MallocExtension::instance()->ReleaseFreeMemory();
+#else
+  UNREFERENCED_PARAMETER(max_unfreed_bytes);
 #endif
 }
 
@@ -39,7 +42,7 @@ void Utils::tryShrinkHeap() {
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
 
   if (total_physical_bytes >= allocated_size_by_app &&
-      (total_physical_bytes - allocated_size_by_app) >= MAX_UNFREED_MEMORY_BYTE) {
+      (total_physical_bytes - allocated_size_by_app) >= kDefaultMaxUnfreedMemoryBytes) {
     Utils::releaseFreeMemory();
   }
 #endif

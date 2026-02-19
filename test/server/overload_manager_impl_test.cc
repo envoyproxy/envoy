@@ -758,13 +758,69 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
 TEST_F(OverloadManagerImplTest, ActionWithUnexpectedTypedConfig) {
   const std::string config = R"EOF(
     actions:
-      - name: "envoy.overload_actions.shrink_heap"
+      - name: "envoy.overload_actions.stop_accepting_requests"
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Empty
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           ".* unexpected .* typed_config .*");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig
+          timer_interval: 5s
+          max_unfreed_memory_bytes: 52428800
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  ASSERT_TRUE(config_opt.has_value());
+  EXPECT_EQ(config_opt->timer_interval().seconds(), 5);
+  EXPECT_EQ(config_opt->max_unfreed_memory_bytes(), 52428800);
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithWrongTypedConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unable to unpack as .*ShrinkHeapConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shrink_heap"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShrinkHeapConfig();
+  EXPECT_FALSE(config_opt.has_value());
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {

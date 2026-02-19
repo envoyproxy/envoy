@@ -167,6 +167,10 @@ public:
   LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
   void stop() override;
+  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const override {
+    return shrink_heap_config_;
+  }
 
 protected:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
@@ -253,6 +257,8 @@ private:
       std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
+
+  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
 };
 
 } // namespace Server
