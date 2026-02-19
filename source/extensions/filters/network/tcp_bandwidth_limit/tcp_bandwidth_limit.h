@@ -24,17 +24,19 @@ namespace TcpBandwidthLimit {
 /**
  * All TCP bandwidth limit stats. @see stats_macros.h
  */
-#define ALL_TCP_BANDWIDTH_LIMIT_STATS(COUNTER)                                                     \
+#define ALL_TCP_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE)                                              \
   COUNTER(download_enabled)                                                                        \
   COUNTER(upload_enabled)                                                                          \
   COUNTER(download_throttled)                                                                      \
-  COUNTER(upload_throttled)
+  COUNTER(upload_throttled)                                                                        \
+  GAUGE(download_bytes_buffered, Accumulate)                                                       \
+  GAUGE(upload_bytes_buffered, Accumulate)
 
 /**
  * Struct definition for all TCP bandwidth limit stats. @see stats_macros.h
  */
 struct TcpBandwidthLimitStats {
-  ALL_TCP_BANDWIDTH_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_TCP_BANDWIDTH_LIMIT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -85,7 +87,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class TcpBandwidthLimitFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
-  TcpBandwidthLimitFilter(FilterConfigSharedPtr config, Event::Dispatcher& dispatcher);
+  explicit TcpBandwidthLimitFilter(FilterConfigSharedPtr config);
   ~TcpBandwidthLimitFilter() override;
 
   // Network::ReadFilter
@@ -114,7 +116,6 @@ private:
   void onDownloadBufferHighWatermark();
 
   FilterConfigSharedPtr config_;
-  Event::Dispatcher& dispatcher_;
 
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};

@@ -19,9 +19,8 @@ Network::FilterFactoryCb TcpBandwidthLimitConfigFactory::createFilterFactoryFrom
                                                context.serverFactoryContext().runtime(),
                                                context.serverFactoryContext().timeSource());
 
-  return [config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<TcpBandwidthLimitFilter>(
-        config, context.serverFactoryContext().mainThreadDispatcher()));
+  return [config](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(std::make_shared<TcpBandwidthLimitFilter>(config));
   };
 }
 

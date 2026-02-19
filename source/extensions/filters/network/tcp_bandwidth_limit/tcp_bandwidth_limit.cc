@@ -37,12 +37,12 @@ FilterConfig::FilterConfig(
 
 TcpBandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".tcp_bandwidth_limit";
-  return {ALL_TCP_BANDWIDTH_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  return {ALL_TCP_BANDWIDTH_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                        POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-TcpBandwidthLimitFilter::TcpBandwidthLimitFilter(FilterConfigSharedPtr config,
-                                                 Event::Dispatcher& dispatcher)
-    : config_(config), dispatcher_(dispatcher),
+TcpBandwidthLimitFilter::TcpBandwidthLimitFilter(FilterConfigSharedPtr config)
+    : config_(config),
       download_buffer_([this]() { onDownloadBufferLowWatermark(); },
                        [this]() { onDownloadBufferHighWatermark(); }, []() -> void {}) {}
 
@@ -77,9 +77,11 @@ Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bo
     }
 
     download_buffer_.move(data);
+    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
 
     if (!download_timer_) {
-      download_timer_ = dispatcher_.createTimer([this]() { onDownloadTokenTimer(); });
+      download_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [this]() { onDownloadTokenTimer(); });
       download_timer_->enableTimer(config_->fillInterval());
     }
 
@@ -105,13 +107,15 @@ Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, b
     if (consumed > 0) {
       Buffer::OwnedImpl to_send;
       to_send.move(data, consumed);
-      write_callbacks_->connection().write(to_send, false);
+      write_callbacks_->injectWriteDataToFilterChain(to_send, false);
     }
 
     upload_buffer_.move(data);
+    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
 
     if (!upload_timer_) {
-      upload_timer_ = dispatcher_.createTimer([this]() { onUploadTokenTimer(); });
+      upload_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [this]() { onUploadTokenTimer(); });
       upload_timer_->enableTimer(config_->fillInterval());
     }
 
@@ -161,6 +165,7 @@ void TcpBandwidthLimitFilter::processBufferedDownloadData() {
     Buffer::OwnedImpl data_to_send;
     data_to_send.move(download_buffer_, consumed);
     read_callbacks_->injectReadDataToFilterChain(data_to_send, false);
+    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
   }
 }
 
@@ -175,7 +180,8 @@ void TcpBandwidthLimitFilter::processBufferedUploadData() {
   if (consumed > 0) {
     Buffer::OwnedImpl data_to_send;
     data_to_send.move(upload_buffer_, consumed);
-    write_callbacks_->connection().write(data_to_send, false);
+    write_callbacks_->injectWriteDataToFilterChain(data_to_send, false);
+    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
   }
 }
 

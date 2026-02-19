@@ -33,7 +33,7 @@ public:
 
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), runtime_,
                                              time_source_);
-    filter_ = std::make_unique<TcpBandwidthLimitFilter>(config_, dispatcher_);
+    filter_ = std::make_unique<TcpBandwidthLimitFilter>(config_);
 
     // Set a buffer limit so the WatermarkBuffer watermarks are active.
     ON_CALL(read_filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(1));
@@ -43,7 +43,6 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   Stats::IsolatedStoreImpl stats_store_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   Event::SimulatedTimeSystem time_source_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_filter_callbacks_;
@@ -174,7 +173,7 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialConsumptionUpload) {
   Buffer::OwnedImpl large_data(std::string(2048, 'b'));
 
   Buffer::OwnedImpl written_data;
-  EXPECT_CALL(write_filter_callbacks_.connection_, write(_, false))
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(large_data, false));
@@ -229,7 +228,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllUpload) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
   EXPECT_EQ(0, data.length());
-  EXPECT_CALL(write_filter_callbacks_.connection_, write(_, _)).Times(0);
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
 }
 
 TEST_F(TcpBandwidthLimitFilterTest, ConnectionClosed) {
@@ -323,7 +322,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDataScenarios) {
   Buffer::OwnedImpl upload_data(std::string(2048, 'b'));
   Buffer::OwnedImpl written_data;
 
-  EXPECT_CALL(write_filter_callbacks_.connection_, write(_, false))
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(upload_data, false));
@@ -387,7 +386,7 @@ TEST_F(TcpBandwidthLimitFilterTest, OnNewConnectionTest) {
 
   setup(yaml);
 
-  auto new_filter = std::make_unique<TcpBandwidthLimitFilter>(config_, dispatcher_);
+  auto new_filter = std::make_unique<TcpBandwidthLimitFilter>(config_);
 
   EXPECT_EQ(Network::FilterStatus::Continue, new_filter->onNewConnection());
 
@@ -409,10 +408,10 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerBufferDraining) {
 
   setup(yaml);
 
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(testing::Invoke([timer](Event::TimerCb) {
-    return timer;
-  }));
+  Event::MockTimer* timer =
+      new NiceMock<Event::MockTimer>(&read_filter_callbacks_.connection_.dispatcher_);
+  ON_CALL(read_filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+      .WillByDefault(testing::Invoke([timer](Event::TimerCb) { return timer; }));
 
   Buffer::OwnedImpl data1(std::string(1024, 'a'));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data1, false));
@@ -446,10 +445,10 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
 
   setup(yaml);
 
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(testing::Invoke([timer](Event::TimerCb) {
-    return timer;
-  }));
+  Event::MockTimer* timer =
+      new NiceMock<Event::MockTimer>(&read_filter_callbacks_.connection_.dispatcher_);
+  ON_CALL(read_filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+      .WillByDefault(testing::Invoke([timer](Event::TimerCb) { return timer; }));
 
   Buffer::OwnedImpl data1(std::string(1024, 'a'));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data1, false));
@@ -459,7 +458,8 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
 
-  ON_CALL(write_filter_callbacks_.connection_, write(_, false)).WillByDefault(testing::Return());
+  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillByDefault(testing::Return());
 
   filter_->onUploadTokenTimer();
   filter_->onUploadTokenTimer();
@@ -478,10 +478,12 @@ TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
 
   setup(yaml);
 
-  Event::MockTimer* download_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  Event::MockTimer* upload_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  Event::MockTimer* download_timer =
+      new NiceMock<Event::MockTimer>(&read_filter_callbacks_.connection_.dispatcher_);
+  Event::MockTimer* upload_timer =
+      new NiceMock<Event::MockTimer>(&read_filter_callbacks_.connection_.dispatcher_);
   int timer_count = 0;
-  ON_CALL(dispatcher_, createTimer_(_))
+  ON_CALL(read_filter_callbacks_.connection_.dispatcher_, createTimer_(_))
       .WillByDefault(testing::Invoke([&timer_count, download_timer, upload_timer](Event::TimerCb) {
         return (timer_count++ == 0) ? download_timer : upload_timer;
       }));
@@ -506,7 +508,8 @@ TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
       .WillByDefault(testing::Return());
   ON_CALL(read_filter_callbacks_.connection_, readDisable(false))
       .WillByDefault(testing::Return(Network::Connection::ReadDisableStatus::NoTransition));
-  ON_CALL(write_filter_callbacks_.connection_, write(_, false)).WillByDefault(testing::Return());
+  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillByDefault(testing::Return());
 
   filter_->onDownloadTokenTimer();
 
@@ -526,10 +529,10 @@ TEST_F(TcpBandwidthLimitFilterTest, TimerWithEmptyBuffer) {
 
   setup(yaml);
 
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
-  ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(testing::Invoke([timer](Event::TimerCb) {
-    return timer;
-  }));
+  Event::MockTimer* timer =
+      new NiceMock<Event::MockTimer>(&read_filter_callbacks_.connection_.dispatcher_);
+  ON_CALL(read_filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+      .WillByDefault(testing::Invoke([timer](Event::TimerCb) { return timer; }));
 
   Buffer::OwnedImpl data1(std::string(1024, 'a'));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data1, false));
@@ -586,11 +589,19 @@ TEST_F(TcpBandwidthLimitFilterTest, StatsIncrement) {
   EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.download_enabled").value());
   EXPECT_EQ(1,
             stats_store_.counterFromString("test.tcp_bandwidth_limit.download_throttled").value());
+  EXPECT_EQ(1536, stats_store_
+                      .gaugeFromString("test.tcp_bandwidth_limit.download_bytes_buffered",
+                                       Stats::Gauge::ImportMode::Accumulate)
+                      .value());
 
   Buffer::OwnedImpl large_upload(std::string(2048, 'd'));
   filter_->onWrite(large_upload, false);
   EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_enabled").value());
   EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_throttled").value());
+  EXPECT_EQ(1536, stats_store_
+                      .gaugeFromString("test.tcp_bandwidth_limit.upload_bytes_buffered",
+                                       Stats::Gauge::ImportMode::Accumulate)
+                      .value());
 }
 
 TEST_F(TcpBandwidthLimitFilterTest, TimerReEnableReadAlreadyEnabled) {
@@ -698,7 +709,7 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionUpload) {
   Buffer::OwnedImpl data2(std::string(500, 'b'));
 
   Buffer::OwnedImpl written_data;
-  EXPECT_CALL(write_filter_callbacks_.connection_, write(_, false))
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
@@ -812,7 +823,7 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerResetPath) {
 
   // First trigger buffering
   Buffer::OwnedImpl data(std::string(2048, 'x'));
-  auto* timer = new Event::MockTimer(&dispatcher_);
+  auto* timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(50), nullptr));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
@@ -865,7 +876,8 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
 
-  EXPECT_CALL(write_filter_callbacks_.connection_, write(BufferStringEqual("test data"), false));
+  EXPECT_CALL(write_filter_callbacks_,
+              injectWriteDataToFilterChain(BufferStringEqual("test data"), false));
 
   filter_->onUploadTokenTimer();
 
