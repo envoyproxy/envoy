@@ -27,18 +27,14 @@ The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is require
 the administration server.
 
 The ``address`` key specifies the listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
-which in the demo configuration is ``0.0.0.0:9901``.
+which in this example configuration is ``127.0.0.1:9901``.
 
-In this example, the logs are simply discarded.
-
-.. code-block:: yaml
-   :emphasize-lines: 4-5
-
-   admin:
-     address:
-       socket_address:
-         address: 0.0.0.0
-         port_value: 9901
+.. literalinclude:: /_configs/repo/admin-interface.yaml
+   :language: yaml
+   :start-at: admin:
+   :end-before: allow_paths:
+   :emphasize-lines: 5-6
+   :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
 .. warning::
 
@@ -49,6 +45,20 @@ In this example, the logs are simply discarded.
 
    You may wish to restrict the network address the admin server listens to in your own deployment as part
    of your strategy to limit access to this endpoint.
+
+You can also restrict which admin endpoints are exposed using
+:ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>`.
+This is useful when the admin listener is used for limited purposes, such as a readiness probe.
+
+Use ``prefix`` matchers for endpoints that are commonly queried with parameters (for example
+``/stats?filter=...``).
+
+.. literalinclude:: /_configs/repo/admin-interface.yaml
+   :language: yaml
+   :start-at: admin:
+   :end-before: static_resources:
+   :emphasize-lines: 7-9
+   :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
 
 ``stat_prefix``

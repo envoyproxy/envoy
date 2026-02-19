@@ -18,18 +18,17 @@ modify different aspects of the server:
   administration interface is only allowed via a secure network. It is also **critical** that hosts
   that access the administration interface are **only** attached to the secure network (i.e., to
   avoid CSRF attacks). This involves setting up an appropriate firewall or optimally only allowing
-  access to the administration listener via localhost. This can be accomplished with a v2
-  configuration like the following:
+  access to the administration listener via localhost. You can additionally restrict which admin
+  paths are reachable using
+  :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>`.
+  This can be accomplished with a configuration like the following:
 
-  .. code-block:: yaml
-
-    admin:
-      profile_path: /tmp/envoy.prof
-      address:
-        socket_address: { address: 127.0.0.1, port_value: 9901 }
-
-  In the future additional security options will be added to the administration interface. This
-  work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
+  .. literalinclude:: /_configs/repo/admin-interface.yaml
+    :language: yaml
+    :start-at: admin:
+    :end-before: static_resources:
+    :emphasize-lines: 7-9
+    :caption: :download:`admin-interface.yaml </_configs/repo/admin-interface.yaml>`
 
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
