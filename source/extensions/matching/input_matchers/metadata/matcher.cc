@@ -5,20 +5,25 @@ namespace Extensions {
 namespace Matching {
 namespace InputMatchers {
 namespace Metadata {
+namespace {
+using ::Envoy::Matcher::MatchResult;
+}
 
 Matcher::Matcher(const Envoy::Matchers::ValueMatcherConstSharedPtr value_matcher, const bool invert)
     : value_matcher_(value_matcher), invert_(invert) {}
 
-bool Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
+MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
   if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
       ptr != nullptr) {
     const Matching::Http::MetadataInput::MetadataMatchData* match_data =
         dynamic_cast<const Matching::Http::MetadataInput::MetadataMatchData*>(ptr->get());
     if (match_data != nullptr) {
-      return value_matcher_->match(match_data->value_) ^ invert_;
+      if (value_matcher_->match(match_data->value_) ^ invert_) {
+        return MatchResult::Matched;
+      }
     }
   }
-  return false;
+  return MatchResult::NoMatch;
 }
 
 } // namespace Metadata

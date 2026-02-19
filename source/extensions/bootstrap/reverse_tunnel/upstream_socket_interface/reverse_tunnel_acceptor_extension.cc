@@ -38,7 +38,7 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
 }
 
 // ReverseTunnelAcceptorExtension implementation
-void ReverseTunnelAcceptorExtension::onServerInitialized() {
+void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Initialize the reporter.
   if (reporter_) {
     reporter_->onServerInitialized();

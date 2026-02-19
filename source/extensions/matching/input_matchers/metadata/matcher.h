@@ -18,7 +18,7 @@ namespace Metadata {
 class Matcher : public Envoy::Matcher::InputMatcher, Logger::Loggable<Logger::Id::filter> {
 public:
   Matcher(const Envoy::Matchers::ValueMatcherConstSharedPtr, const bool);
-  bool match(const Envoy::Matcher::MatchingDataType& input) override;
+  ::Envoy::Matcher::MatchResult match(const Envoy::Matcher::MatchingDataType& input) override;
 
 private:
   Envoy::Matchers::ValueMatcherConstSharedPtr value_matcher_;

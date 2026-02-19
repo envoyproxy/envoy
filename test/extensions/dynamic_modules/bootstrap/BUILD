@@ -77,6 +77,7 @@ envoy_cc_test(
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
