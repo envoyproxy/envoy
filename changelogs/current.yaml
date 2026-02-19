@@ -71,6 +71,11 @@ minor_behavior_changes:
   change: |
     added received_immediate_response flag in :ref:'FilterStats
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
+- area: happy_eyeballs
+  change: |
+    Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
+    containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
