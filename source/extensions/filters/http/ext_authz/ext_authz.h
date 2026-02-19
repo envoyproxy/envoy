@@ -71,6 +71,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   // Gets the gRPC status returned by the authorization server when it is making a gRPC call.
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
+  // Returns true if the ext_authz stream failed open.
   const absl::optional<bool> failedOpen() const { return failed_open_; }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
