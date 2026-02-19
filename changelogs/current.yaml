@@ -209,6 +209,12 @@ new_features:
     udp listener, and bootstrap filters in the rust SDK.
 - area: dynamic modules
   change: |
+    Added connection state and flow control ABI callbacks for the dynamic module network filter,
+    including ``read_disable``, ``read_enabled``, ``get_connection_state``, ``enable_half_close``,
+    ``is_half_close_enabled``, ``get_buffer_limit``, ``set_buffer_limits``, and
+    ``above_high_watermark``.
+- area: dynamic modules
+  change: |
     Added socket property getter and SSL/TLS information ABI callbacks for the dynamic module listener
     filter, including ``get_requested_server_name``, ``get_detected_transport_protocol``,
     ``get_requested_application_protocols``, ``get_ja3_hash``, ``get_ja4_hash``, ``is_ssl``,

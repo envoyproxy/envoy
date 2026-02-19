@@ -76,9 +76,11 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
