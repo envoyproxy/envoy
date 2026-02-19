@@ -350,5 +350,9 @@ new_features:
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+- area: mcp_json_rest_bridge
+  change: |
+    Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
+    standard JSON-REST HTTP requests.
 
 deprecated:
