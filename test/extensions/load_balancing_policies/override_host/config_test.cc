@@ -232,8 +232,8 @@ TEST(OverrideHostLbConfigTest, ValidSelectedEndpointKey) {
   config_msg.add_override_host_sources()->set_header("x-foo");
 
   auto* metadata_key = config_msg.mutable_selected_endpoint_key()->mutable_metadata();
-  metadata_key->set_key("x-bar");
-  metadata_key->add_path()->set_key("a/b/c");
+  metadata_key->set_key("envoy.lb");
+  metadata_key->add_path()->set_key("x-gateway-destination-endpoint-served");
 
   Config fallback_picker_config;
   auto* typed_extension_config =
@@ -254,7 +254,7 @@ TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameSelectedEndpointKey) {
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
 
-  // Do not set either host or metadata keys
+  // Set both header and metadata keys.
   auto* primary_selected_endpoint_key = config_msg.mutable_selected_endpoint_key();
   primary_selected_endpoint_key->set_header("x-selected-endpoint");
   auto* metadata_key = primary_selected_endpoint_key->mutable_metadata();
