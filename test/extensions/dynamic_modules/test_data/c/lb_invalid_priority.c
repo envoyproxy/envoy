@@ -1,5 +1,5 @@
-// Test module that returns an invalid (too large) host index from chooseHost.
-// This is used to test the invalid host index error path.
+// Test module that returns an invalid (too large) priority from chooseHost.
+// This is used to test the invalid priority error path.
 
 #include <stddef.h>
 #include <stdint.h>
@@ -42,8 +42,8 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
   (void)lb_envoy_ptr;
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
-  // Return an invalid index that is larger than any possible host list.
-  return ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(0, 9999);
+  // Return priority 99 which does not exist.
+  return ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(99, 0);
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

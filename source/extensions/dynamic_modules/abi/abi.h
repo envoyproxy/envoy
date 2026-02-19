@@ -6892,18 +6892,33 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
 
 /**
  * envoy_dynamic_module_on_lb_choose_host is called when a host needs to be selected
- * for an upstream request. The module should return the index of the selected host.
+ * for an upstream request. The module should return the index of the selected host
+ * within the healthy hosts list at the specified priority.
+ *
+ * The return value encodes both the priority and host index:
+ *   - The upper 32 bits contain the priority level.
+ *   - The lower 32 bits contain the host index within the healthy hosts at that priority.
+ *   - A negative value indicates no host should be selected (no upstream connection).
+ *
+ * Modules can use the helper macro ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT to encode
+ * the priority and index into the return value.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param lb_module_ptr is the pointer to the in-module load balancer instance.
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext (may be null).
- * @return the index of the selected host in the healthy hosts list, or a negative value
- *         if no host should be selected (which will result in no upstream connection).
+ * @return the encoded priority and host index, or a negative value if no host should be selected.
  */
 int64_t envoy_dynamic_module_on_lb_choose_host(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
     envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * Helper macro to encode a priority and host index into the return value of
+ * envoy_dynamic_module_on_lb_choose_host.
+ */
+#define ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(priority, index)                                \
+  ((int64_t)(((uint64_t)(uint32_t)(priority) << 32) | (uint64_t)(uint32_t)(index)))
 
 /**
  * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
@@ -7007,6 +7022,76 @@ uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
  */
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_health(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_address returns the address of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_weight returns the load balancing weight
+ * of a host by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_active_requests returns the number of active
+ * requests for a host by index within all hosts at a given priority. This is essential for
+ * implementing least-request, peak EWMA, and similar load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the number of active requests, or 0 if the host was not found.
+ */
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_active_connections returns the number of active
+ * connections for a host by index within all hosts at a given priority. This is useful for
+ * connection-aware load balancing decisions.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the number of active connections, or 0 if the host was not found.
+ */
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_locality returns the locality information
+ * (region, zone, sub_zone) for a host by index within all hosts at a given priority.
+ * This enables zone-aware and locality-aware load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param region is the output for the region string. Can be null if not needed.
+ * @param zone is the output for the zone string. Can be null if not needed.
+ * @param sub_zone is the output for the sub-zone string. Can be null if not needed.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_locality(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone);
 
 /**
  * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from

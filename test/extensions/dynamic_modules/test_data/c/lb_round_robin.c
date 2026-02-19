@@ -59,7 +59,7 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
 
   size_t index = state->next_index % host_count;
   state->next_index++;
-  return (int64_t)index;
+  return ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(0, index);
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

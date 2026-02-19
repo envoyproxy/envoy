@@ -91,6 +91,33 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
     (void)health;
   }
 
+  // Test all-hosts callbacks (address, weight, active requests, connections, locality).
+  if (host_count > 0) {
+    envoy_dynamic_module_type_envoy_buffer host_address_result = {NULL, 0};
+    bool host_found = envoy_dynamic_module_callback_lb_get_host_address(
+        lb_envoy_ptr, 0, 0, &host_address_result);
+    (void)host_found;
+
+    uint32_t host_weight = envoy_dynamic_module_callback_lb_get_host_weight(
+        lb_envoy_ptr, 0, 0);
+    (void)host_weight;
+
+    uint64_t active_rq = envoy_dynamic_module_callback_lb_get_host_active_requests(
+        lb_envoy_ptr, 0, 0);
+    (void)active_rq;
+
+    uint64_t active_cx = envoy_dynamic_module_callback_lb_get_host_active_connections(
+        lb_envoy_ptr, 0, 0);
+    (void)active_cx;
+
+    envoy_dynamic_module_type_envoy_buffer region = {NULL, 0};
+    envoy_dynamic_module_type_envoy_buffer zone = {NULL, 0};
+    envoy_dynamic_module_type_envoy_buffer sub_zone = {NULL, 0};
+    bool locality_found = envoy_dynamic_module_callback_lb_get_host_locality(
+        lb_envoy_ptr, 0, 0, &region, &zone, &sub_zone);
+    (void)locality_found;
+  }
+
   // Test context callbacks if context is available.
   if (context_envoy_ptr != NULL) {
     // Test hash key computation.
@@ -126,7 +153,7 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
 
   size_t index = state->next_index % healthy_count;
   state->next_index++;
-  return (int64_t)index;
+  return ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(0, index);
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {
