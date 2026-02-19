@@ -13,7 +13,7 @@ directories:
   source/common/http/http2: 96.6
   source/common/json: 95.2
   source/common/jwt: 86.2
-  source/common/matcher: 95.0
+  source/common/matcher: 94.8
   source/common/memory: 98.1  # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
   source/common/network: 94.3  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
   source/common/network/dns_resolver: 91.4   # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
@@ -37,6 +37,7 @@ directories:
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
   source/extensions/filters/common/lua: 95.6
+  source/extensions/filters/http/a2a: 96.1  # Under active development
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
   source/extensions/filters/http/dynamic_modules: 95.2
@@ -72,6 +73,7 @@ directories:
   source/extensions/tracers/zipkin: 95.6
   source/extensions/transport_sockets/proxy_protocol: 96.2
   source/extensions/transport_sockets/tls/cert_mappers/filter_state_override: 96.2
+  source/extensions/transport_sockets/tls/cert_validator/spiffe: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
   source/extensions/watchdog: 83.3  # Death tests within extensions

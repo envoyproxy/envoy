@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/server/factory_context.h"
+#include "envoy/server/instance.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -19,7 +20,7 @@ public:
   /**
    * Called when server is done initializing and we have the ServerFactoryContext fully initialized.
    */
-  virtual void onServerInitialized() PURE;
+  virtual void onServerInitialized(Server::Instance& server) PURE;
 
   /**
    * Called when the worker thread is initialized.

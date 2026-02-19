@@ -4,12 +4,13 @@
 
 // We don't use all the headers in the test below, but including them anyway as
 // a cheap way to get some C++ compiler sanity checking.
+#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
-#include "envoy/config/core/v3/protocol.pb.validate.h"
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.validate.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
@@ -24,7 +25,6 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 
 #include "google/protobuf/text_format.h"
 

@@ -238,6 +238,29 @@ private:
   const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
+/**
+ * Action for remote address match rate limiting.
+ */
+class RemoteAddressMatchAction : public RateLimit::DescriptorProducer {
+public:
+  RemoteAddressMatchAction(
+      const envoy::config::route::v3::RateLimit::Action::RemoteAddressMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string descriptor_key_;
+  const std::string default_value_;
+  const std::unique_ptr<Network::Address::IpList> ip_list_;
+  const bool invert_match_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
+};
+
 class RateLimitDescriptorValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
 public:

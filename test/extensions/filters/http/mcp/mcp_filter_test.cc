@@ -864,6 +864,61 @@ TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
 }
 
+// Test that non-JSON-RPC JSON stops buffering immediately after root object closes
+TEST_F(McpFilterTest, NonMcpJsonEarlyStopInPassThroughMode) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Complete JSON object that is NOT JSON-RPC (no "jsonrpc" or "method" fields).
+  std::string json = R"({"foo": "bar", "nested": {"deep": 123}, "baz": true})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+}
+
+// Test multi-chunk non-MCP JSON.
+TEST_F(McpFilterTest, NonMcpJsonMultiChunkEarlyStop) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer1(R"({"foo": "bar", )");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
+
+  Buffer::OwnedImpl buffer2(R"("baz": 123})");
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, false));
+}
+
+// Test that non-MCP JSON is rejected early in REJECT_NO_MCP mode after root closes.
+TEST_F(McpFilterTest, NonMcpJsonEarlyStopInRejectMode) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"foo": "bar", "baz": 123})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "request must be a valid JSON-RPC 2.0 message for MCP", _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
+}
+
 // Test per-route max body size override with smaller limit
 TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
   // Global config with 1024 bytes
@@ -1187,6 +1242,90 @@ TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
   ASSERT_NE(filter_state_obj, nullptr);
   EXPECT_TRUE(filter_state_obj->method().has_value());
   EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
+}
+
+// Test that POST with Content-Type "application/json; charset=utf-8" is accepted
+TEST_F(McpFilterTest, PostWithJsonCharsetContentTypeAccepted) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json; charset=utf-8"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that POST with Content-Type "application/json;charset=utf-8" (no space) is accepted
+TEST_F(McpFilterTest, PostWithJsonCharsetNoSpaceContentTypeAccepted) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json;charset=utf-8"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that POST with Content-Type "application/json-patch+json" (RFC 6902) is rejected in
+// REJECT_NO_MCP mode because it is not plain application/json.
+TEST_F(McpFilterTest, PostWithJsonPatchContentTypeRejectedInRejectMode) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json-patch+json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+// Test that POST with Content-Type "application/jsonl" is rejected in REJECT_NO_MCP mode
+// because it is not plain application/json.
+TEST_F(McpFilterTest, PostWithJsonlContentTypeRejectedInRejectMode) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/jsonl"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+// Test REJECT_NO_MCP mode - allow DELETE with MCP-Session-Id (session termination)
+TEST_F(McpFilterTest, RejectModeAllowsDeleteWithSessionId) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"},
+                                         {"mcp-session-id", "session-abc-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+// Test REJECT_NO_MCP mode - reject DELETE without MCP-Session-Id (not session termination)
+TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
+  setupRejectMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 } // namespace

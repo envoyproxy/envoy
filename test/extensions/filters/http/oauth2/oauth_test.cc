@@ -387,6 +387,45 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccessBasicAuthType) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
+TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncGetAccessToken("auth_code", "client_id", "secret", "cb", "verifier",
+                               AuthType::TlsClientAuth);
+  EXPECT_EQ(1, callbacks_.size());
+}
+
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenTlsClientAuthNoClientSecret) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::TlsClientAuth);
+  EXPECT_EQ(1, callbacks_.size());
+}
+
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenErrorResponse) {
   Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
       {Http::Headers::get().Status.get(), "500"},
