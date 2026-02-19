@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/shared_token_bucket_impl.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -49,8 +50,8 @@ public:
   TcpBandwidthLimitStats& stats() { return stats_; }
   TimeSource& timeSource() { return time_source_; }
 
-  bool hasDownloadLimit() const { return has_download_limit_; }
-  bool hasUploadLimit() const { return has_upload_limit_; }
+  bool hasDownloadLimit() const { return download_token_bucket_ != nullptr; }
+  bool hasUploadLimit() const { return upload_token_bucket_ != nullptr; }
   uint64_t downloadLimit() const { return download_limit_kbps_; }
   uint64_t uploadLimit() const { return upload_limit_kbps_; }
   bool enabled() const { return enabled_.enabled(); }
@@ -68,8 +69,6 @@ private:
 
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
-  const bool has_download_limit_;
-  const bool has_upload_limit_;
   const uint64_t download_limit_kbps_;
   const uint64_t upload_limit_kbps_;
   const std::chrono::milliseconds fill_interval_;
@@ -87,12 +86,14 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class TcpBandwidthLimitFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
   TcpBandwidthLimitFilter(FilterConfigSharedPtr config, Event::Dispatcher& dispatcher);
+  ~TcpBandwidthLimitFilter() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+    download_buffer_.setWatermarks(callbacks.connection().bufferLimit());
   }
 
   // Network::WriteFilter
@@ -109,6 +110,8 @@ private:
 
   void processBufferedDownloadData();
   void processBufferedUploadData();
+  void onDownloadBufferLowWatermark();
+  void onDownloadBufferHighWatermark();
 
   FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
@@ -117,15 +120,12 @@ private:
   Network::WriteFilterCallbacks* write_callbacks_{};
 
   // Buffered data waiting for tokens
-  Buffer::OwnedImpl download_buffer_;
+  Buffer::WatermarkBuffer download_buffer_;
   Buffer::OwnedImpl upload_buffer_;
 
   // Timers for processing buffered data
   Event::TimerPtr download_timer_;
   Event::TimerPtr upload_timer_;
-
-  // Track whether read is disabled
-  bool read_disabled_{false};
 };
 
 } // namespace TcpBandwidthLimit

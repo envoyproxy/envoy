@@ -27,10 +27,12 @@ message TcpBandwidthLimit {
 
   // The limit for download bandwidth in KiB/s.
   // If not set, no limit is applied (unlimited bandwidth).
+  // If set to 0, all download traffic is blocked.
   google.protobuf.UInt64Value download_limit_kbps = 2;
 
   // The limit for upload bandwidth in KiB/s.
   // If not set, no limit is applied (unlimited bandwidth).
+  // If set to 0, all upload traffic is blocked.
   google.protobuf.UInt64Value upload_limit_kbps = 3;
 
   // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.

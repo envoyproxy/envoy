@@ -19,33 +19,6 @@ The filter works by:
 * Buffering data when insufficient tokens are available
 * Using timers to refill tokens and resume data flow when bandwidth becomes available
 
-Configuration
--------------
-
-The filter supports the following configuration options:
-
-* **download_limit_kbps**: The limit for download bandwidth in KiB/s (kibibytes per second).
-
-  - If not set, no limit is applied (unlimited bandwidth)
-  - If set to 0, all download traffic is blocked
-  - If set to a positive value, that rate limit is applied
-
-* **upload_limit_kbps**: The limit for upload bandwidth in KiB/s (kibibytes per second).
-
-  - If not set, no limit is applied (unlimited bandwidth)
-  - If set to 0, all upload traffic is blocked
-  - If set to a positive value, that rate limit is applied
-
-* **fill_interval**: The interval at which tokens are refilled to the bucket.
-
-  - Minimum: 20 milliseconds
-  - Maximum: 1 second
-  - Default: 50 milliseconds
-
-* **runtime_enabled**: Runtime feature flag to enable/disable the filter.
-
-* **stat_prefix**: The human-readable prefix to use when emitting statistics.
-
 Example configuration
 ---------------------
 

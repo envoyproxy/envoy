@@ -24,6 +24,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:shared_token_bucket_impl_lib",

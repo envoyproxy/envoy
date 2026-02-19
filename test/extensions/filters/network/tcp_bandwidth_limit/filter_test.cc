@@ -22,9 +22,8 @@ namespace TcpBandwidthLimit {
 
 class TcpBandwidthLimitFilterTest : public ::testing::Test {
 public:
-  Buffer::OwnedImpl& getDownloadBuffer() { return filter_->download_buffer_; }
+  Buffer::WatermarkBuffer& getDownloadBuffer() { return filter_->download_buffer_; }
   Buffer::OwnedImpl& getUploadBuffer() { return filter_->upload_buffer_; }
-  bool& getReadDisabled() { return filter_->read_disabled_; }
   Event::TimerPtr& getDownloadTimer() { return filter_->download_timer_; }
   Event::TimerPtr& getUploadTimer() { return filter_->upload_timer_; }
 
@@ -35,6 +34,9 @@ public:
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(), runtime_,
                                              time_source_);
     filter_ = std::make_unique<TcpBandwidthLimitFilter>(config_, dispatcher_);
+
+    // Set a buffer limit so the WatermarkBuffer watermarks are active.
+    ON_CALL(read_filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(1));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }
@@ -770,7 +772,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadDataNoTokenBucket) {
   filter_->onUploadTokenTimer();
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerResetWithReadReEnable) {
+TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerDrainsBufferAndReEnablesRead) {
   const std::string yaml = R"EOF(
     stat_prefix: test
     download_limit_kbps: 1
@@ -783,19 +785,17 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerResetWithReadReEnable) {
 
   Buffer::OwnedImpl data(std::string(2048, 'x'));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(true));
-  auto* timer = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(50), nullptr));
+  EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, false));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  getDownloadBuffer().drain(getDownloadBuffer().length());
-  getReadDisabled() = true;
+  // Advance time so the token bucket refills
+  time_source_.advanceTimeWait(std::chrono::milliseconds(1100));
 
-  // When buffer is empty, timer should be reset and read should be re-enabled
+  EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, false));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(false));
   filter_->onDownloadTokenTimer();
 
-  // Verify internal state
-  EXPECT_FALSE(getReadDisabled());
+  EXPECT_EQ(0, getDownloadBuffer().length());
   EXPECT_EQ(nullptr, getDownloadTimer());
 }
 
@@ -836,13 +836,11 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDownloadWithTokens) {
   setup(yaml);
 
   getDownloadBuffer().add("test data");
-  getReadDisabled() = true;
   getDownloadTimer().reset(new Event::MockTimer());
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(read_filter_callbacks_,
               injectReadDataToFilterChain(BufferStringEqual("test data"), false));
-  EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(false));
 
   filter_->onDownloadTokenTimer();
 
