@@ -22,6 +22,8 @@ constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr absl::string_view METHOD_FIELD = "method";
 constexpr absl::string_view ID_FIELD = "id";
 
+constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
+
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 
