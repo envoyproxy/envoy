@@ -41,7 +41,7 @@ public:
 
     return std::unique_ptr<DecodedResourceImpl>(new DecodedResourceImpl(
         resource_decoder, absl::nullopt, Protobuf::RepeatedPtrField<std::string>(), resource, true,
-        version, absl::nullopt, absl::nullopt));
+        version, absl::nullopt, absl::nullopt, absl::nullopt));
   }
 
   static DecodedResourceImplPtr
@@ -53,21 +53,30 @@ public:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(
-            resource_decoder, resource.name(), resource.aliases(), resource.resource(),
-            resource.has_resource(), resource.version(),
+            resource_decoder,
+            (resource.has_resource_name() && !resource.resource_name().name().empty())
+                ? resource.resource_name().name()
+                : resource.name(),
+            resource.aliases(), resource.resource(), resource.has_resource(), resource.version(),
             resource.has_ttl() ? absl::make_optional(std::chrono::milliseconds(
                                      DurationUtil::durationToMilliseconds(resource.ttl())))
                                : absl::nullopt,
-            resource.has_metadata() ? absl::make_optional(resource.metadata()) : absl::nullopt) {}
+            resource.has_metadata() ? absl::make_optional(resource.metadata()) : absl::nullopt,
+            (resource.has_resource_name() &&
+             resource.resource_name().has_dynamic_parameter_constraints())
+                ? absl::make_optional(resource.resource_name().dynamic_parameter_constraints())
+                : absl::nullopt) {}
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const xds::core::v3::CollectionEntry::InlineEntry& inline_entry)
       : DecodedResourceImpl(resource_decoder, inline_entry.name(),
                             Protobuf::RepeatedPtrField<std::string>(), inline_entry.resource(),
-                            true, inline_entry.version(), absl::nullopt, absl::nullopt) {}
+                            true, inline_entry.version(), absl::nullopt, absl::nullopt,
+                            absl::nullopt) {}
   DecodedResourceImpl(ProtobufTypes::MessagePtr resource, const std::string& name,
                       const std::vector<std::string>& aliases, const std::string& version)
       : resource_(std::move(resource)), has_resource_(true), name_(name), aliases_(aliases),
-        version_(version), ttl_(absl::nullopt), metadata_(absl::nullopt) {}
+        version_(version), ttl_(absl::nullopt), metadata_(absl::nullopt),
+        dynamic_parameter_constraints_(absl::nullopt) {}
 
   // Config::DecodedResource
   const std::string& name() const override { return name_; }
@@ -79,17 +88,25 @@ public:
   const OptRef<const envoy::config::core::v3::Metadata> metadata() const override {
     return metadata_.has_value() ? makeOptRef(metadata_.value()) : absl::nullopt;
   }
+  const OptRef<const envoy::service::discovery::v3::DynamicParameterConstraints>
+  dynamicParameterConstraints() const override {
+    return dynamic_parameter_constraints_.has_value()
+               ? makeOptRef(dynamic_parameter_constraints_.value())
+               : absl::nullopt;
+  }
 
 private:
-  DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
-                      const Protobuf::RepeatedPtrField<std::string>& aliases,
-                      const Protobuf::Any& resource, bool has_resource, const std::string& version,
-                      absl::optional<std::chrono::milliseconds> ttl,
-                      const absl::optional<envoy::config::core::v3::Metadata>& metadata)
+  DecodedResourceImpl(
+      OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
+      const Protobuf::RepeatedPtrField<std::string>& aliases, const Protobuf::Any& resource,
+      bool has_resource, const std::string& version, absl::optional<std::chrono::milliseconds> ttl,
+      const absl::optional<envoy::config::core::v3::Metadata>& metadata,
+      const absl::optional<envoy::service::discovery::v3::DynamicParameterConstraints>&
+          dynamic_parameter_constraints)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
-        metadata_(metadata) {}
+        metadata_(metadata), dynamic_parameter_constraints_(dynamic_parameter_constraints) {}
 
   const ProtobufTypes::MessagePtr resource_;
   const bool has_resource_;
@@ -102,6 +119,9 @@ private:
   // This is the metadata info under the Resource wrapper.
   // It is intended to be consumed in the xds_config_tracker extension.
   const absl::optional<envoy::config::core::v3::Metadata> metadata_;
+
+  const absl::optional<envoy::service::discovery::v3::DynamicParameterConstraints>
+      dynamic_parameter_constraints_;
 };
 
 struct DecodedResourcesWrapper {
