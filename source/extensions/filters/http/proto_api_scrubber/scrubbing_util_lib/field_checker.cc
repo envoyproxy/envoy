@@ -179,9 +179,9 @@ FieldChecker::normalizePath(const std::vector<std::string>& path) const {
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field, const int /*field_depth*/,
                                            const Protobuf::Type* parent_type) const {
-  // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
+  // If the field is unknown (i.e., not present in the descriptor), it should be excluded.
   if (field == nullptr) {
-    return FieldCheckResults::kInclude;
+    return FieldCheckResults::kExclude;
   }
 
   // If the field itself holds a message or enum, check if that type is globally restricted.
