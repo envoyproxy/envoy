@@ -2191,10 +2191,14 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     host_selection_cancelable_.reset();
   }
 
-  // Retry-aware weighted cluster selection: record the failed cluster name in
-  // filter state so that on route re-evaluation, pickWeightedCluster can
-  // zero out its weight and select a different cluster.
-  if (route_entry_ != nullptr) {
+  // Retry-aware weighted cluster selection: only activate when the current route
+  // was produced by a weighted cluster specifier plugin AND the runtime feature is
+  // enabled. Non-weighted-cluster routes (the vast majority) skip this entirely —
+  // no FilterState allocation, no clearRouteCache(), no route re-evaluation.
+  // The runtime guard allows disabling the feature without a rebuild if issues arise.
+  if (route_entry_ != nullptr && route_entry_->retryAwareWeightedClusters() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.retry_aware_weighted_clusters")) {
     const std::string& failed_cluster_name = route_entry_->clusterName();
     auto& filter_state = callbacks_->streamInfo().filterState();
 

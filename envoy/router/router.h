@@ -1170,6 +1170,17 @@ public:
    */
   virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                                    const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * @return true if this route entry was produced by a weighted cluster specifier plugin
+   *         that supports retry-aware cluster selection. When true, doRetry() will record
+   *         attempted clusters in filter state and re-evaluate the route to avoid retrying
+   *         to the same (likely broken) single-endpoint cluster.
+   *
+   * The default implementation returns false so that non-weighted-cluster routes pay zero
+   * cost on the retry path (no FilterState allocation, no clearRouteCache).
+   */
+  virtual bool retryAwareWeightedClusters() const { return false; }
 };
 
 /**

@@ -184,8 +184,9 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
 class WeightedClusterEntry : public DynamicRouteEntry {
 public:
   WeightedClusterEntry(RouteConstSharedPtr route, std::string&& cluster_name,
-                       WeightedClustersConfigEntryConstSharedPtr config)
-      : DynamicRouteEntry(route, std::move(cluster_name)), config_(std::move(config)) {
+                       WeightedClustersConfigEntryConstSharedPtr config, bool has_alternatives)
+      : DynamicRouteEntry(route, std::move(cluster_name)), config_(std::move(config)),
+        has_alternatives_(has_alternatives) {
     ASSERT(config_ != nullptr);
   }
 
@@ -256,6 +257,11 @@ public:
     return result;
   }
 
+  // Only worth re-evaluating the route on retry when there is more than one
+  // weighted cluster to choose from. Single-cluster weighted routes (common in
+  // control-plane configs) skip the retry-aware path entirely.
+  bool retryAwareWeightedClusters() const override { return has_alternatives_; }
+
 private:
   const HeaderParser& requestHeaderParser() const {
     if (config_->request_headers_parser_ != nullptr) {
@@ -271,6 +277,7 @@ private:
   }
 
   WeightedClustersConfigEntryConstSharedPtr config_;
+  const bool has_alternatives_;
 };
 
 // Selects a cluster depending on weight parameters from configuration or from headers.
@@ -446,8 +453,10 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
     }
 
     if (selected_value >= begin && selected_value < end) {
+      const bool has_alternatives = weighted_clusters_.size() > 1;
       if (!cluster->cluster_name_.empty()) {
-        return std::make_shared<WeightedClusterEntry>(std::move(parent), "", cluster);
+        return std::make_shared<WeightedClusterEntry>(std::move(parent), "", cluster,
+                                                      has_alternatives);
       }
       ASSERT(!cluster->cluster_header_name_.get().empty());
 
@@ -455,7 +464,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
       absl::string_view cluster_name =
           entries.empty() ? absl::string_view{} : entries[0]->value().getStringView();
       return std::make_shared<WeightedClusterEntry>(std::move(parent), std::string(cluster_name),
-                                                    cluster);
+                                                    cluster, has_alternatives);
     }
     begin = end;
   }
