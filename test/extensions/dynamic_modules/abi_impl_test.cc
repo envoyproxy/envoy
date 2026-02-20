@@ -495,6 +495,61 @@ TEST(CommonAbiImplTest, LbGetHostHealthEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_get_host_address triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+  EXPECT_EQ(result.ptr, nullptr);
+  EXPECT_EQ(result.length, 0);
+}
+
+// Test that the weak symbol stub for lb_get_host_weight triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostWeightEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto weight = envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0);
+        EXPECT_EQ(weight, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_active_requests triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostActiveRequestsEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_active_connections triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbGetHostActiveConnectionsEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_locality triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostLocalityEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr,
+                                                                        nullptr, nullptr);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
 // Test that the weak symbol stub for lb_context_compute_hash_key triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, LbContextComputeHashKeyEnvoyBug) {
   uint64_t hash_out = 0;

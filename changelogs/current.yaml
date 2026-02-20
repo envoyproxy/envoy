@@ -303,6 +303,12 @@ new_features:
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
     close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
     and ``RemoteReset``.
+- area: reverse_tunnel
+  change: |
+    Added optional tenant isolation support to the reverse tunnel network filter. When
+    ``enable_tenant_isolation`` is set, Envoy scopes cached reverse tunnel sockets with composite
+    ``<tenant>@<node>`` and ``<tenant>@<cluster>`` identifiers and rejects handshake headers that already
+    contain the ``@`` delimiter to prevent ambiguous lookups.
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
@@ -420,5 +426,9 @@ new_features:
   change: |
     Added options ``extract_trace_context`` and ``extract_baggage`` for extracting traceparent & tracestate
     and baggage from mcp params, respectively.
+- area: mcp_json_rest_bridge
+  change: |
+    Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
+    standard JSON-REST HTTP requests.
 
 deprecated:
