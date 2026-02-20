@@ -45,6 +45,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_us
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_get_header_tag_from_header_map);

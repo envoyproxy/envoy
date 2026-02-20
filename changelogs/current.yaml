@@ -11,6 +11,10 @@ bug_fixes:
 - area: oauth2
   change: |
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: ext_proc
+  change: |
+    Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
