@@ -10,11 +10,13 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -58,8 +60,41 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
     return {nullptr};
   }
 
-  ENVOY_LOG(debug, "reverse_connection: using host identifier from formatter: {}", host_id);
-  return parent_->checkAndCreateHost(host_id);
+  // Check if tenant isolation is enabled and tenant_id_formatter is configured.
+  std::string final_host_id = host_id;
+  auto* socket_manager = parent_->getUpstreamSocketManager();
+  if (socket_manager != nullptr && socket_manager->tenantIsolationEnabled()) {
+    // When tenant isolation is enabled, tenant_id_formatter must be configured.
+    if (parent_->tenant_id_formatter_ == nullptr) {
+      ENVOY_LOG(error,
+                "reverse_connection: tenant isolation is enabled but tenant_id_format is not "
+                "configured. tenant_id_format is required when tenant isolation is enabled.");
+      return {nullptr};
+    }
+    // Format tenant identifier.
+    const std::string tenant_id =
+        parent_->tenant_id_formatter_->format(formatter_context, stream_info);
+
+    // Treat "-" (formatter default for missing) as empty as well.
+    if (!tenant_id.empty() && tenant_id != "-") {
+      // Concatenate tenant_id and host_id using the utility function.
+      final_host_id =
+          BootstrapReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier(
+              tenant_id, host_id);
+      ENVOY_LOG(debug,
+                "reverse_connection: tenant isolation enabled, using tenant-scoped identifier: {}",
+                final_host_id);
+    } else {
+      // When tenant isolation is enabled, tenant_id must be derivable.
+      ENVOY_LOG(error,
+                "reverse_connection: tenant isolation enabled but tenant_id cannot be inferred "
+                "(formatter returned empty value)");
+      return {nullptr};
+    }
+  }
+
+  ENVOY_LOG(debug, "reverse_connection: using host identifier: {}", final_host_id);
+  return parent_->checkAndCreateHost(final_host_id);
 }
 
 Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_view host_id) {
@@ -169,6 +204,14 @@ RevConCluster::RevConCluster(
       Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
   host_id_formatter_ = std::move(*formatter_or_error);
 
+  // Create the tenant-id formatter if configured.
+  if (!rev_con_config.tenant_id_format().empty()) {
+    auto tenant_formatter_or_error = Envoy::Formatter::FormatterImpl::create(
+        rev_con_config.tenant_id_format(), /*omit_empty_values=*/false,
+        Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
+    tenant_id_formatter_ = std::move(*tenant_formatter_or_error);
+  }
+
   // Schedule periodic cleanup.
   cleanup_timer_->enableTimer(cleanup_interval_);
 }
@@ -214,11 +257,31 @@ RevConClusterFactory::createClusterWithConfig(
                     extension_name));
   }
 
+  // Validate that if tenant isolation is enabled in bootstrap config, tenant_id_format is
+  // configured.
+  auto* extension = upstream_socket_interface->getExtension();
+  if (extension != nullptr && extension->enableTenantIsolation() &&
+      proto_config.tenant_id_format().empty()) {
+    return absl::InvalidArgumentError(
+        fmt::format("tenant_id_format must be configured for reverse connection cluster '{}' when "
+                    "tenant isolation is enabled in the bootstrap configuration. Please configure "
+                    "tenant_id_format in the reverse connection cluster configuration.",
+                    cluster.name()));
+  }
+
   // Validate the host_id_format early to catch formatter errors.
   auto validation_or_error = Envoy::Formatter::FormatterImpl::create(
       proto_config.host_id_format(), /*omit_empty_values=*/false,
       Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
   RETURN_IF_NOT_OK_REF(validation_or_error.status());
+
+  // Validate the tenant_id_format if provided.
+  if (!proto_config.tenant_id_format().empty()) {
+    auto tenant_validation_or_error = Envoy::Formatter::FormatterImpl::create(
+        proto_config.tenant_id_format(), /*omit_empty_values=*/false,
+        Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
+    RETURN_IF_NOT_OK_REF(tenant_validation_or_error.status());
+  }
 
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<RevConCluster>(
