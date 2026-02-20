@@ -5,6 +5,7 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -152,7 +153,7 @@ message Config {
     CaReloadFailurePolicy ca_reload_failure_policy = 12;
 
     // Include the mapped host as DNS SAN entry. Defaults to true.
-    optional bool include_primary_dns_san = 13;
+    google.protobuf.BoolValue include_primary_dns_san = 13;
 
     // Additional DNS SAN values to include in generated certs.
     repeated string additional_dns_sans = 14;
@@ -165,7 +166,7 @@ message Config {
 
     // Optional basicConstraints CA value for generated certs.
     // If unset, the extension is not added.
-    optional bool basic_constraints_ca = 17;
+    google.protobuf.BoolValue basic_constraints_ca = 17;
 
     // Optional subject field overrides for generated certs.
     // If ``subject_common_name`` is unset, mapped host is used as CN.
