@@ -23,7 +23,7 @@ LC-tries <https://www.csc.kth.se/~snilsson/publications/IP-address-lookup-using-
 G. Karlsson.
 
 IP tags can either be provided directly using the :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` API field or
-can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>` API field is configured.
+can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` API field is configured.
 For file based IP tags YAML and JSON file formats are supported.
 IP tags will be dynamically reloaded if ``watched_directory`` is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>`.
 
