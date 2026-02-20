@@ -74,7 +74,7 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
   // Returns true if the ext_authz stream failed open.
   const absl::optional<bool> failedOpen() const { return failed_open_; }
-  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>& processingEffect() const {return last_processing_effect_;}
+  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>& requestProcessingEffect() const {return last_processing_effect_;}
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -113,6 +113,7 @@ public:
 private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
+  // The last processing effect applied to the request.
   absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect> last_processing_effect_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
@@ -472,6 +473,7 @@ private:
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
+  void updateEffect(const absl::optional<ExternalProcessing::ProcessingEffect::Effect>& effect);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
