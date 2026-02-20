@@ -1,11 +1,7 @@
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
 
 #include <algorithm>
-#include <cstdint>
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -186,7 +182,9 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
   if (!context || !context->requestStreamInfo()) {
     // If there is no context or no request stream info, we can't use the
     // metadata, so we just return a host from the fallback picker.
-    return fallback_picker_lb_->chooseHost(context);
+    auto response = fallback_picker_lb_->chooseHost(context);
+    addSelectedEndpointKey(context, response);
+    return response;
   }
 
   OverrideHostFilterState* override_host_state = nullptr;
@@ -239,7 +237,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
 
   const std::string selected_endpoint = response.host->address()->asString();
   const auto& selected_endpoint_key = config_.selectedEndpointKey().value();
-  if (!selected_endpoint_key.metadata_key.has_value()) {
+  if (selected_endpoint_key.metadata_key.has_value()) {
     ASSERT(selected_endpoint_key.header_name.has_value() != selected_endpoint_key.metadata_key.has_value());
 
     const Config::MetadataKey& metadata_key = selected_endpoint_key.metadata_key.value();
