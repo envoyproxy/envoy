@@ -45,6 +45,21 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // If no valid host in the override host list, then the specified fallback load balancing policy is used. This allows load
 // balancing to degrade to a a built in policy (i.e. Round Robin) in case external endpoint picker fails.
 //
+// In addition to specifying ``override_host_sources``, the policy can be configured to inform downstream filters
+// of the selected endpoint through dynamic metadata or response headers through ``selected_endpoint_key``:
+//
+// .. code-block:: yaml
+//
+//    override_host_sources:
+//      - metadata:
+//          key: "envoy.lb"
+//          path:
+//          - key: "x-gateway-destination-endpoint"
+//    selected_endpoint_key:
+//      key: "envoy.lb"
+//      path:
+//      - key: "x-gateway-destination-endpoint-served"
+//
 // See the :ref:`load balancing architecture
 // overview<arch_overview_load_balancing_types>` for more information.
 //
@@ -71,6 +86,10 @@ message OverrideHost {
   // satisfy all retry attempts the fallback load balancing policy is used to pick a host.
   repeated OverrideHostSource override_host_sources = 1
       [(validate.rules).repeated = {min_items: 1}];
+
+  // The metadata key to populate with the selected host address. This is optional and
+  // may be used to inform downstream filters of the host address selected by load balancing policy.
+  type.metadata.v3.MetadataKey selected_endpoint_key = 2;
 
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
