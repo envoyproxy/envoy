@@ -404,6 +404,9 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``resources/list`` fanout aggregation.
+- area: mcp_router
+  change: |
+    Added support for MCP ``resources/templates/list`` method with fanout aggregation.
 - area: tcp_proxy
   change: |
     Added :ref:`proxy_protocol_tlv_merge_policy
