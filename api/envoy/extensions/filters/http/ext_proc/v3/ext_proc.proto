@@ -370,12 +370,12 @@ message ExternalProcessor {
   // The default status is ``HTTP 500 Internal Server Error``.
   type.v3.HttpStatus status_on_error = 24;
 
-  // If true, the filter will not remove the ``content-length`` header from the request/response.
+  // If true, the filter will not remove the ``content-length`` header from the request/response after external processing.
   //
   // .. warning::
-  //    This is an advanced configuration and should only be used if you are sure that the
-  //    content length matches the body length after external processing.
-  //    Otherwise, it may cause vulnerability issues such as request smuggling.
+  //    This configuration should only be used if you are sure that the content length matches
+  //    the body length after external processing. Otherwise, it may cause vulnerability issues such as
+  //    request smuggling.
   //
   bool keep_content_length = 26;
 }
