@@ -164,6 +164,9 @@ type StreamInfo interface {
 	// For HTTP/1.x, this will add a "Connection: close" header to the response.
 	// For HTTP/2 and HTTP/3, this will send a GOAWAY frame after the response is sent.
 	DrainConnectionUponCompletion()
+	// DownstreamSslConnection returns SSL connection info for the downstream connection
+	// Returns nil if the connection is not secured with SSL/TLS
+	DownstreamSslConnection() SslConnection
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }
@@ -338,6 +341,54 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+// SslConnection provides SSL/TLS connection information
+// refer https://github.com/envoyproxy/envoy/blob/main/envoy/ssl/connection.h
+type SslConnection interface {
+	// PeerCertificatePresented returns whether the peer certificate was presented
+	PeerCertificatePresented() bool
+	// PeerCertificateValidated returns whether the peer certificate was validated
+	PeerCertificateValidated() bool
+
+	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate
+	Sha256PeerCertificateDigest() (string, bool)
+	// SerialNumberPeerCertificate returns the serial number of the peer certificate
+	SerialNumberPeerCertificate() (string, bool)
+	// SubjectPeerCertificate returns the subject field of the peer certificate
+	SubjectPeerCertificate() (string, bool)
+	// IssuerPeerCertificate returns the issuer field of the peer certificate
+	IssuerPeerCertificate() (string, bool)
+	// SubjectLocalCertificate returns the subject field of the local certificate
+	SubjectLocalCertificate() (string, bool)
+
+	// UriSanPeerCertificate returns the URI SANs of the peer certificate
+	UriSanPeerCertificate() ([]string, bool)
+	// UriSanLocalCertificate returns the URI SANs of the local certificate
+	UriSanLocalCertificate() ([]string, bool)
+	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate
+	DnsSansPeerCertificate() ([]string, bool)
+	// DnsSansLocalCertificate returns the DNS SANs of the local certificate
+	DnsSansLocalCertificate() ([]string, bool)
+
+	// ValidFromPeerCertificate returns the validity start time of the peer certificate as Unix timestamp
+	ValidFromPeerCertificate() (uint64, bool)
+	// ExpirationPeerCertificate returns the expiration time of the peer certificate as Unix timestamp
+	ExpirationPeerCertificate() (uint64, bool)
+
+	// TlsVersion returns the TLS version (e.g., "TLSv1.3")
+	TlsVersion() string
+	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA")
+	CiphersuiteString() (string, bool)
+	// CiphersuiteId returns the ciphersuite ID
+	CiphersuiteId() (uint16, bool)
+	// SessionId returns the TLS session ID
+	SessionId() string
+
+	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate
+	UrlEncodedPemEncodedPeerCertificate() (string, bool)
+	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain
+	UrlEncodedPemEncodedPeerCertificateChain() (string, bool)
 }
 
 type SecretManager interface {

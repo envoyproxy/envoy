@@ -58,6 +58,28 @@ const (
 	ValueUpstreamClusterName     = 11
 	ValueVirtualClusterName      = 12
 
+	// SSL values (100+)
+	ValueSslConnectionExists                         = 100
+	ValueSslPeerCertificatePresented                 = 101
+	ValueSslPeerCertificateValidated                 = 102
+	ValueSslCiphersuiteId                            = 103
+	ValueSslValidFromPeerCertificate                 = 104
+	ValueSslExpirationPeerCertificate                = 105
+	ValueSslSha256PeerCertificateDigest              = 106
+	ValueSslSerialNumberPeerCertificate              = 107
+	ValueSslSubjectPeerCertificate                   = 108
+	ValueSslIssuerPeerCertificate                    = 109
+	ValueSslSubjectLocalCertificate                  = 110
+	ValueSslTlsVersion                               = 111
+	ValueSslCiphersuiteString                        = 112
+	ValueSslSessionId                                = 113
+	ValueSslUrlEncodedPemEncodedPeerCertificate      = 114
+	ValueSslUrlEncodedPemEncodedPeerCertificateChain = 115
+	ValueSslUriSanPeerCertificate                    = 116
+	ValueSslUriSanLocalCertificate                   = 117
+	ValueSslDnsSansPeerCertificate                   = 118
+	ValueSslDnsSansLocalCertificate                  = 119
+
 	// NOTE: this is a trade-off value.
 	// When the number of header is less this value, we could use the slice on the stack,
 	// otherwise, we have to allocate a new slice on the heap,
@@ -368,6 +390,37 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	}
 	handleCApiStatus(res)
 	return uint64(value), true
+}
+
+func (c *httpCApiImpl) HttpGetStringsValue(r unsafe.Pointer, id int) ([]string, bool) {
+	req := (*httpRequest)(r)
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+
+	var valueData C.uint64_t
+	var valueLen C.int
+	var count C.int
+	res := C.envoyGoFilterHttpGetStringsValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen, &count)
+	if res == C.CAPIValueNotFound {
+		return nil, false
+	}
+	handleCApiStatus(res)
+
+	if count == 0 {
+		return []string{}, true
+	}
+
+	// Parse null-separated strings
+	buf := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
+	result := make([]string, 0, int(count))
+	start := 0
+	for i := 0; i < len(buf); i++ {
+		if buf[i] == 0 {
+			result = append(result, string(buf[start:i]))
+			start = i + 1
+		}
+	}
+	return result, true
 }
 
 func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{} {

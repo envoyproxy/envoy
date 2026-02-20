@@ -50,6 +50,7 @@ type HttpCAPI interface {
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
+	HttpGetStringsValue(r unsafe.Pointer, id int) ([]string, bool)
 
 	HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})

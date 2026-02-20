@@ -106,6 +106,8 @@ CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, in
 CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
+CAPIStatus envoyGoFilterHttpGetStringsValue(void* r, int id, uint64_t* value_data, int* value_len,
+                                            int* count);
 
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name_data, int name_len,
                                                uint64_t* value_data, int* value_len);

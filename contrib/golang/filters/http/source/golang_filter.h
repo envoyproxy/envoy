@@ -163,6 +163,7 @@ enum class DestroyReason {
 };
 
 enum class EnvoyValue {
+  // Stream info values (1-99)
   RouteName = 1,
   FilterChainName,
   Protocol,
@@ -175,6 +176,28 @@ enum class EnvoyValue {
   UpstreamRemoteAddress,
   UpstreamClusterName,
   VirtualClusterName,
+
+  // SSL values (100-199)
+  SslConnectionExists = 100,
+  SslPeerCertificatePresented,
+  SslPeerCertificateValidated,
+  SslCiphersuiteId,
+  SslValidFromPeerCertificate,
+  SslExpirationPeerCertificate,
+  SslSha256PeerCertificateDigest,
+  SslSerialNumberPeerCertificate,
+  SslSubjectPeerCertificate,
+  SslIssuerPeerCertificate,
+  SslSubjectLocalCertificate,
+  SslTlsVersion,
+  SslCiphersuiteString,
+  SslSessionId,
+  SslUrlEncodedPemEncodedPeerCertificate,
+  SslUrlEncodedPemEncodedPeerCertificateChain,
+  SslUriSanPeerCertificate,
+  SslUriSanLocalCertificate,
+  SslDnsSansPeerCertificate,
+  SslDnsSansLocalCertificate,
 };
 
 class Filter;
@@ -304,6 +327,7 @@ public:
 
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
+  CAPIStatus getStringsValue(int id, uint64_t* value_data, int* value_len, int* count);
 
   CAPIStatus getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);

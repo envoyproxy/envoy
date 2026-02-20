@@ -277,6 +277,14 @@ CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value) {
   });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringsValue(void* r, int id, uint64_t* value_data, int* value_len,
+                                            int* count) {
+  return envoyGoFilterHandlerWrapper(
+      r, [id, value_data, value_len, count](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        return filter->getStringsValue(id, value_data, value_len, count);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name_data, int name_len,
                                                uint64_t* buf_data, int* buf_len) {
   return envoyGoFilterHandlerWrapper(

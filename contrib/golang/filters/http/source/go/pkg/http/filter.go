@@ -395,8 +395,102 @@ func (s *streamInfo) DrainConnectionUponCompletion() {
 	cAPI.HttpSetDrainConnectionUponCompletion(unsafe.Pointer(s.request))
 }
 
+func (s *streamInfo) DownstreamSslConnection() api.SslConnection {
+	exists, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslConnectionExists)
+	if exists == 0 {
+		return nil
+	}
+	return &sslConnection{request: s.request}
+}
+
 type filterState struct {
 	request *httpRequest
+}
+
+type sslConnection struct {
+	request *httpRequest
+}
+
+func (s *sslConnection) PeerCertificatePresented() bool {
+	presented, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslPeerCertificatePresented)
+	return ok && presented != 0
+}
+
+func (s *sslConnection) PeerCertificateValidated() bool {
+	validated, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslPeerCertificateValidated)
+	return ok && validated != 0
+}
+
+func (s *sslConnection) Sha256PeerCertificateDigest() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSha256PeerCertificateDigest)
+}
+
+func (s *sslConnection) SerialNumberPeerCertificate() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSerialNumberPeerCertificate)
+}
+
+func (s *sslConnection) SubjectPeerCertificate() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSubjectPeerCertificate)
+}
+
+func (s *sslConnection) IssuerPeerCertificate() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslIssuerPeerCertificate)
+}
+
+func (s *sslConnection) SubjectLocalCertificate() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSubjectLocalCertificate)
+}
+
+func (s *sslConnection) UriSanPeerCertificate() ([]string, bool) {
+	return cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslUriSanPeerCertificate)
+}
+
+func (s *sslConnection) UriSanLocalCertificate() ([]string, bool) {
+	return cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslUriSanLocalCertificate)
+}
+
+func (s *sslConnection) DnsSansPeerCertificate() ([]string, bool) {
+	return cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslDnsSansPeerCertificate)
+}
+
+func (s *sslConnection) DnsSansLocalCertificate() ([]string, bool) {
+	return cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslDnsSansLocalCertificate)
+}
+
+func (s *sslConnection) ValidFromPeerCertificate() (uint64, bool) {
+	return cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslValidFromPeerCertificate)
+}
+
+func (s *sslConnection) ExpirationPeerCertificate() (uint64, bool) {
+	return cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslExpirationPeerCertificate)
+}
+
+func (s *sslConnection) TlsVersion() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslTlsVersion)
+	return val
+}
+
+func (s *sslConnection) CiphersuiteString() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslCiphersuiteString)
+}
+
+func (s *sslConnection) CiphersuiteId() (uint16, bool) {
+	// TLS cipher suite IDs are 16-bit values (RFC 5246), narrowing from uint64 is safe.
+	id, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslCiphersuiteId)
+	return uint16(id), ok
+}
+
+func (s *sslConnection) SessionId() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSessionId)
+	return val
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificate() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUrlEncodedPemEncodedPeerCertificate)
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificateChain() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUrlEncodedPemEncodedPeerCertificateChain)
 }
 
 func (s *streamInfo) FilterState() api.FilterState {

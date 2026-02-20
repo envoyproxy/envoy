@@ -164,6 +164,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: golang
+  change: |
+    Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
+    providing access to SSL/TLS connection information for the downstream connection. This includes
+    peer certificate details (subject, issuer, serial number, SANs, validity), TLS version, cipher
+    suite, and PEM-encoded certificates. This achieves feature parity with the Lua filter's
+    ``downstreamSslConnection()`` functionality.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
