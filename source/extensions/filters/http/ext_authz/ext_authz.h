@@ -74,7 +74,10 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
   // Returns true if the ext_authz stream failed open.
   const absl::optional<bool> failedOpen() const { return failed_open_; }
-  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>& requestProcessingEffect() const {return last_processing_effect_;}
+  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>&
+  processingEffect() const {
+    return last_processing_effect_;
+  }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -86,7 +89,10 @@ public:
     upstream_host_ = std::move(upstream_host);
   }
   void setFailedOpen() { failed_open_ = true; }
-  void setLastProcessingEffect(const Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect& effect) {last_processing_effect_ = effect;}
+  void setLastProcessingEffect(
+      const Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect& effect) {
+    last_processing_effect_ = effect;
+  }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
   void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
 
@@ -113,8 +119,9 @@ public:
 private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
-  // The last processing effect applied to the request.
-  absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect> last_processing_effect_;
+  // The last processing effect applied by the ext_authz filter.
+  absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>
+      last_processing_effect_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;
