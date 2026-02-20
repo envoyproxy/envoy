@@ -41,6 +41,7 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/load_stats_reporter.h"
 #include "test/mocks/upstream/od_cds_api.h"
 #include "test/mocks/upstream/od_cds_api_handle.h"
 #include "test/mocks/upstream/priority_set.h"

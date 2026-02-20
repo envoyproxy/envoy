@@ -1213,7 +1213,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 #endif
 
-  // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
+  // Both LoadStatsReporter interface implementations and per_endpoint_stats need to `latch()` the
+  // counters, so if both are
   // configured they will interfere with each other and both get incorrect values.
   // TODO(ggreenway): Verify that bypassing virtual dispatch here was intentional
   if (ClusterInfoImpl::perEndpointStatsEnabled() &&
