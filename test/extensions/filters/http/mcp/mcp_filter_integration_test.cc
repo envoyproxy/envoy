@@ -493,8 +493,8 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
     name: envoy.filters.http.mcp
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-      extract_trace_context: true
-      extract_baggage: true
+      propagate_trace_context: {}
+      propagate_baggage: {}
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -548,8 +548,6 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersDisabled) {
     name: envoy.filters.http.mcp
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-      extract_trace_context: false
-      extract_baggage: false
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -592,8 +590,8 @@ TEST_P(McpFilterIntegrationTest, InvalidTracingHeadersNotInjected) {
     name: envoy.filters.http.mcp
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-      extract_trace_context: true
-      extract_baggage: true
+      propagate_trace_context: {}
+      propagate_baggage: {}
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

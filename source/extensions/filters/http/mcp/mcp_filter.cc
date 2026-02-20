@@ -46,8 +46,10 @@ McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-                        Http::RequestHeaderMap& headers) {
+void injectTraceContext(
+    const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+    const envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig& config,
+    Http::RequestHeaderMap& headers) {
   const auto& tp_it = meta_fields.find("traceparent");
   if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
     return;
@@ -58,20 +60,21 @@ void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_
     return;
   }
 
-  headers.remove(Http::LowerCaseString("traceparent"));
-  headers.remove(Http::LowerCaseString("tracestate"));
-  headers.remove(Http::LowerCaseString("baggage"));
-
-  headers.addCopy(Http::LowerCaseString("traceparent"), tp);
-
-  const auto& ts_it = meta_fields.find("tracestate");
-  if (ts_it == meta_fields.end() || ts_it->second.kind_case() != Protobuf::Value::kStringValue) {
-    return;
+  // Clear traceparent and tracestate if configured. Default is true if not set.
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, clear_trace_ctx_headers_on_valid_meta_traceparent,
+                                      true)) {
+    headers.remove(Http::LowerCaseString("traceparent"));
+    headers.remove(Http::LowerCaseString("tracestate"));
   }
 
-  const std::string& ts = ts_it->second.string_value();
-  if (Envoy::Tracing::isValidTraceState(ts)) {
-    headers.addCopy(Http::LowerCaseString("tracestate"), ts);
+  headers.setCopy(Http::LowerCaseString("traceparent"), tp);
+
+  const auto& ts_it = meta_fields.find("tracestate");
+  if (ts_it != meta_fields.end() && ts_it->second.kind_case() == Protobuf::Value::kStringValue) {
+    const std::string& ts = ts_it->second.string_value();
+    if (Envoy::Tracing::isValidTraceState(ts)) {
+      headers.setCopy(Http::LowerCaseString("tracestate"), ts);
+    }
   }
 }
 
@@ -84,7 +87,7 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
 
   const std::string& bg = bg_it->second.string_value();
   if (Envoy::Tracing::isValidBaggage(bg)) {
-    headers.addCopy(Http::LowerCaseString("baggage"), bg);
+    headers.setCopy(Http::LowerCaseString("baggage"), bg);
   }
 }
 } // namespace
@@ -93,8 +96,12 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  const std::string& stats_prefix, Stats::Scope& scope)
     : traffic_mode_(proto_config.traffic_mode()),
       clear_route_cache_(proto_config.clear_route_cache()),
-      extract_trace_context_(proto_config.extract_trace_context()),
-      extract_baggage_(proto_config.extract_baggage()),
+      propagate_trace_context_(proto_config.has_propagate_trace_context()
+                                   ? absl::make_optional(proto_config.propagate_trace_context())
+                                   : absl::nullopt),
+      propagate_baggage_(proto_config.has_propagate_baggage()
+                             ? absl::make_optional(proto_config.propagate_baggage())
+                             : absl::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
@@ -347,16 +354,16 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   // Handle tracing field extraction and header injection.
-  if (config_->extractTraceContext() || config_->extractBaggage()) {
+  if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
     const Protobuf::Value* meta_value =
         parser_->getNestedValue(std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
     auto headers = decoder_callbacks_->requestHeaders();
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
-      if (config_->extractTraceContext()) {
-        injectTraceContext(meta_fields, *headers);
+      if (config_->propagateTraceContext().has_value()) {
+        injectTraceContext(meta_fields, *config_->propagateTraceContext(), *headers);
       }
-      if (config_->extractBaggage()) {
+      if (config_->propagateBaggage().has_value()) {
         injectBaggage(meta_fields, *headers);
       }
     }

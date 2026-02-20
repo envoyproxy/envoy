@@ -78,14 +78,29 @@ message Mcp {
   // Default is DYNAMIC_METADATA when unspecified.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // If true, extract W3C trace context from params._meta.traceparent and params._meta.tracestate
-  // according to https://www.w3.org/TR/trace-context/ and inject them as headers.
-  // If false, do not extract or inject trace context.
-  bool extract_trace_context = 6;
+  message TraceContextPropagationConfig {
+    // If set to true, the filter will clear the HTTP headers `traceparent` & `tracestate`
+    // if the MCP request body contains a valid traceparent field, as suggested in the spec at
+    // `https://github.com/monahk/modelcontextprotocol/blob/sep-meta-http-header-forwarding/seps/2028-meta-http-header-forwarding.md`
+    // If false, the headers are not cleared and might lead to mixing of original header values and
+    // values extracted from the MCP body.
+    // Df unset, dtrue if not set.
+    google.protobuf.BoolValue clear_trace_ctx_headers_on_valid_meta_traceparent = 1;
+  }
+  // If set, extract and validate W3C trace context from the MCP request body and propagate it in
+  // HTTP headers `traceparent` and `tracestate`. The fields are validated and propagated according
+  // to the spec which can be found at `https://www.w3.org/TR/trace-context/`.
+  // If unset (default), do not extract or inject trace context.
+  TraceContextPropagationConfig propagate_trace_context = 6;
 
-  // Whether to extract W3C baggage from params._meta.baggage and inject it as a header.
-  // If false, do not extract or inject baggage.
-  bool extract_baggage = 7;
+  message BaggagePropagationConfig {}
+  // If set, extract and validate W3C baggage from the MCP request body and copy it to the
+  // HTTP header `baggage`. Validated according to the spec at `https://www.w3.org/TR/baggage/`.
+  // Note that this is independent of trace context extraction. Also note that if this is set, the
+  // downstream request's baggage header will be overwritten if the MCP request body contains a
+  // valid baggage field.
+  // If unset (default), do not extract or inject baggage.
+  BaggagePropagationConfig propagate_baggage = 7;
 }
 
 // Parser configuration with method-specific rules.
