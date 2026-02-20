@@ -3,6 +3,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/common/callback_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/local_certificate_minter.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
@@ -10,19 +11,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "envoy/filesystem/filesystem.h"
-
-#include "openssl/bio.h"
-#include "openssl/base.h"
-#include "openssl/bn.h"
-#include "openssl/ec.h"
-#include "openssl/evp.h"
-#include "openssl/pem.h"
-#include "openssl/rand.h"
-#include "openssl/rsa.h"
-#include "openssl/x509.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -95,169 +84,88 @@ absl::optional<ConfigProto::LocalSigner::HostnameValidation> parseHostnameValida
   return absl::nullopt;
 }
 
-absl::StatusOr<std::string> bioToString(BIO* bio) {
-  BUF_MEM* mem = nullptr;
-  BIO_get_mem_ptr(bio, &mem);
-  if (mem == nullptr || mem->data == nullptr || mem->length == 0) {
-    return absl::InternalError("empty BIO buffer");
-  }
-  return std::string(mem->data, mem->length);
-}
-
-absl::StatusOr<bssl::UniquePtr<EVP_PKEY>> generateRsaKey(uint32_t key_bits) {
-  bssl::UniquePtr<BIGNUM> exponent(BN_new());
-  if (!exponent || BN_set_word(exponent.get(), RSA_F4) != 1) {
-    return absl::InternalError("failed to initialize RSA exponent");
-  }
-  bssl::UniquePtr<RSA> rsa(RSA_new());
-  if (!rsa || RSA_generate_key_ex(rsa.get(), key_bits, exponent.get(), nullptr) != 1) {
-    return absl::InternalError("failed to generate RSA key");
-  }
-  bssl::UniquePtr<EVP_PKEY> pkey(EVP_PKEY_new());
-  if (!pkey || EVP_PKEY_set1_RSA(pkey.get(), rsa.get()) != 1) {
-    return absl::InternalError("failed to wrap RSA key");
-  }
-  return pkey;
-}
-
-absl::StatusOr<bssl::UniquePtr<EVP_PKEY>>
-generateEcdsaKey(ConfigProto::LocalSigner::EcdsaCurve curve) {
-  int nid = NID_X9_62_prime256v1;
-  switch (curve) {
-  case ConfigProto::LocalSigner::ECDSA_CURVE_UNSPECIFIED:
-  case ConfigProto::LocalSigner::ECDSA_CURVE_P256:
-    nid = NID_X9_62_prime256v1;
-    break;
-  case ConfigProto::LocalSigner::ECDSA_CURVE_P384:
-    nid = NID_secp384r1;
-    break;
-  default:
-    return absl::InvalidArgumentError("unsupported ECDSA curve");
-  }
-
-  bssl::UniquePtr<EC_KEY> ec_key(EC_KEY_new_by_curve_name(nid));
-  if (!ec_key || EC_KEY_generate_key(ec_key.get()) != 1) {
-    return absl::InternalError("failed to generate ECDSA key");
-  }
-
-  bssl::UniquePtr<EVP_PKEY> pkey(EVP_PKEY_new());
-  if (!pkey || EVP_PKEY_set1_EC_KEY(pkey.get(), ec_key.get()) != 1) {
-    return absl::InternalError("failed to wrap ECDSA key");
-  }
-  return pkey;
-}
-
-absl::StatusOr<const EVP_MD*>
-digestForSignatureHash(ConfigProto::LocalSigner::SignatureHash signature_hash) {
-  switch (signature_hash) {
-  case ConfigProto::LocalSigner::SIGNATURE_HASH_UNSPECIFIED:
-  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA256:
-    return EVP_sha256();
-  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA384:
-    return EVP_sha384();
-  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA512:
-    return EVP_sha512();
-  default:
-    return absl::InvalidArgumentError("unsupported signature hash");
-  }
-}
-
-absl::StatusOr<bssl::UniquePtr<EVP_PKEY>>
-generateLeafKey(ConfigProto::LocalSigner::KeyType key_type, uint32_t rsa_key_bits,
-                ConfigProto::LocalSigner::EcdsaCurve ecdsa_curve) {
+absl::StatusOr<Ssl::LocalCertificateMinter::KeyType>
+toMinterKeyType(ConfigProto::LocalSigner::KeyType key_type) {
   switch (key_type) {
   case ConfigProto::LocalSigner::KEY_TYPE_UNSPECIFIED:
   case ConfigProto::LocalSigner::KEY_TYPE_RSA:
-    return generateRsaKey(rsa_key_bits);
+    return Ssl::LocalCertificateMinter::KeyType::Rsa;
   case ConfigProto::LocalSigner::KEY_TYPE_ECDSA:
-    return generateEcdsaKey(ecdsa_curve);
+    return Ssl::LocalCertificateMinter::KeyType::Ecdsa;
   default:
     return absl::InvalidArgumentError("unsupported key type");
   }
 }
 
-absl::Status addExtension(X509* cert, X509* issuer, int nid, absl::string_view value) {
-  X509V3_CTX ctx;
-  X509V3_set_ctx(&ctx, issuer, cert, nullptr, nullptr, 0);
-  bssl::UniquePtr<X509_EXTENSION> ext(
-      X509V3_EXT_nconf_nid(nullptr, &ctx, nid, std::string(value).c_str()));
-  if (!ext || X509_add_ext(cert, ext.get(), -1) != 1) {
-    return absl::InternalError("failed to add X509 extension");
+absl::StatusOr<Ssl::LocalCertificateMinter::EcdsaCurve>
+toMinterEcdsaCurve(ConfigProto::LocalSigner::EcdsaCurve curve) {
+  switch (curve) {
+  case ConfigProto::LocalSigner::ECDSA_CURVE_UNSPECIFIED:
+  case ConfigProto::LocalSigner::ECDSA_CURVE_P256:
+    return Ssl::LocalCertificateMinter::EcdsaCurve::P256;
+  case ConfigProto::LocalSigner::ECDSA_CURVE_P384:
+    return Ssl::LocalCertificateMinter::EcdsaCurve::P384;
+  default:
+    return absl::InvalidArgumentError("unsupported ECDSA curve");
   }
-  return absl::OkStatus();
 }
 
-absl::Status addDnsSans(X509* cert, X509* issuer, const std::vector<std::string>& dns_names) {
-  if (dns_names.empty()) {
-    return absl::OkStatus();
+absl::StatusOr<Ssl::LocalCertificateMinter::SignatureHash>
+toMinterSignatureHash(ConfigProto::LocalSigner::SignatureHash signature_hash) {
+  switch (signature_hash) {
+  case ConfigProto::LocalSigner::SIGNATURE_HASH_UNSPECIFIED:
+  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA256:
+    return Ssl::LocalCertificateMinter::SignatureHash::Sha256;
+  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA384:
+    return Ssl::LocalCertificateMinter::SignatureHash::Sha384;
+  case ConfigProto::LocalSigner::SIGNATURE_HASH_SHA512:
+    return Ssl::LocalCertificateMinter::SignatureHash::Sha512;
+  default:
+    return absl::InvalidArgumentError("unsupported signature hash");
   }
-  std::vector<std::string> san_entries;
-  san_entries.reserve(dns_names.size());
-  for (const auto& name : dns_names) {
-    if (!name.empty()) {
-      san_entries.push_back(absl::StrCat("DNS:", name));
-    }
-  }
-  if (san_entries.empty()) {
-    return absl::OkStatus();
-  }
-  return addExtension(cert, issuer, NID_subject_alt_name, absl::StrJoin(san_entries, ","));
 }
 
-absl::Status addSubjectNameEntry(X509_NAME* subject, const char* field, absl::string_view value) {
-  if (value.empty()) {
-    return absl::OkStatus();
-  }
-  if (!subject ||
-      X509_NAME_add_entry_by_txt(subject, field, MBSTRING_ASC,
-                                 reinterpret_cast<const unsigned char*>(std::string(value).c_str()),
-                                 -1, -1, 0) != 1) {
-    return absl::InternalError("failed to set subject attribute");
-  }
-  return absl::OkStatus();
-}
-
-absl::StatusOr<absl::optional<std::string>>
-keyUsageToken(ConfigProto::LocalSigner::KeyUsage usage) {
+absl::StatusOr<Ssl::LocalCertificateMinter::KeyUsage>
+toMinterKeyUsage(ConfigProto::LocalSigner::KeyUsage usage) {
   switch (usage) {
-  case ConfigProto::LocalSigner::KEY_USAGE_UNSPECIFIED:
-    return absl::nullopt;
   case ConfigProto::LocalSigner::KEY_USAGE_DIGITAL_SIGNATURE:
-    return std::string("digitalSignature");
+    return Ssl::LocalCertificateMinter::KeyUsage::DigitalSignature;
   case ConfigProto::LocalSigner::KEY_USAGE_CONTENT_COMMITMENT:
-    return std::string("nonRepudiation");
+    return Ssl::LocalCertificateMinter::KeyUsage::ContentCommitment;
   case ConfigProto::LocalSigner::KEY_USAGE_KEY_ENCIPHERMENT:
-    return std::string("keyEncipherment");
+    return Ssl::LocalCertificateMinter::KeyUsage::KeyEncipherment;
   case ConfigProto::LocalSigner::KEY_USAGE_DATA_ENCIPHERMENT:
-    return std::string("dataEncipherment");
+    return Ssl::LocalCertificateMinter::KeyUsage::DataEncipherment;
   case ConfigProto::LocalSigner::KEY_USAGE_KEY_AGREEMENT:
-    return std::string("keyAgreement");
+    return Ssl::LocalCertificateMinter::KeyUsage::KeyAgreement;
   case ConfigProto::LocalSigner::KEY_USAGE_KEY_CERT_SIGN:
-    return std::string("keyCertSign");
+    return Ssl::LocalCertificateMinter::KeyUsage::KeyCertSign;
   case ConfigProto::LocalSigner::KEY_USAGE_CRL_SIGN:
-    return std::string("cRLSign");
+    return Ssl::LocalCertificateMinter::KeyUsage::CrlSign;
+  case ConfigProto::LocalSigner::KEY_USAGE_UNSPECIFIED:
+    return absl::InvalidArgumentError("unspecified key usage is not supported");
   default:
     return absl::InvalidArgumentError("unsupported key usage");
   }
 }
 
-absl::StatusOr<absl::optional<std::string>>
-extendedKeyUsageToken(ConfigProto::LocalSigner::ExtendedKeyUsage usage) {
+absl::StatusOr<Ssl::LocalCertificateMinter::ExtendedKeyUsage>
+toMinterExtendedKeyUsage(ConfigProto::LocalSigner::ExtendedKeyUsage usage) {
   switch (usage) {
-  case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_UNSPECIFIED:
-    return absl::nullopt;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_SERVER_AUTH:
-    return std::string("serverAuth");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::ServerAuth;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_CLIENT_AUTH:
-    return std::string("clientAuth");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::ClientAuth;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_CODE_SIGNING:
-    return std::string("codeSigning");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::CodeSigning;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_EMAIL_PROTECTION:
-    return std::string("emailProtection");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::EmailProtection;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_TIME_STAMPING:
-    return std::string("timeStamping");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::TimeStamping;
   case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_OCSP_SIGNING:
-    return std::string("OCSPSigning");
+    return Ssl::LocalCertificateMinter::ExtendedKeyUsage::OcspSigning;
+  case ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_UNSPECIFIED:
+    return absl::InvalidArgumentError("unspecified extended key usage is not supported");
   default:
     return absl::InvalidArgumentError("unsupported extended key usage");
   }
@@ -281,123 +189,6 @@ toExtendedKeyUsageVector(const Protobuf::RepeatedField<int>& values) {
     out.push_back(static_cast<ConfigProto::LocalSigner::ExtendedKeyUsage>(value));
   }
   return out;
-}
-
-absl::StatusOr<int64_t> randomPositiveSerial() {
-  uint64_t raw = 0;
-  if (RAND_bytes(reinterpret_cast<uint8_t*>(&raw), sizeof(raw)) != 1) {
-    return absl::InternalError("failed to generate serial");
-  }
-  raw = raw & 0x7fffffffULL;
-  if (raw == 0) {
-    raw = 1;
-  }
-  return static_cast<int64_t>(raw);
-}
-
-absl::StatusOr<std::pair<std::string, std::string>>
-mintLeafCertificatePem(X509* ca_cert, EVP_PKEY* ca_key, absl::string_view host_name,
-                       absl::string_view subject_org, uint32_t ttl_days,
-                       ConfigProto::LocalSigner::KeyType key_type, uint32_t rsa_key_bits,
-                       ConfigProto::LocalSigner::EcdsaCurve ecdsa_curve,
-                       ConfigProto::LocalSigner::SignatureHash signature_hash,
-                       uint32_t not_before_backdate_seconds, absl::string_view subject_common_name,
-                       absl::string_view subject_organizational_unit,
-                       absl::string_view subject_country,
-                       absl::string_view subject_state_or_province,
-                       absl::string_view subject_locality,
-                       const std::vector<std::string>& dns_sans,
-                       const std::vector<ConfigProto::LocalSigner::KeyUsage>& key_usages,
-                       const std::vector<ConfigProto::LocalSigner::ExtendedKeyUsage>&
-                           extended_key_usages,
-                       const absl::optional<bool>& basic_constraints_ca) {
-  auto leaf_key_or = generateLeafKey(key_type, rsa_key_bits, ecdsa_curve);
-  RETURN_IF_NOT_OK(leaf_key_or.status());
-  bssl::UniquePtr<EVP_PKEY> leaf_key = std::move(leaf_key_or.value());
-
-  bssl::UniquePtr<X509> cert(X509_new());
-  if (!cert || X509_set_version(cert.get(), 2) != 1) {
-    return absl::InternalError("failed to initialize leaf certificate");
-  }
-  auto serial_or = randomPositiveSerial();
-  RETURN_IF_NOT_OK(serial_or.status());
-  if (ASN1_INTEGER_set(X509_get_serialNumber(cert.get()), serial_or.value()) != 1) {
-    return absl::InternalError("failed to set leaf serial");
-  }
-  if (X509_gmtime_adj(X509_getm_notBefore(cert.get()),
-                      -static_cast<int64_t>(not_before_backdate_seconds)) == nullptr ||
-      X509_gmtime_adj(X509_getm_notAfter(cert.get()),
-                      static_cast<int64_t>(ttl_days) * 24 * 60 * 60) == nullptr) {
-    return absl::InternalError("failed to set certificate validity");
-  }
-  if (X509_set_issuer_name(cert.get(), X509_get_subject_name(ca_cert)) != 1 ||
-      X509_set_pubkey(cert.get(), leaf_key.get()) != 1) {
-    return absl::InternalError("failed to set issuer/public key");
-  }
-
-  X509_NAME* subject = X509_get_subject_name(cert.get());
-  const auto cn = subject_common_name.empty() ? std::string(host_name) : std::string(subject_common_name);
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "CN", cn));
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "O", subject_org));
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "OU", subject_organizational_unit));
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "C", subject_country));
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "ST", subject_state_or_province));
-  RETURN_IF_NOT_OK(addSubjectNameEntry(subject, "L", subject_locality));
-
-  RETURN_IF_NOT_OK(addDnsSans(cert.get(), ca_cert, dns_sans));
-  if (!key_usages.empty()) {
-    std::vector<std::string> key_usage_tokens;
-    key_usage_tokens.reserve(key_usages.size());
-    for (const auto usage : key_usages) {
-      auto token_or = keyUsageToken(usage);
-      RETURN_IF_NOT_OK(token_or.status());
-      if (token_or.value().has_value()) {
-        key_usage_tokens.push_back(token_or.value().value());
-      }
-    }
-    if (!key_usage_tokens.empty()) {
-      RETURN_IF_NOT_OK(addExtension(cert.get(), ca_cert, NID_key_usage,
-                                    absl::StrCat("critical,", absl::StrJoin(key_usage_tokens, ","))));
-    }
-  }
-  if (!extended_key_usages.empty()) {
-    std::vector<std::string> eku_tokens;
-    eku_tokens.reserve(extended_key_usages.size());
-    for (const auto usage : extended_key_usages) {
-      auto token_or = extendedKeyUsageToken(usage);
-      RETURN_IF_NOT_OK(token_or.status());
-      if (token_or.value().has_value()) {
-        eku_tokens.push_back(token_or.value().value());
-      }
-    }
-    if (!eku_tokens.empty()) {
-      RETURN_IF_NOT_OK(
-          addExtension(cert.get(), ca_cert, NID_ext_key_usage, absl::StrJoin(eku_tokens, ",")));
-    }
-  }
-  if (basic_constraints_ca.has_value()) {
-    RETURN_IF_NOT_OK(addExtension(cert.get(), ca_cert, NID_basic_constraints,
-                                  basic_constraints_ca.value() ? "critical,CA:TRUE"
-                                                               : "critical,CA:FALSE"));
-  }
-  auto digest_or = digestForSignatureHash(signature_hash);
-  RETURN_IF_NOT_OK(digest_or.status());
-  if (X509_sign(cert.get(), ca_key, digest_or.value()) <= 0) {
-    return absl::InternalError("failed to sign leaf certificate");
-  }
-
-  bssl::UniquePtr<BIO> cert_bio(BIO_new(BIO_s_mem()));
-  bssl::UniquePtr<BIO> key_bio(BIO_new(BIO_s_mem()));
-  if (!cert_bio || !key_bio || PEM_write_bio_X509(cert_bio.get(), cert.get()) != 1 ||
-      PEM_write_bio_PrivateKey(key_bio.get(), leaf_key.get(), nullptr, nullptr, 0, nullptr,
-                               nullptr) != 1) {
-    return absl::InternalError("failed to write leaf certificate/key PEM");
-  }
-  auto cert_pem_or = bioToString(cert_bio.get());
-  RETURN_IF_NOT_OK(cert_pem_or.status());
-  auto key_pem_or = bioToString(key_bio.get());
-  RETURN_IF_NOT_OK(key_pem_or.status());
-  return std::make_pair(std::move(cert_pem_or.value()), std::move(key_pem_or.value()));
 }
 
 struct LocalSignerOptions {
@@ -432,8 +223,12 @@ class LocalSignerCertificateProvider
 public:
   LocalSignerCertificateProvider(std::string secret_name,
                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                 const LocalSignerOptions& options)
-      : secret_name_(std::move(secret_name)), factory_context_(factory_context), options_(options) {}
+                                 const LocalSignerOptions& options,
+                                 Ssl::LocalCertificateMinterSharedPtr minter)
+      : secret_name_(std::move(secret_name)), factory_context_(factory_context), options_(options),
+        minter_(std::move(minter)) {
+    ASSERT(minter_ != nullptr);
+  }
 
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
     return tls_certificate_.get();
@@ -558,26 +353,9 @@ private:
       return ca_key_pem_or.status();
     }
 
-    bssl::UniquePtr<BIO> ca_cert_bio(
-        BIO_new_mem_buf(ca_cert_pem_or.value().data(), ca_cert_pem_or.value().size()));
-    bssl::UniquePtr<BIO> ca_key_bio(
-        BIO_new_mem_buf(ca_key_pem_or.value().data(), ca_key_pem_or.value().size()));
-    if (!ca_cert_bio || !ca_key_bio) {
-      if (ca_material_.loaded_ &&
-          options_.ca_reload_failure_policy ==
-              ConfigProto::LocalSigner::CA_RELOAD_FAILURE_POLICY_FAIL_OPEN) {
-        ENVOY_LOG_EVERY_POW_2(
-            warn,
-            "failed to allocate CA BIO during local signer reload, keeping prior CA (fail-open)");
-        return absl::OkStatus();
-      }
-      return absl::InternalError("failed to allocate CA BIO");
-    }
-
-    bssl::UniquePtr<X509> ca_cert(PEM_read_bio_X509(ca_cert_bio.get(), nullptr, nullptr, nullptr));
-    bssl::UniquePtr<EVP_PKEY> ca_key(
-        PEM_read_bio_PrivateKey(ca_key_bio.get(), nullptr, nullptr, nullptr));
-    if (!ca_cert || !ca_key) {
+    const auto ca_validation_status =
+        minter_->validateCaMaterial(ca_cert_pem_or.value(), ca_key_pem_or.value());
+    if (!ca_validation_status.ok()) {
       if (ca_material_.loaded_ &&
           options_.ca_reload_failure_policy ==
               ConfigProto::LocalSigner::CA_RELOAD_FAILURE_POLICY_FAIL_OPEN) {
@@ -586,11 +364,11 @@ private:
             "failed to parse CA PEM during local signer reload, keeping prior CA (fail-open)");
         return absl::OkStatus();
       }
-      return absl::InvalidArgumentError("failed to parse CA cert/key PEM");
+      return ca_validation_status;
     }
 
-    ca_material_.cert_ = std::move(ca_cert);
-    ca_material_.key_ = std::move(ca_key);
+    ca_material_.cert_pem_ = std::move(ca_cert_pem_or.value());
+    ca_material_.key_pem_ = std::move(ca_key_pem_or.value());
     ca_material_.cert_last_modified_ = cert_stat.return_value_.time_last_modified_;
     ca_material_.key_last_modified_ = key_stat.return_value_.time_last_modified_;
     ca_material_.loaded_ = true;
@@ -672,19 +450,62 @@ private:
     dns_sans.insert(dns_sans.end(), options_.additional_dns_sans.begin(),
                     options_.additional_dns_sans.end());
 
-    auto leaf_pems_or = mintLeafCertificatePem(
-        ca_material_.cert_.get(), ca_material_.key_.get(), *hostname_or, options_.subject_organization,
-        effective_cert_ttl_days, effective_key_type, effective_rsa_key_bits, effective_ecdsa_curve,
-        effective_signature_hash, effective_not_before_backdate_seconds, options_.subject_common_name,
-        options_.subject_organizational_unit, options_.subject_country,
-        options_.subject_state_or_province, options_.subject_locality, dns_sans,
-        options_.key_usages, options_.extended_key_usages, options_.basic_constraints_ca);
-    RETURN_IF_NOT_OK(leaf_pems_or.status());
+    std::vector<Ssl::LocalCertificateMinter::KeyUsage> minter_key_usages;
+    minter_key_usages.reserve(options_.key_usages.size());
+    for (const auto usage : options_.key_usages) {
+      if (usage == ConfigProto::LocalSigner::KEY_USAGE_UNSPECIFIED) {
+        continue;
+      }
+      auto mapped_or = toMinterKeyUsage(usage);
+      RETURN_IF_NOT_OK(mapped_or.status());
+      minter_key_usages.push_back(mapped_or.value());
+    }
+
+    std::vector<Ssl::LocalCertificateMinter::ExtendedKeyUsage> minter_extended_key_usages;
+    minter_extended_key_usages.reserve(options_.extended_key_usages.size());
+    for (const auto usage : options_.extended_key_usages) {
+      if (usage == ConfigProto::LocalSigner::EXTENDED_KEY_USAGE_UNSPECIFIED) {
+        continue;
+      }
+      auto mapped_or = toMinterExtendedKeyUsage(usage);
+      RETURN_IF_NOT_OK(mapped_or.status());
+      minter_extended_key_usages.push_back(mapped_or.value());
+    }
+
+    auto key_type_or = toMinterKeyType(effective_key_type);
+    RETURN_IF_NOT_OK(key_type_or.status());
+    auto ecdsa_curve_or = toMinterEcdsaCurve(effective_ecdsa_curve);
+    RETURN_IF_NOT_OK(ecdsa_curve_or.status());
+    auto signature_hash_or = toMinterSignatureHash(effective_signature_hash);
+    RETURN_IF_NOT_OK(signature_hash_or.status());
+
+    Ssl::LocalCertificateMinter::MintRequest mint_request;
+    mint_request.ca_cert_pem = ca_material_.cert_pem_;
+    mint_request.ca_key_pem = ca_material_.key_pem_;
+    mint_request.host_name = *hostname_or;
+    mint_request.subject_organization = options_.subject_organization;
+    mint_request.ttl_days = effective_cert_ttl_days;
+    mint_request.key_type = key_type_or.value();
+    mint_request.rsa_key_bits = effective_rsa_key_bits;
+    mint_request.ecdsa_curve = ecdsa_curve_or.value();
+    mint_request.signature_hash = signature_hash_or.value();
+    mint_request.not_before_backdate_seconds = effective_not_before_backdate_seconds;
+    mint_request.subject_common_name = options_.subject_common_name;
+    mint_request.subject_organizational_unit = options_.subject_organizational_unit;
+    mint_request.subject_country = options_.subject_country;
+    mint_request.subject_state_or_province = options_.subject_state_or_province;
+    mint_request.subject_locality = options_.subject_locality;
+    mint_request.dns_sans = std::move(dns_sans);
+    mint_request.key_usages = std::move(minter_key_usages);
+    mint_request.extended_key_usages = std::move(minter_extended_key_usages);
+    mint_request.basic_constraints_ca = options_.basic_constraints_ca;
+    auto minted_or = minter_->mint(mint_request);
+    RETURN_IF_NOT_OK(minted_or.status());
 
     auto tls_certificate =
         std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
-    tls_certificate->mutable_certificate_chain()->set_inline_bytes(leaf_pems_or->first);
-    tls_certificate->mutable_private_key()->set_inline_bytes(leaf_pems_or->second);
+    tls_certificate->mutable_certificate_chain()->set_inline_bytes(minted_or->certificate_pem);
+    tls_certificate->mutable_private_key()->set_inline_bytes(minted_or->private_key_pem);
 
     tls_certificate_ = std::move(tls_certificate);
     RETURN_IF_NOT_OK(update_callback_manager_.runCallbacks());
@@ -692,8 +513,8 @@ private:
   }
 
   struct LocalCaMaterial {
-    bssl::UniquePtr<X509> cert_;
-    bssl::UniquePtr<EVP_PKEY> key_;
+    std::string cert_pem_;
+    std::string key_pem_;
     absl::optional<SystemTime> cert_last_modified_;
     absl::optional<SystemTime> key_last_modified_;
     bool loaded_{false};
@@ -702,6 +523,7 @@ private:
   const std::string secret_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const LocalSignerOptions options_;
+  const Ssl::LocalCertificateMinterSharedPtr minter_;
   LocalCaMaterial ca_material_;
   Secret::TlsCertificatePtr tls_certificate_;
   Common::CallbackManager<absl::Status,
@@ -733,7 +555,9 @@ public:
       providers_.erase(it);
     }
     auto provider =
-        std::make_shared<LocalSignerCertificateProvider>(std::string(secret_name), factory_context, options);
+        std::make_shared<LocalSignerCertificateProvider>(std::string(secret_name), factory_context,
+                                                         options,
+                                                         Ssl::getDefaultLocalCertificateMinter());
     RETURN_IF_NOT_OK(provider->ensureReady());
     providers_[cache_key] = provider;
     return provider;

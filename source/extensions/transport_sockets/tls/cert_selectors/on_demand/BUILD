@@ -20,6 +20,7 @@ envoy_cc_extension(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/config:utility_lib",
+        "//source/common/ssl:local_certificate_minter_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_lib",

@@ -265,6 +265,7 @@ envoy_cmake(
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_MBEDTLS": "on",
         "EVENT__DISABLE_REGRESS": "on",
