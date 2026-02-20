@@ -249,7 +249,7 @@ void IpTaggingFilterConfig::addTagsReloadCb() {
     auto weak_self = weak_from_this();
     tags_reload_callback_handle_ =
         provider_->addTagsReloadCb([weak_self](const std::vector<std::string> tags) {
-          if (auto filter_config = weak_self.lock()) {
+          if (auto filter_config = weak_self.lock(); filter_config != nullptr) {
             filter_config->initializeTagStats(tags);
           }
         });
