@@ -315,6 +315,13 @@ public:
   // Called when an upstream is ready to serve early data streams.
   void onUpstreamReadyForEarlyData(ActiveClient& client);
 
+  struct EndpointLimitOptions {
+    uint32_t max_concurrent_streams{0};
+    uint32_t max_requests_per_connection{0};
+  };
+
+  const EndpointLimitOptions& endpointLimits() { return endpoint_limits_; }
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) {}
@@ -419,6 +426,8 @@ private:
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
   Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
+
+  EndpointLimitOptions endpoint_limits_;
 };
 
 } // namespace ConnectionPool

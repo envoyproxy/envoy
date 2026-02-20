@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -220,4 +221,41 @@ message HttpProtocolOptions {
   //   Cluster-level retry policy will override route-level retry policy entirely. Policies are
   //   not merged.
   config.route.v3.RetryPolicy retry_policy = 11;
+}
+
+// Aggregates endpoint-specific protocol options. Each item has
+// a "metadata match" field that allows for specific endpoints to
+// pick up a particular configuration.
+message EndpointSpecificHttpProtocolOptions {
+  // Defines endpoint-specific HTTP protocol options. These options
+  // are only applied to endpoints for each their metadata match the
+  // ``endpoint_metadata_match`` field. Otherwise the endpoint will
+  // pick the cluster's protocol options.
+  message EndpointSpecificOptions {
+    // Endpoint-specific HTTP/2 protocol options.
+    config.core.v3.Http2ProtocolOptions http2_protocol_options = 1;
+
+    // Endpoint-specific HTTP protocol options.
+    config.core.v3.HttpProtocolOptions http_protocol_options = 2;
+
+    // Defines metadata matcher that will be used to match against the endpoints
+    // these configurations should be applied to.
+    //
+    // Example:
+    //
+    // .. code::
+    //
+    //      endpoint_metadata_match:
+    //        filter: endpoint_specific_protocol_options
+    //        path:
+    //        - key: type
+    //        value:
+    //          string_match:
+    //            exact: "high_throughput"
+    //
+    type.matcher.v3.MetadataMatcher endpoint_metadata_match = 3
+        [(validate.rules).message = {required: true}];
+  }
+
+  repeated EndpointSpecificOptions endpoint_specific_options = 1;
 }

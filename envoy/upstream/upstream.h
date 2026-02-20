@@ -1040,6 +1040,12 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
+   * @return const HttpProtocolOptionsConfig& HTTP protocol options for an specific host
+   * in this cluster.
+   */
+  virtual const HttpProtocolOptionsConfig& httpProtocolOptions(HostDescriptionConstSharedPtr host) const PURE;
+
+  /**
    * @return const HttpProtocolOptionsConfig& HTTP protocol options for this cluster.
    */
   virtual const HttpProtocolOptionsConfig& httpProtocolOptions() const PURE;
@@ -1113,6 +1119,14 @@ public:
    *         tolerate imbalance. 0 indicates no maximum.
    */
   virtual uint32_t maxRequestsPerConnection() const PURE;
+
+  /**
+   * @return uint32_t the maximum number of outbound requests for a specific host, taking into
+   *         account any endpoint-specific protocol options. Falls back to cluster-level config
+   *         if no host-specific override exists.
+   * @param host the host to get the max requests for.
+   */
+  virtual uint32_t maxRequestsPerConnection(HostDescriptionConstSharedPtr host) const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a

@@ -31,3 +31,19 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_extension(
+    name = "ep_specific_config",
+    srcs = ["ep_specific_config.cc"],
+    hdrs = ["ep_specific_config.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:matchers_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
