@@ -79,12 +79,13 @@ message Mcp {
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
   message TraceContextPropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
     // If set to true, the filter will clear the HTTP headers `traceparent` & `tracestate`
     // if the MCP request body contains a valid traceparent field, as suggested in the spec at
     // `https://github.com/monahk/modelcontextprotocol/blob/sep-meta-http-header-forwarding/seps/2028-meta-http-header-forwarding.md`
     // If false, the headers are not cleared and might lead to mixing of original header values and
     // values extracted from the MCP body.
-    // Df unset, dtrue if not set.
+    // If unset, default to true.
     google.protobuf.BoolValue clear_trace_ctx_headers_on_valid_meta_traceparent = 1;
   }
   // If set, extract and validate W3C trace context from the MCP request body and propagate it in
@@ -93,7 +94,9 @@ message Mcp {
   // If unset (default), do not extract or inject trace context.
   TraceContextPropagationConfig propagate_trace_context = 6;
 
-  message BaggagePropagationConfig {}
+  message BaggagePropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
   // If set, extract and validate W3C baggage from the MCP request body and copy it to the
   // HTTP header `baggage`. Validated according to the spec at `https://www.w3.org/TR/baggage/`.
   // Note that this is independent of trace context extraction. Also note that if this is set, the
