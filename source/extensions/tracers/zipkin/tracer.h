@@ -32,15 +32,17 @@ public:
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
    * @param trace_id_128bit Whether 128bit ids should be used.
    * @param shared_span_context Whether shared span id should be used.
+   * @param timestamp_trace_ids Whether to include timestamp in first 4 bytes of trace IDs.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Random::RandomGenerator& random_generator, const bool trace_id_128bit,
          const bool shared_span_context, TimeSource& time_source,
-         bool split_spans_for_request = false)
+         bool split_spans_for_request = false, bool timestamp_trace_ids = false)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
         shared_span_context_(shared_span_context), time_source_(time_source),
-        split_spans_for_request_(split_spans_for_request) {}
+        split_spans_for_request_(split_spans_for_request),
+        timestamp_trace_ids_(timestamp_trace_ids) {}
 
   /**
    * Sets the trace context option for header injection behavior.
@@ -71,6 +73,15 @@ public:
   void setReporter(ReporterPtr reporter);
 
 private:
+  /**
+   * Generates a 64-bit value with a timestamp in the first 4 bytes if enabled.
+   * Format when enabled: [32-bit epoch seconds][32-bit random]
+   * Otherwise: fully random 64-bit.
+   *
+   * @return uint64_t value with optional timestamp prefix
+   */
+  uint64_t generateTraceId();
+
   const std::string service_name_;
   Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
@@ -80,6 +91,7 @@ private:
   TimeSource& time_source_;
   const bool split_spans_for_request_{};
   TraceContextOption trace_context_option_{envoy::config::trace::v3::ZipkinConfig::USE_B3};
+  const bool timestamp_trace_ids_{};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
