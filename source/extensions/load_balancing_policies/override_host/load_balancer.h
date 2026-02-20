@@ -74,7 +74,9 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
-  const absl::optional<OverrideSource>& selectedEndpointKey() const { return selected_endpoint_key_; }
+  const absl::optional<OverrideSource>& selectedEndpointKey() const {
+    return selected_endpoint_key_;
+  }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
@@ -84,8 +86,8 @@ private:
 
   static absl::StatusOr<std::vector<OverrideSource>> makeOverrideSources(
       const Protobuf::RepeatedPtrField<OverrideHost::OverrideHostSource>& override_sources);
-  static absl::StatusOr<absl::optional<OverrideSource>> makeSelectedEndpointKey(
-      const OverrideHost& config);
+  static absl::StatusOr<absl::optional<OverrideSource>>
+  makeSelectedEndpointKey(const OverrideHost& config);
 
   // Group the factory and config together to make them const in the
   // configuration object.

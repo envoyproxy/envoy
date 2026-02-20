@@ -92,17 +92,19 @@ OverrideHostLbConfig::makeOverrideSources(
 }
 
 absl::StatusOr<absl::optional<OverrideHostLbConfig::OverrideSource>>
-OverrideHostLbConfig::makeSelectedEndpointKey(
-      const OverrideHost& config) {
+OverrideHostLbConfig::makeSelectedEndpointKey(const OverrideHost& config) {
   if (!config.has_selected_endpoint_key()) {
     return absl::nullopt;
   }
-  OverrideHostLbConfig::OverrideSource selected_endpoint_key = OverrideSource::make(config.selected_endpoint_key());
+  OverrideHostLbConfig::OverrideSource selected_endpoint_key =
+      OverrideSource::make(config.selected_endpoint_key());
 
-  if (!selected_endpoint_key.header_name.has_value() && !selected_endpoint_key.metadata_key.has_value()) {
+  if (!selected_endpoint_key.header_name.has_value() &&
+      !selected_endpoint_key.metadata_key.has_value()) {
     return absl::InvalidArgumentError("Empty selected endpoint key");
   }
-  if (selected_endpoint_key.header_name.has_value() && selected_endpoint_key.metadata_key.has_value()) {
+  if (selected_endpoint_key.header_name.has_value() &&
+      selected_endpoint_key.metadata_key.has_value()) {
     return absl::InvalidArgumentError("Only one selected endpoint key must be set");
   }
 
@@ -133,11 +135,9 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
 
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
-      return std::unique_ptr<OverrideHostLbConfig>(
-          new OverrideHostLbConfig(std::move(override_host_sources).value(),
-                                   std::move(selected_endpoint_key).value(),
-                                   factory,
-                                   std::move(fallback_load_balancer_config.value())));
+      return std::unique_ptr<OverrideHostLbConfig>(new OverrideHostLbConfig(
+          std::move(override_host_sources).value(), std::move(selected_endpoint_key).value(),
+          factory, std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
   }
@@ -224,8 +224,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
   return response;
 }
 
-void
-OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
+void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
     LoadBalancerContext* context, HostSelectionResponse& response) {
   if (!config_.selectedEndpointKey().has_value()) {
     return;
@@ -238,13 +237,14 @@ OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
   const std::string selected_endpoint = response.host->address()->asString();
   const auto& selected_endpoint_key = config_.selectedEndpointKey().value();
   if (selected_endpoint_key.metadata_key.has_value()) {
-    ASSERT(selected_endpoint_key.header_name.has_value() != selected_endpoint_key.metadata_key.has_value());
+    ASSERT(selected_endpoint_key.header_name.has_value() !=
+           selected_endpoint_key.metadata_key.has_value());
 
     const Config::MetadataKey& metadata_key = selected_endpoint_key.metadata_key.value();
 
     Protobuf::Struct selected_endpoint_metadata;
-    (*selected_endpoint_metadata.mutable_fields())[metadata_key.path_[0]]
-        .set_string_value(selected_endpoint);
+    (*selected_endpoint_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(
+        selected_endpoint);
 
     // Set the value of the metadata key to be the host:port
     context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, selected_endpoint_metadata);

@@ -47,9 +47,10 @@ public:
     ON_CALL(load_balancer_context_, downstreamHeaders())
         .WillByDefault(Return(&downstream_headers_));
     ON_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
-        .WillByDefault(testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
-        (*metadata_.mutable_filter_metadata())[std::string(name)] = value;
-        }));
+        .WillByDefault(
+            testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
+              (*metadata_.mutable_filter_metadata())[std::string(name)] = value;
+            }));
   }
 
 protected:
@@ -736,12 +737,11 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointStoredInMetadata) {
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
                                     us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY)};
-  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
-      {{host_set->hosts_[0]}});
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
-  createLoadBalancer(makeDefaultConfigWithSelectedEndpointKey(
-      "x-gateway-destination-endpoint-served"));
+  createLoadBalancer(
+      makeDefaultConfigWithSelectedEndpointKey("x-gateway-destination-endpoint-served"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
 
@@ -753,15 +753,15 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointStoredInMetadata) {
   )pb");
   addHeader("x-gateway-destination-endpoint", "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
-    .Times(testing::AtLeast(1));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
   // Expect the address from the metadata to be used.
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
 
   // Expect that the selected endpoint metadata key will contain the selected address.
   const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
-  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(&metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
 
   EXPECT_EQ(metadata_value.string_value(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
 }
