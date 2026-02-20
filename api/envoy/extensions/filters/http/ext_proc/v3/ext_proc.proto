@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -369,6 +369,15 @@ message ExternalProcessor {
   //
   // The default status is ``HTTP 500 Internal Server Error``.
   type.v3.HttpStatus status_on_error = 24;
+
+  // If true, the filter will not remove the ``content-length`` header from the request/response.
+  //
+  // .. warning::
+  //    This is an advanced configuration and should only be used if you are sure that the
+  //    content length matches the body length after external processing.
+  //    Otherwise, it may cause vulnerability issues such as request smuggling.
+  //
+  bool keep_content_length = 26;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
