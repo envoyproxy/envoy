@@ -31,23 +31,26 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   // Call the module's chooseHost function.
-  int64_t host_index = config_->on_choose_host_(this, in_module_lb_, context);
+  uint32_t priority = 0;
+  uint32_t host_index = 0;
+  bool selected = config_->on_choose_host_(this, in_module_lb_, context, &priority, &host_index);
 
-  if (host_index < 0) {
+  if (!selected) {
     return {nullptr};
   }
 
-  // Get the host from the priority set at priority 0.
-  // The module returns an index into the healthy hosts list.
   const auto& host_sets = priority_set_.hostSetsPerPriority();
-  if (host_sets.empty()) {
+  if (priority >= host_sets.size()) {
+    ENVOY_LOG(warn, "dynamic module returned invalid priority {} (priorities: {})", priority,
+              host_sets.size());
     return {nullptr};
   }
 
-  const auto& healthy_hosts = host_sets[0]->healthyHosts();
-  if (static_cast<size_t>(host_index) >= healthy_hosts.size()) {
-    ENVOY_LOG(warn, "dynamic module returned invalid host index {} (healthy hosts: {})", host_index,
-              healthy_hosts.size());
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
+  if (host_index >= healthy_hosts.size()) {
+    ENVOY_LOG(warn,
+              "dynamic module returned invalid host index {} at priority {} (healthy hosts: {})",
+              host_index, priority, healthy_hosts.size());
     return {nullptr};
   }
 

@@ -1675,3 +1675,6 @@ OIDC
 Bredband
 Bevtec
 doublings
+lcalpha
+nblk
+chr

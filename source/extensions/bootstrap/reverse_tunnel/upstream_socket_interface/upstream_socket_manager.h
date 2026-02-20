@@ -118,6 +118,8 @@ public:
    * @param threshold minimum value 1.
    */
   void setMissThreshold(uint32_t threshold) { miss_threshold_ = std::max<uint32_t>(1, threshold); }
+  void setTenantIsolationEnabled(bool enabled) { tenant_isolation_enabled_ = enabled; }
+  bool tenantIsolationEnabled() const { return tenant_isolation_enabled_; }
 
   /**
    * Get the upstream extension for stats integration.
@@ -204,6 +206,8 @@ private:
   // for the node. This is used to rebalance a request to accept reverse
   // connections to a different worker thread.
   absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
+
+  bool tenant_isolation_enabled_{false};
 
   // Global list of all socket managers across threads for rebalancing.
   static std::vector<UpstreamSocketManager*> socket_managers_;
