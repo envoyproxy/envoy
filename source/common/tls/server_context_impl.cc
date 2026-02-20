@@ -248,20 +248,21 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
     for (const auto& ctx : tls_contexts_) {
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
-      X509_NAME* cert_subject = X509_get_subject_name(cert);
+      const X509_NAME* cert_subject = X509_get_subject_name(cert);
       RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
 
       const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
       if (cn_index >= 0) {
-        X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+        const X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
         RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
 
-        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+        const ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
         if (ASN1_STRING_length(cn_asn1) <= 0) {
           return absl::InvalidArgumentError("Invalid TLS context has an empty subject CN");
         }
 
-        rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+        rc =
+            EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(cn_asn1), ASN1_STRING_length(cn_asn1));
         RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
       }
 
@@ -278,13 +279,13 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
             ++san_count;
             break;
           case GEN_DNS:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.dNSName),
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.dNSName),
                                   ASN1_STRING_length(san->d.dNSName));
             RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
             ++san_count;
             break;
           case GEN_URI:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.uniformResourceIdentifier),
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.uniformResourceIdentifier),
                                   ASN1_STRING_length(san->d.uniformResourceIdentifier));
             RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
             ++san_count;
