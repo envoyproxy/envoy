@@ -13,6 +13,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,6 +28,7 @@ constexpr uint32_t kDefaultPerRouteTimeoutMs = 200;
 using MetadataProto = ::envoy::config::core::v3::Metadata;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
+using Extensions::HttpFilters::ExternalProcessing::ProcessingEffect;
 
 void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
@@ -674,6 +676,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // Any changes to request headers or query parameters can affect how the request is going to be
     // routed. If we are changing the headers we also need to clear the route
     // cache.
+    // TODO finish this
+    ProcessingEffect::Effect last_effect = ProcessingEffect::Effect::None;
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||

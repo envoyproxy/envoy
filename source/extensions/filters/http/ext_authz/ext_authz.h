@@ -28,6 +28,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,6 +74,7 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
   // Returns true if the ext_authz stream failed open.
   const absl::optional<bool> failedOpen() const { return failed_open_; }
+  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>& processingEffect() const {return last_processing_effect_;}
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -83,9 +85,10 @@ public:
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
     upstream_host_ = std::move(upstream_host);
   }
+  void setFailedOpen() { failed_open_ = true; }
+  void setLastProcessingEffect(const Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect& effect) {last_processing_effect_ = effect;}
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
   void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
-  void setFailedOpen() { failed_open_ = true; }
 
   bool hasFieldSupport() const override { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType
@@ -110,6 +113,7 @@ public:
 private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
+  absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect> last_processing_effect_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;
