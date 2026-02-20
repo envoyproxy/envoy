@@ -431,5 +431,8 @@ new_features:
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
     standard JSON-REST HTTP requests.
+- area: mcp_router
+  change: |
+    Added SSE response support for MCP ``prompts/list`` fanout aggregation.
 
 deprecated:

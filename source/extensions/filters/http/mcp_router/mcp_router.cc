@@ -966,12 +966,16 @@ void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method
   ENVOY_LOG(debug, "{}: backend='{}', uri='{}' -> '{}', needs_rewrite={}", method_name,
             backend_name, resource_uri_, actual_uri, needs_body_rewrite_);
 
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+  initializeSingleBackend(*backend, [weak_self = weak_from_this()](BackendResponse resp) {
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
     if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
+      self->sendJsonResponse(resp.body, self->encoded_session_id_);
     } else {
-      config_->stats().rq_backend_failure_.inc();
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+      self->config_->stats().rq_backend_failure_.inc();
+      self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
 }
@@ -989,10 +993,15 @@ void McpRouterFilter::handleResourcesUnsubscribe() {
 void McpRouterFilter::handlePromptsList() {
   ENVOY_LOG(debug, "prompts/list: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregatePromptsList(responses);
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "prompts/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregatePromptsList(responses);
     ENVOY_LOG(debug, "prompts/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
   });
 }
 
@@ -1019,12 +1028,16 @@ void McpRouterFilter::handlePromptsGet() {
   ENVOY_LOG(debug, "prompts/get: backend='{}', prompt='{}' -> '{}', needs_rewrite={}", backend_name,
             prompt_name_, actual_prompt, needs_body_rewrite_);
 
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+  initializeSingleBackend(*backend, [weak_self = weak_from_this()](BackendResponse resp) {
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
     if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
+      self->sendJsonResponse(resp.body, self->encoded_session_id_);
     } else {
-      config_->stats().rq_backend_failure_.inc();
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+      self->config_->stats().rq_backend_failure_.inc();
+      self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
 }
@@ -1072,12 +1085,16 @@ void McpRouterFilter::handleCompletionComplete() {
     return;
   }
 
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+  initializeSingleBackend(*backend, [weak_self = weak_from_this()](BackendResponse resp) {
+    auto self = weak_self.lock();
+    if (!self) {
+      return;
+    }
     if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
+      self->sendJsonResponse(resp.body, self->encoded_session_id_);
     } else {
-      config_->stats().rq_backend_failure_.inc();
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+      self->config_->stats().rq_backend_failure_.inc();
+      self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
   });
 }
@@ -1087,7 +1104,12 @@ void McpRouterFilter::handleLoggingSetLevel() {
   // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
   ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "logging/setLevel callback ignored: filter destroyed");
+      return;
+    }
     // Check if at least one backend succeeded.
     bool any_success = false;
     for (const auto& resp : responses) {
@@ -1098,14 +1120,15 @@ void McpRouterFilter::handleLoggingSetLevel() {
     }
 
     if (!any_success) {
-      config_->stats().rq_fanout_failure_.inc();
-      sendHttpError(500, "All backends failed to set logging level");
+      self->config_->stats().rq_fanout_failure_.inc();
+      self->sendHttpError(500, "All backends failed to set logging level");
       return;
     }
 
     // Return empty JSON-RPC result.
-    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
-    sendJsonResponse(response, encoded_session_id_);
+    std::string response =
+        fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", self->request_id_);
+    self->sendJsonResponse(response, self->encoded_session_id_);
   });
 }
 
@@ -1361,9 +1384,10 @@ std::string McpRouterFilter::aggregatePromptsList(const std::vector<BackendRespo
           if (!resp.success) {
             continue;
           }
+          std::string json_body = extractJsonRpcFromResponse(resp);
           ENVOY_LOG(debug, "Aggregating prompts list from backend '{}': {}", resp.backend_name,
-                    resp.body);
-          auto parsed_or = Json::Factory::loadFromString(resp.body);
+                    json_body);
+          auto parsed_or = Json::Factory::loadFromString(json_body);
           if (!parsed_or.ok()) {
             ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
                       parsed_or.status().message());
