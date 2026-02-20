@@ -248,8 +248,8 @@ OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
 
     // Set the value of the metadata key to be the host:port
     context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, selected_endpoint_metadata);
-    // TODO(ericdbishop): Add the selected endpoint to the header if configured to do so.
   }
+  // TODO(ericdbishop): Add the selected endpoint to the header if configured to do so.
 }
 
 absl::optional<absl::string_view>
