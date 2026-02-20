@@ -374,7 +374,9 @@ message ExternalProcessor {
   // It is typically used in
   // :ref:`FULL_DUPLEX_STREAMED <envoy_v3_api_enum_value_extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode.FULL_DUPLEX_STREAMED>`
   // mode.
+  //
   // .. warning::
+  //
   //    This configuration should only be used if you are sure that the content length matches
   //    the body length after external processing. Otherwise, it may cause vulnerability issues such as
   //    request smuggling. Thus, please use your own discretion when enabling this feature.
