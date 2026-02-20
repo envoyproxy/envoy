@@ -227,14 +227,15 @@ public:
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
   bool shouldRemoveContentLength() const {
-    // Always remove the content length in 4 cases below, unless
+    // Always remove the content length in 4 cases below, unless keep_content_length is set to true
+    // in the config:
     // 1) STREAMED BodySendMode
     // 2) BUFFERED_PARTIAL BodySendMode
     // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
     // 4) FULL_DUPLEX_STREAMED BodySendMode
-    // In these modes, ext_proc filter can not guarantee to set the content length correctly if
-    // body is mutated by external processor later.
-    // In http1 codec, removing content length will enable chunked encoding whenever feasible.
+    // In these modes, ext_proc filter can not guarantee to set the content length correctly if body
+    // is mutated by external processor later. In http1 codec, removing content length will enable
+    // chunked encoding whenever feasible.
     if (keep_content_length_) {
       return false;
     }

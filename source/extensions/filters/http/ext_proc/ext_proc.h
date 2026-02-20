@@ -489,25 +489,23 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
   };
 
 public:
- Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
+  Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
         grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
                                                         : envoy::config::core::v3::GrpcService()),
         config_with_hash_key_(grpc_service_),
-        decoding_state_(*this, config->processingMode(),
-                        config->untypedForwardingMetadataNamespaces(),
-                        config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces(),
-                        config->untypedClusterMetadataForwardingNamespaces(),
-                        config->typedClusterMetadataForwardingNamespaces(),
-                        config->keepContentLength()),
-        encoding_state_(*this, config->processingMode(),
-                        config->untypedForwardingMetadataNamespaces(),
-                        config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces(),
-                        config->untypedClusterMetadataForwardingNamespaces(),
-                        config->typedClusterMetadataForwardingNamespaces(),
-                        config->keepContentLength()),
+        decoding_state_(
+            *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
+            config->typedForwardingMetadataNamespaces(),
+            config->untypedReceivingMetadataNamespaces(),
+            config->untypedClusterMetadataForwardingNamespaces(),
+            config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
+        encoding_state_(
+            *this, config->processingMode(), config->untypedForwardingMetadataNamespaces(),
+            config->typedForwardingMetadataNamespaces(),
+            config->untypedReceivingMetadataNamespaces(),
+            config->untypedClusterMetadataForwardingNamespaces(),
+            config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
         failure_mode_allow_(config->failureModeAllow()) {}
