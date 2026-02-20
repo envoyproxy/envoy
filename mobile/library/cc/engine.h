@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 
 #include "absl/strings/string_view.h"
@@ -17,10 +18,15 @@ using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
 
 class Engine : public std::enable_shared_from_this<Engine> {
 public:
+  // Creates a non-owning Engine wrapper around an existing InternalEngine handle.
+  // The returned Engine will not auto-terminate the underlying InternalEngine in its destructor.
+  static std::shared_ptr<Engine> createFromInternalEngineHandle(int64_t internal_engine_handle);
+
   ~Engine();
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
+  int64_t getInternalEngineHandle() const;
   void onDefaultNetworkChangeEvent(int network);
   // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().
   void onDefaultNetworkChanged(int network);
@@ -32,7 +38,7 @@ public:
   Envoy::InternalEngine* engine() { return engine_; }
 
 private:
-  Engine(::Envoy::InternalEngine* engine);
+  Engine(::Envoy::InternalEngine* engine, bool owns_engine = true);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -42,6 +48,7 @@ private:
   friend class ::Envoy::BaseClientIntegrationTest;
 
   Envoy::InternalEngine* engine_;
+  bool owns_engine_;
   StreamClientSharedPtr stream_client_;
 };
 

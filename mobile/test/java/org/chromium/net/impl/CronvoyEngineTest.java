@@ -79,6 +79,16 @@ public class CronvoyEngineTest {
   }
 
   @Test
+  public void getEngineHandle_returnsUnderlyingEnvoyEngineHandle() {
+    long contextHandle = cronvoyEngine.getEngineHandle();
+    long envoyEngineHandle = cronvoyEngine.getEnvoyEngine().getEngineHandle();
+
+    assertThat(contextHandle).isNotEqualTo(0L);
+    assertThat(envoyEngineHandle).isNotEqualTo(0L);
+    assertThat(contextHandle).isEqualTo(envoyEngineHandle);
+  }
+
+  @Test
   public void get_simple() throws Exception {
     mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
     mockWebServer.start();
