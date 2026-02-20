@@ -293,6 +293,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
+      (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
+          .set_bool_value(is_mcp_request_);
       decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
