@@ -397,8 +397,8 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidIndex) {
   auto lb = thread_aware_lb->factory()->create(params);
   ASSERT_NE(lb, nullptr);
 
-  // Module returns ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(0, 9999) which is way beyond the
-  // number of hosts. Should log a warning and return nullptr.
+  // Module returns priority=0, index=9999 which is way beyond the number of hosts. Should log a
+  // warning and return nullptr.
   auto response = lb->chooseHost(nullptr);
   EXPECT_EQ(response.host, nullptr);
 }
@@ -424,8 +424,8 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidPriority) {
   auto lb = thread_aware_lb->factory()->create(params);
   ASSERT_NE(lb, nullptr);
 
-  // Module returns ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(99, 0) which is an invalid priority.
-  // Should log a warning and return nullptr.
+  // Module returns priority=99, index=0 which is an invalid priority. Should log a warning and
+  // return nullptr.
   auto response = lb->chooseHost(nullptr);
   EXPECT_EQ(response.host, nullptr);
 }

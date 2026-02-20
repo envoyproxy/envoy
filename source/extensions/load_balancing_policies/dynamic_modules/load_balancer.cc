@@ -31,15 +31,13 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   // Call the module's chooseHost function.
-  // The return value encodes both priority (upper 32 bits) and host index (lower 32 bits).
-  int64_t result = config_->on_choose_host_(this, in_module_lb_, context);
+  uint32_t priority = 0;
+  uint32_t host_index = 0;
+  bool selected = config_->on_choose_host_(this, in_module_lb_, context, &priority, &host_index);
 
-  if (result < 0) {
+  if (!selected) {
     return {nullptr};
   }
-
-  const uint32_t priority = static_cast<uint32_t>(static_cast<uint64_t>(result) >> 32);
-  const uint32_t host_index = static_cast<uint32_t>(result & 0xFFFFFFFF);
 
   const auto& host_sets = priority_set_.hostSetsPerPriority();
   if (priority >= host_sets.size()) {

@@ -9707,7 +9707,7 @@ pub trait LoadBalancerConfig: Sync {
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
 }
 
-/// Represents the result of a host selection decision, encoding both the priority level
+/// Represents the result of a host selection decision, containing the priority level
 /// and the host index within the healthy hosts at that priority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostSelection {
@@ -9802,15 +9802,21 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
-) -> i64 {
+  result_priority: *mut u32,
+  result_index: *mut u32,
+) -> bool {
   let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
   let lb = {
     let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
     &mut **raw
   };
   match lb.choose_host(&envoy_lb) {
-    Some(selection) => ((selection.priority as u64) << 32 | selection.index as u64) as i64,
-    None => -1,
+    Some(selection) => {
+      *result_priority = selection.priority;
+      *result_index = selection.index;
+      true
+    },
+    None => false,
   }
 }
 

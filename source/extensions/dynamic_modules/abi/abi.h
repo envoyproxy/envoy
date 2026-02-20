@@ -6892,33 +6892,23 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
 
 /**
  * envoy_dynamic_module_on_lb_choose_host is called when a host needs to be selected
- * for an upstream request. The module should return the index of the selected host
- * within the healthy hosts list at the specified priority.
- *
- * The return value encodes both the priority and host index:
- *   - The upper 32 bits contain the priority level.
- *   - The lower 32 bits contain the host index within the healthy hosts at that priority.
- *   - A negative value indicates no host should be selected (no upstream connection).
- *
- * Modules can use the helper macro ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT to encode
- * the priority and index into the return value.
+ * for an upstream request. The module should select a host by writing the priority level
+ * and host index (within the healthy hosts at that priority) into the output parameters.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param lb_module_ptr is the pointer to the in-module load balancer instance.
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext (may be null).
- * @return the encoded priority and host index, or a negative value if no host should be selected.
+ * @param result_priority is the output parameter for the priority level of the selected host.
+ * @param result_index is the output parameter for the index of the selected host within the
+ * healthy hosts at the given priority.
+ * @return true if a host was selected (result_priority and result_index are populated),
+ * false if no host should be selected (which will result in no upstream connection).
  */
-int64_t envoy_dynamic_module_on_lb_choose_host(
+bool envoy_dynamic_module_on_lb_choose_host(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
     envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
-
-/**
- * Helper macro to encode a priority and host index into the return value of
- * envoy_dynamic_module_on_lb_choose_host.
- */
-#define ENVOY_DYNAMIC_MODULE_LB_CHOOSE_HOST_RESULT(priority, index)                                \
-  ((int64_t)(((uint64_t)(uint32_t)(priority) << 32) | (uint64_t)(uint32_t)(index)))
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index);
 
 /**
  * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
