@@ -50,6 +50,7 @@ def envoy_mobile_dependencies(extra_maven_dependencies = []):
 
     swift_dependencies()
     kotlin_dependencies(extra_maven_dependencies)
+    python_dependencies()
 
 def swift_dependencies():
     apple_support_dependencies()
@@ -104,3 +105,6 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     rules_proto_grpc_repos()
     rules_proto_dependencies()
     rules_proto_toolchains()
+
+def python_dependencies():
+    pass
