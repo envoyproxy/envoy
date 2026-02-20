@@ -231,7 +231,7 @@ TEST(OverrideHostLbConfigTest, ValidSelectedEndpointKey) {
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
 
-  auto* metadata_key = config_msg.mutable_selected_endpoint_key()->mutable_metadata();
+  auto* metadata_key = config_msg.mutable_selected_endpoint_key();
   metadata_key->set_key("envoy.lb");
   metadata_key->add_path()->set_key("x-gateway-destination-endpoint-served");
 
@@ -245,33 +245,6 @@ TEST(OverrideHostLbConfigTest, ValidSelectedEndpointKey) {
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
   auto result = factory.loadConfig(context, config_msg);
   EXPECT_TRUE(result.ok());
-}
-
-TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameSelectedEndpointKey) {
-  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
-  ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancers.override_host");
-  OverrideHost config_msg;
-  config_msg.add_override_host_sources()->set_header("x-foo");
-
-  // Set both header and metadata keys.
-  auto* primary_selected_endpoint_key = config_msg.mutable_selected_endpoint_key();
-  primary_selected_endpoint_key->set_header("x-selected-endpoint");
-  auto* metadata_key = primary_selected_endpoint_key->mutable_metadata();
-  metadata_key->set_key("x-bar");
-  metadata_key->add_path()->set_key("a/b/c");
-
-  Config fallback_picker_config;
-  auto* typed_extension_config =
-      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
-  typed_extension_config->set_name("envoy.load_balancers.override_host.test");
-  config.mutable_typed_config()->PackFrom(config_msg);
-
-  auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
-  auto result = factory.loadConfig(context, config_msg);
-  EXPECT_THAT(result, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
-                                               "Only one selected endpoint key must be set"));
 }
 
 } // namespace

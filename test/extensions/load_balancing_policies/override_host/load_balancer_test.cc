@@ -138,7 +138,7 @@ protected:
     host_source->mutable_metadata()->set_key("envoy.lb");
     host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
 
-    auto* metadata_key = config.mutable_selected_endpoint_key()->mutable_metadata();
+    auto* metadata_key = config.mutable_selected_endpoint_key();
     metadata_key->set_key("envoy.lb");
     metadata_key->add_path()->set_key(selected_endpoint_key_name);
 
