@@ -14,10 +14,6 @@
 
 #include <vector>
 
-#include "openssl/base.h"
-#include "openssl/evp.h"
-#include "openssl/x509.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -53,6 +49,10 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
                      OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
+  AsyncContextConfig(absl::string_view cert_name,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     Secret::TlsCertificateConfigProviderSharedPtr cert_provider, UpdateCb update_cb,
+                     RemoveCb remove_cb);
   const absl::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
 
 private:
@@ -217,10 +217,8 @@ public:
                                    bool client_ocsp_capable);
 
 private:
-  absl::StatusOr<Ssl::TlsCertificateConfigImpl> generateLocalCertificate(absl::string_view secret_name);
-  absl::Status updateLocalCertificate(absl::string_view secret_name);
-  absl::Status refreshLocalSignerCa();
-  absl::optional<std::string> secretNameToHostname(absl::string_view secret_name) const;
+  Secret::TlsCertificateConfigProviderSharedPtr
+  createLocalCertificateProvider(absl::string_view secret_name) const;
 
   void doRemoveCertificateConfig(absl::string_view);
   const Stats::ScopeSharedPtr stats_scope_;
@@ -229,6 +227,7 @@ private:
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
   const bool local_signer_enabled_;
+  const std::string local_signer_key_;
   const std::string local_ca_cert_path_;
   const std::string local_ca_key_path_;
   const uint32_t local_cert_ttl_days_;
@@ -251,15 +250,6 @@ private:
   const std::string local_subject_country_;
   const std::string local_subject_state_or_province_;
   const std::string local_subject_locality_;
-
-  struct LocalCaMaterial {
-    bssl::UniquePtr<X509> cert_;
-    bssl::UniquePtr<EVP_PKEY> key_;
-    absl::optional<SystemTime> cert_last_modified_;
-    absl::optional<SystemTime> key_last_modified_;
-    bool loaded_{false};
-  };
-  LocalCaMaterial local_ca_material_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
