@@ -12,7 +12,7 @@ index 9e067aa29e..089a447ec4 100644
  )
  
 diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
-index a3b8923b6e..f4a2ed3f13 100644
+index a3b8923b6e..87c59a932a 100644
 --- a/bazel/grpc_build_system.bzl
 +++ b/bazel/grpc_build_system.bzl
 @@ -27,7 +27,6 @@
@@ -40,6 +40,20 @@ index a3b8923b6e..f4a2ed3f13 100644
              "//conditions:default": [name + "_native"],
          }),
          outs = [name + "_binary"],
+@@ -217,11 +211,13 @@ def grpc_internal_proto_library(
+         srcs = [],
+         deps = [],
+         visibility = None,
++        strip_import_prefix = None,
+         has_services = False):  # buildifier: disable=unused-variable
+     proto_library(
+         name = name,
+         srcs = srcs,
+         deps = deps,
++        strip_import_prefix = strip_import_prefix,
+         visibility = visibility,
+     )
+ 
 diff --git a/include/grpc/event_engine/memory_request.h b/include/grpc/event_engine/memory_request.h
 index 76bcbb2036..ad8cab842e 100644
 --- a/include/grpc/event_engine/memory_request.h
@@ -235,6 +249,19 @@ index 3fb5d68146..583a2f9553 100644
      return PromiseFactoryImpl(RepeatableToken{}, f_);
    }
  };
+diff --git a/src/core/load_balancing/health_check_client.cc b/src/core/load_balancing/health_check_client.cc
+index c84f6d0a48..9f8bee2c53 100644
+--- a/src/core/load_balancing/health_check_client.cc
++++ b/src/core/load_balancing/health_check_client.cc
+@@ -57,7 +57,7 @@
+ #include "src/core/util/ref_counted_ptr.h"
+ #include "src/core/util/sync.h"
+ #include "src/core/util/work_serializer.h"
+-#include "src/proto/grpc/health/v1/health.upb.h"
++#include "grpc/health/v1/health.upb.h"
+ #include "upb/base/string_view.h"
+ #include "upb/mem/arena.hpp"
+ 
 diff --git a/src/core/util/glob.cc b/src/core/util/glob.cc
 index 1b1c16e23d..22e54259f0 100644
 --- a/src/core/util/glob.cc
@@ -248,11 +275,32 @@ index 1b1c16e23d..22e54259f0 100644
  #include "absl/strings/string_view.h"
  
  namespace grpc_core {
+diff --git a/src/cpp/server/health/default_health_check_service.cc b/src/cpp/server/health/default_health_check_service.cc
+index 492ba694c1..1cd2ee17fd 100644
+--- a/src/cpp/server/health/default_health_check_service.cc
++++ b/src/cpp/server/health/default_health_check_service.cc
+@@ -30,7 +30,7 @@
+ 
+ #include "absl/log/log.h"
+ #include "src/core/util/grpc_check.h"
+-#include "src/proto/grpc/health/v1/health.upb.h"
++#include "grpc/health/v1/health.upb.h"
+ #include "upb/base/string_view.h"
+ #include "upb/mem/arena.hpp"
+ 
 diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
-index f6165e0392..374653516a 100644
+index f6165e0392..90e86a5c50 100644
 --- a/src/proto/grpc/health/v1/BUILD
 +++ b/src/proto/grpc/health/v1/BUILD
-@@ -44,3 +44,10 @@ filegroup(
+@@ -24,6 +24,7 @@ grpc_package(
+ grpc_internal_proto_library(
+     name = "health_proto",
+     srcs = ["health.proto"],
++    strip_import_prefix = "/src/proto",
+     has_services = True,
+ )
+ 
+@@ -44,3 +45,10 @@ filegroup(
          "health.proto",
      ],
  )

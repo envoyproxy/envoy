@@ -29,3 +29,133 @@ index 1a41f68..4d95b0d 100644
              executable = True,
              allow_single_file = True,
          ),
+diff --git a/templates/cc/register.go b/templates/cc/register.go
+index e927985..050efda 100644
+--- a/templates/cc/register.go
++++ b/templates/cc/register.go
+@@ -315,7 +315,7 @@ func (fns CCFuncs) inType(f pgs.Field, x interface{}) string {
+ 			return fns.cTypeOfString(fns.Type(f).Value().String())
+ 		}
+ 
+-		return fns.PackageName(fldEn).String() + "::" + fns.Type(f).Value().String()
++		return fns.packageName(fldEn) + "::" + fns.Type(f).Value().String()
+ 	default:
+ 		return fns.cType(f.Type())
+ 	}
+diff --git a/templates/cc/repeated.go b/templates/cc/repeated.go
+index 53b2a35..e7124f6 100644
+--- a/templates/cc/repeated.go
++++ b/templates/cc/repeated.go
+@@ -26,6 +26,9 @@ const repTpl = `
+ 	{{ end }}
+ 
+ 	{{ if $r.GetUnique }}
++	{{ if isRepeatedEnum $f }}
++	std::unordered_set<int> {{ lookup $f "Unique" }};
++	{{ else }}
+ 	// Implement comparison for wrapped reference types
+ 	struct cmp {
+ 		bool operator() (const std::reference_wrapper<{{ $typ }}> lhs, const std::reference_wrapper<{{ $typ }}> rhs) const {
+@@ -44,6 +47,7 @@ const repTpl = `
+ 	// Save a set of references to avoid copying overhead
+ 	std::unordered_set<std::reference_wrapper<{{ $typ }}>, hash, cmp> {{ lookup $f "Unique" }};
+ 	{{ end }}
++	{{ end }}
+ 
+ 	{{ if or $r.GetUnique (ne (.Elem "" "").Typ "none") }}
+ 		for (int i = 0; i < {{ accessor . }}.size(); i++) {
+@@ -51,7 +55,11 @@ const repTpl = `
+ 			(void)item;
+ 
+ 			{{ if $r.GetUnique }}
++				{{ if isRepeatedEnum $f }}
++				auto p = {{ lookup $f "Unique" }}.emplace(item);
++				{{ else }}
+ 				auto p = {{ lookup $f "Unique" }}.emplace(const_cast<{{ $typ }}&>(item));
++				{{ end }}
+ 				if (p.second == false) {
+ 					{{ errIdx . "i" "repeated value must contain unique items" }}
+ 				}
+diff --git a/templates/goshared/register.go b/templates/goshared/register.go
+index 19a2a00..6a8fac7 100644
+--- a/templates/goshared/register.go
++++ b/templates/goshared/register.go
+@@ -415,3 +415,29 @@ func (fns goSharedFuncs) enumPackages(enums []pgs.Enum) map[pgs.Name]NormalizedE
+ func (fns goSharedFuncs) snakeCase(name string) string {
+ 	return strcase.ToSnake(name)
+ }
++
++func (fns goSharedFuncs) Type(f pgs.Field) pgsgo.TypeName {
++	if f.Type().ProtoType() == pgs.EnumT {
++		ens := fns.enumPackages(fns.externalEnums(f.File()))
++		// Check if the imported name of the enum has collided and been renamed
++		if len(ens) != 0 {
++			enType := f.Type().Enum()
++			if f.Type().IsRepeated() {
++				enType = f.Type().Element().Enum()
++			}
++
++			enImportPath := fns.ImportPath(enType)
++			for pkg, en := range ens {
++				if en.FilePath == enImportPath {
++					name := fns.enumName(enType)
++					if f.Type().IsRepeated() {
++						return pgsgo.TypeName("[]" + pkg.String() + "." + name)
++					}
++					return pgsgo.TypeName(pkg.String() + "." + name)
++				}
++			}
++		}
++	}
++
++	return fns.Context.Type(f)
++}
+diff --git a/templates/shared/enums.go b/templates/shared/enums.go
+index bb5f053..79fcf39 100644
+--- a/templates/shared/enums.go
++++ b/templates/shared/enums.go
+@@ -11,6 +11,10 @@ func isEnum(f pgs.Field) bool {
+ 	return f.Type().IsEnum()
+ }
+ 
++func isRepeatedEnum(f pgs.Field) bool {
++	return f.Type().IsRepeated() && f.Type().Element().IsEnum()
++}
++
+ func enumNamesMap(values []pgs.EnumValue) (m map[int32]string) {
+ 	m = make(map[int32]string)
+ 	for _, v := range values {
+diff --git a/templates/shared/functions.go b/templates/shared/functions.go
+index eb10045..8ed5cd6 100644
+--- a/templates/shared/functions.go
++++ b/templates/shared/functions.go
+@@ -8,16 +8,17 @@ import (
+ 
+ func RegisterFunctions(tpl *template.Template, params pgs.Parameters) {
+ 	tpl.Funcs(map[string]interface{}{
+-		"disabled":  Disabled,
+-		"ignored":   Ignored,
+-		"required":  RequiredOneOf,
+-		"context":   rulesContext,
+-		"render":    Render(tpl),
+-		"has":       Has,
+-		"needs":     Needs,
+-		"fileneeds": FileNeeds,
+-		"isEnum":    isEnum,
+-		"enumList":  enumList,
+-		"enumVal":   enumVal,
++		"disabled":       Disabled,
++		"ignored":        Ignored,
++		"required":       RequiredOneOf,
++		"context":        rulesContext,
++		"render":         Render(tpl),
++		"has":            Has,
++		"needs":          Needs,
++		"fileneeds":      FileNeeds,
++		"isEnum":         isEnum,
++		"isRepeatedEnum": isRepeatedEnum,
++		"enumList":       enumList,
++		"enumVal":        enumVal,
+ 	})
+ }
+ 

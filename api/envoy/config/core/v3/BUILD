@@ -9,6 +9,7 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/type/matcher/v3:pkg",
         "//envoy/type/v3:pkg",
+        "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto",
         "@xds//udpa/annotations:pkg",
         "@xds//xds/annotations/v3:pkg",
         "@xds//xds/core/v3:pkg",
