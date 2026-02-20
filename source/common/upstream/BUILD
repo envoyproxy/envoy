@@ -273,12 +273,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "load_stats_reporter_lib",
-    srcs = ["load_stats_reporter.cc"],
-    hdrs = ["load_stats_reporter.h"],
+    srcs = ["load_stats_reporter_impl.cc"],
+    hdrs = ["load_stats_reporter_impl.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",

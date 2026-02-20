@@ -407,7 +407,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_reporter_test",
-    srcs = ["load_stats_reporter_test.cc"],
+    srcs = ["load_stats_reporter_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
