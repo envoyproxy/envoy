@@ -118,7 +118,7 @@ public:
       const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
       ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
       std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)> data_transform_cb,
-      uint64_t max_size, absl::optional<std::function<void()>> data_update_cb) {
+      uint64_t max_size, absl::optional<std::function<void()>> data_update_cb = absl::nullopt) {
     auto initial_data_or_error = read(source, allow_empty, api, max_size);
     RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
 

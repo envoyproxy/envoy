@@ -55,16 +55,19 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
       ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api,
                                                           validation_visitor, tls, scope, singleton,
                                                           creation_status);
+      if (!creation_status.ok()) {
+        return creation_status;
+      }
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_datasource, main_dispatcher, api,
                                                         validation_visitor, tls, scope, singleton,
                                                         creation_status);
+    if (!creation_status.ok()) {
+        return creation_status;
+      }
     ip_tags_registry_[key] = ip_tags_provider;
-  }
-  if (!creation_status.ok()) {
-    return creation_status;
   }
   return ip_tags_provider;
 }
@@ -80,7 +83,7 @@ IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& va
 }
 
 void IpTagsLoader::incCounter(Stats::StatName name) {
-  Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({name});
+  Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({stats_prefix_, name});
   scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
