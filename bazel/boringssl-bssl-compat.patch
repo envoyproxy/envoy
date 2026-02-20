@@ -1,0 +1,25 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index b7dc359..cd87639 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -66,6 +66,20 @@ license(
+ 
+ exports_files(["LICENSE"])
+ 
++# Export additional files for bssl-compat layer
++exports_files(glob(["include/**/*"]))
++exports_files(glob(["crypto/**/*"]))
++exports_files(glob(["ssl/**/*"]))
++
++filegroup(
++    name = "test_data",
++    srcs = glob([
++        "crypto/x509/test/*.pem",
++        "crypto/pkcs8/test/*.p12",
++    ]),
++    visibility = ["//visibility:public"],
++)
++
+ bssl_cc_library(
+     name = "crypto",
+     srcs = bcm_sources + crypto_sources,

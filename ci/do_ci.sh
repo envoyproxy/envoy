@@ -262,6 +262,18 @@ function bazel_envoy_api_go_build() {
     done
 }
 
+function build_openssl() {
+    BAZEL_BUILD_OPTIONS+=("--config=openssl")
+    # shellcheck disable=SC2207
+    # Append OpenSSL compat tests, and exclude quiche tests
+    TEST_TARGETS=("@compat-openssl//test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
+    setup_clang_toolchain
+    echo "Bazel fastbuild build with OpenSSL..."
+    bazel_envoy_binary_build fastbuild
+    echo "Testing ${TEST_TARGETS[*]} with OpenSSL..."
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+}
+
 shift
 
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
@@ -775,7 +787,15 @@ case $CI_TARGET in
         ;;
 
     openssl)
-        echo "Nothing to do right now, this is a placeholder for any OpenSSL-specific build or test steps that may be needed in the future."
+        # This whole boilerplate is to not fail the entire CI if there is an issue with the OpenSSL build or tests,
+        # as this is not a blocker for other work.
+        set +e
+        (set -e; build_openssl)
+        rc=$?
+        set -e
+        if [[ $rc -ne 0 ]]; then
+            echo "ERROR: OpenSSL build or test failed" >&2
+        fi
         ;;
 
     publish)

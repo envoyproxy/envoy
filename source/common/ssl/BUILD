@@ -37,3 +37,8 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "ssl_lib",
+    hdrs = ["ssl.h"],
+)

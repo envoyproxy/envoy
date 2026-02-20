@@ -13,6 +13,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/ssl_handshaker.h"
 
@@ -87,11 +88,20 @@ bool getStatelessSessionResumptionDisabled(
 } // namespace
 
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
+
 const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
 
 const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
+#ifdef ENVOY_SSL_OPENSSL
+    // OpenSSL does not support BoringSSL's group syntax ([A|B]).
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-ECDSA-CHACHA20-POLY1305:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-CHACHA20-POLY1305:"
+#else
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
+#endif
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
@@ -101,8 +111,7 @@ const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
-const std::string ServerContextConfigImpl::DEFAULT_CURVES = "X25519:"
-                                                            "P-256";
+const std::string ServerContextConfigImpl::DEFAULT_CURVES = "X25519:P-256";
 
 const std::string ServerContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
