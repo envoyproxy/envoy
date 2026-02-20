@@ -37,3 +37,17 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "local_certificate_minter_lib",
+    srcs = ["local_certificate_minter.cc"],
+    hdrs = ["local_certificate_minter.h"],
+    deps = [
+        "//bazel:ssl",
+        "//envoy/common:pure_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
+    ],
+)
