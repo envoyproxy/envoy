@@ -1196,7 +1196,12 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                  static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
-    Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
+    absl::string_view downstream_local_close_reason =
+        idle_timeout_triggered_
+            ? absl::string_view(StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout)
+            : "";
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data(
+        upstream_->onDownstreamEvent(event, downstream_local_close_reason));
     if (conn_data != nullptr &&
         conn_data->connection().state() != Network::Connection::State::Closed) {
       config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
@@ -1240,6 +1245,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    // Propagate the upstream local close reason to the downstream stream info's upstreamInfo.
+    if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamLocalCloseReason(upstream_->localCloseReason());
+    }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
@@ -1348,6 +1357,7 @@ void Filter::onUpstreamConnection() {
 void Filter::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "Session timed out", read_callbacks_->connection());
   config_->stats().idle_timeout_.inc();
+  idle_timeout_triggered_ = true;
 
   // This results in also closing the upstream connection.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,

@@ -1313,6 +1313,20 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("RemoteReset", us_close_type_format.format({}, stream_info));
   }
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CLOSE_REASON");
+    stream_info.upstreamInfo()->setUpstreamLocalCloseReason("local_close_reason");
+    EXPECT_EQ("local_close_reason", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("local_close_reason")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CLOSE_REASON");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
         "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_EQ(absl::nullopt,

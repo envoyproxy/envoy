@@ -175,13 +175,17 @@ public:
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
-  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+  Tcp::ConnectionPool::ConnectionData*
+  onDownstreamEvent(Network::ConnectionEvent event,
+                    absl::string_view downstream_local_close_reason = "") override;
   bool startUpstreamSecureTransport() override;
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
   StreamInfo::DetectedCloseType detectedCloseType() const override;
+  absl::string_view localCloseReason() const override { return local_close_reason_; }
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  absl::string_view local_close_reason_;
 };
 
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
@@ -203,7 +207,9 @@ public:
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
-  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+  Tcp::ConnectionPool::ConnectionData*
+  onDownstreamEvent(Network::ConnectionEvent event,
+                    absl::string_view downstream_local_close_reason = "") override;
   // HTTP upstream must not implement converting upstream transport
   // socket from non-secure to secure mode.
   bool startUpstreamSecureTransport() override { return false; }
@@ -293,7 +299,9 @@ public:
   void setRouterUpstreamRequest(UpstreamRequestPtr);
   void newStream(GenericConnectionPoolCallbacks& callbacks);
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+  Tcp::ConnectionPool::ConnectionData*
+  onDownstreamEvent(Network::ConnectionEvent event,
+                    absl::string_view downstream_local_close_reason = "") override;
   bool isValidResponse(const Http::ResponseHeaderMap&);
   bool readDisable(bool disable) override;
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
