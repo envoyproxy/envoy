@@ -10,6 +10,7 @@ x-envoy-build-base: &envoy-build-base
   environment:
   # Core build environment
   - BUILD_DIR=/build
+  - DOCKER_COMMAND
   - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
   - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
   - ENVOY_OCI_DIR
@@ -59,15 +60,9 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_GEN_COMPDB_OPTIONS
 
   # Publishing and artifacts
-  - DOCKERHUB_USERNAME
-  - DOCKERHUB_PASSWORD
   - ENVOY_DOCKER_SAVE_IMAGE
   - ENVOY_PUBLISH_DRY_RUN
   - ENVOY_TARBALL_DIR
-  - GCS_ARTIFACT_BUCKET
-  - GCS_REDIRECT_PATH
-  - GCP_SERVICE_ACCOUNT_KEY
-  - GCP_SERVICE_ACCOUNT_KEY_PATH
 
   - MOBILE_DOCS_CHECKOUT_DIR
   - SYSTEM_STAGEDISPLAYNAME

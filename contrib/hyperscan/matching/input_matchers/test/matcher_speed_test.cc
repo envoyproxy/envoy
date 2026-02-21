@@ -1,6 +1,8 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from
 // a quiescent system with disabled cstate power management.
 
+#include "envoy/matcher/matcher.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -52,7 +54,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {
-      if (matcher.match(cluster_input)) {
+      if (matcher.match(cluster_input) == ::Envoy::Matcher::MatchResult::Matched) {
         ++passes;
       }
     }

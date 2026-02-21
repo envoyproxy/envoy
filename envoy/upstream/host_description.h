@@ -144,6 +144,11 @@ public:
   virtual MetadataConstSharedPtr metadata() const PURE;
 
   /**
+   * @return the cached hash of the metadata associated with this host, or 0 if no metadata.
+   */
+  virtual std::size_t metadataHash() const PURE;
+
+  /**
    * Set the current metadata.
    */
   virtual void metadata(MetadataConstSharedPtr new_metadata) PURE;

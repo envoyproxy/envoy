@@ -3,8 +3,8 @@
 #*       @envoyproxy/maintainers
 
 # ci
-/.github/ @agrawroh @phlax
-/ci/ @agrawroh @phlax
+/.github/ @agrawroh @phlax @jwendell
+/ci/ @agrawroh @phlax @jwendell
 
 # api
 /api/ @envoyproxy/api-shepherds
@@ -241,8 +241,12 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
 /*/extensions/filters/http/mcp @botengyao @yanavlasov
+# HTTP MCP Jon Rest Bridge filter
+/*/extensions/filters/http/mcp_json_rest_bridge @paulhong01 @leon-gg @botengyao @tyxia @yanavlasov
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
+# HTTP A2A filter
+/*/extensions/filters/http/a2a @tyxia @botengyao @yanavlasov @agrawroh
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
@@ -346,6 +350,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
+# SSE to metadata
+/*/extensions/filters/http/sse_to_metadata @JuniorHsu @PeterL328 @tyxia
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -408,6 +414,10 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 

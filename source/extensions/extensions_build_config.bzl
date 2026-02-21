@@ -94,6 +94,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
+    "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
 
     #
@@ -123,6 +124,7 @@ EXTENSIONS = {
     # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+    "envoy.matching.inputs.dynamic_module_data_input":  "//source/extensions/matching/http/dynamic_modules:data_input_lib",
 
     #
     # Dynamic Metadata Matching Input
@@ -192,6 +194,7 @@ EXTENSIONS = {
     "envoy.filters.http.json_to_metadata":              "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.mcp":                           "//source/extensions/filters/http/mcp:config",
+    "envoy.filters.http.mcp_json_rest_bridge":          "//source/extensions/filters/http/mcp_json_rest_bridge:config",
     "envoy.filters.http.mcp_router":                    "//source/extensions/filters/http/mcp_router:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default. kill_request is not built into most prebuilt images.
@@ -214,6 +217,7 @@ EXTENSIONS = {
     "envoy.filters.http.thrift_to_metadata":            "//source/extensions/filters/http/thrift_to_metadata:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
+    "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
@@ -420,6 +424,7 @@ EXTENSIONS = {
     # TLS peer certification validators
     #
 
+    "envoy.tls.cert_validator.dynamic_modules":          "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
@@ -568,6 +573,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
+    "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
     #
     # HTTP Early Header Mutation

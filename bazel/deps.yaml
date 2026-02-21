@@ -284,7 +284,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-01-26"
+  release_date: "2026-02-16"
   use_category:
   - controlplane
   - dataplane_core
@@ -295,7 +295,7 @@ tcmalloc:
   project_name: "tcmalloc"
   project_desc: "Fast, multi-threaded malloc implementation"
   project_url: "https://github.com/google/tcmalloc"
-  release_date: "2024-12-27"
+  release_date: "2025-09-26"
   use_category:
   - dataplane_core
   - controlplane

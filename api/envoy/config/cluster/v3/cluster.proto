@@ -1343,14 +1343,18 @@ message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";
 
+  // [#comment: Keep this list of address types in sync with api/config/core/v3/address.proto.]
   enum FirstAddressFamilyVersion {
-    // respect the native ranking of destination ip addresses returned from dns
-    // resolution
+    // Use the first address family encountered in the address list.
     DEFAULT = 0;
 
     V4 = 1;
 
     V6 = 2;
+
+    PIPE = 3;
+
+    INTERNAL = 4;
   }
 
   message HappyEyeballsConfig {
