@@ -28,6 +28,12 @@ behavior_changes:
     :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
     to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
     the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
+- area: ext_proc
+  change: |
+    The processing_effect_lib has been moved from :ref:`extensions/filters/http/ext_proc namespace
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` to
+    extensions/filters/common/processing_effect namespace. All path references within the Envoy
+    codebase have been updated.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

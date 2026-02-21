@@ -14,7 +14,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
 #include "matching_utils.h"
@@ -186,7 +186,8 @@ public:
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
-  void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
+  void logMutation(CallbackState callback_state,
+                   Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
@@ -391,7 +392,7 @@ private:
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                        ProcessingEffect::Effect& processing_effect);
+                        Extensions::Filters::Common::ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
 
   /**
@@ -470,7 +471,7 @@ private:
    */
   absl::Status processHeaderMutationIfAvailable(
       const envoy::service::ext_proc::v3::CommonResponse& common_response,
-      ProcessingEffect::Effect& effect);
+      Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only
@@ -491,7 +492,7 @@ private:
    */
   void
   applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                            ProcessingEffect::Effect& effect);
+                            Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.
