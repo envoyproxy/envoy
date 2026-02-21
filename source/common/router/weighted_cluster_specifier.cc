@@ -31,23 +31,20 @@ uint64_t WeightedClusterSpecifierPlugin::healthawareClusterWeight(const std::str
     return config_weight; // cannot tell cluster health.
   }
 
-  bool has_healthy = false;
   for (const auto& ps : cluster->prioritySet().hostSetsPerPriority()) {
     if (!ps->healthyHosts().empty()) {
-      has_healthy = true;
-      break;
+      return config_weight; // cluster has some healthy host, use given weight.
     }
   }
-  if (!has_healthy) {
+  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
     const auto& stats = cluster->info()->endpointStats();
     uint64_t healthy_count = stats.membership_healthy_.value();
     uint64_t total_count = stats.membership_total_.value();
     ENVOY_LOG(debug, "unhealthy cluster {} has {} healthy hosts out of {} total hosts",
               cluster_name, healthy_count, total_count);
-    return 0;
   }
 
-  return config_weight;
+  return 0;
 }
 
 uint64_t WeightedClusterSpecifierPlugin::retryAwareClusterWeight(
@@ -81,8 +78,9 @@ uint64_t WeightedClusterSpecifierPlugin::retryAwareClusterWeight(
     }
   }
 
-  ENVOY_LOG(debug, "retry-aware lb: zeroing weight for previously attempted single-endpoint "
-                   "cluster {}",
+  ENVOY_LOG(debug,
+            "retry-aware lb: zeroing weight for previously attempted single-endpoint "
+            "cluster {}",
             cluster_name);
   return 0;
 }
@@ -395,9 +393,8 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
   //    zeroing out weights is unnecessary.
   const AttemptedClustersFilterState* attempted_clusters = nullptr;
   if (retry_aware_lb_ && weighted_clusters_.size() > 1) {
-    attempted_clusters =
-        stream_info.filterState().getDataReadOnly<AttemptedClustersFilterState>(
-            kWeightedClusterAttemptedClustersKey);
+    attempted_clusters = stream_info.filterState().getDataReadOnly<AttemptedClustersFilterState>(
+        kWeightedClusterAttemptedClustersKey);
     if (attempted_clusters != nullptr && attempted_clusters->size() > 0) {
       absl::InlinedVector<uint32_t, 4> retry_cluster_weights;
       retry_cluster_weights.reserve(weighted_clusters_.size());
@@ -422,8 +419,9 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
         total_cluster_weight = total_retry_weight;
         cluster_weights = std::move(retry_cluster_weights);
         use_weight_override = true;
-        ENVOY_LOG(debug, "retry-aware lb: adjusted total weight to {} after excluding {} "
-                         "previously attempted cluster(s)",
+        ENVOY_LOG(debug,
+                  "retry-aware lb: adjusted total weight to {} after excluding {} "
+                  "previously attempted cluster(s)",
                   total_cluster_weight, attempted_clusters->size());
       } else {
         // All clusters have been attempted; fall back to original weights

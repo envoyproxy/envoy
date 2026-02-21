@@ -2197,14 +2197,12 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   // no FilterState allocation, no clearRouteCache(), no route re-evaluation.
   // The runtime guard allows disabling the feature without a rebuild if issues arise.
   if (route_entry_ != nullptr && route_entry_->retryAwareWeightedClusters() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.retry_aware_weighted_clusters")) {
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.retry_aware_weighted_clusters")) {
     const std::string& failed_cluster_name = route_entry_->clusterName();
     auto& filter_state = callbacks_->streamInfo().filterState();
 
-    auto* attempted =
-        filter_state->getDataMutable<AttemptedClustersFilterState>(
-            kWeightedClusterAttemptedClustersKey);
+    auto* attempted = filter_state->getDataMutable<AttemptedClustersFilterState>(
+        kWeightedClusterAttemptedClustersKey);
     if (attempted == nullptr) {
       auto attempted_clusters = std::make_shared<AttemptedClustersFilterState>();
       attempted_clusters->addAttemptedCluster(failed_cluster_name);
@@ -2235,8 +2233,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
       const auto* new_route_entry = route_->routeEntry();
       if (new_route_entry != nullptr) {
         route_entry_ = new_route_entry;
-        ENVOY_STREAM_LOG(debug, "retry-aware lb: re-evaluated route, new cluster '{}'",
-                         *callbacks_, route_entry_->clusterName());
+        ENVOY_STREAM_LOG(debug, "retry-aware lb: re-evaluated route, new cluster '{}'", *callbacks_,
+                         route_entry_->clusterName());
       }
     }
   }
