@@ -141,6 +141,8 @@ test_program(name = "lb_no_choose_host")
 
 test_program(name = "lb_invalid_host_index")
 
+test_program(name = "lb_invalid_priority")
+
 test_program(name = "matcher_no_op")
 
 test_program(name = "matcher_config_new_fail")

@@ -268,6 +268,37 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterName) {
+  stream_info_.virtual_cluster_name_ = "test_vcluster";
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
+  stream_info_.virtual_cluster_name_ = "";
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
+  stream_info_.virtual_cluster_name_ = absl::nullopt;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, IsHealthCheck) {
   ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(true));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
