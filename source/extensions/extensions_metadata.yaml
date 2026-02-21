@@ -475,6 +475,14 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.filter_chain:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig
+  - envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute
 envoy.filters.http.file_system_buffer:
   categories:
   - envoy.filters.http

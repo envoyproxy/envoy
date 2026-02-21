@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.filter_chain.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.filter_chain.v3";
+option java_outer_classname = "FilterChainProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/filter_chain/v3;filter_chainv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter Chain]
+// Filter Chain :ref:`configuration overview <config_http_filters_filter_chain>`.
+// [#extension: envoy.filters.http.filter_chain]
+
+// Filter-level configuration for the filter chain filter. This filter acts as a wrapper
+// that applies a configurable chain of HTTP filters to incoming requests.
+message FilterChainConfig {
+  // Default filter chain applied when no route level filter chain is specified.
+  //
+  // This field is optional. If not specified and no route-level configuration matches,
+  // the filter will pass through without applying any additional filters.
+  FilterChain filter_chain = 1;
+}
+
+// Per-route configuration for the filter chain filter. This allows different filter chains
+// to be applied on different routes.
+//
+// .. note::
+//   Only the initial route match is considered for filter chain selection. Subsequent
+//   internal route refreshes do not affect the filter chain applied to the request.
+//
+// This could be used to implement route specific filter chains.
+message FilterChainConfigPerRoute {
+  // Filter chain to be applied on current route.
+  //
+  // .. note::
+  //   Not all HTTP filters are compatible to be used within this route level filter chain
+  //   for now.
+  //
+  FilterChain filter_chain = 1 [(validate.rules).message = {required: true}];
+}
+
+// A filter chain is a list of HTTP filters that are applied in order.
+// This message is used to define a reusable chain of filters that can be
+// referenced by name or used as the default filter chain.
+message FilterChain {
+  // A list of HTTP filter configurations to be applied in order.
+  // Each filter in the chain will process the request/response in sequence.
+  // At least one filter must be specified.
+  //
+  // .. warning::
+  //   Please do not configure the ``filter_chain`` filter itself within this list recursively
+  //   to avoid undefined behavior.
+  //
+  // .. note::
+  //   It is possible to configure ``terminal`` filters (filters that do not expect next filter
+  //   in the chain, e.g., ``envoy.filters.http.router``) in the middle of the chain. However,
+  //   use it with caution to ensure the to avoid unexpected behavior.
+  //
+  // [#extension-category: envoy.filters.http]
+  repeated config.core.v3.TypedExtensionConfig filters = 1
+      [(validate.rules).repeated = {min_items: 1}];
+}
