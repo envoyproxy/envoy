@@ -1,8 +1,11 @@
 #include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
 
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
+#include "source/extensions/filters/http/bandwidth_limit/config.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,16 +25,23 @@ class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
 
-  void setup(const std::string& yaml) {
+  void setup(absl::string_view yaml) {
     envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
-    TestUtility::loadFromYaml(yaml, config);
-    auto config_or_status =
-        FilterConfig::create(config, *stats_.rootScope(), runtime_, time_system_, true);
-    EXPECT_TRUE(config_or_status.ok());
-    config_ = *config_or_status;
+    TestUtility::loadFromYaml(std::string{yaml}, config);
+    NiceMock<Server::Configuration::MockServerFactoryContext> mock_server_factory_context;
+    EXPECT_CALL(mock_server_factory_context, scope).WillRepeatedly(ReturnRef(*stats_.rootScope()));
+    EXPECT_CALL(mock_server_factory_context, timeSource).WillRepeatedly(ReturnRef(time_system_));
+    EXPECT_CALL(mock_server_factory_context, runtime).WillRepeatedly(ReturnRef(runtime_));
+    auto config_or_status = BandwidthLimitFilterConfig().createRouteSpecificFilterConfig(
+        config, mock_server_factory_context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_OK(config_or_status);
+    config_ = std::dynamic_pointer_cast<const FilterConfig>(std::move(config_or_status.value()));
     filter_ = std::make_shared<BandwidthLimiter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+
+    ON_CALL(decoder_filter_callbacks_, bufferLimit).WillByDefault(Return(1050));
+    ON_CALL(encoder_filter_callbacks_, bufferLimit).WillByDefault(Return(1100));
 
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
@@ -53,7 +63,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_filter_callbacks_;
   NiceMock<Runtime::MockLoader> runtime_;
-  std::shared_ptr<FilterConfig> config_;
+  std::shared_ptr<const FilterConfig> config_;
   std::shared_ptr<BandwidthLimiter> filter_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -75,7 +85,7 @@ TEST_F(FilterTest, Disabled) {
   fill_interval: 1s
   enable_response_trailers: true
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -91,6 +101,120 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(false, response_trailers_.has("bandwidth-response-delay-ms"));
   EXPECT_EQ(false, response_trailers_.has("bandwidth-request-filter-delay-ms"));
   EXPECT_EQ(false, response_trailers_.has("bandwidth-response-filter-delay-ms"));
+}
+
+TEST_F(FilterTest, NamedBucketSelectorWithNoMatchingBucketAndNoCreateFlagActsDisabled) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  enable_mode: REQUEST_AND_RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+  )";
+  setup(config_yaml);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.response_enabled"));
+}
+
+TEST_F(FilterTest, DisabledInRouteConfig) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: REQUEST_AND_RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  enable_response_trailers: true
+  )";
+  setup(config_yaml);
+  constexpr absl::string_view route_config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: DISABLED
+  limit_kbps: 10
+  fill_interval: 1s
+  enable_response_trailers: true
+  )";
+  envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit route_config;
+  TestUtility::loadFromYaml(std::string{route_config_yaml}, route_config);
+  auto route_config_or_status = FilterConfig::create(route_config, nullptr, *stats_.rootScope(),
+                                                     runtime_, time_system_, true);
+  ASSERT_OK(route_config_or_status);
+
+  EXPECT_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig)
+      .WillRepeatedly(Return(route_config_or_status.value().get()));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-filter-delay-ms"));
+}
+
+TEST_F(FilterTest, HeaderOnlyResponseAndDisabledOnRequest) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  enable_response_trailers: true
+  )";
+  setup(config_yaml);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enforced"));
+}
+
+TEST_F(FilterTest, NoTrailersResponseAndDisabledOnRequest) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  enable_mode: RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  )";
+  setup(config_yaml);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data_, true));
+  EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enforced"));
 }
 
 TEST_F(FilterTest, LimitOnDecode) {
@@ -112,8 +236,10 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.request_enabled"));
-  EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
@@ -216,6 +342,137 @@ TEST_F(FilterTest, LimitOnDecode) {
   filter_->onDestroy();
 }
 
+TEST_F(FilterTest, LimitOnDecodeWithNamedBucket) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  enable_mode: REQUEST
+  limit_kbps: 1000  # Should be overridden by explicit bucket
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+  named_bucket_configurations:
+  - name: test_explicit_bucket
+    limit_kbps: 1
+  )";
+  setup(config_yaml);
+
+  Event::MockTimer* token_timer =
+      new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ(1U, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
+
+  // Send a small amount of data which should be within limit.
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data1, false));
+  EXPECT_EQ(1, findGauge("test_explicit_bucket.http_bandwidth_limit.request_pending"));
+  EXPECT_EQ(5, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(5,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual("hello"), false));
+  token_timer->invokeCallback();
+  EXPECT_EQ(0, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(5, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(5, findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+
+  // Advance time by 1s which should refill all tokens.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Send 1126 bytes of data which is 1s + 2 refill cycles of data.
+  EXPECT_CALL(decoder_filter_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data2(std::string(1126, 'a'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data2, false));
+  EXPECT_EQ(1, findGauge("test_explicit_bucket.http_bandwidth_limit.request_pending"));
+  EXPECT_EQ(1126, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(1131,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_filter_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
+  token_timer->invokeCallback();
+  EXPECT_EQ(1, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(1024, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(1029,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+  EXPECT_EQ(1126, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(1131,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+  token_timer->invokeCallback();
+  EXPECT_EQ(2, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(51, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(1080,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+  EXPECT_EQ(1126, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(1131,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+
+  // Get new data with current data buffered, not end_stream.
+  Buffer::OwnedImpl data3(std::string(51, 'b'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data3, false));
+  EXPECT_EQ(1, findGauge("test_explicit_bucket.http_bandwidth_limit.request_pending"));
+  EXPECT_EQ(51, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(1182,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+
+  // Fire timer, also advance time.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+  token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(51, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(1131,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+
+  // Fire timer, also advance time. No timer enable because there is nothing
+  // buffered.
+  time_system_.advanceTimeWait(std::chrono::milliseconds(50));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
+  token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(51, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(1182,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+
+  // Advance time by 1s for a full refill.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  // Now send 1024 in one shot with end_stream true which should go through and
+  // end the stream.
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data4(std::string(1024, 'c'));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data4, true));
+  EXPECT_EQ(1024, findGauge("test_explicit_bucket.http_bandwidth_limit.request_incoming_size"));
+  EXPECT_EQ(2206,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_incoming_total_size"));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+  token_timer->invokeCallback();
+  EXPECT_EQ(3, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(1024, findGauge("test_explicit_bucket.http_bandwidth_limit.request_allowed_size"));
+  EXPECT_EQ(2206,
+            findCounter("test_explicit_bucket.http_bandwidth_limit.request_allowed_total_size"));
+  EXPECT_EQ(0, findGauge("test_explicit_bucket.http_bandwidth_limit.request_pending"));
+
+  filter_->onDestroy();
+}
+
 TEST_F(FilterTest, LimitOnEncode) {
   constexpr absl::string_view config_yaml = R"(
   stat_prefix: test
@@ -227,15 +484,16 @@ TEST_F(FilterTest, LimitOnEncode) {
   enable_response_trailers: true
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
-  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
-  EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -351,18 +609,18 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   enable_response_trailers: true
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
-  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
-  EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -488,17 +746,17 @@ TEST_F(FilterTest, WithTrailers) {
   limit_kbps: 1
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
-  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
-  EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -564,17 +822,17 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   limit_kbps: 1
   enable_response_trailers: true
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
-  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
-  EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(1UL, config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->limit_kbps());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;

@@ -23,7 +23,9 @@ envoy_extension_cc_test(
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
+        "//source/extensions/filters/http/bandwidth_limit:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )
@@ -36,5 +38,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/bandwidth_limit:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
