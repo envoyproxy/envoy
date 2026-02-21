@@ -106,6 +106,12 @@ public:
   const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
     return received_custom_transport_parameters_;
   }
+  const std::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
+    return received_ipv6_alternate_server_address_;
+  }
+  const std::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
+    return received_ipv4_alternate_server_address_;
+  }
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -146,6 +152,8 @@ private:
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
   quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
+  std::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
+  std::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
 };
 
 } // namespace Quic
