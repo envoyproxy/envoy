@@ -91,6 +91,48 @@ impl AccessLogger for TestAccessLogger {
     // Test worker id.
     let worker_id = ctx.get_worker_index();
     assert_eq!(worker_id, 0);
+
+    // Test response flags.
+    let _response_flags = ctx.response_flags();
+    let _has_flag =
+      ctx.has_response_flag(abi::envoy_dynamic_module_type_response_flag::NoRouteFound);
+
+    // Test attempt count.
+    let _attempt_count = ctx.attempt_count();
+
+    // Test address accessors.
+    let _downstream_remote = ctx.downstream_remote_address();
+    let _downstream_local = ctx.downstream_local_address();
+    let _upstream_remote = ctx.upstream_remote_address();
+    let _upstream_local = ctx.upstream_local_address();
+
+    // Test upstream info.
+    let _upstream_failure = ctx.upstream_transport_failure_reason();
+
+    // Test TLS/connection info.
+    let _tls_version = ctx.downstream_tls_version();
+    let _peer_subject = ctx.downstream_peer_subject();
+    let _peer_digest = ctx.downstream_peer_cert_digest();
+
+    // Test request ID and metadata.
+    let _request_id = ctx.request_id();
+    let _filter_state = ctx.get_filter_state("test_key");
+
+    // Test tracing (stubs that always return None).
+    let _trace_id = ctx.get_trace_id();
+    let _span_id = ctx.get_span_id();
+
+    // Test response trailer access.
+    let _response_trailer = ctx.get_response_trailer("x-trailer");
+
+    // Test bulk header access.
+    let request_headers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+    assert!(!request_headers.is_empty());
+    let _response_headers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader);
+    let _response_trailers =
+      ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
   }
 
   fn flush(&mut self) {
