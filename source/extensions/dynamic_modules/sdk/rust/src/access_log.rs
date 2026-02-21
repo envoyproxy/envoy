@@ -642,6 +642,13 @@ impl LogContext {
     unsafe { abi::envoy_dynamic_module_callback_access_logger_get_attempt_count(self.envoy_ptr) }
   }
 
+  /// Get the connection termination details.
+  pub fn connection_termination_details(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_connection_termination_details,
+    )
+  }
+
   /// Get the downstream remote address (client) as an IP address string and port.
   ///
   /// Returns `None` if the address is not available or is not an IP address.
@@ -668,6 +675,24 @@ impl LogContext {
   /// Returns `None` if the address is not available or is not an IP address.
   pub fn upstream_local_address(&self) -> Option<(&str, u32)> {
     self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_address)
+  }
+
+  /// Get the downstream direct remote address (physical peer address before XFF processing).
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn downstream_direct_remote_address(&self) -> Option<(&str, u32)> {
+    self.get_address(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address,
+    )
+  }
+
+  /// Get the downstream direct local address (physical listener address).
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn downstream_direct_local_address(&self) -> Option<(&str, u32)> {
+    self.get_address(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address,
+    )
   }
 
   /// Helper to retrieve an address (IP string + port) from an ABI callback.
@@ -719,6 +744,96 @@ impl LogContext {
   pub fn downstream_peer_cert_digest(&self) -> Option<&str> {
     self.get_envoy_buffer_string(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest,
+    )
+  }
+
+  /// Get the downstream TLS cipher suite.
+  ///
+  /// The returned string uses thread-local storage and is valid until the next call to
+  /// this method or [`upstream_tls_cipher`](Self::upstream_tls_cipher) on the same thread.
+  pub fn downstream_tls_cipher(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher,
+    )
+  }
+
+  /// Get the downstream TLS session ID.
+  pub fn downstream_tls_session_id(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id,
+    )
+  }
+
+  /// Get the downstream peer certificate issuer.
+  pub fn downstream_peer_issuer(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer,
+    )
+  }
+
+  /// Get the downstream peer certificate serial number.
+  pub fn downstream_peer_serial(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial,
+    )
+  }
+
+  /// Get the downstream peer certificate SHA-1 fingerprint.
+  pub fn downstream_peer_fingerprint_1(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1,
+    )
+  }
+
+  /// Get the downstream local certificate subject (Envoy's own certificate).
+  pub fn downstream_local_subject(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_subject,
+    )
+  }
+
+  /// Get the upstream connection ID, or 0 if not available.
+  pub fn upstream_connection_id(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(self.envoy_ptr)
+    }
+  }
+
+  /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+  pub fn upstream_tls_version(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_version,
+    )
+  }
+
+  /// Get the upstream TLS cipher suite.
+  ///
+  /// The returned string uses thread-local storage and is valid until the next call to
+  /// this method or [`downstream_tls_cipher`](Self::downstream_tls_cipher) on the same thread.
+  pub fn upstream_tls_cipher(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher,
+    )
+  }
+
+  /// Get the upstream TLS session ID.
+  pub fn upstream_tls_session_id(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id,
+    )
+  }
+
+  /// Get the upstream peer certificate subject.
+  pub fn upstream_peer_subject(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject,
+    )
+  }
+
+  /// Get the upstream peer certificate issuer.
+  pub fn upstream_peer_issuer(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer,
     )
   }
 
