@@ -29,7 +29,7 @@ TEST(McpJsonRestBridgeFilterConfigFactoryTest, RegisterAndCreateFilterWithEmptyC
   // TODO(paulhong01): Update the following verification once the proto config is processed
   // properly.
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamFilter).Times(0);
+  EXPECT_CALL(filter_callbacks, addStreamFilter);
   (*cb)(filter_callbacks);
 }
 
