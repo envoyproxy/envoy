@@ -388,6 +388,13 @@ new_features:
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: formatter
+  change: |
+    Added new access log formatters for tracking upstream hosts and connection IDs attempted during
+    request processing: ``%UPSTREAM_HOSTS_ATTEMPTED%``, ``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``,
+    ``%UPSTREAM_HOST_NAMES_ATTEMPTED%``, ``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``, and
+    ``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``. These are useful for debugging retry behavior and
+    understanding which hosts were tried before a successful connection or final failure.
 - area: dynamic_modules
   change: |
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target

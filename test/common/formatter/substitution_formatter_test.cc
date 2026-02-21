@@ -19,6 +19,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
@@ -717,6 +718,320 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("10.0.0.1", upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+
+  // Test UPSTREAM_HOSTS_ATTEMPTED
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(nullptr));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    std::string hostname = "upstream_host_xxx";
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("10.0.0.1:443", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+
+  // Test UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(nullptr));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    std::string hostname = "upstream_host_xxx:443";
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("10.0.0.1", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+
+  // Test UPSTREAM_HOST_NAMES_ATTEMPTED
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    std::string empty_hostname;
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(empty_hostname));
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(nullptr));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    // Both hostname and address are empty, returns nullopt.
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    // Hostname is used.
+    std::string hostname = "upstream_host_xxx";
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("upstream_host_xxx", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    // Hostname is not used then the main address is used.
+    std::string empty_hostname;
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(empty_hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("10.0.0.1:443", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
+  }
+
+  // Test UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    std::string empty_hostname;
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(empty_hostname));
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(nullptr));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    // Both hostname and address are empty, returns nullopt.
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    // Hostname includes port.
+    std::string hostname_with_port = "upstream_host_xxx:443";
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(hostname_with_port));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("upstream_host_xxx", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    // Hostname is used (no port).
+    std::string hostname = "upstream_host_xxx";
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("upstream_host_xxx", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    EXPECT_CALL(*attempted_host, address()).WillRepeatedly(Return(address));
+
+    // Hostname is not used then the main address (only the ip) is used.
+    std::string empty_hostname;
+    EXPECT_CALL(*attempted_host, hostname()).WillRepeatedly(ReturnRef(empty_hostname));
+    upstream_info->addUpstreamHostAttempted(attempted_host);
+    EXPECT_EQ("10.0.0.1", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+
+  // Tests with multiple valid attempted hosts
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host1 = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto attempted_host2 = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto address1 = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    auto address2 = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.2", 8080)};
+    EXPECT_CALL(*attempted_host1, address()).WillRepeatedly(Return(address1));
+    EXPECT_CALL(*attempted_host2, address()).WillRepeatedly(Return(address2));
+    upstream_info->addUpstreamHostAttempted(attempted_host1);
+    upstream_info->addUpstreamHostAttempted(attempted_host2);
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED");
+      EXPECT_EQ("10.0.0.1:443,10.0.0.2:8080", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1:443,10.0.0.2:8080")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT");
+      EXPECT_EQ("10.0.0.1,10.0.0.2", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1,10.0.0.2")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED");
+      EXPECT_EQ("10.0.0.1:443,10.0.0.2:8080", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1:443,10.0.0.2:8080")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+      EXPECT_EQ("10.0.0.1,10.0.0.2", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1,10.0.0.2")));
+    }
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    auto attempted_host1 = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto attempted_host2 = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    auto attempted_host3 = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    std::string hostname1 = "host1.example.com";
+    std::string hostname2 = "host2.example.com:8080";
+    auto address1 = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.1", 443)};
+    auto address2 = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.2", 8080)};
+    auto address3 = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.3", 80)};
+    EXPECT_CALL(*attempted_host1, hostname()).WillRepeatedly(ReturnRef(hostname1));
+    EXPECT_CALL(*attempted_host1, address()).WillRepeatedly(Return(address1));
+    EXPECT_CALL(*attempted_host2, hostname()).WillRepeatedly(ReturnRef(hostname2));
+    EXPECT_CALL(*attempted_host2, address()).WillRepeatedly(Return(address2));
+    EXPECT_CALL(*attempted_host3, address()).WillRepeatedly(Return(address3));
+    upstream_info->addUpstreamHostAttempted(attempted_host1);
+    upstream_info->addUpstreamHostAttempted(attempted_host2);
+    upstream_info->addUpstreamHostAttempted(attempted_host3);
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED");
+      EXPECT_EQ("10.0.0.1:443,10.0.0.2:8080,10.0.0.3:80", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1:443,10.0.0.2:8080,10.0.0.3:80")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT");
+      EXPECT_EQ("10.0.0.1,10.0.0.2,10.0.0.3", upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("10.0.0.1,10.0.0.2,10.0.0.3")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED");
+      EXPECT_EQ("host1.example.com,host2.example.com:8080,10.0.0.3:80",
+                upstream_format.format({}, stream_info));
+      EXPECT_THAT(
+          upstream_format.formatValue({}, stream_info),
+          ProtoEq(ValueUtil::stringValue("host1.example.com,host2.example.com:8080,10.0.0.3:80")));
+    }
+
+    {
+      StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT");
+      EXPECT_EQ("host1.example.com,host2.example.com,10.0.0.3",
+                upstream_format.format({}, stream_info));
+      EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                  ProtoEq(ValueUtil::stringValue("host1.example.com,host2.example.com,10.0.0.3")));
+    }
+  }
+
+  // Test UPSTREAM_CONNECTION_IDS_ATTEMPTED
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+
+    StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_IDS_ATTEMPTED");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    stream_info.setUpstreamInfo(upstream_info);
+    upstream_info->setUpstreamConnectionId(123);
+    upstream_info->setUpstreamConnectionId(456);
+
+    StreamInfoFormatter upstream_format("UPSTREAM_CONNECTION_IDS_ATTEMPTED");
+    EXPECT_EQ("123,456", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("123,456")));
   }
 
   auto test_upstream_remote_address =

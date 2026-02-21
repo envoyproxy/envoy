@@ -25,6 +25,7 @@ MockUpstreamInfo::MockUpstreamInfo()
   }));
   ON_CALL(*this, setUpstreamConnectionId(_)).WillByDefault(Invoke([this](uint64_t id) {
     upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
   }));
   ON_CALL(*this, upstreamConnectionId()).WillByDefault(ReturnPointee(&upstream_connection_id_));
   ON_CALL(*this, setUpstreamInterfaceName(_))
@@ -78,6 +79,13 @@ MockUpstreamInfo::MockUpstreamInfo()
   ON_CALL(*this, upstreamDetectedCloseType()).WillByDefault(Invoke([this]() {
     return upstream_detected_close_type_;
   }));
+  ON_CALL(*this, addUpstreamHostAttempted(_))
+      .WillByDefault(Invoke([this](Upstream::HostDescriptionConstSharedPtr host) {
+        upstream_hosts_attempted_.push_back(host);
+      }));
+  ON_CALL(*this, upstreamHostsAttempted()).WillByDefault(ReturnRef(upstream_hosts_attempted_));
+  ON_CALL(*this, upstreamConnectionIdsAttempted())
+      .WillByDefault(ReturnRef(upstream_connection_ids_attempted_));
 }
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;

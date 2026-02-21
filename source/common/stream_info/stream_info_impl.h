@@ -29,7 +29,10 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct UpstreamInfoImpl : public UpstreamInfo {
-  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+  void setUpstreamConnectionId(uint64_t id) override {
+    upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
+  }
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
@@ -100,6 +103,19 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
   absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
 
+  void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_hosts_attempted_.push_back(host);
+  }
+
+  const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const override {
+    return upstream_hosts_attempted_;
+  }
+
+  const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const override {
+    return upstream_connection_ids_attempted_;
+  }
+
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
@@ -112,6 +128,8 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};
   absl::optional<Http::Protocol> upstream_protocol_;
+  std::vector<Upstream::HostDescriptionConstSharedPtr> upstream_hosts_attempted_;
+  std::vector<uint64_t> upstream_connection_ids_attempted_;
 };
 
 struct StreamInfoImpl : public StreamInfo {
