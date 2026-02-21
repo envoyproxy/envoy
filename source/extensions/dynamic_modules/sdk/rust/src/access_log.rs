@@ -792,6 +792,78 @@ impl LogContext {
     )
   }
 
+  /// Check if the downstream peer certificate was presented.
+  pub fn downstream_peer_cert_presented(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Check if the downstream peer certificate was validated.
+  pub fn downstream_peer_cert_validated(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Get the downstream peer certificate validity start time as epoch seconds.
+  ///
+  /// Returns 0 if the certificate or validity time is not available.
+  pub fn downstream_peer_cert_v_start(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Get the downstream peer certificate validity end time as epoch seconds.
+  ///
+  /// Returns 0 if the certificate or validity time is not available.
+  pub fn downstream_peer_cert_v_end(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Get the URI Subject Alternative Names from the downstream peer certificate.
+  pub fn downstream_peer_uri_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san,
+    )
+  }
+
+  /// Get the URI Subject Alternative Names from the downstream local certificate.
+  pub fn downstream_local_uri_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san,
+    )
+  }
+
+  /// Get the DNS Subject Alternative Names from the downstream peer certificate.
+  pub fn downstream_peer_dns_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san,
+    )
+  }
+
+  /// Get the DNS Subject Alternative Names from the downstream local certificate.
+  pub fn downstream_local_dns_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san,
+    )
+  }
+
   /// Get the upstream connection ID, or 0 if not available.
   pub fn upstream_connection_id(&self) -> u64 {
     unsafe {
@@ -834,6 +906,73 @@ impl LogContext {
   pub fn upstream_peer_issuer(&self) -> Option<&str> {
     self.get_envoy_buffer_string(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer,
+    )
+  }
+
+  /// Get the upstream local certificate subject (Envoy's own certificate for the upstream
+  /// connection).
+  pub fn upstream_local_subject(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_subject,
+    )
+  }
+
+  /// Get the upstream peer certificate SHA-256 digest.
+  pub fn upstream_peer_cert_digest(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest,
+    )
+  }
+
+  /// Get the upstream peer certificate validity start time as epoch seconds.
+  ///
+  /// Returns 0 if the certificate or validity time is not available.
+  pub fn upstream_peer_cert_v_start(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Get the upstream peer certificate validity end time as epoch seconds.
+  ///
+  /// Returns 0 if the certificate or validity time is not available.
+  pub fn upstream_peer_cert_v_end(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(self.envoy_ptr)
+    }
+  }
+
+  /// Get the URI Subject Alternative Names from the upstream peer certificate.
+  pub fn upstream_peer_uri_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san,
+    )
+  }
+
+  /// Get the URI Subject Alternative Names from the upstream local certificate.
+  pub fn upstream_local_uri_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san,
+    )
+  }
+
+  /// Get the DNS Subject Alternative Names from the upstream peer certificate.
+  pub fn upstream_peer_dns_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san,
+    )
+  }
+
+  /// Get the DNS Subject Alternative Names from the upstream local certificate.
+  pub fn upstream_local_dns_san(&self) -> Vec<&str> {
+    self.get_san_list(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size,
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san,
     )
   }
 
@@ -977,6 +1116,47 @@ impl LogContext {
     } else {
       None
     }
+  }
+
+  /// Helper to retrieve a list of SAN strings from size + data ABI callbacks.
+  fn get_san_list(
+    &self,
+    size_cb: unsafe extern "C" fn(*mut c_void) -> usize,
+    data_cb: unsafe extern "C" fn(
+      *mut c_void,
+      *mut abi::envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool,
+  ) -> Vec<&str> {
+    let count = unsafe { size_cb(self.envoy_ptr) };
+    if count == 0 {
+      return Vec::new();
+    }
+
+    let mut buffers = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: ptr::null_mut(),
+        length: 0,
+      };
+      count
+    ];
+
+    if !unsafe { data_cb(self.envoy_ptr, buffers.as_mut_ptr()) } {
+      return Vec::new();
+    }
+
+    buffers
+      .iter()
+      .filter_map(|buf| {
+        if buf.ptr.is_null() || buf.length == 0 {
+          None
+        } else {
+          unsafe {
+            let s = slice::from_raw_parts(buf.ptr as *const u8, buf.length);
+            str::from_utf8(s).ok()
+          }
+        }
+      })
+      .collect()
   }
 }
 

@@ -5816,6 +5816,130 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * Get the upstream local certificate subject (Envoy's own certificate for the upstream connection).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
 // ------------------ Access Logger Callbacks - Connection/TLS Info ------------
 
 /**
@@ -5946,6 +6070,126 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint
 bool envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if the downstream peer certificate was presented.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if a peer certificate was presented, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Check if the downstream peer certificate was validated.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if the peer certificate was validated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
 
 // ---------------- Access Logger Callbacks - Metadata and Dynamic State -------
 

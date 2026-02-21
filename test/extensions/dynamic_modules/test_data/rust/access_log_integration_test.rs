@@ -145,6 +145,30 @@ impl AccessLogger for TestAccessLogger {
     let _upstream_subject = ctx.upstream_peer_subject();
     let _upstream_issuer = ctx.upstream_peer_issuer();
 
+    // Test downstream certificate status and validity.
+    let _cert_presented = ctx.downstream_peer_cert_presented();
+    let _cert_validated = ctx.downstream_peer_cert_validated();
+    let _cert_v_start = ctx.downstream_peer_cert_v_start();
+    let _cert_v_end = ctx.downstream_peer_cert_v_end();
+
+    // Test downstream SAN accessors.
+    let _ds_peer_uri = ctx.downstream_peer_uri_san();
+    let _ds_local_uri = ctx.downstream_local_uri_san();
+    let _ds_peer_dns = ctx.downstream_peer_dns_san();
+    let _ds_local_dns = ctx.downstream_local_dns_san();
+
+    // Test upstream extended certificate fields.
+    let _us_local_subj = ctx.upstream_local_subject();
+    let _us_peer_digest = ctx.upstream_peer_cert_digest();
+    let _us_cert_v_start = ctx.upstream_peer_cert_v_start();
+    let _us_cert_v_end = ctx.upstream_peer_cert_v_end();
+
+    // Test upstream SAN accessors.
+    let _us_peer_uri = ctx.upstream_peer_uri_san();
+    let _us_local_uri = ctx.upstream_local_uri_san();
+    let _us_peer_dns = ctx.upstream_peer_dns_san();
+    let _us_local_dns = ctx.upstream_local_dns_san();
+
     // Test response trailer access.
     let _response_trailer = ctx.get_response_trailer("x-trailer");
 
