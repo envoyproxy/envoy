@@ -78,6 +78,12 @@ bug_fixes:
 - area: drop_overload
   change: |
     Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
+- area: scoped_rds
+  change: |
+    Fixed a bug where SRDS subscriptions would never start when a listener with scoped routes was
+    added after server initialization completed. The ``SrdsFactory`` interface
+    was incorrectly using the server-level init manager instead of the listener-level init manager,
+    causing the SRDS init target to be silently discarded.
 - area: http
   change: |
     Fixed upstream client to not close connection when idle timeout fires before the connection is
