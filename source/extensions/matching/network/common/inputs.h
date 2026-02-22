@@ -260,7 +260,8 @@ DECLARE_FACTORY(TransportProtocolInputFactory);
 template <class MatchingDataType>
 class FilterStateInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  FilterStateInput(const std::string& filter_state_key) : filter_state_key_(filter_state_key) {}
+  FilterStateInput(const std::string& filter_state_key, const std::string& field = "")
+      : filter_state_key_(filter_state_key), field_(field) {}
 
   Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
     const auto* filter_state_object =
@@ -268,6 +269,20 @@ public:
             filter_state_key_);
 
     if (filter_state_object != nullptr) {
+      // If a field is specified and the object supports field access, use getField().
+      if (!field_.empty() && filter_state_object->hasFieldSupport()) {
+        const auto field_value = filter_state_object->getField(field_);
+        if (absl::holds_alternative<absl::string_view>(field_value)) {
+          return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+                  std::string(absl::get<absl::string_view>(field_value))};
+        } else if (absl::holds_alternative<int64_t>(field_value)) {
+          return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+                  absl::StrCat(absl::get<int64_t>(field_value))};
+        }
+        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+      }
+
+      // Default: return the serialized string representation of the whole object.
       auto str = filter_state_object->serializeAsString();
       if (str.has_value()) {
         return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, str.value()};
@@ -281,6 +296,7 @@ public:
 
 private:
   const std::string filter_state_key_;
+  const std::string field_;
 };
 
 template <class MatchingDataType>
@@ -295,8 +311,8 @@ public:
         const envoy::extensions::matching::common_inputs::network::v3::FilterStateInput&>(
         message, validation_visitor);
 
-    return [filter_state_key = typed_config.key()] {
-      return std::make_unique<FilterStateInput<MatchingDataType>>(filter_state_key);
+    return [filter_state_key = typed_config.key(), field = typed_config.field()] {
+      return std::make_unique<FilterStateInput<MatchingDataType>>(filter_state_key, field);
     };
   };
 
