@@ -1601,6 +1601,8 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
 // by sending back an immediate_response message, which should be
 // returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -1629,6 +1631,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value());
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_imm_resp = json_log->getString("received_immediate_response_field");
+  EXPECT_EQ(*field_imm_resp, "1");
 }
 
 // Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
@@ -5195,7 +5201,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5273,7 +5278,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5313,7 +5317,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   // Ensure that we replaced and did not append to the request.
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   // No header mutations but a body replacement happened due to continue & replace.
   // Test that the request_body_effect shows mutation applied
@@ -5348,7 +5351,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Failed mutation request
@@ -5379,7 +5381,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
@@ -5427,7 +5428,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request

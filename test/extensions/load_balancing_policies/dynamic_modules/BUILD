@@ -15,6 +15,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:lb_callbacks_test",
         "//test/extensions/dynamic_modules/test_data/c:lb_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:lb_invalid_host_index",
+        "//test/extensions/dynamic_modules/test_data/c:lb_invalid_priority",
         "//test/extensions/dynamic_modules/test_data/c:lb_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:lb_no_choose_host",
         "//test/extensions/dynamic_modules/test_data/c:lb_round_robin",

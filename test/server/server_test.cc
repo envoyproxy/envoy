@@ -1555,7 +1555,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
-            EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
+            EXPECT_CALL(*mock_extension, onServerInitialized(_)).WillOnce(Invoke([&ctx]() {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));

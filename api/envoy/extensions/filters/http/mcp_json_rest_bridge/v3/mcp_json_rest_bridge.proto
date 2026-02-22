@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp_json_rest_bridge.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_json_rest_bridge.v3";
+option java_outer_classname = "McpJsonRestBridgeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_json_rest_bridge/v3;mcp_json_rest_bridgev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP JSON REST Bridge]
+// [#extension: envoy.filters.http.mcp_json_rest_bridge]
+
+// Configuration for the MCP MCP JSON REST Bridge.
+//
+// This extension translates Model Context Protocol (MCP) JSON-RPC requests into standard JSON-REST
+// HTTP requests. This enables existing REST backends to function as MCP servers without native MCP
+// support.
+//
+// Main functionalities:
+//
+// 1. Transcoding: Converts JSON-RPC request payload to HTTP REST request, and maps JSON response
+//    back to JSON-RPC.
+// 2. Session negotiation: Handles MCP connection prerequisites.
+//
+// The core logic transforms "tools/call" request into HTTP request following the ``HttpRule``
+// specification.
+//
+// Example 1: GET request with path and query parameters
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "getResource"
+//     http_rule: {
+//       get: "/v1/projects/{project_id}/resources/{resource_id}"
+//       // body is omitted for GET
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "getResource", "arguments": {"project_id": "foo", "resource_id": "res-789", "view": "FULL"} }
+//   Translation:
+//   - Method: GET
+//   - URL: /v1/projects/foo/resources/res-789?view=FULL
+//     (Arguments not matching path templates become query parameters.)
+//
+// Example 2: POST request with wildcard body
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "createResource"
+//     http_rule: {
+//       post: "/v1/projects/{project_id}/resources"
+//       body: "*"
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "createResource", "arguments": {"project_id": "foo", "resource_id": "res-456", "payload": { "data": "some value" }} }
+//   Translation:
+//   - Method: POST
+//   - URL: /v1/projects/foo/resources
+//   - Body: {"resource_id": "res-456", "payload": { "data": "some value" }}
+//     (Arguments not used in the path form the body, as per body: "*".)
+//
+// Example 3: PUT request with a specific field as body
+//
+// .. code-block:: text
+//
+//   tools: {
+//     name: "updateResource"
+//     http_rule: {
+//       put: "/v1/projects/{project_id}"
+//       body: "payload"
+//     }
+//   }
+//   If tools/call params are:
+//   { "name": "updateResource", "arguments": {"project_id": "foo", "resource_id": "res-456", "payload": { "data": "updated value" }} }
+//   Translation:
+//   - Method: PUT
+//   - URL: /v1/projects/foo?resource_id=res-456
+//   - Body: {"data": "updated value"}
+//     (Only the "payload" field from arguments is used as the body. Other arguments not in the
+//     path, like 'resource_id', become query parameters.)
+message McpJsonRestBridge {
+  // General server information.
+  ServerInfo server_info = 1;
+
+  // Configuration for the MCP tools.
+  ServerToolConfig tool_config = 2;
+}
+
+// Configuration for the server metadata.
+message ServerInfo {
+  // Lists the MCP protocol versions supported by this MCP endpoint.
+  //
+  // - If provided: The extension enforces version negotiation according to the MCP specification:
+  //   https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation
+  // - If not provided: The extension accepts any version sent by the client during negotiation and
+  //   skips validation of the mcp-protocol-version header on subsequent requests.
+  //
+  // Example values: ["2025-11-25", "2025-06-18"]
+  repeated string supported_protocol_versions = 1;
+
+  // Optional description of the server.
+  string description = 2;
+}
+
+// Configuration for the MCP tool capability of the server.
+message ServerToolConfig {
+  // List of MCP tools configurations.
+  repeated ToolConfig tools = 1;
+
+  // Whether this server supports notifications for changes to the tool list.
+  bool list_changed = 2;
+
+  // Optional configuration to transcode the tools/list requests to a standard HTTP request.
+  //
+  // - If provided: The extension transcodes the request and forwards it down the filter chain.
+  //   The response (whether from an upstream backend, a configured ``direct_response``, or another
+  //   extension) MUST be a JSON body strictly matching the MCP ``ListToolsResult`` schema.
+  //   Ref: https://modelcontextprotocol.io/specification/2025-11-25/schema#listtoolsresult
+  // - If not provided: The ``tools/list`` request is passed through. This allows subsequent
+  //   extension or the backend itself to handle the tools/list request if they support it.
+  HttpRule tool_list_http_rule = 3;
+}
+
+// Configuration for a specific MCP tool.
+message ToolConfig {
+  // Name of the tool.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The HTTP configuration rules that apply to the normal backend.
+  HttpRule http_rule = 2;
+}
+
+// Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
+// in a tools/call request are mapped to the URL path, query parameters, and HTTP request body.
+//
+// Mapping Rules:
+//
+// 1. Path: Fields defined in the path template (e.g., ``/v1/resources/{id}``) are extracted from
+//    arguments and placed in the URL.
+// 2. Body: Determined by the ``body`` field.
+//    - If "*": All arguments not used in the path become the HTTP JSON body.
+//    - If specify a field: Only that specific argument becomes the HTTP JSON body.
+//    - If empty: No body is sent.
+// 3. Query: Any leaf arguments not mapped to Path or Body are added as URL query parameters.
+// [#next-free-field: 7]
+message HttpRule {
+  // Determines the HTTP method and the URL path template.
+  //
+  // Path templating uses curly braces ``{}`` to mark a section of the URL path as replaceable.
+  // Each template variable MUST correspond to a field in the JSON-RPC "arguments".
+  // Use dot-notation to access fields within nested objects (e.g., "user.id" maps the value of the
+  // "id" field inside "user").
+  //
+  // To support backward compatibility with future methods, these are defined as individual fields
+  // rather than a "oneof". If multiple fields are present, the one with the highest field number
+  // highest priority) is the effective method.
+  //
+  // Maps to HTTP GET.
+  string get = 1;
+
+  // Maps to HTTP PUT.
+  string put = 2;
+
+  // Maps to HTTP POST.
+  string post = 3;
+
+  // Maps to HTTP DELETE.
+  string delete = 4;
+
+  // Maps to HTTP PATCH.
+  string patch = 5;
+
+  // The name of the request field whose value is mapped to the HTTP request body.
+  //
+  // - If "*": All fields not bound by the path template are mapped to the request body.
+  // - If specify a field: This specific field is mapped to the body. Uses dot-notation for nested
+  //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
+  // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
+  string body = 6;
+}

@@ -192,7 +192,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
         filter_config_ptr_->getMessageMatcher(std::string(type_name));
 
     if (type_matcher != nullptr) {
-      absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(type_matcher);
+      absl::StatusOr<Matcher::ActionMatchResult> match_result = tryMatch(type_matcher);
       // If the matcher says "Remove", we exclude this field entirely.
       if (matchResultStatusToFieldCheckResult(match_result, type_name) ==
           FieldCheckResults::kExclude) {
@@ -276,7 +276,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
   // If there's a match tree configured for the field, evaluate the match, convert the match result
   // to FieldCheckResults and return it.
   if (match_tree != nullptr) {
-    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+    absl::StatusOr<Matcher::ActionMatchResult> match_result = tryMatch(match_tree);
     return matchResultStatusToFieldCheckResult(match_result, field->name());
   }
 
@@ -298,7 +298,7 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
 }
 
 FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
-    absl::StatusOr<Matcher::MatchResult>& match_result, absl::string_view field_mask) const {
+    absl::StatusOr<Matcher::ActionMatchResult>& match_result, absl::string_view field_mask) const {
   // Preserve the field (i.e., kInclude) if there's any error in evaluating the match.
   // This can happen in two cases:
   // 1. The match tree is corrupt.
@@ -334,14 +334,14 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
   }
 }
 
-absl::StatusOr<Matcher::MatchResult>
+absl::StatusOr<Matcher::ActionMatchResult>
 FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
   auto it = match_result_cache_.find(getMatchTreeRawPtr(match_tree));
   if (it != match_result_cache_.end()) {
     return it->second;
   }
 
-  Matcher::MatchResult match_result = match_tree->match(matching_data_);
+  Matcher::ActionMatchResult match_result = match_tree->match(matching_data_);
   if (!match_result.isComplete()) {
     return absl::InternalError("Matching couldn't complete due to insufficient data.");
   }
@@ -359,7 +359,7 @@ FieldCheckResults FieldChecker::CheckType(const Protobuf::Type* type) const {
   // This handles scrubbing the entire payload of an Any field if the type matches.
   auto match_tree = filter_config_ptr_->getMessageMatcher(type->name());
   if (match_tree != nullptr) {
-    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+    absl::StatusOr<Matcher::ActionMatchResult> match_result = tryMatch(match_tree);
 
     if (matchResultStatusToFieldCheckResult(match_result, type->name()) ==
         FieldCheckResults::kExclude) {

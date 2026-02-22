@@ -104,6 +104,7 @@ public:
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
   void setFailedOpen() { failed_open_ = true; }
+  void setReceivedImmediateResponse() { received_immediate_response_ = true; }
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
     grpc_status_before_first_call_ = call_status;
   }
@@ -137,6 +138,7 @@ public:
   uint64_t bytesSent() const { return bytes_sent_; }
   uint64_t bytesReceived() const { return bytes_received_; }
   bool failedOpen() const { return failed_open_; }
+  bool immediateResponseReceived() const { return received_immediate_response_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
@@ -170,6 +172,8 @@ private:
   std::string http_response_code_details_;
   // True if the stream failed open.
   bool failed_open_{false};
+  // True if the external_processor sends an immediate response.
+  bool received_immediate_response_{false};
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };

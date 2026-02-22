@@ -188,6 +188,7 @@ message BindConfig {
 message Address {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Address";
 
+  // [#comment: Keep this list of address types in sync with UpstreamConnectionOptions.FirstAddressFamilyVersion in api/envoy/config/cluster/v3/cluster.proto.]
   oneof address {
     option (validate.required) = true;
 
