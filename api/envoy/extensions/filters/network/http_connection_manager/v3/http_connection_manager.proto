@@ -553,7 +553,9 @@ message HttpConnectionManager {
   //
   //   Currently some protocol codecs impose limits on the maximum size of a single header.
   //
-  //   * HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   * HTTP/2 (when using nghttp2) limits a single header to around 100kb by default. This can be
+  //     adjusted via :ref:`max_header_field_size_kb
+  //     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>`.
   //   * HTTP/3 limits a single header to around 1024kb.
   //
   google.protobuf.UInt32Value max_request_headers_kb = 29

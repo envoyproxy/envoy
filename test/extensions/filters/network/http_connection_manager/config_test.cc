@@ -907,6 +907,24 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   EXPECT_EQ(8192, config.maxRequestHeadersKb());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxHeaderFieldSizeKbExceedsMaxRequestHeadersKb) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 64
+  http2_protocol_options:
+    max_header_field_size_kb: 128
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "max_header_field_size_kb must not exceed max_request_headers_kb");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRuntime) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

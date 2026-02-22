@@ -2123,6 +2123,11 @@ ConnectionImpl::Http2Options::Http2Options(
     nghttp2_option_set_disable_huffman_encoding(options_, 1);
   }
 
+  if (http2_options.has_max_header_field_size_kb()) {
+    nghttp2_option_set_max_hd_nv_size(options_,
+                                      http2_options.max_header_field_size_kb().value() * 1024);
+  }
+
   if (http2_options.allow_metadata()) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   } else {

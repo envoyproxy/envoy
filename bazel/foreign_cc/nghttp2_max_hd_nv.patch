@@ -1,0 +1,120 @@
+diff --git a/lib/includes/nghttp2/nghttp2.h b/lib/includes/nghttp2/nghttp2.h
+--- a/lib/includes/nghttp2/nghttp2.h
++++ b/lib/includes/nghttp2/nghttp2.h
+@@ -3162,6 +3162,18 @@
+ */
+ NGHTTP2_EXTERN void
+ nghttp2_option_set_disable_huffman_encoding(nghttp2_option *option, int val);
++
++/**
++ * @function
++ *
++ * This option sets the maximum length of an individual header
++ * name/value that the HPACK inflater will accept.  The default value
++ * is 65536 (64 KiB on the wire).  Setting a larger value allows
++ * receiving headers whose Huffman-encoded representation exceeds the
++ * default limit.
++ */
++NGHTTP2_EXTERN void
++nghttp2_option_set_max_hd_nv_size(nghttp2_option *option, size_t val);
+ 
+ /**
+  * @function
+
+diff --git a/lib/nghttp2_hd.h b/lib/nghttp2_hd.h
+--- a/lib/nghttp2_hd.h
++++ b/lib/nghttp2_hd.h
+@@ -252,6 +252,8 @@
+   size_t min_hd_table_bufsize_max;
+   /* The number of next shift to decode integer */
+   size_t shift;
++  /* The maximum length of a single header name or value */
++  size_t max_nv;
+   nghttp2_hd_opcode opcode;
+   nghttp2_hd_inflate_state state;
+   /* nonzero if string is huffman encoded */
+
+diff --git a/lib/nghttp2_hd.c b/lib/nghttp2_hd.c
+--- a/lib/nghttp2_hd.c
++++ b/lib/nghttp2_hd.c
+@@ -757,6 +757,7 @@
+ 
+   inflater->settings_hd_table_bufsize_max = NGHTTP2_HD_DEFAULT_MAX_BUFFER_SIZE;
+   inflater->min_hd_table_bufsize_max = UINT32_MAX;
++  inflater->max_nv = NGHTTP2_HD_MAX_NV;
+ 
+   inflater->nv_name_keep = NULL;
+   inflater->nv_value_keep = NULL;
+@@ -2179,7 +2180,7 @@
+     /* Fall through */
+     case NGHTTP2_HD_STATE_NEWNAME_READ_NAMELEN:
+       rfin = 0;
+-      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
++      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
+       if (rv < 0) {
+         goto fail;
+       }
+@@ -2263,7 +2264,7 @@
+     /* Fall through */
+     case NGHTTP2_HD_STATE_READ_VALUELEN:
+       rfin = 0;
+-      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, NGHTTP2_HD_MAX_NV);
++      rv = hd_inflate_read_len(inflater, &rfin, in, last, 7, inflater->max_nv);
+       if (rv < 0) {
+         goto fail;
+       }
+
+diff --git a/lib/nghttp2_option.h b/lib/nghttp2_option.h
+--- a/lib/nghttp2_option.h
++++ b/lib/nghttp2_option.h
+@@ -72,6 +72,7 @@
+   NGHTTP2_OPT_NO_RFC9113_LEADING_AND_TRAILING_WS_VALIDATION = 1 << 14,
+   NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
+   NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
++  NGHTTP2_OPT_MAX_HD_NV_SIZE = 1 << 17,
+   NGHTTP2_OPT_DISABLE_HUFFMAN = 1 << 30,
+ } nghttp2_option_flag;
+ 
+@@ -97,6 +98,10 @@
+    */
+   int disable_huffman;
+   /**
++   * NGHTTP2_OPT_MAX_HD_NV_SIZE
++   */
++  size_t max_hd_nv_size;
++  /**
+    * NGHTTP2_OPT_MAX_OUTBOUND_ACK
+    */
+   size_t max_outbound_ack;
+
+diff --git a/lib/nghttp2_option.c b/lib/nghttp2_option.c
+--- a/lib/nghttp2_option.c
++++ b/lib/nghttp2_option.c
+@@ -122,6 +122,11 @@
+   option->disable_huffman = val;
+ }
+ 
++void nghttp2_option_set_max_hd_nv_size(nghttp2_option *option, size_t val) {
++  option->opt_set_mask |= NGHTTP2_OPT_MAX_HD_NV_SIZE;
++  option->max_hd_nv_size = val;
++}
++
+ void nghttp2_option_set_no_closed_streams(nghttp2_option *option, int val) {
+   option->opt_set_mask |= NGHTTP2_OPT_NO_CLOSED_STREAMS;
+   option->no_closed_streams = val;
+
+diff --git a/lib/nghttp2_session.c b/lib/nghttp2_session.c
+--- a/lib/nghttp2_session.c
++++ b/lib/nghttp2_session.c
+@@ -586,6 +586,10 @@
+   rv = nghttp2_hd_inflate_init(&(*session_ptr)->hd_inflater, mem);
+   if (rv != 0) {
+     goto fail_hd_inflater;
++  }
++
++  if (option && (option->opt_set_mask & NGHTTP2_OPT_MAX_HD_NV_SIZE)) {
++    (*session_ptr)->hd_inflater.max_nv = option->max_hd_nv_size;
+   }
+ 
+   nbuffer = ((*session_ptr)->max_send_header_block_length +
+
