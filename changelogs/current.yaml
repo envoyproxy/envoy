@@ -241,6 +241,13 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: matching
+  change: |
+    Added an optional ``field`` parameter to
+    :ref:`FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`.
+    When set, ``FilterStateInput`` calls ``getField()`` on the filter state object instead of
+    ``serializeAsString()``, enabling direct matching on individual fields within composite filter
+    state objects such as proxy protocol TLVs stored via ``tlv_location: FILTER_STATE``.
 - area: ratelimit
   change: |
     Added per-descriptor ``x-ratelimit-*`` headers support. See the
