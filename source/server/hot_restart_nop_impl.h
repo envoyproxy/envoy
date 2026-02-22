@@ -34,6 +34,7 @@ public:
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  bool isInitializing() const override { return false; }
 
 private:
   Thread::MutexBasicLockable log_lock_;

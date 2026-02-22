@@ -128,6 +128,11 @@ public:
    * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
+
+  /**
+   * @return bool whether the server is currently in the initializing state during hot restart.
+   */
+  virtual bool isInitializing() const PURE;
 };
 
 /**
