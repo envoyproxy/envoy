@@ -2606,9 +2606,9 @@ uint32_t adjustMaxSingleHeaderSizeForCodecLimits(uint32_t size,
   if (params.http2_implementation == Http2Impl::Nghttp2 &&
       (params.downstream_protocol == Http::CodecType::HTTP2 ||
        params.upstream_protocol == Http::CodecType::HTTP2)) {
-    // nghttp2 has a hard-coded, unconfigurable limit of 64k for a header in it's header
-    // decompressor, so this test will always fail when using that codec.
-    // Reduce the size so that it can pass and receive some test coverage.
+    // nghttp2 has a default limit of 64k for a header in its HPACK decompressor.
+    // This can be increased via max_header_field_size_kb, but for these tests we
+    // reduce the size so that it can pass with the default limit.
     return 100;
   } else if (params.downstream_protocol == Http::CodecType::HTTP3 ||
              params.upstream_protocol == Http::CodecType::HTTP3) {
@@ -2626,6 +2626,74 @@ TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAccepted) {
   uint32_t size = adjustMaxSingleHeaderSizeForCodecLimits(8191, GetParam());
 
   testLargeRequestHeaders(size, 1, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+// Test that configuring max_header_field_size_kb allows sending a single header that exceeds
+// the default nghttp2 per-header HPACK limit.
+TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAcceptedWithIncreasedPerHeaderLimit) {
+  // This test only applies when both downstream and upstream are HTTP/2 with nghttp2.
+  if (GetParam().http2_implementation != Http2Impl::Nghttp2 ||
+      GetParam().downstream_protocol != Http::CodecType::HTTP2 ||
+      GetParam().upstream_protocol != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  // Use a 200 KiB header of 'a' characters. With Huffman encoding, 'a' is 5 bits, so the
+  // wire-encoded size is 200*1024*5/8 = 128000 bytes, which exceeds the default 64 KiB
+  // wire limit but fits within a max_header_field_size_kb of 128 KiB.
+  const uint32_t header_size_kb = 200;
+  const uint32_t max_header_field_size_kb = 128;
+  const uint32_t max_headers_kb = header_size_kb + 1;
+
+  // Configure downstream HTTP/2 codec with increased max_header_field_size_kb.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_max_request_headers_kb()->set_value(max_headers_kb);
+        hcm.mutable_http2_protocol_options()->mutable_max_header_field_size_kb()->set_value(
+            max_header_field_size_kb);
+      });
+
+  // Configure upstream cluster HTTP/2 options with increased max_header_field_size_kb.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->mutable_max_header_field_size_kb()
+        ->set_value(max_header_field_size_kb);
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_response_headers_kb()
+        ->set_value(max_headers_kb);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  // Configure the fake upstream to accept the larger headers.
+  setMaxRequestHeadersKb(max_headers_kb);
+  upstreamConfig().http2_options_.mutable_max_header_field_size_kb()->set_value(
+      max_header_field_size_kb);
+
+  autonomous_upstream_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
+      ->setResponseHeaders(
+          std::make_unique<Http::TestResponseHeaderMapImpl>(default_response_headers_));
+
+  Http::TestRequestHeaderMapImpl big_headers{{":method", "GET"},
+                                             {":path", "/test/long/url"},
+                                             {":scheme", "http"},
+                                             {":authority", "sni.lyft.com"}};
+  big_headers.addCopy("big", std::string(header_size_kb * 1024, 'a'));
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(big_headers);
+  RELEASE_ASSERT(response->waitForEndStream(TestUtility::DefaultTimeout),
+                 "unexpected timeout waiting for response");
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
 }
 
 // Test a single header of the maximum allowed size.

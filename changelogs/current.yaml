@@ -169,6 +169,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: http2
+  change: |
+    Added :ref:`max_header_field_size_kb
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>` to configure the
+    maximum wire-encoded size in KiB of an individual HPACK-encoded header field that the HTTP/2
+    codec will accept. This allows increasing the default nghttp2 per-header limit of 64 KiB on the
+    wire when larger single headers need to be supported.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic

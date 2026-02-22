@@ -3140,6 +3140,32 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, LargeRequestHeadersAcceptedWithIncreasedPerHeaderLimit) {
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    // max_header_field_size_kb only applies to nghttp2.
+    initialize();
+    return;
+  }
+
+  // Use the same 80KB 'q' header that exceeds the default 64KB wire limit in
+  // LargeRequestHeadersExceedPerHeaderLimit, but configure max_header_field_size_kb to 128 KiB
+  // so that the inflater accepts it.
+  max_request_headers_kb_ = 128;
+  server_http2_options_.mutable_max_header_field_size_kb()->set_value(128);
+  client_http2_options_.mutable_max_header_field_size_kb()->set_value(128);
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  std::string long_string = std::string(80 * 1024, 'q');
+  request_headers.addCopy("big", long_string);
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
   max_request_headers_kb_ = 81;
   initialize();

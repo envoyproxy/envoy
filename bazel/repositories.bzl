@@ -593,6 +593,7 @@ def _nghttp2():
         patches = [
             "@envoy//bazel/foreign_cc:nghttp2.patch",
             "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
+            "@envoy//bazel/foreign_cc:nghttp2_max_hd_nv.patch",
         ],
     )
 
