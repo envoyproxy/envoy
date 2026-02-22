@@ -122,9 +122,14 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
-                                           : datadog::tracing::SamplingPriority::USER_DROP);
-  span_->trace_segment().override_sampling_priority(priority);
+  if (!sampled) {
+    // Match startSpan() semantics: false is a definite drop.
+    span_->trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+  }
+  // When sampled is true, do nothing — leave the priority as-is so the
+  // Datadog agent can apply its own sampling rate. This matches how
+  // startSpan() handles traced=true by leaving the priority unset.
 }
 
 std::string Span::getBaggage(absl::string_view) {
