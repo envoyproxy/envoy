@@ -329,7 +329,7 @@ EXTENSIONS = {
     "envoy.tracers.opentelemetry.resource_detectors.environment":         "//source/extensions/tracers/opentelemetry/resource_detectors/environment:config",
     "envoy.tracers.opentelemetry.resource_detectors.dynatrace":           "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
     "envoy.tracers.opentelemetry.resource_detectors.static_config":       "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",
-
+    "envoy.tracers.opentelemetry.resource_detectors.per_route":           "//source/extensions/tracers/opentelemetry/resource_detectors/per_route:config",
     #
     # OpenTelemetry tracer samplers
     #
@@ -631,6 +631,9 @@ EXTENSIONS = {
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",
+
+    # Typed Metadata
+    "envoy.tracers.opentelemetry.resource_typed_metadata": "//source/extensions/tracers/opentelemetry/resource_typed_metadata:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

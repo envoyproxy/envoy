@@ -23,7 +23,8 @@ namespace {
 
 class SampleDetector : public ResourceDetector {
 public:
-  MOCK_METHOD(Resource, detect, ());
+  MOCK_METHOD(ResourceConstSharedPtr, detect, (), (const));
+  MOCK_METHOD(ResourceConstSharedPtr, detect, (const StreamInfo::StreamInfo&), (const));
 };
 
 class DetectorFactoryA : public ResourceDetectorFactory {
@@ -77,10 +78,10 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -104,10 +105,10 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
 // Verifies it is possible to configure multiple resource detectors
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(resource_a_));
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(std::make_shared<Resource>(resource_a_)));
 
   auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(resource_b_));
+  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(std::make_shared<Resource>(resource_b_)));
 
   DetectorFactoryA factory_a;
   Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
@@ -146,10 +147,10 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   EXPECT_EQ(resource.schema_url_, "");
 
@@ -181,10 +182,9 @@ TEST_F(ResourceProviderTest, UnknownResourceDetectors) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
   EXPECT_THROW_WITH_MESSAGE(
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name()),
+      ResourceProviderImpl(opentelemetry_config.resource_detectors(), server_factory_context_,
+                           opentelemetry_config.service_name()),
       EnvoyException,
       "Resource detector factory not found: "
       "'envoy.tracers.opentelemetry.resource_detectors.UnkownResourceDetector'");
@@ -213,10 +213,9 @@ TEST_F(ResourceProviderTest, ProblemCreatingResourceDetector) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  EXPECT_THROW_WITH_MESSAGE(resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                                          server_factory_context_,
-                                                          opentelemetry_config.service_name()),
+  EXPECT_THROW_WITH_MESSAGE(ResourceProviderImpl(opentelemetry_config.resource_detectors(),
+                                                 server_factory_context_,
+                                                 opentelemetry_config.service_name()),
                             EnvoyException,
                             "Resource detector could not be created: "
                             "'envoy.tracers.opentelemetry.resource_detectors.a'");
@@ -232,10 +231,11 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   updating_resource.schema_url_ = expected_schema_url;
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(std::make_shared<Resource>(old_resource)));
 
   auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  EXPECT_CALL(*detector_b, detect())
+      .WillOnce(Return(std::make_shared<Resource>(updating_resource)));
 
   DetectorFactoryA factory_a;
   Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
@@ -265,10 +265,10 @@ TEST_F(ResourceProviderTest, OldSchemaEmptyUpdatingSet) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -284,10 +284,11 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   updating_resource.schema_url_ = "";
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(std::make_shared<Resource>(old_resource)));
 
   auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  EXPECT_CALL(*detector_b, detect())
+      .WillOnce(Return(std::make_shared<Resource>(updating_resource)));
 
   DetectorFactoryA factory_a;
   Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
@@ -317,10 +318,10 @@ TEST_F(ResourceProviderTest, OldSchemaSetUpdatingEmpty) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   // OTel spec says the updating schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
@@ -336,10 +337,11 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   updating_resource.schema_url_ = expected_schema_url;
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(std::make_shared<Resource>(old_resource)));
 
   auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  EXPECT_CALL(*detector_b, detect())
+      .WillOnce(Return(std::make_shared<Resource>(updating_resource)));
 
   DetectorFactoryA factory_a;
   Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
@@ -369,10 +371,10 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreEqual) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   EXPECT_EQ(expected_schema_url, resource.schema_url_);
 }
@@ -387,10 +389,11 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   updating_resource.schema_url_ = "my.schema/v2";
 
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(old_resource));
+  EXPECT_CALL(*detector_a, detect()).WillOnce(Return(std::make_shared<Resource>(old_resource)));
 
   auto detector_b = std::make_unique<NiceMock<SampleDetector>>();
-  EXPECT_CALL(*detector_b, detect()).WillOnce(Return(updating_resource));
+  EXPECT_CALL(*detector_b, detect())
+      .WillOnce(Return(std::make_shared<Resource>(updating_resource)));
 
   DetectorFactoryA factory_a;
   Registry::InjectFactory<ResourceDetectorFactory> factory_a_registration(factory_a);
@@ -420,10 +423,10 @@ TEST_F(ResourceProviderTest, OldAndUpdatingSchemaAreDifferent) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  ResourceProviderImpl resource_provider;
-  Resource resource =
-      resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                    server_factory_context_, opentelemetry_config.service_name());
+  ResourceProviderImpl resource_provider(opentelemetry_config.resource_detectors(),
+                                         server_factory_context_,
+                                         opentelemetry_config.service_name());
+  Resource resource = *resource_provider.getResource();
 
   // OTel spec says Old schema should be used
   EXPECT_EQ(expected_schema_url, resource.schema_url_);

@@ -23,11 +23,8 @@ namespace OpenTelemetry {
 class Driver : Logger::Loggable<Logger::Id::tracing>, public Tracing::Driver {
 public:
   Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-         Server::Configuration::TracerFactoryContext& context);
-
-  Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
          Server::Configuration::TracerFactoryContext& context,
-         const ResourceProvider& resource_provider);
+         std::shared_ptr<ResourceProvider> resource_provider);
 
   // Tracing::Driver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
@@ -49,6 +46,7 @@ private:
   const envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config_;
   ThreadLocal::SlotPtr tls_slot_ptr_;
   OpenTelemetryTracerStats tracing_stats_;
+  std::shared_ptr<ResourceProvider> resource_provider_;
 };
 
 } // namespace OpenTelemetry

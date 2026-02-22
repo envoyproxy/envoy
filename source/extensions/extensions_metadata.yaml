@@ -2188,6 +2188,20 @@ envoy.tracers.opentelemetry.resource_detectors.static_config:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig
+envoy.tracers.opentelemetry.resource_detectors.per_route:
+  categories:
+  - envoy.tracers.opentelemetry.resource_detectors
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.PerRouteResourceDetectorConfig
+envoy.tracers.opentelemetry.resource_typed_metadata:
+  categories:
+  - envoy.typed_metadata
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.resource_detectors.v3.ResourceTypedMetadata
 envoy.quic.connection_debug_visitor.basic:
   categories:
   - envoy.quic.connection_debug_visitor

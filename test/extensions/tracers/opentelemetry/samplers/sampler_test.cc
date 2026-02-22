@@ -6,6 +6,7 @@
 
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
@@ -21,8 +22,16 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+using ::testing::_;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
+
+class MockResourceProvider : public ResourceProvider {
+public:
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (), (const));
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (const StreamInfo::StreamInfo&), (const));
+};
 
 class TestSampler : public Sampler {
 public:
@@ -81,7 +90,11 @@ TEST_F(SamplerFactoryTest, TestWithoutSampler) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+  auto resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+  EXPECT_CALL(*resource_provider, getResource(_))
+      .WillRepeatedly(Return(std::make_shared<Resource>()));
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context, resource_provider);
 
   driver->startSpan(config, trace_context, stream_info, "operation_name",
                     {Tracing::Reason::Sampling, true});
@@ -110,7 +123,12 @@ TEST_F(SamplerFactoryTest, TestWithInvalidSampler) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  EXPECT_THROW(std::make_unique<Driver>(opentelemetry_config, context), EnvoyException);
+  auto resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+  EXPECT_CALL(*resource_provider, getResource(_))
+      .WillRepeatedly(Return(std::make_shared<Resource>()));
+
+  EXPECT_THROW(std::make_unique<Driver>(opentelemetry_config, context, resource_provider),
+               EnvoyException);
 }
 
 // Test OTLP tracer with a sampler
@@ -136,7 +154,11 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+  auto resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+  EXPECT_CALL(*resource_provider, getResource(_))
+      .WillRepeatedly(Return(std::make_shared<Resource>()));
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context, resource_provider);
 
   // shouldSample returns a result without additional attributes and Decision::RecordAndSample
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
@@ -247,7 +269,11 @@ TEST_F(SamplerFactoryTest, TestInitialAttributes) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+  auto resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+  EXPECT_CALL(*resource_provider, getResource(_))
+      .WillRepeatedly(Return(std::make_shared<Resource>()));
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context, resource_provider);
 
   auto expected = makeOptRef<const Tracing::TraceContext>(trace_context);
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, expected, _));

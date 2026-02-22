@@ -21,7 +21,7 @@ void addAttributes(const std::string& content, Resource& resource) {
 
 } // namespace
 
-Resource DynatraceResourceDetector::detect() {
+ResourceConstSharedPtr DynatraceResourceDetector::detect() const {
   Resource resource;
   resource.schema_url_ = "";
   int failure_count = 0;
@@ -54,7 +54,7 @@ Resource DynatraceResourceDetector::detect() {
         "Check the Dynatrace deployment status to ensure it is correctly deployed.");
   }
 
-  return resource;
+  return std::make_shared<Resource>(std::move(resource));
 }
 
 } // namespace OpenTelemetry
