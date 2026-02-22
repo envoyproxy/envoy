@@ -913,16 +913,25 @@ class FormatChecker:
 
     def clang_format(self, file_path, check=False):
         result = []
-        command = (
-            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
-            if check else f"{self.config.clang_format_path} -i {file_path}")
-
         if check:
-            result = self.execute_command(command, "clang-format check failed", file_path)
+            fmt_proc = subprocess.Popen(
+                [self.config.clang_format_path, file_path],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            diff_proc = subprocess.Popen(
+                ["diff", file_path, "-"],
+                stdin=fmt_proc.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            fmt_proc.stdout.close()
+            output, _ = diff_proc.communicate()
+            if diff_proc.returncode not in (0, 1):
+                result = [f"clang-format check failed for file: {file_path}"]
+            elif output:
+                result = output.decode('utf-8').strip().split("\n")
         else:
-            if os.system(command) != 0:
+            ret = subprocess.run(
+                [self.config.clang_format_path, "-i", file_path],
+                capture_output=True)
+            if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
-
         return result
 
     def check_format(self, file_path, fail_on_diff=False):
