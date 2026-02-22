@@ -99,6 +99,43 @@ const std::string ConfigIspAndCity = R"EOF(
           isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
 
+const std::string ConfigIspAndAsnWithAsnOrg = R"EOF(
+  name: envoy.filters.http.geoip
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
+    xff_config:
+      xff_num_trusted_hops: 1
+    provider:
+      name: envoy.geoip_providers.maxmind
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+        common_provider_config:
+          geo_field_keys:
+            asn: "x-geo-asn"
+            asn_org: "x-geo-asn-org"
+            isp: "x-geo-isp"
+        isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+        asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF";
+
+const std::string ConfigIspOnlyWithAsnOrg = R"EOF(
+  name: envoy.filters.http.geoip
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
+    xff_config:
+      xff_num_trusted_hops: 1
+    provider:
+      name: envoy.geoip_providers.maxmind
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+        common_provider_config:
+          geo_field_keys:
+            asn: "x-geo-asn"
+            asn_org: "x-geo-asn-org"
+            isp: "x-geo-isp"
+        isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+  )EOF";
+
 const std::string ConfigIsApplePrivateRelayOnly = R"EOF(
     name: envoy.filters.http.geoip
     typed_config:
@@ -303,6 +340,50 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
   // asn_db is not used so the metrics should be null.
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.total"));
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.hit"));
+}
+
+TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigIspAndAsnWithAsnOrg));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "89.160.20.112,9.10.11.12"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_EQ("29518", headerValue("x-geo-asn"));
+  // Verify ASN DB takes precedence: For IP 89.160.20.112:
+  // - ASN DB returns autonomous_system_organization="Bredband2 AB"
+  // - ISP DB returns organization="Bevtec"
+  // We expect "Bredband2 AB", proving ASN DB takes precedence over ISP DB for asn_org.
+  EXPECT_EQ("Bredband2 AB", headerValue("x-geo-asn-org"));
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.hit")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
+}
+
+TEST_P(GeoipFilterIntegrationTest, AsnOrgFallsBackToIspDbWhenAsnDbNotConfigured) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigIspOnlyWithAsnOrg));
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "::1.128.0.1,9.10.11.12"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_EQ("1221", headerValue("x-geo-asn"));
+  EXPECT_EQ("Telstra Internet", headerValue("x-geo-asn-org"));
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.total"));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoHeadersOverridenInRequest) {

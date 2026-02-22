@@ -13,13 +13,26 @@ class StatsAccessLogIntegrationTest : public HttpIntegrationTest,
 public:
   StatsAccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void init(const std::string& config_yaml) {
-    autonomous_upstream_ = true;
+  void init(const std::string& config_yaml, bool autonomous_upstream = true,
+            bool flush_access_log_on_new_request = false) {
+    init(std::vector<std::string>{config_yaml}, autonomous_upstream,
+         flush_access_log_on_new_request);
+  }
+
+  void init(const std::vector<std::string>& config_yamls, bool autonomous_upstream = true,
+            bool flush_access_log_on_new_request = false) {
+    autonomous_upstream_ = autonomous_upstream;
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        [&, config_yamls](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          auto* access_log = hcm.add_access_log();
-          TestUtility::loadFromYaml(config_yaml, *access_log);
+          if (flush_access_log_on_new_request) {
+            hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
+          }
+          for (const auto& config_yaml : config_yamls) {
+            auto* access_log = hcm.add_access_log();
+            TestUtility::loadFromYaml(config_yaml, *access_log);
+          }
         });
 
     HttpIntegrationTest::initialize();
@@ -162,6 +175,108 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
 
   double p100 = histogram->cumulativeStatistics().computedQuantiles().back();
   EXPECT_NEAR(0.1, p100, 0.05);
+}
+
+TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
+  const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
+)EOF";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-tag"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for upstream to receive request.
+  waitForNextUpstreamRequest();
+
+  // After DownstreamStart is logged, gauge should be 1.
+  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 1);
+
+  // Send response from upstream.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for client to receive response.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // After DownstreamEnd is logged, gauge should be 0.
+  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+}
+
+TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
+  const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              filter:
+                log_type_filter:
+                  types: [DownstreamEnd]
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
+)EOF";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-tag"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for upstream to receive request.
+  waitForNextUpstreamRequest();
+
+  // Since DownstreamStart is filtered out, gauge should be 0.
+  // Note: waitForGaugeEq waits for the gauge to exist and equal the value.
+  // If no stats are emitted yet, it might timeout or fail depending on implementation.
+  // However, in this case, we expect NO stats to be emitted at start.
+  // We can't verify "stat doesn't exist" easily with waitForGaugeEq.
+  // But we proceed.
+
+  // Send response from upstream.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for client to receive response.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // After DownstreamEnd is logged, subtract should be skipped because Add didn't happen.
+  // Gauge should still be 0.
+  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
 } // namespace

@@ -24,11 +24,15 @@ public:
   public:
     virtual ~OutputFormat() = default;
 
-    void setHistogramsAsSummaries(bool histograms_as_summaries) {
-      histograms_as_summaries_ = histograms_as_summaries;
-    }
+    enum class HistogramType {
+      Summary,
+      ClassicHistogram,
+      NativeHistogram,
+    };
 
-    bool histogramsAsSummaries() const { return histograms_as_summaries_; }
+    void setHistogramType(HistogramType type) { histogram_type_ = type; }
+
+    HistogramType histogramType() const { return histogram_type_; }
 
     // Return the prometheus output for a group of Counters.
     virtual void generateOutput(Buffer::Instance& output,
@@ -61,7 +65,7 @@ public:
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
   private:
-    bool histograms_as_summaries_{false};
+    HistogramType histogram_type_;
   };
 
   /**
@@ -118,7 +122,8 @@ public:
   /**
    * Validate the given params, returning an error on invalid arguments
    */
-  static absl::Status validateParams(const StatsParams& params);
+  static absl::Status validateParams(const StatsParams& params,
+                                     const Http::RequestHeaderMap& headers);
 
   /**
    * Format the given metric name, and prefixed with "envoy_" if it does not have a custom

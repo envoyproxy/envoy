@@ -32,7 +32,8 @@ public:
   QuicPlatformPacketWriterFactoryTest() : factory_(dispatcher_) {
     // Prepare the mock file event and expectation before creating/initializing the socket
     file_event_ = new Event::MockFileEvent();
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event_));
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
+        .WillOnce(testing::DoAll(testing::SaveArg<0>(&socket_fd_), Return(file_event_)));
 
     Network::Address::InstanceConstSharedPtr peer_address =
         quicAddressToEnvoyAddressInstance(peer_addr_);
@@ -47,6 +48,7 @@ public:
     client_socket_->ioHandle().initializeFileEvent(
         dispatcher_, [&](uint32_t) { return absl::OkStatus(); }, Event::FileTriggerType::Edge,
         Event::FileReadyType::Write);
+    EXPECT_NE(socket_fd_, INVALID_SOCKET);
   }
 
   void SetUp() override {
@@ -76,6 +78,7 @@ protected:
   QuicPlatformPacketWriterFactory factory_;
   std::unique_ptr<EnvoyQuicPacketWriter> packet_writer_;
   Network::ConnectionSocketPtr client_socket_;
+  os_fd_t socket_fd_{INVALID_SOCKET};
   std::string packet_data_{"Hello World!"};
   quic::QuicIpAddress self_ip_{quic::QuicIpAddress::Loopback6()};
   quic::QuicSocketAddress peer_addr_{quic::QuicIpAddress::Any6(), 443};
@@ -83,7 +86,7 @@ protected:
 
 // Tests successful write.
 TEST_F(QuicPlatformPacketWriterFactoryTest, WritePacketSuccess) {
-  EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+  EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{static_cast<ssize_t>(packet_data_.length()), 0}));
 
   writePacketAndVerifyResult(quic::WRITE_STATUS_OK);
@@ -93,7 +96,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, WritePacketSuccess) {
 // backoff: 1 retry -> 1ms, 2 retries -> 2ms, 3 retries -> 4ms, etc.
 TEST_F(QuicPlatformPacketWriterFactoryTest,
        WritePacketWithNoBufferSpaceErrorAndRetryWithExponentialBackoff) {
-  EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+  EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}));
 
   // Mock the retry timer.
@@ -121,7 +124,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest,
 
 // Test that retry count gets reset after a successful write.
 TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) {
-  EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+  EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}));
 
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
@@ -132,7 +135,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) 
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
     packet_writer_->SetWritable();
     // Simulate successful write after retries.
-    EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+    EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{static_cast<ssize_t>(packet_data_.length()), 0}));
     packet_writer_->SetWritable();
     writePacketAndVerifyResult(quic::WRITE_STATUS_OK);
@@ -141,7 +144,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) 
 
   // Retry count should be reset after the last successful write. Following SOCKET_ERROR_NOBUFS
   // errors should be retried for 12 times again.
-  EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+  EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}));
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1), _));
   writePacketAndVerifyResult(quic::WRITE_STATUS_BLOCKED);
@@ -165,7 +168,7 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) 
 // Test that other error codes don't trigger retry logic
 TEST_F(QuicPlatformPacketWriterFactoryTest, OtherErrorCodesNoRetry) {
   // EPERM should not trigger retry
-  EXPECT_CALL(os_sys_calls_, send(3, _, _, _))
+  EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_PERM}));
 
   writePacketAndVerifyResult(quic::WRITE_STATUS_ERROR, SOCKET_ERROR_PERM);

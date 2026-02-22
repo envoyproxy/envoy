@@ -258,6 +258,39 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
 
+.. note::
+   The ``upstream_rq_<*xx>`` and ``upstream_rq_<*>`` counters only count **final** responses
+   sent to the downstream client. Responses that trigger a retry are counted in
+   ``retry.upstream_rq_<*xx>`` and ``retry.upstream_rq_<*>`` instead (see
+   :ref:`retry statistics <config_cluster_manager_cluster_stats_retry>` below).
+
+   For example, if a request receives ``503`` → ``503`` → ``200`` (two retries before success):
+
+   * ``retry.upstream_rq_503`` = 2 (the two ``503`` responses that were retried)
+   * ``upstream_rq_503`` = 0 (no 503 was sent downstream)
+   * ``upstream_rq_200`` = 1 (the final successful response)
+
+.. _config_cluster_manager_cluster_stats_retry:
+
+Retry statistics
+----------------
+
+When retries are enabled and a response triggers a retry, the following dynamic HTTP statistics
+are emitted. These are rooted at ``cluster.<name>.retry.`` and track responses that were **not**
+sent to the downstream client because they triggered a retry:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  ``upstream_rq_<\*xx>``, Counter, "Aggregate HTTP response codes that triggered retry (e.g., 5xx)"
+  ``upstream_rq_<\*>``, Counter, "Specific HTTP response codes that triggered retry (e.g., ``503``)"
+
+.. note::
+   These counters are incremented when a response triggers a retry and is **not** forwarded
+   downstream. The corresponding ``upstream_rq_<*>`` counters (without the ``retry.`` prefix)
+   only count final responses that were actually sent to the client.
+
 .. _config_cluster_manager_cluster_stats_tls:
 
 TLS statistics

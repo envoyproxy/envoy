@@ -4,6 +4,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 
 #include "absl/strings/str_cat.h"
@@ -16,6 +17,10 @@ namespace Mcp {
 using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
+
+const Http::LowerCaseString kMcpSessionId{
+    std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
+
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "mcp.");
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -35,6 +40,14 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
       stats_(generateStats(stats_prefix, scope)) {}
+
+bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
+  // DELETE is only meaningful for MCP session termination when MCP-Session-Id is present.
+  if (headers.getMethodValue() != Http::Headers::get().MethodValues.Delete) {
+    return false;
+  }
+  return !headers.get(kMcpSessionId).empty();
+}
 
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a GET request for SSE stream
@@ -59,10 +72,18 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
 }
 
 bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const {
-  // Check if this is a POST request with JSON content
+  // Check if this is a POST request with JSON content.
+  // Content-Type is JSON if it is exactly "application/json" or starts with
+  // "application/json" followed by ';' or ' ' (for parameters like charset).
+  // This rejects related but distinct types like application/json-patch+json.
+  const absl::string_view content_type = headers.getContentTypeValue();
+  const auto& json_ct = Http::Headers::get().ContentTypeValues.Json;
+  bool is_json_content_type =
+      absl::StartsWith(content_type, json_ct) &&
+      (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
+       content_type[json_ct.size()] == ' ');
   bool is_post_request =
-      headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+      headers.getMethodValue() == Http::Headers::get().MethodValues.Post && is_json_content_type;
 
   if (!is_post_request) {
     return false;
@@ -119,6 +140,12 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
+  if (isValidMcpDeleteRequest(headers)) {
+    is_mcp_request_ = true;
+    ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (isValidMcpSseRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP SSE request, passing through");
@@ -266,6 +293,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
+      (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
+          .set_bool_value(is_mcp_request_);
       decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }

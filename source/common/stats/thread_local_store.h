@@ -115,6 +115,7 @@ public:
   std::vector<Bucket> detailedIntervalBuckets() const override {
     return detailedlBucketsHelper(*interval_histogram_);
   }
+  uint64_t cumulativeCountLessThanOrEqualToValue(double value) const override;
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
@@ -134,8 +135,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
-  static std::vector<Stats::ParentHistogram::Bucket>
-  detailedlBucketsHelper(const histogram_t& histogram);
+  std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram) const;
 
   const Histogram::Unit unit_;
   const absl::optional<uint32_t> bins_;

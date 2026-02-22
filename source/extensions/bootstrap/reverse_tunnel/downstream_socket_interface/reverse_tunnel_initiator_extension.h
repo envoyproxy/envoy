@@ -50,7 +50,7 @@ public:
               stat_prefix_);
   }
 
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override;
 
   /**

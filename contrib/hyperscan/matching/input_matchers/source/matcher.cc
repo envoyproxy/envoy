@@ -6,6 +6,8 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
+using ::Envoy::Matcher::MatchResult;
+
 ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
                                        const hs_database_t* start_of_match_database) {
   hs_error_t err = hs_alloc_scratch(database, &scratch_);
@@ -125,12 +127,14 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   return absl::StrJoin(parts, "");
 }
 
-bool Matcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
+MatchResult Matcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
   if (absl::holds_alternative<absl::monostate>(input)) {
-    return false;
+    return MatchResult::NoMatch;
   }
 
-  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(absl::get<std::string>(input));
+  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(absl::get<std::string>(input))
+             ? MatchResult::Matched
+             : MatchResult::NoMatch;
 }
 
 void Matcher::compile(const std::vector<const char*>& expressions,

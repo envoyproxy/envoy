@@ -16,7 +16,7 @@ that the dynamic module can call to interact with Envoy.
 
 Implementing the ABI from scratch requires an extensive understanding of the Envoy internals. For users, we provide an
 official SDK that abstracts these details and provides a high-level API to implement dynamic modules. The SDK is currently
-available in Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
+available in C++, Go, and Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
 Future development may include support for other languages.
 
 Currently, dynamic modules are supported at the following extension points:
@@ -27,6 +27,9 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
+* As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 
 There are a few design goals for the dynamic modules:
 

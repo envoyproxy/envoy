@@ -1,6 +1,8 @@
 #include "source/server/admin/prometheus_stats.h"
 
 #include <cmath>
+#include <map>
+#include <set>
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
@@ -93,10 +95,16 @@ public:
   void generateOutput(Buffer::Instance& output,
                       const std::vector<const Stats::ParentHistogram*>& histograms,
                       const std::string& prefixed_tag_extracted_name) const override {
-    if (histogramsAsSummaries()) {
+    switch (histogramType()) {
+    case HistogramType::Summary:
       generateSummaryOutput(output, histograms, prefixed_tag_extracted_name);
-    } else {
+      break;
+    case HistogramType::ClassicHistogram:
       generateHistogramOutput(output, histograms, prefixed_tag_extracted_name);
+      break;
+    case HistogramType::NativeHistogram:
+      IS_ENVOY_BUG("invalid type");
+      break;
     }
   }
 
@@ -221,6 +229,12 @@ private:
 
 class ProtobufFormat : public PrometheusStatsFormatter::OutputFormat {
 public:
+  static constexpr uint32_t kDefaultMaxNativeHistogramBuckets = 20;
+
+  ProtobufFormat(absl::optional<uint32_t> native_histogram_max_buckets)
+      : native_histogram_max_buckets_(
+            native_histogram_max_buckets.value_or(kDefaultMaxNativeHistogramBuckets)) {}
+
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
     generateNumericOutput(output, counters, prefixed_tag_extracted_name,
@@ -287,10 +301,16 @@ public:
     io::prometheus::client::MetricFamily metric_family;
     metric_family.set_name(prefixed_tag_extracted_name);
 
-    if (histogramsAsSummaries()) {
+    switch (histogramType()) {
+    case HistogramType::Summary:
       generateSummaryOutput(metric_family, histograms);
-    } else {
+      break;
+    case HistogramType::ClassicHistogram:
       generateHistogramOutput(metric_family, histograms);
+      break;
+    case HistogramType::NativeHistogram:
+      generateNativeHistogramOutput(metric_family, histograms);
+      break;
     }
 
     writeDelimitedMessage(metric_family, output);
@@ -388,6 +408,211 @@ private:
     }
   }
 
+  // Set zero threshold - values below this go in zero bucket.
+  // Since Histogram::recordValue() only accepts integers, the minimum non-zero value is 1.
+  // Setting threshold to 0.5 ensures:
+  // - Zeros go to zero bucket (0 < 0.5)
+  // - Values >= 1 get positive bucket indices (1 > 0.5).
+  // Using 0.5 avoids interpolation issues at bucket boundaries that occur with 1.0.
+  // For Percent unit histograms, values are scaled by 1/PercentScale, so the threshold
+  // must also be scaled accordingly.
+  static constexpr double kNativeHistogramZeroThreshold = 0.5;
+
+  static constexpr double nativeHistogramZeroThreshold(Stats::Histogram::Unit unit) {
+    return (unit == Stats::Histogram::Unit::Percent)
+               ? (kNativeHistogramZeroThreshold / Stats::Histogram::PercentScale)
+               : kNativeHistogramZeroThreshold;
+  }
+
+  /**
+   * Generates Prometheus native histogram output from Envoy's circllhist histograms.
+   *
+   * References for Prometheus native histogram format:
+   *
+   * https://prometheus.io/docs/specs/native_histograms/
+   * https://docs.google.com/document/d/1VhtB_cGnuO2q_zqEMgtoaLDvJ_kFSXRXoE0Wo74JlSY/edit?tab=t.0
+   *
+   * Envoy uses circllhist (a log-linear histogram library) internally, which provides ~90 buckets
+   * per order of magnitude with very high precision. Prometheus native histograms use exponential
+   * buckets with base = 2^(2^(-schema)), where schema ranges from -4 (coarsest, 16x per bucket)
+   * to 8 (finest, ~0.27% width per bucket).
+   *
+   * This code tries to map as accurately as possible from one format to the other.
+   */
+  void generateNativeHistogramOutput(
+      io::prometheus::client::MetricFamily& metric_family,
+      const std::vector<const Stats::ParentHistogram*>& histograms) const {
+    metric_family.set_type(io::prometheus::client::MetricType::HISTOGRAM);
+
+    for (const auto* histogram : histograms) {
+      const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+
+      auto* metric = metric_family.add_metric();
+      addLabelsToMetric(metric, histogram->tags());
+
+      auto* proto_histogram = metric->mutable_histogram();
+
+      // Handle empty histogram case early to avoid unnecessary work.
+      // Add a no-op span (offset 0, length 0) to distinguish from classic histograms.
+      if (stats.sampleCount() == 0) {
+        proto_histogram->set_schema(3); // Default schema
+        proto_histogram->set_zero_count(0);
+        auto* span = proto_histogram->add_positive_span();
+        span->set_offset(0);
+        span->set_length(0);
+        continue;
+      }
+
+      proto_histogram->set_sample_count(stats.sampleCount());
+      proto_histogram->set_sample_sum(stats.sampleSum());
+
+      const double zero_threshold = nativeHistogramZeroThreshold(histogram->unit());
+      proto_histogram->set_zero_threshold(zero_threshold);
+
+      const auto detailed_buckets = histogram->detailedTotalBuckets();
+      const auto [schema, needed_indices] = chooseNativeHistogramSchema(
+          detailed_buckets, native_histogram_max_buckets_, zero_threshold);
+      proto_histogram->set_schema(schema);
+
+      // Count samples below zero_threshold as zero bucket
+      const uint64_t zero_count = histogram->cumulativeCountLessThanOrEqualToValue(zero_threshold);
+      proto_histogram->set_zero_count(zero_count);
+      uint64_t prev_cumulative = zero_count;
+
+      const double base = std::pow(2.0, std::pow(2.0, -schema));
+
+      // Process needed indices and encode directly to protobuf spans and deltas.
+      // We iterate over needed_indices, query cumulative counts, and build the
+      // span/delta encoding.
+      int32_t prev_nonzero_index = 0;
+      int64_t prev_count = 0;
+      bool first_nonzero = true;
+      io::prometheus::client::BucketSpan* current_span = nullptr;
+      uint32_t span_length = 0;
+
+      proto_histogram->mutable_positive_delta()->Reserve(needed_indices.size());
+      for (int32_t idx : needed_indices) {
+        const double upper_bound = std::pow(base, idx + 1);
+        uint64_t cumulative = histogram->cumulativeCountLessThanOrEqualToValue(upper_bound);
+        uint64_t bucket_count = cumulative - prev_cumulative;
+        prev_cumulative = cumulative;
+
+        if (bucket_count == 0) {
+          continue; // Skip zero-count buckets; gaps are handled by span encoding
+        }
+
+        const bool need_new_span = first_nonzero || (idx != prev_nonzero_index + 1);
+        if (need_new_span) {
+          if (current_span != nullptr) {
+            // Finalize previous span if exists
+            current_span->set_length(span_length);
+          }
+
+          current_span = proto_histogram->add_positive_span();
+          if (first_nonzero) {
+            current_span->set_offset(idx); // Offset from 0 for first span
+            first_nonzero = false;
+          } else {
+            current_span->set_offset(idx - prev_nonzero_index - 1); // Gap from previous span
+          }
+          span_length = 0;
+        }
+
+        // Add delta-encoded count: the format takes the difference from the previous bucket
+        // value, assuming that adjacent buckets often have similar values, and small numbers
+        // encode smaller as protobuf varint.
+        int64_t delta = static_cast<int64_t>(bucket_count) - prev_count;
+        proto_histogram->add_positive_delta(delta);
+
+        prev_nonzero_index = idx;
+        prev_count = static_cast<int64_t>(bucket_count);
+        span_length++;
+      }
+
+      if (current_span != nullptr) {
+        current_span->set_length(span_length);
+      }
+    }
+  }
+
+  // Choose the highest-resolution schema that keeps the bucket count within max_buckets.
+  // Returns both the schema and the computed bucket indices to avoid recomputing them.
+  static std::pair<int8_t, std::set<int32_t>>
+  chooseNativeHistogramSchema(const std::vector<Stats::ParentHistogram::Bucket>& detailed_buckets,
+                              uint32_t max_buckets, double zero_threshold) {
+    // Schema ranges from -4 (coarsest: 16x per bucket) to 8 (finest: ~0.27% per bucket). However,
+    // we cap at schema 5 because circllhist has ~90 buckets per decade, which translates to ~27
+    // buckets per doubling. This resolution falls between schema 4 (16 buckets/doubling) and schema
+    // 5 (32 buckets/doubling). Using schemas higher than 5 would create artificial precision via
+    // interpolation, not real accuracy gains.
+    //
+    // The default schema used is 4. Often schema 5 is more precision than is required, and because
+    // the underlying data is at an accuracy between schemas 4 and 5, choose the lower value to
+    // reduce resource usage.
+
+    // Uncomment and use this if schema is every directly specified.
+    // constexpr int8_t kSchemaMax = 5;
+
+    constexpr int8_t kSchemaMin = -4;
+    constexpr int8_t kSchemaDefault = 4;
+
+    for (int8_t schema = kSchemaDefault; schema >= kSchemaMin; --schema) {
+      absl::optional<std::set<int32_t>> indices = nativeHistogramBucketIndicesFromHistogramBuckets(
+          detailed_buckets, schema, zero_threshold, max_buckets);
+      // If it doesn't have a value, that means it exceeded `max_buckets`.
+      if (indices.has_value()) {
+        return {schema, std::move(*indices)};
+      }
+    }
+    // Fallback if nothing fits - compute indices at coarsest schema without limit
+    return {kSchemaMin, nativeHistogramBucketIndicesFromHistogramBuckets(detailed_buckets,
+                                                                         kSchemaMin, zero_threshold)
+                            .value()};
+  }
+
+  // For the vector of histogram buckets, return the set of all native histogram indices that
+  // cover any part of the range of any of the buckets.
+  //
+  // If max_buckets is provided and the limit would be exceeded, returns nullopt.
+  static absl::optional<std::set<int32_t>> nativeHistogramBucketIndicesFromHistogramBuckets(
+      const std::vector<Stats::ParentHistogram::Bucket>& buckets, int8_t schema,
+      double zero_threshold, absl::optional<uint32_t> max_buckets = absl::nullopt) {
+    std::set<int32_t> indices;
+
+    const double log_base = std::log(std::pow(2.0, std::pow(2.0, static_cast<double>(-schema))));
+
+    for (const auto& bucket : buckets) {
+      ASSERT(bucket.count_ > 0, "unexpected empty bucket");
+      const double upper_bound = bucket.lower_bound_ + bucket.width_;
+      if (upper_bound <= zero_threshold) {
+        continue; // Entire bucket is in zero bucket range
+      }
+
+      ASSERT(bucket.lower_bound_ >= 0, "Envoy histograms only have unsigned integers recorded.");
+
+      // Clamp lower bound to zero_threshold to prevent log(0).
+      const double effective_lower = std::max(bucket.lower_bound_, zero_threshold);
+      // Use ceil(...) - 1 to find the bucket containing effective_lower.
+      // Prometheus bucket i covers (base^i, base^(i+1)], so value v is in bucket
+      // ceil(log(v)/log(base)) - 1. This correctly handles boundary cases where
+      // v = base^k exactly (it goes in bucket k-1, not k).
+      const int32_t lower_index =
+          static_cast<int32_t>(std::ceil(std::log(effective_lower) / log_base)) - 1;
+      const int32_t upper_index = static_cast<int32_t>(std::ceil(std::log(upper_bound) / log_base));
+
+      for (int32_t idx = lower_index; idx <= upper_index; ++idx) {
+        indices.insert(idx);
+
+        // Early termination if we've exceeded the limit
+        if (max_buckets.has_value() && indices.size() > *max_buckets) {
+          return absl::nullopt;
+        }
+      }
+    }
+
+    return indices;
+  }
+
   // Write a varint-length-delimited protobuf message to the buffer.
   void writeDelimitedMessage(const Protobuf::MessageLite& message, Buffer::Instance& output) const {
     constexpr size_t kMaxVarintLength = 10; // This is documented, but not exported as a constant.
@@ -405,6 +630,8 @@ private:
     ASSERT(varint_size <= kMaxVarintLength);
     reservation.commit(varint_size + length);
   }
+
+  uint32_t native_histogram_max_buckets_{kDefaultMaxNativeHistogramBuckets};
 };
 
 /**
@@ -601,13 +828,22 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return absl::StrJoin(buf, ",");
 }
 
-absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params) {
+absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params,
+                                                      const Http::RequestHeaderMap& headers) {
   absl::Status result;
   switch (params.histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Summary:
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
     result = absl::OkStatus();
+    break;
+  case Utility::HistogramBucketsMode::PrometheusNative:
+    if (useProtobufFormat(params, headers)) {
+      result = absl::OkStatus();
+    } else {
+      result = absl::InvalidArgumentError("unsupported prometheusnative histogram type when not "
+                                          "using protobuf exposition format");
+    }
     break;
   case Utility::HistogramBucketsMode::Detailed:
   case Utility::HistogramBucketsMode::Disjoint:
@@ -652,25 +888,30 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
     const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces,
     OutputFormat& output_format) {
 
-  bool histograms_as_summaries = false;
+  OutputFormat::HistogramType hist_type;
 
   // Validation of bucket modes is handled separately.
   switch (params.histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Summary:
-    histograms_as_summaries = true;
+    hist_type = OutputFormat::HistogramType::Summary;
     break;
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Cumulative:
-    histograms_as_summaries = false;
+    hist_type = OutputFormat::HistogramType::ClassicHistogram;
     break;
-  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics
+  case Utility::HistogramBucketsMode::PrometheusNative:
+    hist_type = OutputFormat::HistogramType::NativeHistogram;
+    break;
+  // "Detailed" and "Disjoint" don't make sense for prometheus histogram semantics. These types were
+  // have been filtered out in validateParams().
   case Utility::HistogramBucketsMode::Detailed:
   case Utility::HistogramBucketsMode::Disjoint:
+    hist_type = OutputFormat::HistogramType::ClassicHistogram;
     IS_ENVOY_BUG("unsupported prometheus histogram bucket mode");
     break;
   }
 
-  output_format.setHistogramsAsSummaries(histograms_as_summaries);
+  output_format.setHistogramType(hist_type);
 
   uint64_t metric_name_count = 0;
   metric_name_count +=
@@ -731,7 +972,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheusProtobuf(
       "application/vnd.google.protobuf; "
       "proto=io.prometheus.client.MetricFamily; encoding=delimited");
 
-  ProtobufFormat output_format;
+  ProtobufFormat output_format(params.native_histogram_max_buckets_);
   return generateWithOutputFormat(counters, gauges, histograms, text_readouts, cluster_manager,
                                   response, params, custom_namespaces, output_format);
 }

@@ -214,8 +214,8 @@ public:
   RequestMatchInputMatcher(const RequestMatcherProto& config,
                            Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const Matcher::MatchingDataType& input) override;
-  bool match(const RequestHeaderFrame& request);
+  Matcher::MatchResult match(const Matcher::MatchingDataType& input) override;
+  Matcher::MatchResult match(const RequestHeaderFrame& request);
 
   absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
     return absl::flat_hash_set<std::string>{std::string(GenericRequestMatcheInputType)};

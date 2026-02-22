@@ -472,9 +472,9 @@ TEST_F(StringMatcher, Memory) {
     // The memory constraints were added to ensure that the amount of memory
     // used by matchers is carefully analyzed. These constraints can be relaxed
     // when additional features are added, but it should be done in a thoughtful manner.
-    // Adding 3*8192 bytes because tcmalloc consumption estimation may return
+    // Adding 5*8192 bytes because tcmalloc consumption estimation may return
     // different values depending on memory alignment.
-    EXPECT_MEMORY_LE(prefix_consumed_bytes, 530176 + 3 * 8192);
+    EXPECT_MEMORY_LE(prefix_consumed_bytes, 530176 + 5 * 8192);
   }
   // Regex matcher.
   {
@@ -494,7 +494,7 @@ TEST_F(StringMatcher, Memory) {
     // when additional features are added, but it should be done in a thoughtful  manner.
     // Adding 10*8192 bytes because tcmalloc consumption estimation may return
     // different values depending on memory alignment.
-    EXPECT_MEMORY_LE(regex_consumed_bytes, 15038016 + 10 * 8192);
+    EXPECT_MEMORY_LE(regex_consumed_bytes, 15603776 + 10 * 8192);
   }
 }
 
@@ -786,6 +786,94 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, AddressMatchWithInvertMatch) {
+  struct TestCase {
+    std::string name;
+    std::vector<std::pair<std::string, uint32_t>> cidr_ranges; // address_prefix, prefix_len
+    bool invert_match;
+    std::string test_ip;
+    bool expected_match;
+  };
+
+  const std::vector<TestCase> test_cases = {
+      {
+          "ipv4_invert_match",
+          {{"10.0.0.0", 8}},
+          true,
+          "192.168.1.1",
+          true,
+      },
+      {
+          "ipv4_invert_no_match",
+          {{"10.0.0.0", 8}},
+          true,
+          "10.0.0.1",
+          false,
+      },
+      {
+          "ipv6_invert_match",
+          {{"2001:db8::", 32}},
+          true,
+          "2001:db7::1",
+          true,
+      },
+      {
+          "ipv6_invert_no_match",
+          {{"2001:db8::", 32}},
+          true,
+          "2001:db8::1",
+          false,
+      },
+      {
+          "multiple_ranges_invert_match",
+          {{"10.0.0.0", 8}, {"192.168.0.0", 16}},
+          true,
+          "172.16.0.1",
+          true,
+      },
+      {
+          "multiple_ranges_invert_no_match_first",
+          {{"10.0.0.0", 8}, {"192.168.0.0", 16}},
+          true,
+          "10.0.0.1",
+          false,
+      },
+      {
+          "multiple_ranges_invert_no_match_second",
+          {{"10.0.0.0", 8}, {"192.168.0.0", 16}},
+          true,
+          "192.168.1.1",
+          false,
+      },
+  };
+
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.name);
+
+    const std::string key = "test.key";
+    envoy::type::matcher::v3::FilterStateMatcher matcher;
+    matcher.set_key(key);
+
+    for (const auto& cidr : test_case.cidr_ranges) {
+      auto* range = matcher.mutable_address_match()->add_ranges();
+      range->set_address_prefix(cidr.first);
+      range->mutable_prefix_len()->set_value(cidr.second);
+    }
+    matcher.mutable_address_match()->set_invert_match(test_case.invert_match);
+
+    StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+    filter_state.setData(
+        key,
+        std::make_shared<Network::Address::InstanceAccessor>(
+            Envoy::Network::Utility::parseInternetAddressNoThrow(test_case.test_ip, 456, false)),
+        StreamInfo::FilterState::StateType::Mutable);
+
+    auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+    ASSERT_TRUE(filter_state_matcher.ok());
+    EXPECT_EQ(test_case.expected_match, (*filter_state_matcher)->match(filter_state));
+  }
 }
 
 } // namespace

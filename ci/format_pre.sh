@@ -45,6 +45,26 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
+# TODO(phlax): Remove this once migration to bzlmod is complete
+CURRENT=dep-names
+
+check_legacy_dep_names () {
+    local legacy="$1"
+    local new="$2"
+    local matches
+    matches="$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' || :)"
+    if [[ -n "$matches" ]]; then
+        echo "ERROR: Found references to '$legacy' that should use '@${new}' instead:"
+        echo ""
+        git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh'
+        echo ""
+        echo "Please replace '@${legacy}//' with '@${new}//' in the above files."
+        return 1
+    fi
+}
+
+check_legacy_dep_names com_google_absl abseil-cpp
+check_legacy_dep_names com_github_cncf_xds xds
 
 CURRENT=check
 # This test runs code check with:

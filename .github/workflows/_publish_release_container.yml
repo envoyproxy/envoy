@@ -56,7 +56,7 @@ jobs:
     - name: Generate manifest configuration (dev)
       id: dev-config
       if: ${{ inputs.dev && inputs.target-branch == 'main' }}
-      uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       with:
         input-format: yaml
         filter: >-
@@ -135,14 +135,23 @@ jobs:
             - tools-dev-${{ github.sha }}
 
     - name: Generate manifest configuration (release)
-      uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       id: release-config
       if: ${{ ! inputs.dev || ! inputs.target-branch != 'main' }}
       with:
         input-format: yaml
         filter: >-
-          {manifests: .}
+          .version as $v
+          | {manifests:
+              [.manifests[]
+               | select(
+                   (.tag | test("contrib-distroless") | not)
+                   or ($v.major > 1 or ($v.major == 1 and $v.minor >= 37)))]}
         input: |
+          version:
+            major: ${{ inputs.version-major }}
+            minor: ${{ inputs.version-minor }}
+          manifests:
           - name: ${{ inputs.dockerhub-repo }}
             tag: v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             registry: docker.io/envoyproxy
@@ -216,7 +225,7 @@ jobs:
             - tools-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
 
     - name: Collect and push OCI artifacts
-      uses: envoyproxy/toolshed/actions/oci/collector@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/oci/collector@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       with:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}

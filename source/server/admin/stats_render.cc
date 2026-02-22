@@ -45,6 +45,9 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
     addDetail(histogram.detailedIntervalBuckets(), response);
     response.addFragments({"\n  summary=", histogram.quantileSummary(), "\n"});
     break;
+  case Utility::HistogramBucketsMode::PrometheusNative:
+    IS_ENVOY_BUG("unsupported histogram mode");
+    break;
   }
 }
 
@@ -182,6 +185,9 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
     generateHistogramDetail(name, histogram, *json_->histogram_array_->addMap());
     break;
   }
+  case Utility::HistogramBucketsMode::PrometheusNative:
+    IS_ENVOY_BUG("unsupported histogram mode");
+    break;
   }
   drainIfNeeded(response);
 }
@@ -232,6 +238,9 @@ void StatsJsonRender::renderHistogramStart() {
   case Utility::HistogramBucketsMode::Cumulative:
   case Utility::HistogramBucketsMode::Disjoint:
     json_->histogram_array_ = json_->histogram_map1_->addArray();
+    break;
+  case Utility::HistogramBucketsMode::PrometheusNative:
+    IS_ENVOY_BUG("unsupported histogram mode");
     break;
   }
 }

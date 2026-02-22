@@ -161,6 +161,10 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           action.query_parameter_value_match(), context, std::move(formatter_or_error.value())));
       break;
     }
+    case ProtoRateLimit::Action::ActionSpecifierCase::kRemoteAddressMatch:
+      actions_.emplace_back(
+          new Router::RemoteAddressMatchAction(action.remote_address_match(), context));
+      break;
     default:
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));
