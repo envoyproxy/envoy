@@ -8305,8 +8305,18 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 ///
 /// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
 /// timer when dropped.
+///
+/// Each timer has a unique [`id`](EnvoyBootstrapExtensionTimer::id) that is stable for its
+/// lifetime. This allows modules with multiple timers to identify which timer fired in the
+/// [`BootstrapExtensionConfig::on_timer_fired`] callback by comparing the id of the fired timer
+/// reference against the ids of their stored timer handles.
 #[automock]
 pub trait EnvoyBootstrapExtensionTimer: Send + Sync {
+  /// Returns a unique opaque identifier for this timer. The identifier is stable for the
+  /// lifetime of the timer and can be used to distinguish between multiple timers in the
+  /// [`BootstrapExtensionConfig::on_timer_fired`] callback.
+  fn id(&self) -> usize;
+
   /// Enable the timer with the given delay. If the timer is already enabled, it is reset.
   fn enable(&self, delay: std::time::Duration);
 
@@ -8334,6 +8344,10 @@ impl Drop for EnvoyBootstrapExtensionTimerImpl {
 }
 
 impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerImpl {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
@@ -8365,6 +8379,10 @@ unsafe impl Send for EnvoyBootstrapExtensionTimerRef {}
 unsafe impl Sync for EnvoyBootstrapExtensionTimerRef {}
 
 impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerRef {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
@@ -8386,6 +8404,10 @@ impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerRef {
 }
 
 impl EnvoyBootstrapExtensionTimer for Box<dyn EnvoyBootstrapExtensionTimer> {
+  fn id(&self) -> usize {
+    (**self).id()
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     (**self).enable(delay);
   }
