@@ -180,6 +180,7 @@ Http::FilterTrailersStatus FileSystemBufferFilter::receiveTrailers(const BufferB
     return Http::FilterTrailersStatus::Continue;
   }
   state.seen_end_stream_ = true;
+  state.seen_trailers_ = true;
   dispatchStateChanged();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -245,7 +246,9 @@ void FileSystemBufferFilter::maybeOutputRequest() {
       request_state_.memory_used_ -= request_state_.buffer_.front()->size();
       auto out = request_state_.buffer_.front()->extract();
       request_state_.buffer_.pop_front();
-      request_callbacks_->injectDecodedDataToFilterChain(*out, false);
+      bool end_stream = (request_state_.buffer_.empty() && request_state_.seen_end_stream_ &&
+                         !request_state_.seen_trailers_);
+      request_callbacks_->injectDecodedDataToFilterChain(*out, end_stream);
     }
   }
   if (request_state_.buffer_.empty() && request_state_.seen_end_stream_) {
@@ -270,7 +273,9 @@ bool FileSystemBufferFilter::maybeOutputResponse() {
       response_state_.memory_used_ -= response_state_.buffer_.front()->size();
       auto out = response_state_.buffer_.front()->extract();
       response_state_.buffer_.pop_front();
-      response_callbacks_->injectEncodedDataToFilterChain(*out, false);
+      bool end_stream = (response_state_.buffer_.empty() && response_state_.seen_end_stream_ &&
+                         !response_state_.seen_trailers_);
+      response_callbacks_->injectEncodedDataToFilterChain(*out, end_stream);
     }
   }
   if (response_state_.buffer_.empty() && response_state_.seen_end_stream_) {
