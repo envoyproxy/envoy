@@ -274,6 +274,18 @@ uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
   return logger->stream_info_->attemptCount().value_or(0);
 }
 
+bool envoy_dynamic_module_callback_access_logger_get_connection_termination_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& details = logger->stream_info_->connectionTerminationDetails();
+  if (!details.has_value() || details->empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(details->data()), details->size()};
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // Access Logger Callbacks - Address Information
 // -----------------------------------------------------------------------------
@@ -304,6 +316,40 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
   }
 
   const auto& ip = provider.localAddress()->ip();
+  const std::string& addr_str = ip->addressAsString();
+  *address_out = {const_cast<char*>(addr_str.data()), addr_str.size()};
+  *port_out = ip->port();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.directRemoteAddress() ||
+      provider.directRemoteAddress()->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const auto& ip = provider.directRemoteAddress()->ip();
+  const std::string& addr_str = ip->addressAsString();
+  *address_out = {const_cast<char*>(addr_str.data()), addr_str.size()};
+  *port_out = ip->port();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.directLocalAddress() ||
+      provider.directLocalAddress()->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const auto& ip = provider.directLocalAddress()->ip();
   const std::string& addr_str = ip->addressAsString();
   *address_out = {const_cast<char*>(addr_str.data()), addr_str.size()};
   *port_out = ip->port();
@@ -399,6 +445,269 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_
   return true;
 }
 
+uint64_t envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamConnectionId().has_value()) {
+    return 0;
+  }
+  return upstream->upstreamConnectionId().value();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& version = upstream->upstreamSslConnection()->tlsVersion();
+  if (version.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(version.data()), version.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  // ciphersuiteString() returns std::string by value, so we use thread-local storage.
+  static thread_local std::string tls_cipher_str;
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  tls_cipher_str = upstream->upstreamSslConnection()->ciphersuiteString();
+  if (tls_cipher_str.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(tls_cipher_str.data()), tls_cipher_str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& session_id = upstream->upstreamSslConnection()->sessionId();
+  if (session_id.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(session_id.data()), session_id.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& subject = upstream->upstreamSslConnection()->subjectPeerCertificate();
+  if (subject.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(subject.data()), subject.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& issuer = upstream->upstreamSslConnection()->issuerPeerCertificate();
+  if (issuer.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(issuer.data()), issuer.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& subject = upstream->upstreamSslConnection()->subjectLocalCertificate();
+  if (subject.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(subject.data()), subject.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+
+  const std::string& digest = upstream->upstreamSslConnection()->sha256PeerCertificateDigest();
+  if (digest.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(digest.data()), digest.size()};
+  return true;
+}
+
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  const auto valid_from = upstream->upstreamSslConnection()->validFromPeerCertificate();
+  if (!valid_from.has_value()) {
+    return 0;
+  }
+  return std::chrono::duration_cast<std::chrono::seconds>(valid_from->time_since_epoch()).count();
+}
+
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  const auto expiration = upstream->upstreamSslConnection()->expirationPeerCertificate();
+  if (!expiration.has_value()) {
+    return 0;
+  }
+  return std::chrono::duration_cast<std::chrono::seconds>(expiration->time_since_epoch()).count();
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  return upstream->upstreamSslConnection()->uriSanPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+  const auto& sans = upstream->upstreamSslConnection()->uriSanPeerCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  return upstream->upstreamSslConnection()->uriSanLocalCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+  const auto& sans = upstream->upstreamSslConnection()->uriSanLocalCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  return upstream->upstreamSslConnection()->dnsSansPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+  const auto& sans = upstream->upstreamSslConnection()->dnsSansPeerCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return 0;
+  }
+  return upstream->upstreamSslConnection()->dnsSansLocalCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+  const auto& sans = upstream->upstreamSslConnection()->dnsSansLocalCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // Access Logger Callbacks - Connection/TLS Info
 // -----------------------------------------------------------------------------
@@ -481,6 +790,262 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest
     return false;
   }
   *result = {const_cast<char*>(digest.data()), digest.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  // ciphersuiteString() returns std::string by value, so we use thread-local storage.
+  static thread_local std::string tls_cipher_str;
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  tls_cipher_str = provider.sslConnection()->ciphersuiteString();
+  if (tls_cipher_str.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(tls_cipher_str.data()), tls_cipher_str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  const std::string& session_id = provider.sslConnection()->sessionId();
+  if (session_id.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(session_id.data()), session_id.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  const std::string& issuer = provider.sslConnection()->issuerPeerCertificate();
+  if (issuer.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(issuer.data()), issuer.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  const std::string& serial = provider.sslConnection()->serialNumberPeerCertificate();
+  if (serial.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(serial.data()), serial.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  const std::string& digest = provider.sslConnection()->sha1PeerCertificateDigest();
+  if (digest.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(digest.data()), digest.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+
+  const std::string& subject = provider.sslConnection()->subjectLocalCertificate();
+  if (subject.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(subject.data()), subject.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  return provider.sslConnection()->peerCertificatePresented();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  return provider.sslConnection()->peerCertificateValidated();
+}
+
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  const auto valid_from = provider.sslConnection()->validFromPeerCertificate();
+  if (!valid_from.has_value()) {
+    return 0;
+  }
+  return std::chrono::duration_cast<std::chrono::seconds>(valid_from->time_since_epoch()).count();
+}
+
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  const auto expiration = provider.sslConnection()->expirationPeerCertificate();
+  if (!expiration.has_value()) {
+    return 0;
+  }
+  return std::chrono::duration_cast<std::chrono::seconds>(expiration->time_since_epoch()).count();
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  return provider.sslConnection()->uriSanPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  const auto& sans = provider.sslConnection()->uriSanPeerCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  return provider.sslConnection()->uriSanLocalCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  const auto& sans = provider.sslConnection()->uriSanLocalCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  return provider.sslConnection()->dnsSansPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  const auto& sans = provider.sslConnection()->dnsSansPeerCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return 0;
+  }
+  return provider.sslConnection()->dnsSansLocalCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  const auto& sans = provider.sslConnection()->dnsSansLocalCertificate();
+  for (size_t i = 0; i < sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(sans[i].data());
+    sans_out[i].length = sans[i].size();
+  }
   return true;
 }
 
