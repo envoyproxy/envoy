@@ -109,6 +109,11 @@ bug_fixes:
 - area: drop_overload
   change: |
     Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
+- area: odcds
+  change: |
+    Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
+    cases. This change could be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.tcp_proxy_odcds_over_ads_fix`` to ``false``.
 - area: http
   change: |
     Fixed upstream client to not close connection when idle timeout fires before the connection is
@@ -303,6 +308,12 @@ new_features:
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
     close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
     and ``RemoteReset``.
+- area: reverse_tunnel
+  change: |
+    Added optional tenant isolation support to the reverse tunnel network filter. When
+    ``enable_tenant_isolation`` is set, Envoy scopes cached reverse tunnel sockets with composite
+    ``<tenant>@<node>`` and ``<tenant>@<cluster>`` identifiers and rejects handshake headers that already
+    contain the ``@`` delimiter to prevent ambiguous lookups.
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
@@ -416,5 +427,9 @@ new_features:
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+- area: mcp_json_rest_bridge
+  change: |
+    Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
+    standard JSON-REST HTTP requests.
 
 deprecated:

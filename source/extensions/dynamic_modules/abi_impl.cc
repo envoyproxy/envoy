@@ -421,6 +421,48 @@ envoy_dynamic_module_callback_lb_get_host_health(envoy_dynamic_module_type_lb_en
   return envoy_dynamic_module_type_host_health_Unhealthy;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
+                                                  size_t,
+                                                  envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_address: "
+               "not implemented in this context");
+  result->ptr = nullptr;
+  result->length = 0;
+  return false;
+}
+
+__attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_weight: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_active_requests: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_active_connections: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_lb_get_host_locality(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
+                                                   size_t, envoy_dynamic_module_type_envoy_buffer*,
+                                                   envoy_dynamic_module_type_envoy_buffer*,
+                                                   envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_locality: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_compute_hash_key(
     envoy_dynamic_module_type_lb_context_envoy_ptr, uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_compute_hash_key: "

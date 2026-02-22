@@ -96,6 +96,13 @@ public:
 
     // Create the config.
     config_.set_stat_prefix("test_prefix");
+
+    // Set up bootstrap config with the upstream socket interface extension.
+    // Both options_.config_proto_ and bootstrap_ are populated since validation may use either.
+    auto* bootstrap_extension = server_context_.options_.config_proto_.add_bootstrap_extensions();
+    bootstrap_extension->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    bootstrap_extension->mutable_typed_config()->PackFrom(config_);
+    *server_context_.bootstrap_.add_bootstrap_extensions() = *bootstrap_extension;
   }
 
   ~ReverseConnectionClusterTest() override = default;
@@ -167,6 +174,18 @@ public:
 
   void TearDown() override {
     // Do not assert on timer teardown; allow destructor-time disable.
+
+    // Clear extension from registered acceptor before destroying it to avoid dangling pointer
+    // when the next test runs (getExtension() would otherwise return stale pointer).
+    auto* registered_socket_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    if (registered_socket_interface) {
+      auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+          const_cast<Network::SocketInterface*>(registered_socket_interface));
+      if (registered_acceptor) {
+        registered_acceptor->extension_ = nullptr;
+      }
+    }
 
     // Clean up thread local resources if they were set up.
     if (tls_slot_) {
@@ -1594,6 +1613,26 @@ TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
     EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
                               "Not supported field in StreamInfo: INVALID_COMMAND");
   }
+
+  // Test invalid tenant_id_format.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%REQ(x-node-id)%"
+          tenant_id_format: "%INVALID_COMMAND()%"
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
+                              "Not supported field in StreamInfo: INVALID_COMMAND");
+  }
 }
 
 // Test concurrent host creation and caching
@@ -1729,6 +1768,317 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     auto result = lb.chooseHost(&lb_context);
     EXPECT_EQ(result.host, nullptr);
   }
+}
+
+class ReverseConnectionClusterWithTenantIsolationTest : public ReverseConnectionClusterTest {
+public:
+  void SetUp() override {
+    ReverseConnectionClusterTest::SetUp();
+    // Enable tenant isolation in bootstrap config.
+    config_.mutable_enable_tenant_isolation()->set_value(true);
+    // Update both bootstrap configs to reflect the change (validation uses bootstrap()).
+    auto& bootstrap = server_context_.bootstrap_;
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        extension.mutable_typed_config()->PackFrom(config_);
+        break;
+      }
+    }
+    // Recreate extension with tenant isolation enabled.
+    if (socket_interface_) {
+      extension_ = std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptorExtension>(
+          *socket_interface_, server_context_, config_);
+      auto* registered_socket_interface =
+          Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+      if (registered_socket_interface) {
+        auto* registered_acceptor =
+            dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+                const_cast<Network::SocketInterface*>(registered_socket_interface));
+        if (registered_acceptor) {
+          registered_acceptor->extension_ = extension_.get();
+        }
+      }
+    }
+    setupUpstreamExtension();
+    setupThreadLocalSlot();
+    // Ensure tenant isolation is set on the socket manager.
+    if (extension_) {
+      auto* registry = socket_interface_->getLocalRegistry();
+      if (registry && registry->socketManager()) {
+        registry->socketManager()->setTenantIsolationEnabled(true);
+      }
+    }
+  }
+};
+
+// Test cluster startup validation fails when tenant isolation enabled but tenant_id_format missing.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterStartupValidationFailsWhenTenantIsolationEnabledButTenantIdFormatMissing) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml, false), EnvoyException,
+      "tenant_id_format must be configured for reverse connection cluster 'name' when "
+      "tenant isolation is enabled in the bootstrap configuration. Please configure "
+      "tenant_id_format in the reverse connection cluster configuration.");
+}
+
+// Test cluster runtime fails when tenant ID cannot be inferred.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterRuntimeFailsWhenTenantIdCannotBeInferred) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Add socket with tenant-scoped identifier.
+  addTestSocket("tenant-a:node-1", "tenant-a:cluster-1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  // Don't include x-tenant-id header - tenant_id formatter will return empty.
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node-1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  // Should fail because tenant_id must be derivable when tenant isolation is enabled.
+  ASSERT_EQ(result.host, nullptr);
+}
+
+// Test cluster uses tenant-scoped identifier for host lookup.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterUsesTenantScopedIdentifierForHostLookup) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Add socket with tenant-scoped identifier.
+  addTestSocket("tenant1:node1", "tenant1:cluster1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "tenant1"}, {"x-node-id", "node1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  // The cluster should construct "tenant1:node1" internally and resolve to "tenant1:node1".
+  EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
+}
+
+// Test chooseHost returns nullptr when tenant isolation is enabled but cluster has no
+// tenant_id_format configured.
+TEST_F(ReverseConnectionClusterTest,
+       ChooseHostFailsWhenTenantIsolationEnabledButTenantIdFormatNotConfigured) {
+  // Create cluster without tenant_id_format (bootstrap has tenant isolation disabled by default).
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  // Enable tenant isolation on the extension (simulating a config mismatch that validation would
+  // normally prevent).
+  config_.mutable_enable_tenant_isolation()->set_value(true);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node-1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  EXPECT_EQ(result.host, nullptr);
+}
+
+// Test cluster uses non-scoped identifier when tenant isolation disabled.
+TEST_F(ReverseConnectionClusterTest, ClusterUsesNonScopedIdentifierWhenTenantIsolationDisabled) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  // Don't enable tenant isolation - socket manager flag remains false.
+
+  // Add socket with non-tenant-scoped identifier.
+  addTestSocket("node1", "cluster1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  // Should use host_id only, not tenant-scoped.
+  EXPECT_EQ(result.host->address()->logicalName(), "node1");
+}
+
+// Test cluster tenant ID formatter with dash returns empty.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterTenantIdFormatterWithDashReturnsEmpty) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Add socket with tenant-scoped identifier.
+  addTestSocket("tenant-a:node-1", "tenant-a:cluster-1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  // Include x-tenant-id header with "-" (default for missing) - should be treated as empty.
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "-"}, {"x-node-id", "node-1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  // Should fail because "-" is treated as empty tenant ID.
+  ASSERT_EQ(result.host, nullptr);
+}
+
+// Test cluster tenant ID formatter with various formatters.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest,
+       ClusterTenantIdFormatterWithVariousFormatters) {
+  // Test with %REQ(header)% formatter.
+  const std::string yaml = R"EOF(
+    name: name1
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Add socket with tenant-scoped identifier.
+  addTestSocket("tenant1:node1", "tenant1:cluster1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "tenant1"}, {"x-node-id", "node1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
+}
+
+// Test chooseHost uses requestStreamInfo when available.
+TEST_F(ReverseConnectionClusterWithTenantIsolationTest, ClusterUsesRequestStreamInfoWhenAvailable) {
+  const std::string yaml = R"EOF(
+    name: name1
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+        tenant_id_format: "%REQ(x-tenant-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("tenant1:node1", "tenant1:cluster1");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  TestLoadBalancerContext lb_context(&connection, &stream_info);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-tenant-id", "tenant1"}, {"x-node-id", "node1"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  EXPECT_EQ(result.host->address()->logicalName(), "tenant1:node1");
 }
 
 } // namespace ReverseConnection

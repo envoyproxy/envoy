@@ -1,5 +1,6 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 namespace Envoy {
@@ -58,9 +59,10 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Set up the thread-local dispatcher and socket manager.
   tls_slot_->set([this](Event::Dispatcher& dispatcher) {
     auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
-    // Propagate configured miss threshold into the socket manager.
+    // Propagate configured miss threshold and tenant isolation into the socket manager.
     if (tls->socketManager()) {
       tls->socketManager()->setMissThreshold(ping_failure_threshold_);
+      tls->socketManager()->setTenantIsolationEnabled(enable_tenant_isolation_);
     }
     return tls;
   });
@@ -156,7 +158,8 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
 
 void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& node_id,
                                                            const std::string& cluster_id,
-                                                           bool increment) {
+                                                           bool increment,
+                                                           bool tenant_isolation_enabled) {
   // Update per-worker aggregate metrics.
   updatePerWorkerAggregateMetrics(node_id, cluster_id, increment);
 
@@ -178,47 +181,60 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
     reverse_tunnel_detailed_stats_warning_logged = true;
   }
 
-  // Create/update node connection stat.
-  if (!node_id.empty()) {
-    std::string node_stat_name = fmt::format("{}.nodes.{}", stat_prefix_, node_id);
-    Stats::StatNameManagedStorage node_stat_name_storage(node_stat_name, stats_store.symbolTable());
-    auto& node_gauge = stats_store.gaugeFromStatName(node_stat_name_storage.statName(),
-                                                     Stats::Gauge::ImportMode::HiddenAccumulate);
-    if (increment) {
-      node_gauge.inc();
-      ENVOY_LOG(trace, "reverse_tunnel: incremented node stat {} to {}", node_stat_name,
-                node_gauge.value());
-    } else {
-      if (node_gauge.value() > 0) {
-        node_gauge.dec();
-        ENVOY_LOG(trace, "reverse_tunnel: decremented node stat {} to {}", node_stat_name,
-                  node_gauge.value());
-      }
+  ReverseConnectionUtility::TenantScopedIdentifierView scoped_node{};
+  ReverseConnectionUtility::TenantScopedIdentifierView scoped_cluster{};
+  if (tenant_isolation_enabled) {
+    scoped_node = ReverseConnectionUtility::splitTenantScopedIdentifier(node_id);
+    scoped_cluster = ReverseConnectionUtility::splitTenantScopedIdentifier(cluster_id);
+  }
+
+  const auto adjust_gauge = [&](const std::string& stat_name, bool is_increment,
+                                Stats::Gauge::ImportMode import_mode) {
+    if (stat_name.empty()) {
+      return;
+    }
+    Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
+    auto& gauge = stats_store.gaugeFromStatName(stat_name_storage.statName(), import_mode);
+    if (is_increment) {
+      gauge.inc();
+      ENVOY_LOG(trace, "reverse_tunnel: incremented stat {} to {}", stat_name, gauge.value());
+    } else if (gauge.value() > 0) {
+      gauge.dec();
+      ENVOY_LOG(trace, "reverse_tunnel: decremented stat {} to {}", stat_name, gauge.value());
+    }
+  };
+
+  const absl::string_view base_node_identifier =
+      (tenant_isolation_enabled && scoped_node.hasTenant()) ? scoped_node.identifier : node_id;
+  const absl::string_view base_cluster_identifier =
+      (tenant_isolation_enabled && scoped_cluster.hasTenant()) ? scoped_cluster.identifier
+                                                               : cluster_id;
+
+  if (!base_node_identifier.empty()) {
+    const std::string node_stat_name =
+        fmt::format("{}.nodes.{}", stat_prefix_, base_node_identifier);
+    adjust_gauge(node_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
+    if (tenant_isolation_enabled && scoped_node.hasTenant()) {
+      const std::string tenant_node_stat_name = fmt::format(
+          "{}.tenants.{}.nodes.{}", stat_prefix_, scoped_node.tenant, scoped_node.identifier);
+      adjust_gauge(tenant_node_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
     }
   }
 
-  // Create/update cluster connection stat.
-  if (!cluster_id.empty()) {
-    std::string cluster_stat_name = fmt::format("{}.clusters.{}", stat_prefix_, cluster_id);
-    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
-                                                            stats_store.symbolTable());
-    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::HiddenAccumulate);
-    if (increment) {
-      cluster_gauge.inc();
-      ENVOY_LOG(trace, "reverse_tunnel: incremented cluster stat {} to {}", cluster_stat_name,
-                cluster_gauge.value());
-    } else {
-      if (cluster_gauge.value() > 0) {
-        cluster_gauge.dec();
-        ENVOY_LOG(trace, "reverse_tunnel: decremented cluster stat {} to {}", cluster_stat_name,
-                  cluster_gauge.value());
-      }
+  if (!base_cluster_identifier.empty()) {
+    const std::string cluster_stat_name =
+        fmt::format("{}.clusters.{}", stat_prefix_, base_cluster_identifier);
+    adjust_gauge(cluster_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
+    if (tenant_isolation_enabled && scoped_cluster.hasTenant()) {
+      const std::string tenant_cluster_stat_name =
+          fmt::format("{}.tenants.{}.clusters.{}", stat_prefix_, scoped_cluster.tenant,
+                      scoped_cluster.identifier);
+      adjust_gauge(tenant_cluster_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
     }
   }
 
   // Also update per-worker stats for debugging.
-  updatePerWorkerConnectionStats(node_id, cluster_id, increment);
+  updatePerWorkerConnectionStats(node_id, cluster_id, increment, tenant_isolation_enabled);
 }
 
 void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::string& node_id,
@@ -273,7 +289,8 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::
 
 void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::string& node_id,
                                                                     const std::string& cluster_id,
-                                                                    bool increment) {
+                                                                    bool increment,
+                                                                    bool tenant_isolation_enabled) {
   auto& stats_store = context_.scope();
 
   // Get dispatcher name from the thread local dispatcher.
@@ -288,10 +305,23 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   dispatcher_name = local_registry->dispatcher().name();
   ENVOY_LOG(trace, "reverse_tunnel: Updating stats for worker {}", dispatcher_name);
 
+  ReverseConnectionUtility::TenantScopedIdentifierView scoped_node{};
+  ReverseConnectionUtility::TenantScopedIdentifierView scoped_cluster{};
+  if (tenant_isolation_enabled) {
+    scoped_node = ReverseConnectionUtility::splitTenantScopedIdentifier(node_id);
+    scoped_cluster = ReverseConnectionUtility::splitTenantScopedIdentifier(cluster_id);
+  }
+
+  const absl::string_view worker_node_identifier =
+      (tenant_isolation_enabled && scoped_node.hasTenant()) ? scoped_node.identifier : node_id;
+  const absl::string_view worker_cluster_identifier =
+      (tenant_isolation_enabled && scoped_cluster.hasTenant()) ? scoped_cluster.identifier
+                                                               : cluster_id;
+
   // Create/update per-worker node connection stat.
-  if (!node_id.empty()) {
+  if (!worker_node_identifier.empty()) {
     std::string worker_node_stat_name =
-        fmt::format("{}.{}.node.{}", stat_prefix_, dispatcher_name, node_id);
+        fmt::format("{}.{}.node.{}", stat_prefix_, dispatcher_name, worker_node_identifier);
     Stats::StatNameManagedStorage worker_node_stat_name_storage(worker_node_stat_name,
                                                                 stats_store.symbolTable());
     auto& worker_node_gauge = stats_store.gaugeFromStatName(
@@ -316,9 +346,9 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   }
 
   // Create/update per-worker cluster connection stat.
-  if (!cluster_id.empty()) {
+  if (!worker_cluster_identifier.empty()) {
     std::string worker_cluster_stat_name =
-        fmt::format("{}.{}.cluster.{}", stat_prefix_, dispatcher_name, cluster_id);
+        fmt::format("{}.{}.cluster.{}", stat_prefix_, dispatcher_name, worker_cluster_identifier);
     Stats::StatNameManagedStorage worker_cluster_stat_name_storage(worker_cluster_stat_name,
                                                                    stats_store.symbolTable());
     auto& worker_cluster_gauge = stats_store.gaugeFromStatName(

@@ -9333,6 +9333,24 @@ pub trait EnvoyLoadBalancer {
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health;
 
+  /// Returns the address of a host by index within all hosts at a given priority.
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
+
+  /// Returns the weight of a host by index within all hosts at a given priority.
+  fn get_host_weight(&self, priority: u32, index: usize) -> u32;
+
+  /// Returns the number of active requests for a host by index within all hosts at a given
+  /// priority. This is essential for implementing least-request, peak EWMA, and similar algorithms.
+  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64;
+
+  /// Returns the number of active connections for a host by index within all hosts at a given
+  /// priority. This is useful for connection-aware load balancing decisions.
+  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64;
+
+  /// Returns the locality information (region, zone, sub_zone) for a host by index within all
+  /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
+  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
+
   // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
   // -------------------------------------------------------------------------
@@ -9455,6 +9473,112 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_host_health(self.lb_ptr, priority, index) }
+  }
+
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_address(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_host_weight(&self, priority: u32, index: usize) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.lb_ptr, priority, index) }
+  }
+
+  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_active_requests(self.lb_ptr, priority, index)
+    }
+  }
+
+  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_active_connections(
+        self.lb_ptr,
+        priority,
+        index,
+      )
+    }
+  }
+
+  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)> {
+    let mut region = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut zone = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut sub_zone = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_locality(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut region,
+        &mut zone,
+        &mut sub_zone,
+      )
+    };
+    if !found {
+      return None;
+    }
+    unsafe {
+      let region_str = if !region.ptr.is_null() && region.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          region.ptr as *const _,
+          region.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      let zone_str = if !zone.ptr.is_null() && zone.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          zone.ptr as *const _,
+          zone.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      let sub_zone_str = if !sub_zone.ptr.is_null() && sub_zone.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          sub_zone.ptr as *const _,
+          sub_zone.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      Some((region_str, zone_str, sub_zone_str))
+    }
   }
 
   fn has_context(&self) -> bool {
@@ -9583,6 +9707,29 @@ pub trait LoadBalancerConfig: Sync {
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
 }
 
+/// Represents the result of a host selection decision, containing the priority level
+/// and the host index within the healthy hosts at that priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostSelection {
+  /// The priority level of the selected host.
+  pub priority: u32,
+  /// The index of the selected host within the healthy hosts at the given priority.
+  pub index: u32,
+}
+
+impl HostSelection {
+  /// Creates a new host selection at the given priority and index.
+  pub fn new(priority: u32, index: u32) -> Self {
+    Self { priority, index }
+  }
+
+  /// Creates a new host selection at priority 0 with the given index.
+  /// This is a convenience for the common case of single-priority clusters.
+  pub fn at_default_priority(index: u32) -> Self {
+    Self { priority: 0, index }
+  }
+}
+
 /// Trait for a load balancer instance.
 ///
 /// All the event hooks are called on the same thread as the one that the [`LoadBalancer`] is
@@ -9594,9 +9741,10 @@ pub trait LoadBalancer {
   /// The `envoy_lb` provides access to both cluster/host information and request context.
   /// Context methods (those starting with `context_`) are only valid during this callback.
   ///
-  /// Returns the index of the selected host in the healthy hosts list at priority 0,
-  /// or `None` if no host should be selected (which will result in no upstream connection).
-  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize>;
+  /// Returns a [`HostSelection`] containing the priority and index of the selected host
+  /// in the healthy hosts list at that priority, or `None` if no host should be selected
+  /// (which will result in no upstream connection).
+  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection>;
 }
 
 /// The function signature for creating a new load balancer configuration.
@@ -9654,15 +9802,21 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
-) -> i64 {
+  result_priority: *mut u32,
+  result_index: *mut u32,
+) -> bool {
   let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
   let lb = {
     let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
     &mut **raw
   };
   match lb.choose_host(&envoy_lb) {
-    Some(index) => index as i64,
-    None => -1,
+    Some(selection) => {
+      *result_priority = selection.priority;
+      *result_index = selection.index;
+      true
+    },
+    None => false,
   }
 }
 
@@ -9705,14 +9859,14 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
-///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize> {
+///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection> {
 ///     let count = envoy_lb.get_healthy_hosts_count(0);
 ///     if count == 0 {
 ///       return None;
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
-///     Some(index)
+///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }
 /// ```

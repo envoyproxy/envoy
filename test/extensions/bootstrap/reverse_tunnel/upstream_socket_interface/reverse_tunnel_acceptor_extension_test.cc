@@ -3,6 +3,7 @@
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
 #include "source/common/network/utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
@@ -15,6 +16,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gmock/gmock.h"
@@ -152,9 +154,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   setupThreadLocalSlot();
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node2", "cluster2", true);
-  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
 
   auto stat_map = extension_->getPerWorkerStatMap();
 
@@ -167,8 +169,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
     EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
   }
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
 
   stat_map = extension_->getPerWorkerStatMap();
 
@@ -177,9 +179,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 2);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2);
 
-  extension_->updateConnectionStats("node1", "cluster1", false);
-  extension_->updateConnectionStats("node2", "cluster2", false);
-  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node1", "cluster1", false, false);
+  extension_->updateConnectionStats("node2", "cluster2", false, false);
+  extension_->updateConnectionStats("node2", "cluster2", false, false);
 
   stat_map = extension_->getPerWorkerStatMap();
 
@@ -266,19 +268,57 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   EXPECT_FALSE(found_detailed_stats);
 }
 
+TEST_F(ReverseTunnelAcceptorExtensionTest, TenantScopedStatsCreated) {
+  setupThreadLocalSlot();
+
+  const std::string node_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a", "node1");
+  const std::string cluster_id =
+      ReverseConnection::ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-a",
+                                                                               "cluster1");
+
+  extension_->updateConnectionStats(node_id, cluster_id, true, true);
+
+  auto base_node_gauge =
+      TestUtility::findGauge(stats_store_, "test_scope.reverse_connections.nodes.node1");
+  ASSERT_NE(nullptr, base_node_gauge);
+  EXPECT_EQ(1, base_node_gauge->value());
+
+  auto base_cluster_gauge =
+      TestUtility::findGauge(stats_store_, "test_scope.reverse_connections.clusters.cluster1");
+  ASSERT_NE(nullptr, base_cluster_gauge);
+  EXPECT_EQ(1, base_cluster_gauge->value());
+
+  auto tenant_node_gauge = TestUtility::findGauge(
+      stats_store_, "test_scope.reverse_connections.tenants.tenant-a.nodes.node1");
+  ASSERT_NE(nullptr, tenant_node_gauge);
+  EXPECT_EQ(1, tenant_node_gauge->value());
+
+  auto tenant_cluster_gauge = TestUtility::findGauge(
+      stats_store_, "test_scope.reverse_connections.tenants.tenant-a.clusters.cluster1");
+  ASSERT_NE(nullptr, tenant_cluster_gauge);
+  EXPECT_EQ(1, tenant_cluster_gauge->value());
+
+  extension_->updateConnectionStats(node_id, cluster_id, false, true);
+  EXPECT_EQ(0, tenant_node_gauge->value());
+  EXPECT_EQ(0, tenant_cluster_gauge->value());
+  EXPECT_EQ(0, base_node_gauge->value());
+  EXPECT_EQ(0, base_cluster_gauge->value());
+}
+
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   setupThreadLocalSlot();
   setupAnotherThreadLocalSlot();
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
 
   auto original_registry = thread_local_registry_;
   thread_local_registry_ = another_thread_local_registry_;
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node3", "cluster3", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node3", "cluster3", true, false);
 
   thread_local_registry_ = original_registry;
 
@@ -292,8 +332,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster2"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", false, false);
 
   stat_map = extension_->getCrossWorkerStatMap();
 
@@ -304,14 +344,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node3"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
 
-  extension_->updateConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node1", "cluster1", false, false);
 
   auto per_worker_stat_map = extension_->getPerWorkerStatMap();
 
   EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.node.node1"], 3);
   EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 3);
 
-  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node2", "cluster2", false, false);
 
   auto cross_worker_stat_map = extension_->getCrossWorkerStatMap();
 
@@ -324,8 +364,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
 
   thread_local_registry_ = another_thread_local_registry_;
 
-  extension_->updateConnectionStats("node1", "cluster1", false);
-  extension_->updateConnectionStats("node3", "cluster3", false);
+  extension_->updateConnectionStats("node1", "cluster1", false, false);
+  extension_->updateConnectionStats("node3", "cluster3", false, false);
 
   auto worker1_stat_map = extension_->getPerWorkerStatMap();
 
@@ -341,15 +381,15 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetConnectionStatsSyncMultiThread) {
   setupThreadLocalSlot();
   setupAnotherThreadLocalSlot();
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", true, false);
 
   auto original_registry = thread_local_registry_;
   thread_local_registry_ = another_thread_local_registry_;
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node3", "cluster3", true);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node3", "cluster3", true, false);
 
   thread_local_registry_ = original_registry;
 
@@ -372,8 +412,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetConnectionStatsSyncMultiThread) {
   EXPECT_TRUE(std::find(accepted_connections.begin(), accepted_connections.end(), "cluster3") !=
               accepted_connections.end());
 
-  extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node1", "cluster1", true, false);
+  extension_->updateConnectionStats("node2", "cluster2", false, false);
 
   result = extension_->getConnectionStatsSync();
   auto& [updated_connected_nodes, updated_accepted_connections] = result;
@@ -742,6 +782,47 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsDecrement) {
       getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
   EXPECT_EQ(total_clusters, 0);
   EXPECT_EQ(total_nodes, 0);
+}
+
+// Test extension initialization with tenant isolation enabled.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithTenantIsolation) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface tenant_isolation_config;
+  tenant_isolation_config.set_stat_prefix("reverse_connections");
+  tenant_isolation_config.mutable_enable_tenant_isolation()->set_value(true);
+
+  auto tenant_isolation_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, tenant_isolation_config);
+
+  EXPECT_TRUE(tenant_isolation_extension->enableTenantIsolation());
+}
+
+// Test extension initialization without tenant isolation (default behavior).
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionInitializationWithoutTenantIsolation) {
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface default_config;
+  default_config.set_stat_prefix("reverse_connections");
+  // Don't set enable_tenant_isolation - should default to false.
+
+  auto default_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, default_config);
+
+  EXPECT_FALSE(default_extension->enableTenantIsolation());
+}
+
+// Test tenant isolation flag is propagated to socket manager during TLS initialization.
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionTenantIsolationPropagatedToSocketManager) {
+  config_.mutable_enable_tenant_isolation()->set_value(true);
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
+
+  extension_->onServerInitialized(server_);
+
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
+  auto* socket_manager = registry->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
 }
 
 } // namespace ReverseConnection

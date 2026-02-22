@@ -215,6 +215,30 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
+// Test dynamic metadata contains is_mcp_request flag
+TEST_F(McpFilterTest, DynamicMetadataContainsIsMcpRequest) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+
+        auto it = fields.find(std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST));
+        ASSERT_NE(it, fields.end());
+        EXPECT_TRUE(it->second.bool_value());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 // Test buffering behavior for streaming data
 TEST_F(McpFilterTest, PartialNoJsonData) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},

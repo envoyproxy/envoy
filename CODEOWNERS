@@ -241,6 +241,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
 /*/extensions/filters/http/mcp @botengyao @yanavlasov
+# HTTP MCP Jon Rest Bridge filter
+/*/extensions/filters/http/mcp_json_rest_bridge @paulhong01 @leon-gg @botengyao @tyxia @yanavlasov
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
 # HTTP A2A filter

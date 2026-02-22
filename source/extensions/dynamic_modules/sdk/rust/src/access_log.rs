@@ -390,6 +390,27 @@ impl LogContext {
     }
   }
 
+  /// Get the virtual cluster name.
+  pub fn virtual_cluster_name(&self) -> Option<&str> {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
+        self.envoy_ptr,
+        &mut buffer,
+      )
+    } {
+      unsafe {
+        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
+        str::from_utf8(slice).ok()
+      }
+    } else {
+      None
+    }
+  }
+
   /// Check if this is a health check request.
   pub fn is_health_check(&self) -> bool {
     unsafe { abi::envoy_dynamic_module_callback_access_logger_is_health_check(self.envoy_ptr) }
@@ -595,6 +616,252 @@ impl LogContext {
   /// Get the index of the current worker thread.
   pub fn get_worker_index(&self) -> u32 {
     unsafe { abi::envoy_dynamic_module_callback_access_logger_get_worker_index(self.envoy_ptr) }
+  }
+
+  /// Check if a specific response flag is set.
+  ///
+  /// Response flags indicate various error conditions or special processing that occurred
+  /// during request handling (e.g., upstream connection failure, rate limiting).
+  pub fn has_response_flag(&self, flag: abi::envoy_dynamic_module_type_response_flag) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_has_response_flag(self.envoy_ptr, flag)
+    }
+  }
+
+  /// Get all response flags as a bitmask.
+  ///
+  /// Each bit corresponds to a response flag value. Use bitwise operations to check
+  /// individual flags, or use [`has_response_flag`](Self::has_response_flag) for single flag
+  /// checks.
+  pub fn response_flags(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_response_flags(self.envoy_ptr) }
+  }
+
+  /// Get the upstream request attempt count, or 0 if not available.
+  pub fn attempt_count(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_attempt_count(self.envoy_ptr) }
+  }
+
+  /// Get the downstream remote address (client) as an IP address string and port.
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn downstream_remote_address(&self) -> Option<(&str, u32)> {
+    self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_downstream_remote_address)
+  }
+
+  /// Get the downstream local address (Envoy listener) as an IP address string and port.
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn downstream_local_address(&self) -> Option<(&str, u32)> {
+    self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_address)
+  }
+
+  /// Get the upstream remote address (backend) as an IP address string and port.
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn upstream_remote_address(&self) -> Option<(&str, u32)> {
+    self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_upstream_remote_address)
+  }
+
+  /// Get the upstream local address (Envoy outbound) as an IP address string and port.
+  ///
+  /// Returns `None` if the address is not available or is not an IP address.
+  pub fn upstream_local_address(&self) -> Option<(&str, u32)> {
+    self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_address)
+  }
+
+  /// Helper to retrieve an address (IP string + port) from an ABI callback.
+  fn get_address(
+    &self,
+    callback: unsafe extern "C" fn(
+      *mut c_void,
+      *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      *mut u32,
+    ) -> bool,
+  ) -> Option<(&str, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    if unsafe { callback(self.envoy_ptr, &mut address, &mut port) } {
+      unsafe {
+        let slice = slice::from_raw_parts(address.ptr as *const u8, address.length);
+        str::from_utf8(slice).ok().map(|s| (s, port))
+      }
+    } else {
+      None
+    }
+  }
+
+  /// Get the upstream transport failure reason.
+  pub fn upstream_transport_failure_reason(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason,
+    )
+  }
+
+  /// Get the downstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+  pub fn downstream_tls_version(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_version,
+    )
+  }
+
+  /// Get the downstream peer certificate subject (e.g., "CN=client").
+  pub fn downstream_peer_subject(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject,
+    )
+  }
+
+  /// Get the downstream peer certificate SHA-256 digest.
+  pub fn downstream_peer_cert_digest(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest,
+    )
+  }
+
+  /// Get the request ID (stream ID).
+  pub fn request_id(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_request_id)
+  }
+
+  /// Get a response trailer value by key.
+  pub fn get_response_trailer(&self, key: &str) -> Option<&[u8]> {
+    self.get_header_value(
+      abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+      key,
+      0,
+    )
+  }
+
+  /// Get a value from the filter state.
+  ///
+  /// Note: This is not currently supported and always returns `None`.
+  /// Filter state serialization requires allocation which is incompatible
+  /// with the zero-copy ABI design.
+  pub fn get_filter_state(&self, key: &str) -> Option<&str> {
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_filter_state(
+        self.envoy_ptr,
+        key_buf,
+        &mut result,
+      )
+    } {
+      unsafe {
+        let slice = slice::from_raw_parts(result.ptr as *const u8, result.length);
+        str::from_utf8(slice).ok()
+      }
+    } else {
+      None
+    }
+  }
+
+  /// Get the trace ID.
+  ///
+  /// Note: This is not currently supported and always returns `None`.
+  /// The tracing span interface does not expose trace IDs in a way that
+  /// allows zero-copy access.
+  pub fn get_trace_id(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_trace_id)
+  }
+
+  /// Get the span ID.
+  ///
+  /// Note: This is not currently supported and always returns `None`.
+  /// The tracing span interface does not expose span IDs in a way that
+  /// allows zero-copy access.
+  pub fn get_span_id(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_span_id)
+  }
+
+  /// Get the number of headers of the specified type.
+  ///
+  /// The supported header types are `RequestHeader`, `ResponseHeader`, and `ResponseTrailer`.
+  pub fn get_headers_count(
+    &self,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+  ) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_headers_size(self.envoy_ptr, header_type)
+    }
+  }
+
+  /// Get all headers of the specified type as key-value byte slice pairs.
+  ///
+  /// The supported header types are `RequestHeader`, `ResponseHeader`, and `ResponseTrailer`.
+  /// Returns an empty vector if the header map is not available.
+  pub fn get_all_headers(
+    &self,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+  ) -> Vec<(&[u8], &[u8])> {
+    let count = self.get_headers_count(header_type);
+    if count == 0 {
+      return Vec::new();
+    }
+
+    let mut headers = vec![
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: ptr::null_mut(),
+        key_length: 0,
+        value_ptr: ptr::null_mut(),
+        value_length: 0,
+      };
+      count
+    ];
+
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_headers(
+        self.envoy_ptr,
+        header_type,
+        headers.as_mut_ptr(),
+      )
+    };
+
+    if !success {
+      return Vec::new();
+    }
+
+    headers
+      .iter()
+      .map(|h| unsafe {
+        (
+          slice::from_raw_parts(h.key_ptr as *const u8, h.key_length),
+          slice::from_raw_parts(h.value_ptr as *const u8, h.value_length),
+        )
+      })
+      .collect()
+  }
+
+  /// Helper to retrieve a string value from an ABI callback that returns a buffer.
+  fn get_envoy_buffer_string(
+    &self,
+    callback: unsafe extern "C" fn(
+      *mut c_void,
+      *mut abi::envoy_dynamic_module_type_envoy_buffer,
+    ) -> bool,
+  ) -> Option<&str> {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe { callback(self.envoy_ptr, &mut buffer) } {
+      unsafe {
+        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
+        str::from_utf8(slice).ok()
+      }
+    } else {
+      None
+    }
   }
 }
 
