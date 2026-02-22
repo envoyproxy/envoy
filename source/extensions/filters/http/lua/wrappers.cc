@@ -14,18 +14,26 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
-  entries_.reserve(parent_.headers_.size());
-  parent_.headers_.iterate(
+HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(&parent) {
+  entries_.reserve(parent_->headers_.size());
+  parent_->headers_.iterate(
       [this](const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
         entries_.push_back(&header);
         return Envoy::Http::HeaderMap::Iterate::Continue;
       });
 }
 
+HeaderMapIterator::~HeaderMapIterator() {
+  if (parent_ != nullptr) {
+    parent_->onIteratorDestroyed(this);
+  }
+}
+
 int HeaderMapIterator::luaPairsIterator(lua_State* state) {
   if (current_ == entries_.size()) {
-    parent_.iterator_.reset();
+    if (parent_ != nullptr) {
+      parent_->iterator_.reset();
+    }
     return 0;
   } else {
     const absl::string_view key_view(entries_[current_]->key().getStringView());
@@ -124,6 +132,12 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 
   if (!cb_()) {
     luaL_error(state, "header map can no longer be modified");
+  }
+}
+
+void HeaderMapWrapper::onIteratorDestroyed(HeaderMapIterator* it) {
+  if (iterator_.get() == it) {
+    iterator_.resetWithoutMarkDead();
   }
 }
 
