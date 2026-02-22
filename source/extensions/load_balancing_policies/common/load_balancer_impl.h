@@ -246,6 +246,10 @@ protected:
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
 
+  // Processes any dirty priorities accumulated by PriorityUpdateCb.
+  // Idempotent: safe to call multiple times (no-op if dirty set is empty).
+  void processDirtyPriorities();
+
 private:
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;

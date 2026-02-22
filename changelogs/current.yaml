@@ -266,6 +266,13 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: upstream
+  change: |
+    Coalesced load balancer rebuilds during EDS batch host updates. When multiple priorities change in a
+    single batch, each LB level (LoadBalancerBase, ZoneAwareLoadBalancerBase, EdfLoadBalancerBase,
+    ThreadAwareLoadBalancerBase) now defers expensive per-priority recalculations to a single pass after
+    the batch completes, reducing CPU spikes on large clusters. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update`` to ``false``.
 - area: cel
   change: |
     Added functionality to reevaluate CEL expressions that attempt to read response path data on the
