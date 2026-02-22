@@ -1685,6 +1685,120 @@ bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_bool is called by the module to set
+ * the bool value of the dynamic metadata with the given namespace and key. If the metadata is
+ * existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the bool value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_bool is called by the module to get
+ * the bool value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a bool,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param result is the pointer to the variable where the bool value of the dynamic metadata will
+ * be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_keys_count is called by the module to get the
+ * number of keys in the metadata namespace. If the metadata is not accessible or the namespace
+ * does not exist, this returns 0.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @return the number of keys in the metadata namespace.
+ */
+size_t envoy_dynamic_module_callback_http_get_metadata_keys_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_keys is called by the module to get all keys
+ * in the metadata namespace. The keys are returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the keys. The module can use
+ * envoy_dynamic_module_callback_http_get_metadata_keys_count to get the number of
+ * keys before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the key strings will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_keys(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces_count is called by the module to get
+ * the number of namespaces in the metadata. If the metadata is not accessible, this returns 0.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @return the number of namespaces in the metadata.
+ */
+size_t envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces is called by the module to get all
+ * namespace names in the metadata. The namespaces are returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the namespaces. The module can use
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces_count to get the number of
+ * namespaces before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the namespace strings will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_namespaces(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
 // -------------------------- Filter State Callbacks ---------------------------
 
 /**
@@ -1923,6 +2037,24 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
 /**
  * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate

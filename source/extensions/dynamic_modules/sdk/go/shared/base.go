@@ -291,11 +291,29 @@ type HttpFilterHandle interface {
 	// @Return the metadata value if found, otherwise nil.
 	GetMetadataNumber(source MetadataSourceType, metadataNamespace, key string) (float64, bool)
 
+	// GetMetadataBool retrieves the dynamic metadata bool value of the stream.
+	// @Param source the metadata source type.
+	// @Param metadataNamespace the metadata namespace.
+	// @Param key the metadata key.
+	// @Return the metadata value and true if found, otherwise false.
+	GetMetadataBool(source MetadataSourceType, metadataNamespace, key string) (bool, bool)
+
 	// SetMetadata sets the dynamic metadata value of the stream.
 	// @Param metadataNamespace the metadata namespace.
 	// @Param key the metadata key.
-	// @Param value the metadata value. Only string/int/float are supported.
+	// @Param value the metadata value. Only string/int/float/bool are supported.
 	SetMetadata(metadataNamespace, key string, value any)
+
+	// GetMetadataKeys retrieves all keys in the given metadata namespace.
+	// @Param source the metadata source type.
+	// @Param metadataNamespace the metadata namespace.
+	// @Return the list of keys in the namespace, or nil if the namespace does not exist.
+	GetMetadataKeys(source MetadataSourceType, metadataNamespace string) []string
+
+	// GetMetadataNamespaces retrieves all namespace names in the metadata.
+	// @Param source the metadata source type.
+	// @Return the list of namespace names, or nil if no namespaces exist.
+	GetMetadataNamespaces(source MetadataSourceType) []string
 
 	// GetFilterState retrieves the serialized filter state value of the stream.
 	// @Param key the filter state key.
@@ -316,6 +334,11 @@ type HttpFilterHandle interface {
 	// @Param key the attribute key.
 	// @Return the attribute value if found, otherwise nil.
 	GetAttributeNumber(attributeID AttributeID) (float64, bool)
+
+	// GetAttributeBool retrieves the bool attribute value of the stream.
+	// @Param attributeID the attribute ID.
+	// @Return the attribute value and true if found, otherwise false.
+	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
