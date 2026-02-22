@@ -86,6 +86,9 @@ bug_fixes:
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
+- area: http
+  change: |
+    Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
 - area: load_report
   change: |
     Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
