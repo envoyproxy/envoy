@@ -1,5 +1,6 @@
 #include "engine.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
@@ -7,9 +8,14 @@
 namespace Envoy {
 namespace Platform {
 
-std::shared_ptr<Engine> Engine::createFromInternalEngineHandle(int64_t internal_engine_handle) {
+absl::StatusOr<std::shared_ptr<Engine>>
+Engine::createFromInternalEngineHandle(int64_t internal_engine_handle) {
   auto* internal_engine = reinterpret_cast<::Envoy::InternalEngine*>(internal_engine_handle);
-  return std::shared_ptr<Engine>(new Engine(internal_engine, false));
+  if (internal_engine == nullptr) {
+    return absl::InvalidArgumentError(
+        "can't cast internal_engine_handle to an InternalEngine*");
+  }
+  return std::shared_ptr<Engine>(new Engine(internal_engine, /*owns_engine=*/false));
 }
 
 Engine::Engine(::Envoy::InternalEngine* engine, bool owns_engine)

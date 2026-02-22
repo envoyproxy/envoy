@@ -17,13 +17,22 @@ TEST(EngineHandleTest, CreateFromHandleIsNonOwning) {
 
   const int64_t handle = owning_engine->getInternalEngineHandle();
   {
-    EngineSharedPtr handle_engine = Engine::createFromInternalEngineHandle(handle);
+    auto handle_engine_or = Engine::createFromInternalEngineHandle(handle);
+    ASSERT_TRUE(handle_engine_or.ok()) << handle_engine_or.status();
+    EngineSharedPtr handle_engine = handle_engine_or.value();
     EXPECT_EQ(handle, handle_engine->getInternalEngineHandle());
   }
 
   EXPECT_FALSE(owning_engine->engine()->isTerminated());
   EXPECT_EQ(ENVOY_SUCCESS, owning_engine->terminate());
   EXPECT_TRUE(owning_engine->engine()->isTerminated());
+}
+
+TEST(EngineHandleTest, CreateFromNullHandleReturnsError) {
+  auto handle_engine_or = Engine::createFromInternalEngineHandle(0);
+  ASSERT_FALSE(handle_engine_or.ok());
+  EXPECT_EQ(handle_engine_or.status().message(),
+            "can't cast internal_engine_handle to an InternalEngine*");
 }
 
 } // namespace

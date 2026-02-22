@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
@@ -20,7 +21,8 @@ class Engine : public std::enable_shared_from_this<Engine> {
 public:
   // Creates a non-owning Engine wrapper around an existing InternalEngine handle.
   // The returned Engine will not auto-terminate the underlying InternalEngine in its destructor.
-  static std::shared_ptr<Engine> createFromInternalEngineHandle(int64_t internal_engine_handle);
+  static absl::StatusOr<std::shared_ptr<Engine>>
+  createFromInternalEngineHandle(int64_t internal_engine_handle);
 
   ~Engine();
 
@@ -48,7 +50,7 @@ private:
   friend class ::Envoy::BaseClientIntegrationTest;
 
   Envoy::InternalEngine* engine_;
-  bool owns_engine_;
+  const bool owns_engine_;
   StreamClientSharedPtr stream_client_;
 };
 
