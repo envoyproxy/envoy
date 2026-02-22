@@ -126,8 +126,8 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
+  member_update_cb_ =
+      priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) { refresh(); });
 
   refresh();
   return absl::OkStatus();

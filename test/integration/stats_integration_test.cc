@@ -403,6 +403,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2025/07/28  40266    44299       44500   Add request_count_ field to ActiveClient
   // 2026/01/23           44528       45000   Fix test flakes
   // 2026/02/13  43467    45575       46000   Update tcmalloc to 12f2552 (2025-09-27)
+  // 2026/02/14           45156       45500   Coalesce LB rebuilds during batch updates
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

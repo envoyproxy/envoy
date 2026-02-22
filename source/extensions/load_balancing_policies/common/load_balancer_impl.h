@@ -248,6 +248,8 @@ protected:
 
 private:
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 };
 
 /**
@@ -470,7 +472,9 @@ private:
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
   Common::CallbackHandlePtr local_priority_set_member_update_cb_handle_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 
   // Config for zone aware routing.
   const uint64_t min_cluster_size_;
@@ -557,6 +561,7 @@ private:
   absl::flat_hash_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
   Common::CallbackHandlePtr priority_update_cb_;
   Common::CallbackHandlePtr member_update_cb_;
+  absl::flat_hash_set<uint32_t> dirty_priorities_;
 
 protected:
   // Slow start related config
