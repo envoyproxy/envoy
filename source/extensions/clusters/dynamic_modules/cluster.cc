@@ -158,51 +158,64 @@ void DynamicModuleCluster::startPreInit() {
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
 
-Upstream::HostSharedPtr DynamicModuleCluster::addHost(const std::string& address, uint32_t weight) {
-  // Validate weight.
-  if (weight == 0 || weight > 128) {
-    ENVOY_LOG(error, "Invalid weight {} for host {}.", weight, address);
-    return nullptr;
-  }
+bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
+                                    const std::vector<uint32_t>& weights,
+                                    std::vector<Upstream::HostSharedPtr>& result_hosts) {
+  ASSERT(addresses.size() == weights.size());
+  result_hosts.clear();
+  result_hosts.reserve(addresses.size());
 
-  // Parse the address.
-  Network::Address::InstanceConstSharedPtr resolved_address =
-      Network::Utility::parseInternetAddressAndPortNoThrow(address, false);
-  if (resolved_address == nullptr) {
-    ENVOY_LOG(error, "Invalid address: {}.", address);
-    return nullptr;
-  }
-
-  // Create the host.
   auto cluster_info = info();
-  auto host_result = Upstream::HostImpl::create(
-      cluster_info, cluster_info->name() + address, std::move(resolved_address), nullptr, nullptr,
-      weight, std::make_shared<envoy::config::core::v3::Locality>(),
-      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-      envoy::config::core::v3::UNKNOWN);
-  if (!host_result.ok()) {
-    ENVOY_LOG(error, "Failed to create host for address: {}.", address); // LCOV_EXCL_LINE
-    return nullptr;                                                      // LCOV_EXCL_LINE
-  }
-  Upstream::HostSharedPtr host = std::move(host_result.value());
 
-  // Store the mapping from raw pointer to shared pointer.
+  // First pass: validate all hosts and create them. If any fail, return false without modifying
+  // the cluster state.
+  for (size_t i = 0; i < addresses.size(); ++i) {
+    if (weights[i] == 0 || weights[i] > 128) {
+      ENVOY_LOG(error, "Invalid weight {} for host {}.", weights[i], addresses[i]);
+      return false;
+    }
+
+    Network::Address::InstanceConstSharedPtr resolved_address =
+        Network::Utility::parseInternetAddressAndPortNoThrow(addresses[i], false);
+    if (resolved_address == nullptr) {
+      ENVOY_LOG(error, "Invalid address: {}.", addresses[i]);
+      return false;
+    }
+
+    auto host_result = Upstream::HostImpl::create(
+        cluster_info, cluster_info->name() + addresses[i], std::move(resolved_address), nullptr,
+        nullptr, weights[i], std::make_shared<envoy::config::core::v3::Locality>(),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+        envoy::config::core::v3::UNKNOWN);
+    if (!host_result.ok()) {
+      ENVOY_LOG(error, "Failed to create host for address: {}.", addresses[i]); // LCOV_EXCL_LINE
+      return false;                                                             // LCOV_EXCL_LINE
+    }
+    result_hosts.emplace_back(std::move(host_result.value()));
+  }
+
+  // Second pass: store all host mappings and update the priority set once.
   {
     absl::WriterMutexLock lock(&host_map_lock_);
-    host_map_[host.get()] = host;
+    for (const auto& host : result_hosts) {
+      host_map_[host.get()] = host;
+    }
   }
 
-  // Update the priority set.
   ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(first_host_set.hosts()));
-  all_hosts->emplace_back(host);
+  Upstream::HostVector added_hosts;
+  for (const auto& host : result_hosts) {
+    all_hosts->emplace_back(host);
+    added_hosts.emplace_back(host);
+  }
   priority_set_.updateHosts(
       0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-      {}, {host}, {}, absl::nullopt, absl::nullopt);
+      {}, added_hosts, {}, absl::nullopt, absl::nullopt);
 
-  ENVOY_LOG(debug, "Added host {} with weight {} to dynamic module cluster.", address, weight);
-  return host;
+  ENVOY_LOG(debug, "Added {} hosts to dynamic module cluster.", result_hosts.size());
+  return true;
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
@@ -214,37 +227,53 @@ Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
   return it->second;
 }
 
-bool DynamicModuleCluster::removeHost(const Upstream::HostSharedPtr& host) {
-  if (host == nullptr) {
-    return false;
-  }
+size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts) {
+  Upstream::HostVector removed_hosts;
+  removed_hosts.reserve(hosts.size());
 
-  // Remove from our map.
+  // Remove all valid hosts from the map.
   {
     absl::WriterMutexLock lock(&host_map_lock_);
-    auto it = host_map_.find(host.get());
-    if (it == host_map_.end()) {
-      return false;
+    for (const auto& host : hosts) {
+      if (host == nullptr) {
+        continue;
+      }
+      auto it = host_map_.find(host.get());
+      if (it != host_map_.end()) {
+        removed_hosts.emplace_back(host);
+        host_map_.erase(it);
+      }
     }
-    host_map_.erase(it);
   }
 
-  // Update the priority set.
+  if (removed_hosts.empty()) {
+    return 0;
+  }
+
+  // Build the remaining host list and update the priority set once.
   ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
+
+  // Build a set of removed host pointers for O(1) lookup.
+  absl::flat_hash_set<Upstream::Host*> removed_set;
+  removed_set.reserve(removed_hosts.size());
+  for (const auto& h : removed_hosts) {
+    removed_set.insert(h.get());
+  }
+
   Upstream::HostVectorSharedPtr remaining_hosts(new Upstream::HostVector());
   for (const auto& h : first_host_set.hosts()) {
-    if (h.get() != host.get()) {
+    if (removed_set.find(h.get()) == removed_set.end()) {
       remaining_hosts->emplace_back(h);
     }
   }
   priority_set_.updateHosts(0,
                             Upstream::HostSetImpl::partitionHosts(
                                 remaining_hosts, Upstream::HostsPerLocalityImpl::empty()),
-                            {}, {}, {host}, absl::nullopt, absl::nullopt);
+                            {}, {}, removed_hosts, absl::nullopt, absl::nullopt);
 
-  ENVOY_LOG(debug, "Removed host {} from dynamic module cluster.", host->address()->asString());
-  return true;
+  ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
+  return removed_hosts.size();
 }
 
 // =================================================================================================

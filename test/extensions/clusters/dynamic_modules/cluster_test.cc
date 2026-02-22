@@ -154,7 +154,7 @@ TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
               testing::HasSubstr("Failed to create in-module cluster instance"));
 }
 
-// Test host addition and removal via the public API.
+// Test batch host addition and removal via the public API.
 TEST_F(DynamicModuleClusterTest, HostManagement) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
@@ -165,37 +165,73 @@ TEST_F(DynamicModuleClusterTest, HostManagement) {
   // Initially no hosts in the map.
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 
-  // Add a host.
-  auto host1 = cluster->addHost("127.0.0.1:10001", 1);
-  ASSERT_NE(nullptr, host1);
-  EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
-
-  // Add another host.
-  auto host2 = cluster->addHost("127.0.0.1:10002", 2);
-  ASSERT_NE(nullptr, host2);
+  // Add two hosts in a single batch.
+  std::vector<std::string> addresses = {"127.0.0.1:10001", "127.0.0.1:10002"};
+  std::vector<uint32_t> weights = {1, 2};
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts(addresses, weights, hosts));
+  EXPECT_EQ(2, hosts.size());
   EXPECT_EQ(2, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 
-  // Find a host by raw pointer.
-  EXPECT_EQ(host1, cluster->findHost(host1.get()));
-  EXPECT_EQ(host2, cluster->findHost(host2.get()));
+  // Find hosts by raw pointer.
+  EXPECT_EQ(hosts[0], cluster->findHost(hosts[0].get()));
+  EXPECT_EQ(hosts[1], cluster->findHost(hosts[1].get()));
   EXPECT_EQ(nullptr, cluster->findHost(reinterpret_cast<void*>(0xDEAD)));
 
   // Remove the first host.
-  EXPECT_TRUE(cluster->removeHost(host1));
+  EXPECT_EQ(1, cluster->removeHosts({hosts[0]}));
   EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 
-  // Removing an already-removed host returns false.
-  EXPECT_FALSE(cluster->removeHost(host1));
+  // Removing an already-removed host returns 0.
+  EXPECT_EQ(0, cluster->removeHosts({hosts[0]}));
 
-  // Removing a nullptr returns false.
-  EXPECT_FALSE(cluster->removeHost(nullptr));
+  // Removing a nullptr returns 0.
+  EXPECT_EQ(0, cluster->removeHosts({nullptr}));
 
   // Remove the second host.
-  EXPECT_TRUE(cluster->removeHost(host2));
+  EXPECT_EQ(1, cluster->removeHosts({hosts[1]}));
   EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
-// Test that invalid addresses are rejected.
+// Test batch addition with a single host.
+TEST_F(DynamicModuleClusterTest, HostManagementSingleHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<std::string> addresses = {"127.0.0.1:10001"};
+  std::vector<uint32_t> weights = {1};
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts(addresses, weights, hosts));
+  EXPECT_EQ(1, hosts.size());
+  EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+
+  EXPECT_EQ(1, cluster->removeHosts({hosts[0]}));
+  EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// Test that batch remove of multiple hosts works correctly.
+TEST_F(DynamicModuleClusterTest, BatchRemoveMultipleHosts) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<std::string> addresses = {"127.0.0.1:10001", "127.0.0.1:10002", "127.0.0.1:10003"};
+  std::vector<uint32_t> weights = {1, 2, 3};
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts(addresses, weights, hosts));
+  EXPECT_EQ(3, hosts.size());
+
+  // Remove all three at once.
+  EXPECT_EQ(3, cluster->removeHosts(hosts));
+  EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// Test that invalid addresses cause the entire batch to fail.
 TEST_F(DynamicModuleClusterTest, InvalidAddress) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
@@ -203,11 +239,18 @@ TEST_F(DynamicModuleClusterTest, InvalidAddress) {
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   ASSERT_NE(nullptr, cluster);
 
-  EXPECT_EQ(nullptr, cluster->addHost("invalid_address", 1));
-  EXPECT_EQ(nullptr, cluster->addHost("", 1));
+  std::vector<Upstream::HostSharedPtr> hosts;
+
+  // Single invalid address.
+  EXPECT_FALSE(cluster->addHosts({"invalid_address"}, {1}, hosts));
+  EXPECT_FALSE(cluster->addHosts({""}, {1}, hosts));
+
+  // Mixed valid and invalid addresses: the entire batch should fail.
+  EXPECT_FALSE(cluster->addHosts({"127.0.0.1:10001", "invalid_address"}, {1, 1}, hosts));
+  EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
-// Test that invalid weights are rejected.
+// Test that invalid weights cause the entire batch to fail.
 TEST_F(DynamicModuleClusterTest, InvalidWeight) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
@@ -215,8 +258,14 @@ TEST_F(DynamicModuleClusterTest, InvalidWeight) {
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   ASSERT_NE(nullptr, cluster);
 
-  EXPECT_EQ(nullptr, cluster->addHost("127.0.0.1:10001", 0));
-  EXPECT_EQ(nullptr, cluster->addHost("127.0.0.1:10001", 129));
+  std::vector<Upstream::HostSharedPtr> hosts;
+
+  EXPECT_FALSE(cluster->addHosts({"127.0.0.1:10001"}, {0}, hosts));
+  EXPECT_FALSE(cluster->addHosts({"127.0.0.1:10001"}, {129}, hosts));
+
+  // Mixed valid and invalid weights: the entire batch should fail.
+  EXPECT_FALSE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 0}, hosts));
+  EXPECT_EQ(0, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
 }
 
 // Test the load balancer lifecycle.
@@ -247,16 +296,17 @@ TEST_F(DynamicModuleClusterTest, LoadBalancerLifecycle) {
 
   // selectExistingConnection should return nullopt (not supported).
   std::vector<uint8_t> hash_key;
-  auto dummy_host = cluster->addHost("127.0.0.1:10099", 1);
-  ASSERT_NE(nullptr, dummy_host);
-  auto existing = lb->selectExistingConnection(nullptr, *dummy_host, hash_key);
+  std::vector<Upstream::HostSharedPtr> dummy_hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10099"}, {1}, dummy_hosts));
+  ASSERT_EQ(1, dummy_hosts.size());
+  auto existing = lb->selectExistingConnection(nullptr, *dummy_hosts[0], hash_key);
   EXPECT_FALSE(existing.has_value());
 
   // lifetimeCallbacks should return empty (not supported).
   EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
 
   // Clean up.
-  cluster->removeHost(dummy_host);
+  cluster->removeHosts(dummy_hosts);
 }
 
 // Test the load balancer with hosts and the priority set access.
@@ -268,10 +318,9 @@ TEST_F(DynamicModuleClusterTest, LoadBalancerWithHosts) {
   ASSERT_NE(nullptr, cluster);
 
   // Add hosts before creating the LB.
-  auto host1 = cluster->addHost("127.0.0.1:10001", 1);
-  ASSERT_NE(nullptr, host1);
-  auto host2 = cluster->addHost("127.0.0.1:10002", 2);
-  ASSERT_NE(nullptr, host2);
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 2}, hosts));
+  ASSERT_EQ(2, hosts.size());
 
   // Create the LB.
   auto& talb = result->second;
@@ -314,7 +363,7 @@ TEST_F(DynamicModuleClusterTest, InModuleClusterIsSet) {
   EXPECT_NE(nullptr, DynamicModuleClusterTestPeer::getInModuleCluster(*cluster));
 }
 
-// Test the ABI callback implementations for host management directly.
+// Test the ABI callback implementations for batch host management directly.
 TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_TRUE(result.ok()) << result.status().message();
@@ -322,26 +371,38 @@ TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   ASSERT_NE(nullptr, cluster);
 
-  // Test add_host callback.
+  // Test add_hosts callback with two hosts.
   std::string addr1 = "127.0.0.1:10001";
-  envoy_dynamic_module_type_module_buffer addr_buf = {addr1.data(), addr1.size()};
-  auto* host_ptr = envoy_dynamic_module_callback_cluster_add_host(cluster.get(), addr_buf, 1);
-  EXPECT_NE(nullptr, host_ptr);
-
-  // Test add_host with invalid address.
-  std::string bad_addr = "invalid";
-  envoy_dynamic_module_type_module_buffer bad_buf = {bad_addr.data(), bad_addr.size()};
-  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_add_host(cluster.get(), bad_buf, 1));
-
-  // Test add_host with invalid weight.
   std::string addr2 = "127.0.0.1:10002";
-  envoy_dynamic_module_type_module_buffer addr_buf2 = {addr2.data(), addr2.size()};
-  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_add_host(cluster.get(), addr_buf2, 0));
+  envoy_dynamic_module_type_module_buffer addr_bufs[] = {{addr1.data(), addr1.size()},
+                                                         {addr2.data(), addr2.size()}};
+  uint32_t weights[] = {1, 2};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[2] = {nullptr, nullptr};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts(cluster.get(), addr_bufs, weights, 2,
+                                                              host_ptrs));
+  EXPECT_NE(nullptr, host_ptrs[0]);
+  EXPECT_NE(nullptr, host_ptrs[1]);
 
-  // Test remove_host callback.
-  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_remove_host(cluster.get(), host_ptr));
-  // Removing again should fail.
-  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_remove_host(cluster.get(), host_ptr));
+  // Test add_hosts with invalid address causes entire batch to fail.
+  std::string bad_addr = "invalid";
+  envoy_dynamic_module_type_module_buffer bad_bufs[] = {{bad_addr.data(), bad_addr.size()}};
+  uint32_t bad_weights[] = {1};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr bad_host_ptrs[1] = {nullptr};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts(cluster.get(), bad_bufs, bad_weights,
+                                                               1, bad_host_ptrs));
+
+  // Test add_hosts with invalid weight causes entire batch to fail.
+  std::string addr3 = "127.0.0.1:10003";
+  envoy_dynamic_module_type_module_buffer addr_buf3[] = {{addr3.data(), addr3.size()}};
+  uint32_t zero_weight[] = {0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr zero_host_ptrs[1] = {nullptr};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts(cluster.get(), addr_buf3,
+                                                               zero_weight, 1, zero_host_ptrs));
+
+  // Test remove_hosts callback.
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
+  // Removing again should return 0.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
 }
 
 // Test the LB ABI callback implementations directly.
@@ -353,10 +414,9 @@ TEST_F(DynamicModuleClusterTest, LbAbiCallbacks) {
   ASSERT_NE(nullptr, cluster);
 
   // Add some hosts.
-  auto host1 = cluster->addHost("127.0.0.1:10001", 1);
-  ASSERT_NE(nullptr, host1);
-  auto host2 = cluster->addHost("127.0.0.1:10002", 2);
-  ASSERT_NE(nullptr, host2);
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 2}, hosts));
+  ASSERT_EQ(2, hosts.size());
 
   // Create the LB.
   auto& talb = result->second;
@@ -374,9 +434,9 @@ TEST_F(DynamicModuleClusterTest, LbAbiCallbacks) {
 
   // Test get_healthy_host.
   auto* returned_host0 = envoy_dynamic_module_callback_cluster_lb_get_healthy_host(dm_lb, 0, 0);
-  EXPECT_EQ(host1.get(), returned_host0);
+  EXPECT_EQ(hosts[0].get(), returned_host0);
   auto* returned_host1 = envoy_dynamic_module_callback_cluster_lb_get_healthy_host(dm_lb, 0, 1);
-  EXPECT_EQ(host2.get(), returned_host1);
+  EXPECT_EQ(hosts[1].get(), returned_host1);
 
   // Out of bounds index.
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_healthy_host(dm_lb, 0, 2));
@@ -476,8 +536,8 @@ TEST_F(DynamicModuleClusterTest, PreInitFlow) {
   ASSERT_NE(nullptr, cluster);
 
   // Add a host before initialization.
-  auto host = cluster->addHost("127.0.0.1:10001", 1);
-  ASSERT_NE(nullptr, host);
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001"}, {1}, hosts));
 
   // Call initialize() which sets initialization_complete_callback_ and calls startPreInit().
   // The no-op module's on_cluster_init does nothing, so we can then call preInitComplete.

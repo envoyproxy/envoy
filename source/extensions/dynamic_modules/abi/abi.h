@@ -6920,7 +6920,7 @@ void envoy_dynamic_module_on_cluster_config_destroy(
  *
  * @param config_module_ptr is the pointer to the in-module cluster configuration.
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object, which can be used with
- * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_host.
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
  * @return envoy_dynamic_module_type_cluster_module_ptr is the pointer to the in-module cluster.
  * Returning nullptr indicates a failure.
  */
@@ -6989,30 +6989,41 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster
 // =============================================================================
 
 /**
- * envoy_dynamic_module_callback_cluster_add_host adds a host to the cluster. The module calls this
- * to register a new upstream endpoint.
+ * envoy_dynamic_module_callback_cluster_add_hosts adds multiple hosts to the cluster in a single
+ * batch operation. This triggers only one priority set update regardless of how many hosts are
+ * added, avoiding the overhead of updating the priority set per host.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
- * @param address is the host address in ``ip:port`` format (e.g., ``127.0.0.1:8080``).
- * @param weight is the load balancing weight of the host (1-128).
- * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the created host,
- * or nullptr if the operation failed (e.g., invalid address or weight).
+ * @param addresses is the array of host addresses in ``ip:port`` format (e.g.,
+ * ``127.0.0.1:8080``). Each address is owned by the module.
+ * @param weights is the array of load balancing weights for each host (1-128).
+ * @param count is the number of hosts to add. Must match the length of both arrays.
+ * @param result_host_ptrs is the output array of host pointers. On success, each entry is set to
+ * the corresponding created host pointer. On failure, the array contents are undefined. The array
+ * must be pre-allocated by the caller with at least ``count`` entries.
+ * @return true if all hosts were added successfully, false if any host failed (e.g., invalid
+ * address or weight). On failure, no hosts are added.
  */
-envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_add_host(
+bool envoy_dynamic_module_callback_cluster_add_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer address, uint32_t weight);
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights, size_t count,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
 
 /**
- * envoy_dynamic_module_callback_cluster_remove_host removes a host from the cluster.
+ * envoy_dynamic_module_callback_cluster_remove_hosts removes multiple hosts from the cluster in a
+ * single batch operation. This triggers only one priority set update regardless of how many hosts
+ * are removed.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
- * @param host_envoy_ptr is the pointer to the host to remove, as returned by
- * envoy_dynamic_module_callback_cluster_add_host.
- * @return true if the host was found and removed, false otherwise.
+ * @param host_envoy_ptrs is the array of host pointers to remove, as returned by
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param count is the number of hosts to remove.
+ * @return the number of hosts that were successfully removed. Hosts not found in the cluster are
+ * skipped.
  */
-bool envoy_dynamic_module_callback_cluster_remove_host(
+size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr);
+    const envoy_dynamic_module_type_cluster_host_envoy_ptr* host_envoy_ptrs, size_t count);
 
 /**
  * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host

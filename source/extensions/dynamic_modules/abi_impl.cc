@@ -359,19 +359,20 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_tim
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the cluster extension abi_impl.cc when the cluster extension is used.
 
-__attribute__((weak)) envoy_dynamic_module_type_cluster_host_envoy_ptr
-envoy_dynamic_module_callback_cluster_add_host(envoy_dynamic_module_type_cluster_envoy_ptr,
-                                               envoy_dynamic_module_type_module_buffer, uint32_t) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_host: "
-               "not implemented in this context");
-  return nullptr;
-}
-
-__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_remove_host(
-    envoy_dynamic_module_type_cluster_envoy_ptr, envoy_dynamic_module_type_cluster_host_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_remove_host: "
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr, const envoy_dynamic_module_type_module_buffer*,
+    const uint32_t*, size_t, envoy_dynamic_module_type_cluster_host_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_hosts: "
                "not implemented in this context");
   return false;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_remove_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr,
+    const envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_remove_hosts: "
+               "not implemented in this context");
+  return 0;
 }
 
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_pre_init_complete(

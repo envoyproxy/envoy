@@ -411,23 +411,27 @@ TEST(CommonAbiImplTest, CertValidatorGetFilterStateEnvoyBug) {
 // Cluster extension weak symbol stub tests
 // =====================================================================
 
-// Test that the weak symbol stub for cluster_add_host triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, ClusterAddHostEnvoyBug) {
+// Test that the weak symbol stub for cluster_add_hosts triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterAddHostsEnvoyBug) {
   envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:80", 12};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   EXPECT_ENVOY_BUG(
       {
-        auto result = envoy_dynamic_module_callback_cluster_add_host(nullptr, addr, 1);
-        EXPECT_EQ(result, nullptr);
+        auto result =
+            envoy_dynamic_module_callback_cluster_add_hosts(nullptr, &addr, &weight, 1, &host_ptr);
+        EXPECT_FALSE(result);
       },
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for cluster_remove_host triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, ClusterRemoveHostEnvoyBug) {
+// Test that the weak symbol stub for cluster_remove_hosts triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterRemoveHostsEnvoyBug) {
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   EXPECT_ENVOY_BUG(
       {
-        auto result = envoy_dynamic_module_callback_cluster_remove_host(nullptr, nullptr);
-        EXPECT_FALSE(result);
+        auto result = envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, &host_ptr, 1);
+        EXPECT_EQ(result, 0);
       },
       "not implemented in this context");
 }

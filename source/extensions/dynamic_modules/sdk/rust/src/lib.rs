@@ -9330,7 +9330,7 @@ pub trait Cluster: Send + Sync {
   /// Called when cluster initialization begins.
   ///
   /// The module should perform initial host discovery (e.g., add hosts via
-  /// [`EnvoyCluster::add_host`]) and then call [`EnvoyCluster::pre_init_complete`]
+  /// [`EnvoyCluster::add_hosts`]) and then call [`EnvoyCluster::pre_init_complete`]
   /// to signal that the initial set of hosts is ready.
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster);
 
@@ -9359,23 +9359,32 @@ pub trait ClusterLb: Send {
 /// Envoy-side cluster operations available to the module.
 #[automock]
 pub trait EnvoyCluster: Send + Sync {
-  /// Add a host to the cluster.
+  /// Add multiple hosts to the cluster in a single batch operation.
   ///
-  /// The address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
-  /// Weight must be between 1 and 128.
+  /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
+  /// Each weight must be between 1 and 128. The `addresses` and `weights` slices must have the
+  /// same length.
   ///
-  /// Returns the host pointer if successful, or `None` if the address or weight is invalid.
-  fn add_host(
+  /// This triggers only one priority set update regardless of how many hosts are added, avoiding
+  /// the overhead of updating the priority set per host.
+  ///
+  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
+  /// (e.g., invalid address or weight). On failure, no hosts are added.
+  fn add_hosts(
     &self,
-    address: &str,
-    weight: u32,
-  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>>;
 
-  /// Remove a host from the cluster.
+  /// Remove multiple hosts from the cluster in a single batch operation.
   ///
-  /// The host pointer must have been returned by a previous [`add_host`] call.
-  /// Returns `true` if the host was found and removed.
-  fn remove_host(&self, host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr) -> bool;
+  /// The host pointers must have been returned by a previous [`EnvoyCluster::add_hosts`] call.
+  ///
+  /// This triggers only one priority set update regardless of how many hosts are removed.
+  ///
+  /// Returns the number of hosts that were successfully removed. Hosts not found in the cluster
+  /// are skipped.
+  fn remove_hosts(&self, hosts: &[abi::envoy_dynamic_module_type_cluster_host_envoy_ptr]) -> usize;
 
   /// Signal that the cluster's initial host discovery is complete.
   ///
@@ -9416,27 +9425,36 @@ impl EnvoyClusterImpl {
 }
 
 impl EnvoyCluster for EnvoyClusterImpl {
-  fn add_host(
+  fn add_hosts(
     &self,
-    address: &str,
-    weight: u32,
-  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-    let host = unsafe {
-      abi::envoy_dynamic_module_callback_cluster_add_host(
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    let count = addresses.len();
+    let address_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
+      addresses.iter().map(|a| str_to_module_buffer(a)).collect();
+    let mut result_ptrs: Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> =
+      vec![std::ptr::null_mut(); count];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_add_hosts(
         self.raw,
-        str_to_module_buffer(address),
-        weight,
+        address_buffers.as_ptr(),
+        weights.as_ptr(),
+        count,
+        result_ptrs.as_mut_ptr(),
       )
     };
-    if host.is_null() {
-      None
+    if success {
+      Some(result_ptrs)
     } else {
-      Some(host)
+      None
     }
   }
 
-  fn remove_host(&self, host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr) -> bool {
-    unsafe { abi::envoy_dynamic_module_callback_cluster_remove_host(self.raw, host) }
+  fn remove_hosts(&self, hosts: &[abi::envoy_dynamic_module_type_cluster_host_envoy_ptr]) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_remove_hosts(self.raw, hosts.as_ptr(), hosts.len())
+    }
   }
 
   fn pre_init_complete(&self) {

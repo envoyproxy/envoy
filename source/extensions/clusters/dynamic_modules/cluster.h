@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
@@ -15,6 +16,7 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -110,8 +112,9 @@ public:
   }
 
   // Methods called by the dynamic module via ABI callbacks.
-  Upstream::HostSharedPtr addHost(const std::string& address, uint32_t weight);
-  bool removeHost(const Upstream::HostSharedPtr& host);
+  bool addHosts(const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
+                std::vector<Upstream::HostSharedPtr>& result_hosts);
+  size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   void preInitComplete();
 

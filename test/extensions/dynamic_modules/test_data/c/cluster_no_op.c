@@ -40,7 +40,7 @@ void envoy_dynamic_module_on_cluster_init(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
   (void)cluster_module_ptr;
   (void)cluster_envoy_ptr;
-  // The C++ test code will call preInitComplete and addHost directly.
+  // The C++ test code will call preInitComplete and addHosts directly.
 }
 
 void envoy_dynamic_module_on_cluster_destroy(
