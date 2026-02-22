@@ -38,42 +38,95 @@ envoy_extension_cc_test(
     ],
 )
 
+_integration_test_deps = [
+    "//source/extensions/filters/network/tcp_proxy:config",
+    "//source/extensions/transport_sockets/tls:config",
+    "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
+    "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
+    "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
+    "//test/common/grpc:grpc_client_integration_lib",
+    "//test/config/integration/certs:certs_info",
+    "//test/integration:tcp_proxy_integration_test_lib",
+    "//test/test_common:resources_lib",
+    "//test/test_common:utility_lib",
+    "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
+    "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
+]
+
+# Keep the historical target name for compatibility, but only run shard-1 tests.
 envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
-    srcs = [
-        "integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration/certs",
-    ],
+    srcs = ["integration_test.cc"],
+    data = ["//test/config/integration/certs"],
     extension_names = [
         "envoy.tls.certificate_selectors.on_demand_secret",
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
     ],
     rbe_pool = "6gig",
-    deps = [
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
-        "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
-        "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
-        "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "//test/config/integration/certs:certs_info",
-        "//test/integration:tcp_proxy_integration_test_lib",
-        "//test/test_common:resources_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
+    deps = _integration_test_deps,
+    args = [
+        "--gtest_filter=*BasicSuccessWithPrefetch*:*BasicSuccessWithoutPrefetch*:*BasicSuccessSNI*:*BasicSuccessMixed*:*BasicFail*:*TwoPendingConnections*:*ClientInterruptedHandshake*:*ListenerConnectTimeout*:*SecretAddRemove*:*SecretUpdate*:*BasicSuccessFilterStateOverride*",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "integration_test_shard_2",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    data = ["//test/config/integration/certs"],
+    extension_names = [
+        "envoy.tls.certificate_selectors.on_demand_secret",
+        "envoy.tls.certificate_mappers.static_name",
+        "envoy.tls.certificate_mappers.sni",
+    ],
+    rbe_pool = "6gig",
+    deps = _integration_test_deps,
+    args = [
+        "--gtest_filter=*LocalSignerDefaultPermissiveAllowsUnderscoreName*:*LocalSignerRuntimeStrictHostnameBlocksUnderscoreName*:*LocalSignerRuntimePermissiveOverridesStrictConfig*:*BasicSuccessMtlsSuccess*:*BasicSuccessMtlsFail*:*ValidationContextUpdate*:*ValidationContextUpdateWithPending*",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "integration_test_shard_3",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    data = ["//test/config/integration/certs"],
+    extension_names = [
+        "envoy.tls.certificate_selectors.on_demand_secret",
+        "envoy.tls.certificate_mappers.static_name",
+        "envoy.tls.certificate_mappers.sni",
+    ],
+    rbe_pool = "6gig",
+    deps = _integration_test_deps,
+    args = [
+        "--gtest_filter=*LocalSignerFailOpenOnCaReloadErrorKeepsServing*:*LocalSignerFailClosedOnCaReloadErrorBlocksNewSecret*:*LocalSignerFailOpenConcurrentPendingNewSecretSucceeds*:*LocalSignerFailClosedConcurrentPendingNewSecretFails*",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "integration_test_shard_4",
+    size = "large",
+    srcs = ["integration_test.cc"],
+    data = ["//test/config/integration/certs"],
+    extension_names = [
+        "envoy.tls.certificate_selectors.on_demand_secret",
+        "envoy.tls.certificate_mappers.static_name",
+        "envoy.tls.certificate_mappers.sni",
+    ],
+    rbe_pool = "6gig",
+    deps = _integration_test_deps,
+    args = [
+        "--gtest_filter=*LocalSignerHandshakeLatencyUnderCertChurn*:*LocalSignerThroughputBurstUniqueCerts*",
     ],
 )

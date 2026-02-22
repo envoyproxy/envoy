@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/handshaker.h"
@@ -10,6 +11,8 @@
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
+
+#include <vector>
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +49,10 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
                      OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
+  AsyncContextConfig(absl::string_view cert_name,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     Secret::TlsCertificateConfigProviderSharedPtr cert_provider, UpdateCb update_cb,
+                     RemoveCb remove_cb);
   const absl::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
 
 private:
@@ -210,12 +217,39 @@ public:
                                    bool client_ocsp_capable);
 
 private:
+  Secret::TlsCertificateConfigProviderSharedPtr
+  createLocalCertificateProvider(absl::string_view secret_name) const;
+
   void doRemoveCertificateConfig(absl::string_view);
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
+  const bool local_signer_enabled_;
+  const std::string local_signer_key_;
+  const std::string local_ca_cert_path_;
+  const std::string local_ca_key_path_;
+  const uint32_t local_cert_ttl_days_;
+  const std::string local_subject_organization_;
+  const ConfigProto::LocalSigner::KeyType local_key_type_;
+  const uint32_t local_rsa_key_bits_;
+  const ConfigProto::LocalSigner::EcdsaCurve local_ecdsa_curve_;
+  const ConfigProto::LocalSigner::SignatureHash local_signature_hash_;
+  const uint32_t local_not_before_backdate_seconds_;
+  const ConfigProto::LocalSigner::HostnameValidation local_hostname_validation_;
+  const std::string local_runtime_key_prefix_;
+  const ConfigProto::LocalSigner::CaReloadFailurePolicy local_ca_reload_failure_policy_;
+  const bool local_include_primary_dns_san_;
+  const std::vector<std::string> local_additional_dns_sans_;
+  const std::vector<ConfigProto::LocalSigner::KeyUsage> local_key_usages_;
+  const std::vector<ConfigProto::LocalSigner::ExtendedKeyUsage> local_extended_key_usages_;
+  const absl::optional<bool> local_basic_constraints_ca_;
+  const std::string local_subject_common_name_;
+  const std::string local_subject_organizational_unit_;
+  const std::string local_subject_country_;
+  const std::string local_subject_state_or_province_;
+  const std::string local_subject_locality_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
