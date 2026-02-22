@@ -122,6 +122,11 @@ bug_fixes:
 - area: oauth2
   change: |
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: watch-dog
+  change: |
+    Fixed a bug where the worker-threads' watch-dogs were configured using the main-thread's configuration.
+    This change can be reverted by setting the runtime guard ``envoy.restart_features.worker_threads_watchdog_fix``
+    to ``false``.
 - area: ext_proc
   change: |
     Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting

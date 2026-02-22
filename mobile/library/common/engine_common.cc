@@ -69,7 +69,8 @@ public:
   std::unique_ptr<Envoy::Server::OverloadManager> createNullOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
-  std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
+  std::unique_ptr<Server::GuardDog>
+  maybeCreateGuardDog(absl::string_view, const Server::Configuration::Watchdog&) override {
     return nullptr;
   }
   std::unique_ptr<Server::HdsDelegateApi>

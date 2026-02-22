@@ -6,6 +6,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/base_overload_integration_test.h"
+#include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -1489,6 +1490,76 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPen
       "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.scale_"
       "percent",
       0);
+}
+
+// Verifies that worker thread watchdog configuration is correctly applied and triggers megamiss
+// events when a worker thread is non-responsive.
+TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMiss) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* watchdogs = bootstrap.mutable_watchdogs();
+    // Configure a short megamiss timeout for workers.
+    watchdogs->mutable_worker_watchdog()->mutable_megamiss_timeout()->set_nanos(100 * 1000 * 1000);
+    // Configure a long megamiss timeout for the main thread to avoid accidental triggers.
+    watchdogs->mutable_main_thread_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
+  });
+
+  // Use BlockFilter to block the worker thread for 400ms, which is longer than the megamiss
+  // timeout.
+  config_helper_.prependFilter(
+      absl::StrCat("name: block-filter\ntyped_config: \n",
+                   "  \"@type\": type.googleapis.com/test.integration.filters.BlockFilterConfig\n",
+                   "  block_duration: 0.4s\n"));
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Verify that the worker-specific megamiss counter is incremented.
+  test_server_->waitForCounterGe("server.worker_0.watchdog_mega_miss", 1);
+  // Verify that the global workers megamiss counter is incremented.
+  test_server_->waitForCounterGe("workers.watchdog_mega_miss", 1);
+
+  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  EXPECT_TRUE(response->complete());
+}
+
+// Verifies that when the runtime guard is disabled, worker threads fallback to the main thread
+// watchdog configuration.
+TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.restart_features.worker_threads_watchdog_fix", "false"}});
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* watchdogs = bootstrap.mutable_watchdogs();
+    // Configure a short megamiss timeout for workers.
+    watchdogs->mutable_worker_watchdog()->mutable_megamiss_timeout()->set_nanos(100 * 1000 * 1000);
+    // Configure a long megamiss timeout for the main thread.
+    // Since the fix is disabled, workers should use this long timeout.
+    watchdogs->mutable_main_thread_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
+  });
+
+  // Use BlockFilter to block the worker thread for 400ms.
+  config_helper_.prependFilter(
+      absl::StrCat("name: block-filter\ntyped_config: \n",
+                   "  \"@type\": type.googleapis.com/test.integration.filters.BlockFilterConfig\n",
+                   "  block_duration: 0.4s\n"));
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Since workers are using the main thread watchdog config (60s timeout),
+  // a 400ms block should NOT trigger a megamiss.
+  // We wait a bit to be sure, then check the counter is still 0.
+  absl::SleepFor(absl::Milliseconds(600));
+
+  EXPECT_EQ(test_server_->counter("server.worker_0.watchdog_mega_miss")->value(), 0);
+  EXPECT_EQ(test_server_->counter("workers.watchdog_mega_miss")->value(), 0);
+
+  EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
+  EXPECT_TRUE(response->complete());
 }
 
 } // namespace Envoy
