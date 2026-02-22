@@ -1498,6 +1498,90 @@ TEST(McpParserConfigTest, MethodGroupEmptyGroupFallsBackToBuiltIn) {
   EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
 }
 
+// Case sensitivity tests: verify key confusion attacks (e.g., "name" vs "Name") are prevented.
+// Wrong-cased top-level fields ("Jsonrpc", "Method") should not be recognized.
+TEST_F(McpJsonParserTest, CaseSensitiveTopLevelFieldsAreIgnored) {
+  std::string json = R"({
+    "Jsonrpc": "2.0",
+    "Method": "tools/call",
+    "Id": 1,
+    "params": {"name": "calculator"}
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  auto finish_status = parser_->finishParse();
+
+  EXPECT_FALSE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "");
+}
+
+// Both "method" and "Method" present — only lowercase "method" should be used.
+TEST_F(McpJsonParserTest, CaseSensitiveMethodFieldOnlyLowercaseRecognized) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "Method": "resources/read",
+    "params": {"name": "calculator"},
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+}
+
+// Both "name" and "Name" in params — only lowercase "name" should be extracted.
+TEST_F(McpJsonParserTest, CaseSensitiveParamsNameKeyConfusionAttack) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "allowed_tool",
+      "Name": "restricted_secret_tool",
+      "arguments": {"input": "data"}
+    },
+    "id": 3
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name_value = parser_->getNestedValue("params.name");
+  ASSERT_NE(name_value, nullptr);
+  EXPECT_EQ(name_value->string_value(), "allowed_tool");
+
+  // "params.Name"will not be extracted.
+  const auto* upper_name_value = parser_->getNestedValue("params.Name");
+  EXPECT_EQ(upper_name_value, nullptr);
+}
+
+// "Params" vs "params" — only the correctly-cased "params" object is used.
+TEST_F(McpJsonParserTest, CaseSensitiveParamsObjectKeyConfusion) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "Params": {
+      "name": "spoofed_tool"
+    },
+    "params": {
+      "name": "real_tool"
+    },
+    "id": 1
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
+
+  const auto* name_value = parser_->getNestedValue("params.name");
+  ASSERT_NE(name_value, nullptr);
+  EXPECT_EQ(name_value->string_value(), "real_tool");
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

@@ -77,7 +77,7 @@ public:
 // Mock class for `Matcher::MatchTree` to reproduce different responses from the `match()` method.
 class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
 public:
-  MOCK_METHOD(Matcher::MatchResult, match,
+  MOCK_METHOD(Matcher::ActionMatchResult, match,
               (const HttpMatchingData& matching_data, Matcher::SkippedMatchCb skipped_match_cb),
               (override));
 };
@@ -99,7 +99,7 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
     ON_CALL(*remove_action, typeUrl())
         .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
     ON_CALL(*match_tree, match(testing::_, testing::_))
-        .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+        .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
   } else {
     match_tree = nullptr; // No match
   }
@@ -280,7 +280,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
       .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
   EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
-      .WillRepeatedly(testing::Return(Matcher::MatchResult::insufficientData()));
+      .WillRepeatedly(testing::Return(Matcher::ActionMatchResult::insufficientData()));
 
   {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
@@ -337,7 +337,7 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
 
   {
     // No match-action is configured.
-    Matcher::MatchResult match_result(Matcher::ActionConstSharedPtr{nullptr});
+    Matcher::ActionMatchResult match_result(Matcher::ActionConstSharedPtr{nullptr});
 
     auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
     EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
@@ -360,7 +360,7 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     ON_CALL(*mock_action, typeUrl())
         .WillByDefault(testing::Return("type.googleapis.com/google.protobuf.Empty"));
 
-    Matcher::MatchResult match_result(mock_action);
+    Matcher::ActionMatchResult match_result(mock_action);
 
     auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
     EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
@@ -404,7 +404,7 @@ TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*mock_match_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   EXPECT_CALL(mock_filter_config, getMessageFieldMatcher(message_type, field_name))
       .WillOnce(testing::Return(mock_match_tree));
@@ -440,7 +440,7 @@ TEST_F(FieldCheckerTest, GlobalMessageRestriction) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*mock_match_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   EXPECT_CALL(mock_filter_config, getMessageMatcher(message_type))
       .WillOnce(testing::Return(mock_match_tree));
@@ -473,7 +473,7 @@ TEST_F(FieldCheckerTest, GlobalEnumRestriction) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*mock_match_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   EXPECT_CALL(mock_filter_config, getMessageMatcher(enum_type))
       .WillOnce(testing::Return(mock_match_tree));
@@ -502,7 +502,7 @@ TEST_F(FieldCheckerTest, CheckType_GlobalRestriction) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*mock_match_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   EXPECT_CALL(mock_filter_config, getMessageMatcher(message_type))
       .WillOnce(testing::Return(mock_match_tree));
@@ -758,7 +758,7 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*exclude_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   ON_CALL(*mock_config, getRequestFieldMatcher(method, "config.legacy_status"))
       .WillByDefault(testing::Return(exclude_tree));
@@ -1056,7 +1056,7 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   ON_CALL(*remove_action, typeUrl())
       .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
   ON_CALL(*exclude_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillByDefault(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   ON_CALL(*mock_config, getResponseFieldMatcher(method, "config.internal_flags"))
       .WillByDefault(testing::Return(exclude_tree));
@@ -1191,7 +1191,8 @@ TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
       match(testing::AllOf(HasRequestHeader("x-req-header"), HasResponseHeader("x-res-header"),
                            HasRequestTrailer("x-req-trailer"), HasResponseTrailer("x-res-trailer")),
             testing::_))
-      .WillOnce(testing::Return(Matcher::MatchResult(Matcher::ActionConstSharedPtr{nullptr})));
+      .WillOnce(
+          testing::Return(Matcher::ActionMatchResult(Matcher::ActionConstSharedPtr{nullptr})));
 
   // Wire up the config to return our spying match tree.
   ON_CALL(mock_config, getRequestFieldMatcher(method, field_name))
@@ -1236,7 +1237,7 @@ TEST_F(FieldCheckerTest, MatchResultIsCached) {
   // EXPECTATION: match() should be called EXACTLY ONCE.
   // If caching fails, this expectation will fail because match() would be called twice.
   EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
-      .WillOnce(testing::Return(Matcher::MatchResult(remove_action)));
+      .WillOnce(testing::Return(Matcher::ActionMatchResult(remove_action)));
 
   // Setup Config to return the SAME match tree instance for both fields.
   // This simulates the behavior of the deduplication logic we added in FilterConfig.

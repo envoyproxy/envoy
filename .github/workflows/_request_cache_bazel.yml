@@ -59,7 +59,7 @@ jobs:
             && ! fromJSON(inputs.caches).bazel[format('{0}-{1}', inputs.output-base, inputs.arch)])
       }}
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/bind-mounts@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       with:
         mounts: |
           - src: /mnt/workspace
@@ -73,9 +73,9 @@ jobs:
             target: /build
             chown: "runner:docker"
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+      uses: envoyproxy/toolshed/actions/diskspace@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       if: inputs.arch == 'x64' && github.event.repository.private
-    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -83,14 +83,14 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/actions/cache/prime@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: envoyproxy/toolshed/actions/cache/prime@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       id: bazel-cache
       name: Prime Bazel cache
       with:

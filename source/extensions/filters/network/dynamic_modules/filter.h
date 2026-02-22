@@ -55,6 +55,10 @@ public:
   void setCurrentReadBufferForTest(Buffer::Instance* buffer) { current_read_buffer_ = buffer; }
   void setCurrentWriteBufferForTest(Buffer::Instance* buffer) { current_write_buffer_ = buffer; }
 
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the end of the current event hook.
+  absl::optional<std::string> last_serialized_filter_state_;
+
   // Test-only setter for callbacks.
   void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {
     read_callbacks_ = read_callbacks;
@@ -176,7 +180,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // Current buffers, only valid during callbacks.
+  // Current buffers. Set on the first on_read/on_write callback and kept for the lifetime of the
+  // connection so that modules can access buffered data outside of on_read/on_write callbacks.
   Buffer::Instance* current_read_buffer_ = nullptr;
   Buffer::Instance* current_write_buffer_ = nullptr;
 

@@ -59,6 +59,7 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
     return CelValue::CreateMap(
         Protobuf::Arena::Create<RequestWrapper>(arena, *arena, activation_request_headers_, info));
   case ActivationToken::Response:
+    needs_response_path_data_ = true;
     return CelValue::CreateMap(Protobuf::Arena::Create<ResponseWrapper>(
         arena, *arena, activation_response_headers_, activation_response_trailers_, info));
   case ActivationToken::Connection:

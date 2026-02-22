@@ -250,6 +250,18 @@ bool envoy_dynamic_module_callback_access_logger_get_route_name(
   return true;
 }
 
+bool envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& name = logger->stream_info_->virtualClusterName();
+  if (!name.has_value() || name->empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(name->data()), name->size()};
+  return true;
+}
+
 bool envoy_dynamic_module_callback_access_logger_is_health_check(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);

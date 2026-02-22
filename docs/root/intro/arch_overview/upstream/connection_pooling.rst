@@ -99,13 +99,20 @@ by specifying additional IP addresses for a host using the
 The addresses specified in this field will be appended in a list to the one specified in
 :ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`.
 
-The list of all addresses will be sorted according the the Happy Eyeballs
-specification and a connection will be attempted to the first in the list. If this connection succeeds,
-it will be used. If it fails, an attempt will be made to the next on the list. If after 300ms the connection
-is still connecting, then a backup connection attempt will be made to the next address on the list.
+The list of all addresses will be sorted according to the Happy Eyeballs specification. Non-IP address types
+(e.g. :ref:`internal address <envoy_v3_api_msg_config.core.v3.EnvoyInternalAddress>` and
+:ref:`pipe <envoy_v3_api_msg_config.core.v3.Pipe>`) are treated as separate address families for the purposes
+of interleaving. A :ref:`Happy Eyeballs configuration <envoy_v3_api_msg_config.cluster.v3.UpstreamConnectionOptions.HappyEyeballsConfig>`
+may be used to prefer a particular address family up to a specified number before attempting a connection to
+another address type; each other address family will be tried (up to one address) in the order in which it
+originally appears in the :ref:`additional_addresses <envoy_v3_api_field_config.endpoint.v3.Endpoint.additional_addresses>`
+field or the DNS resolution.
 
-Eventually an attempt will succeed to one of the addresses in which case that connection will be used, or else
-all attempts will fail in which case a connection error will be reported.
+A connection will be attempted to the first in the list. If this connection succeeds, it will be used. If it
+fails, an attempt will be made to the next on the list. If after 300ms the connection is still connecting,
+then a backup connection attempt will be made to the next address on the list.  Eventually an attempt will
+succeed to one of the addresses in which case that connection will be used, or else all attempts will fail, in
+which case a connection error will be reported.
 
 HTTP/3 has limited Happy-Eyeballs-like support.
 When using :ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
