@@ -79,8 +79,7 @@ public:
   }
 
   static void setupTestDirectory() {
-    directory_ =
-        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+    directory_ = TestEnvironment::runfilesDirectory() + "/test/server/config_validation/test_data/";
   }
 
   static const std::vector<std::string> getAllConfigFiles() {
@@ -96,8 +95,7 @@ public:
   }
 
   static void setupTestDirectory() {
-    directory_ =
-        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+    directory_ = TestEnvironment::runfilesDirectory() + "/test/server/config_validation/test_data/";
   }
 
   static const std::vector<std::string> getAllConfigFiles() {
@@ -112,8 +110,7 @@ public:
     setupTestDirectory();
   }
   static void setupTestDirectory() {
-    directory_ =
-        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+    directory_ = TestEnvironment::runfilesDirectory() + "/test/server/config_validation/test_data/";
   }
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
@@ -127,8 +124,7 @@ public:
     setupTestDirectory();
   }
   static void setupTestDirectory() {
-    directory_ =
-        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+    directory_ = TestEnvironment::runfilesDirectory() + "/test/server/config_validation/test_data/";
   }
   static const std::vector<std::string> getAllConfigFiles() {
     setupTestDirectory();
@@ -143,8 +139,7 @@ public:
   }
 
   static void setupTestDirectory() {
-    directory_ =
-        TestEnvironment::runfilesDirectory("envoy/test/server/config_validation/test_data/");
+    directory_ = TestEnvironment::runfilesDirectory() + "/test/server/config_validation/test_data/";
   }
 
   static const std::vector<std::string> getAllConfigFiles() {
