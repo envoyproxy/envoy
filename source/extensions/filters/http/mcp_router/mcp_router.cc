@@ -63,6 +63,7 @@ const McpMethodMap& mcpMethodMap() {
        {"resources/read", McpMethod::ResourcesRead},
        {"resources/subscribe", McpMethod::ResourcesSubscribe},
        {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+       {"resources/templates/list", McpMethod::ResourcesTemplatesList},
        {"prompts/list", McpMethod::PromptsList},
        {"prompts/get", McpMethod::PromptsGet},
        {"completion/complete", McpMethod::CompletionComplete},
@@ -167,6 +168,10 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     case McpMethod::ResourcesUnsubscribe:
       handleResourcesUnsubscribe();
+      break;
+
+    case McpMethod::ResourcesTemplatesList:
+      handleResourcesTemplatesList();
       break;
 
     case McpMethod::PromptsList:
@@ -986,6 +991,22 @@ void McpRouterFilter::handleResourcesUnsubscribe() {
   handleSingleBackendResourceMethod("resources/unsubscribe");
 }
 
+void McpRouterFilter::handleResourcesTemplatesList() {
+  ENVOY_LOG(debug, "resources/templates/list: setting up fanout to {} backends",
+            config_->backends().size());
+
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "resources/templates/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateResourcesTemplatesList(responses);
+    ENVOY_LOG(debug, "resources/templates/list: response body: {}", response_body);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
+  });
+}
+
 void McpRouterFilter::handlePromptsList() {
   ENVOY_LOG(debug, "prompts/list: setting up fanout to {} backends", config_->backends().size());
 
@@ -1329,6 +1350,117 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
             if (mime_or.ok() && !mime_or->empty()) {
               resource_map->addKey("mimeType");
               resource_map->addString(*mime_or);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
+std::string
+McpRouterFilter::aggregateResourcesTemplatesList(const std::vector<BackendResponse>& responses) {
+  const bool is_multiplexing = config_->isMultiplexing();
+
+  std::string output;
+  Json::StringStreamer streamer(output);
+  {
+    auto root = streamer.makeRootMap();
+    root->addKey("jsonrpc");
+    root->addString("2.0");
+    root->addKey("id");
+    root->addNumber(request_id_);
+    root->addKey("result");
+    {
+      auto result_map = root->addMap();
+      result_map->addKey("resourceTemplates");
+      {
+        auto templates_array = result_map->addArray();
+
+        for (const auto& resp : responses) {
+          if (!resp.success) {
+            continue;
+          }
+          std::string json_body = extractJsonRpcFromResponse(resp);
+          ENVOY_LOG(debug, "Aggregating resource templates from backend '{}': {}",
+                    resp.backend_name, json_body);
+          auto parsed_or = Json::Factory::loadFromString(json_body);
+          if (!parsed_or.ok()) {
+            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
+                      parsed_or.status().message());
+            continue;
+          }
+
+          Json::ObjectSharedPtr parsed_body = *parsed_or;
+
+          auto result_or = parsed_body->getObject("result");
+          if (!result_or.ok() || !(*result_or)) {
+            continue;
+          }
+
+          auto templates_or = (*result_or)->getObjectArray("resourceTemplates");
+          if (!templates_or.ok()) {
+            continue;
+          }
+
+          for (const auto& tmpl : *templates_or) {
+            if (!tmpl || !tmpl->isObject()) {
+              continue;
+            }
+
+            auto uri_template_or = tmpl->getString("uriTemplate");
+            if (!uri_template_or.ok()) {
+              continue;
+            }
+
+            auto template_map = templates_array->addMap();
+
+            // Prefix URI template with backend name in multiplexing mode.
+            // Example: "file:///{path}" -> "time+file:///{path}" (for backend "time").
+            template_map->addKey("uriTemplate");
+            if (is_multiplexing) {
+              std::string original_uri = *uri_template_or;
+              size_t scheme_end = original_uri.find("://");
+              if (scheme_end != std::string::npos) {
+                std::string scheme = original_uri.substr(0, scheme_end);
+                std::string rest = original_uri.substr(scheme_end);
+                template_map->addString(absl::StrCat(resp.backend_name, "+", scheme, rest));
+              } else {
+                template_map->addString(absl::StrCat(resp.backend_name, "+://", original_uri));
+              }
+            } else {
+              template_map->addString(*uri_template_or);
+            }
+
+            // Prefix name with backend name in multiplexing mode.
+            auto name_or = tmpl->getString("name", "");
+            if (name_or.ok() && !name_or->empty()) {
+              template_map->addKey("name");
+              if (is_multiplexing) {
+                template_map->addString(absl::StrCat(resp.backend_name, kNameDelimiter, *name_or));
+              } else {
+                template_map->addString(*name_or);
+              }
+            }
+
+            auto desc_or = tmpl->getString("description", "");
+            if (desc_or.ok() && !desc_or->empty()) {
+              template_map->addKey("description");
+              template_map->addString(*desc_or);
+            }
+
+            auto title_or = tmpl->getString("title", "");
+            if (title_or.ok() && !title_or->empty()) {
+              template_map->addKey("title");
+              template_map->addString(*title_or);
+            }
+
+            auto mime_or = tmpl->getString("mimeType", "");
+            if (mime_or.ok() && !mime_or->empty()) {
+              template_map->addKey("mimeType");
+              template_map->addString(*mime_or);
             }
           }
         }
