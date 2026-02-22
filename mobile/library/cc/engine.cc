@@ -7,10 +7,16 @@
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(::Envoy::InternalEngine* engine) : engine_(engine) {}
+std::shared_ptr<Engine> Engine::createFromInternalEngineHandle(int64_t internal_engine_handle) {
+  auto* internal_engine = reinterpret_cast<::Envoy::InternalEngine*>(internal_engine_handle);
+  return std::shared_ptr<Engine>(new Engine(internal_engine, false));
+}
+
+Engine::Engine(::Envoy::InternalEngine* engine, bool owns_engine)
+    : engine_(engine), owns_engine_(owns_engine) {}
 
 Engine::~Engine() {
-  if (!engine_->isTerminated()) {
+  if (owns_engine_ && !engine_->isTerminated()) {
     terminate();
   }
 }
@@ -24,6 +30,8 @@ StreamClientSharedPtr Engine::streamClient() {
 }
 
 std::string Engine::dumpStats() { return engine_->dumpStats(); }
+
+int64_t Engine::getInternalEngineHandle() const { return reinterpret_cast<int64_t>(engine_); }
 
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
 

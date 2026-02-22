@@ -38,6 +38,8 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun dumpStats(): String = ""
 
+  override fun getEngineHandle(): Long = 0
+
   override fun resetConnectivityState() = Unit
 
   override fun onDefaultNetworkAvailable() = Unit
