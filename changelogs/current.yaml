@@ -286,6 +286,12 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
     that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
     returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
+- area: dynamic_modules
+  change: |
+    Added :ref:`cluster
+    <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`
+    support for dynamic modules, enabling custom service discovery and host management to be implemented
+    in dynamic modules.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field

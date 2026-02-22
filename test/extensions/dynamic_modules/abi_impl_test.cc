@@ -408,6 +408,58 @@ TEST(CommonAbiImplTest, CertValidatorGetFilterStateEnvoyBug) {
 }
 
 // =====================================================================
+// Cluster extension weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for cluster_add_host triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterAddHostEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:80", 12};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_add_host(nullptr, addr, 1);
+        EXPECT_EQ(result, nullptr);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_remove_host triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterRemoveHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_remove_host(nullptr, nullptr);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_pre_init_complete triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterPreInitCompleteEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_lb_get_healthy_host_count triggers an ENVOY_BUG.
+TEST(CommonAbiImplTest, ClusterLbGetHealthyHostCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0);
+        EXPECT_EQ(result, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_lb_get_healthy_host triggers an ENVOY_BUG.
+TEST(CommonAbiImplTest, ClusterLbGetHealthyHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0);
+        EXPECT_EQ(result, nullptr);
+      },
+      "not implemented in this context");
+}
+
+// =====================================================================
 // Load Balancer weak symbol stub tests
 // =====================================================================
 

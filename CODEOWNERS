@@ -414,6 +414,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/clusters/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
