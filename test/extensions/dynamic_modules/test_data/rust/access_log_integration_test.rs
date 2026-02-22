@@ -122,6 +122,29 @@ impl AccessLogger for TestAccessLogger {
     let _trace_id = ctx.get_trace_id();
     let _span_id = ctx.get_span_id();
 
+    // Test connection termination details.
+    let _termination_details = ctx.connection_termination_details();
+
+    // Test direct address accessors.
+    let _direct_remote = ctx.downstream_direct_remote_address();
+    let _direct_local = ctx.downstream_direct_local_address();
+
+    // Test extended downstream TLS fields.
+    let _tls_cipher = ctx.downstream_tls_cipher();
+    let _tls_session_id = ctx.downstream_tls_session_id();
+    let _peer_issuer = ctx.downstream_peer_issuer();
+    let _peer_serial = ctx.downstream_peer_serial();
+    let _peer_sha1 = ctx.downstream_peer_fingerprint_1();
+    let _local_subject = ctx.downstream_local_subject();
+
+    // Test upstream connection/TLS fields.
+    let _upstream_conn_id = ctx.upstream_connection_id();
+    let _upstream_tls_ver = ctx.upstream_tls_version();
+    let _upstream_cipher = ctx.upstream_tls_cipher();
+    let _upstream_session = ctx.upstream_tls_session_id();
+    let _upstream_subject = ctx.upstream_peer_subject();
+    let _upstream_issuer = ctx.upstream_peer_issuer();
+
     // Test response trailer access.
     let _response_trailer = ctx.get_response_trailer("x-trailer");
 
