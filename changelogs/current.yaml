@@ -348,6 +348,14 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: connection
+  change: |
+    Add support for closing connections when they stay above the buffer high watermark for a configured time.
+    This can be enabled by setting the :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_high_watermark_timeout>`
+    field on the listener and :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.cluster.v3.Cluster.per_connection_buffer_high_watermark_timeout>`
+    field on the cluster. By default, the timeout is disabled.
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
