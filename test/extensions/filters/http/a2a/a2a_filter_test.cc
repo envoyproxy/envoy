@@ -93,12 +93,12 @@ TEST_F(A2aFilterTest, TrafficModeReject) {
   // Set global config to REJECT
   envoy::extensions::filters::http::a2a::v3::A2a proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::REJECT);
-  config_ = std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  config_ =
+      std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "text/plain"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
 
   // Ensure no override config is returned
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
