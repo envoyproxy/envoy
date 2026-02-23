@@ -1,0 +1,6 @@
+gevent
+mypy
+pytest
+pytest-asyncio
+pytest-benchmark
+requests

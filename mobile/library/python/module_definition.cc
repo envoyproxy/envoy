@@ -15,6 +15,8 @@
 
 namespace py = pybind11;
 
+// NOLINT(namespace-envoy)
+
 // These are required by the version library in "source/common/version/version.h".
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
