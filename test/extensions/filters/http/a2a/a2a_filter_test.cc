@@ -89,6 +89,26 @@ TEST_F(A2aFilterTest, DecodeDataValidJson) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
+TEST_F(A2aFilterTest, TrafficModeReject) {
+  // Set global config to REJECT
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::REJECT);
+  config_ = std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "text/plain"}};
+
+  // Ensure no override config is returned
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillRepeatedly(Return(nullptr));
+
+  // Should reject because global config is REJECT and request is not A2A
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
 } // namespace
 } // namespace A2a
 } // namespace HttpFilters
