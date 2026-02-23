@@ -48,7 +48,7 @@ public:
         .WillRepeatedly(ReturnRef(*dispatcher_));
   }
   std::shared_ptr<FileServerFilter> testFilter() {
-    auto filter = FileServerFilter::createShared(configFromYaml(R"(
+    auto filter = std::make_shared<FileServerFilter>(configFromYaml(R"(
 path_mappings:
   - request_path_prefix: /path1
     file_path_prefix: fs1
@@ -94,7 +94,7 @@ path_mappings:
   ProtoFileServerConfig proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   // Create with nullptr for AsyncFileManager.
-  auto filter = FileServerFilter::createShared(
+  auto filter = std::make_shared<FileServerFilter>(
       std::make_shared<FileServerConfig>(proto_config, nullptr, nullptr));
   initFilter(*filter);
   Http::TestRequestHeaderMapImpl request_headers{
@@ -188,6 +188,20 @@ TEST_F(FileServerFilterTest, MethodNotAllowedIfMatchedPathAndUnsupportedMethod) 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
+TEST_F(FileServerFilterTest, BadRequestIfHeadersDoNotEndStream) {
+  auto filter = testFilter();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/path1/foo"},
+      {":method", "GET"},
+      {":host", "test.host"},
+      {":scheme", "https"},
+  };
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _,
+                                                 "file_server_rejected_not_end_stream"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter->decodeHeaders(request_headers, false));
+}
+
 TEST_F(FileServerFilterTest, FileStatFailedNotFoundRespondsNotFound) {
   auto filter = testFilter();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -223,7 +237,7 @@ TEST_F(FileServerFilterTest, FilterOnDestroyWhileFileActionInFlightAbortsRespons
 }
 
 TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithNoConfiguredBehavior) {
-  auto filter = FileServerFilter::createShared(configFromYaml(R"(
+  auto filter = std::make_shared<FileServerFilter>(configFromYaml(R"(
 path_mappings:
   - request_path_prefix: /path1
     file_path_prefix: fs1
@@ -249,7 +263,7 @@ path_mappings:
 }
 
 TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithImpossiblyConfiguredBehaviorForCoverage) {
-  auto filter = FileServerFilter::createShared(configFromYaml(R"(
+  auto filter = std::make_shared<FileServerFilter>(configFromYaml(R"(
 path_mappings:
   - request_path_prefix: /path1
     file_path_prefix: fs1

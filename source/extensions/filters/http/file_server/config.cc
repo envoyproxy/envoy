@@ -20,15 +20,14 @@ namespace FileServer {
 namespace {
 absl::Status validateProto(const ProtoFileServerConfig& config) {
   absl::flat_hash_set<absl::string_view> seen;
-  bool inserted;
   for (const auto& mapping : config.path_mappings()) {
-    std::tie(std::ignore, inserted) = seen.emplace(mapping.request_path_prefix());
+    auto [_, inserted] = seen.emplace(mapping.request_path_prefix());
     if (!inserted) {
       return absl::InvalidArgumentError(
           absl::StrCat("duplicate request_path_prefix: ", mapping.request_path_prefix()));
     }
   }
-  seen.erase(seen.begin(), seen.end());
+  seen.clear();
   bool directory_tried = false;
   static const absl::string_view directory_options = "default_file or list";
   for (const auto& directory_behavior : config.directory_behaviors()) {
@@ -41,7 +40,7 @@ absl::Status validateProto(const ProtoFileServerConfig& config) {
           absl::StrCat("directory_behavior must have only one of ", directory_options));
     }
     if (!directory_behavior.default_file().empty()) {
-      std::tie(std::ignore, inserted) = seen.emplace(directory_behavior.default_file());
+      auto [_, inserted] = seen.emplace(directory_behavior.default_file());
       if (!inserted) {
         return absl::InvalidArgumentError(absl::StrCat(
             "duplicate default_file in directory_behaviors: ", directory_behavior.default_file()));
@@ -76,7 +75,7 @@ absl::StatusOr<Http::FilterFactoryCb> FileServerFilterFactory::createFilterFacto
   }
   return [fsc = std::move(file_server_config.value())](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(FileServerFilter::createShared(fsc));
+    callbacks.addStreamDecoderFilter(std::make_unique<FileServerFilter>(fsc));
   };
 }
 

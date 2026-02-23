@@ -22,10 +22,8 @@ class FileServerFilter : public Http::PassThroughDecoderFilter,
                          public FileStreamerClient,
                          public Http::DownstreamWatermarkCallbacks {
 public:
-  static std::shared_ptr<FileServerFilter>
-  createShared(std::shared_ptr<const FileServerConfig> file_server_config) {
-    return std::shared_ptr<FileServerFilter>(new FileServerFilter(std::move(file_server_config)));
-  }
+  explicit FileServerFilter(std::shared_ptr<const FileServerConfig> file_server_config)
+      : file_server_config_(file_server_config), file_streamer_(*this) {}
 
   static const std::string& filterName();
 
@@ -42,8 +40,6 @@ public:
   void onBelowWriteBufferLowWatermark() override;
 
 private:
-  explicit FileServerFilter(std::shared_ptr<const FileServerConfig> file_server_config)
-      : file_server_config_(file_server_config), file_streamer_(*this) {}
   std::shared_ptr<const FileServerConfig> file_server_config_;
   friend class FileServerConfigTest; // Allow test access to file_server_config_.
   FileStreamer file_streamer_;

@@ -53,7 +53,7 @@ private:
   Event::Dispatcher* dispatcher_;
   FileStreamerClient& client_;
   std::filesystem::path file_path_;
-  uint64_t pos_;
+  uint64_t pos_ = 0;
   // If zero, fetches entire file.
   // To get the last byte, end_ must be the size of the file, not the inclusive last byte
   // like a range request uses.

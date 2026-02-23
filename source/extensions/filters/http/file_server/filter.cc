@@ -70,7 +70,7 @@ void FileServerFilter::onAboveWriteBufferHighWatermark() { file_streamer_.pause(
 void FileServerFilter::onBelowWriteBufferLowWatermark() { file_streamer_.unpause(); }
 
 Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& headers,
-                                                          bool end_stream ABSL_ATTRIBUTE_UNUSED) {
+                                                          bool end_stream) {
   if (!decoder_callbacks_->route() || !headers.Path()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -79,7 +79,7 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
   if (!config) {
     config = file_server_config_.get();
   }
-  std::string path = PercentEncoding::decode(headers.Path()->value().getStringView());
+  const std::string path = PercentEncoding::decode(headers.Path()->value().getStringView());
   std::shared_ptr<const ProtoFileServerConfig::PathMapping> mapping = config->pathMapping(path);
   if (!mapping) {
     // If the request didn't match a mapping, skip this filter.
@@ -103,6 +103,12 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
     decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed,
                                        CodeUtility::toString(Http::Code::MethodNotAllowed), nullptr,
                                        absl::nullopt, "file_server_rejected_method");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  if (!end_stream) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       CodeUtility::toString(Http::Code::BadRequest), nullptr,
+                                       absl::nullopt, "file_server_rejected_not_end_stream");
     return Http::FilterHeadersStatus::StopIteration;
   }
   if (config->asyncFileManager() == nullptr) {
