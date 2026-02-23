@@ -731,12 +731,11 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
 }
 
 TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointStoredInMetadata) {
-  Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {
-      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -748,22 +747,61 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointStoredInMetadata) {
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
       key: "x-gateway-destination-endpoint"
-      value: { string_value: "[2600:2d00:1:cc00:172:b9fb:a00:4]:80" }
+      value: { string_value: "1.2.3.4:80" }
     }
   )pb");
-  addHeader("x-gateway-destination-endpoint", "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
   EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
   // Expect the address from the metadata to be used.
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
-  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
 
   // Expect that the selected endpoint metadata key will contain the selected address.
   const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
   const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
       &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
 
-  EXPECT_EQ(metadata_value.string_value(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  EXPECT_EQ(metadata_value.string_value(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHosts) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://3.5.8.13:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
+      {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(
+      makeDefaultConfigWithSelectedEndpointKey("x-gateway-destination-endpoint-served"));
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "3.5.8.13:80,5.6.7.8:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "3.5.8.13:80");
+
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "5.6.7.8:80");
+
+  // Expect that the selected endpoint metadata key will contain the final selected address.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+
+  EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
 }
 
 } // namespace
