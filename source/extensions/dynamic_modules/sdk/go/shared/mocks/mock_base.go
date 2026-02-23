@@ -735,6 +735,34 @@ func (mr *MockHttpFilterHandleMockRecorder) RecordHistogramValue(id, value any, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHistogramValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).RecordHistogramValue), varargs...)
 }
 
+// ReceivedRequestBody mocks base method.
+func (m *MockHttpFilterHandle) ReceivedRequestBody() shared.BodyBuffer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReceivedRequestBody")
+	ret0, _ := ret[0].(shared.BodyBuffer)
+	return ret0
+}
+
+// ReceivedRequestBody indicates an expected call of ReceivedRequestBody.
+func (mr *MockHttpFilterHandleMockRecorder) ReceivedRequestBody() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceivedRequestBody", reflect.TypeOf((*MockHttpFilterHandle)(nil).ReceivedRequestBody))
+}
+
+// ReceivedResponseBody mocks base method.
+func (m *MockHttpFilterHandle) ReceivedResponseBody() shared.BodyBuffer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReceivedResponseBody")
+	ret0, _ := ret[0].(shared.BodyBuffer)
+	return ret0
+}
+
+// ReceivedResponseBody indicates an expected call of ReceivedResponseBody.
+func (mr *MockHttpFilterHandleMockRecorder) ReceivedResponseBody() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceivedResponseBody", reflect.TypeOf((*MockHttpFilterHandle)(nil).ReceivedResponseBody))
+}
+
 // RequestHeaders mocks base method.
 func (m *MockHttpFilterHandle) RequestHeaders() shared.HeaderMap {
 	m.ctrl.T.Helper()

@@ -8,7 +8,9 @@ pub mod access_log;
 pub mod buffer;
 pub mod cert_validator;
 pub mod matcher;
+pub mod utility;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
+pub use utility::{read_whole_request_body, read_whole_response_body};
 use mockall::predicate::*;
 use mockall::*;
 

@@ -387,6 +387,12 @@ type HttpFilterHandle interface {
 	// @Return the buffered request body.
 	BufferedRequestBody() BodyBuffer
 
+	// ReceivedRequestBody retrieves the latest received request body chunk in the OnRequestBody callback.
+	// NOTE: This is only valid in the OnRequestBody callback, and it retrieves the latest received
+	// body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+	// should use BufferedRequestBody to get the currently buffered body in the chain.
+	ReceivedRequestBody() BodyBuffer
+
 	// RequestTrailers retrieves the request trailers.
 	// @Return the request trailers.
 	RequestTrailers() HeaderMap
@@ -403,6 +409,12 @@ type HttpFilterHandle interface {
 	// called, the full request body is received.
 	// @Return the buffered response body.
 	BufferedResponseBody() BodyBuffer
+
+	// ReceivedResponseBody retrieves the latest received response body chunk in the OnResponseBody callback.
+	// NOTE: This is only valid in the OnResponseBody callback, and it retrieves the latest received
+	// body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+	// should use BufferedResponseBody to get the currently buffered body in the chain.
+	ReceivedResponseBody() BodyBuffer
 
 	// ResponseTrailers retrieves the response trailers.
 	// @Return the response trailers.
