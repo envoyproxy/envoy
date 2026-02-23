@@ -58,7 +58,6 @@ class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
   struct OverrideSource {
     static OverrideSource make(const OverrideHost::OverrideHostSource& config);
-
     absl::optional<Http::LowerCaseString> header_name;
     absl::optional<Config::MetadataKey> metadata_key;
   };
