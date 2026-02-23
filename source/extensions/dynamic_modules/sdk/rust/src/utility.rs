@@ -13,7 +13,10 @@ fn collect_chunk_ptrs<EHF: EnvoyHttpFilter>(
     (false, false) => envoy_filter.get_received_response_body(),
   };
   chunks.map_or(Vec::new(), |chunks| {
-    chunks.iter().map(|c| c.as_slice().as_ptr() as usize).collect()
+    chunks
+      .iter()
+      .map(|c| c.as_slice().as_ptr() as usize)
+      .collect()
   })
 }
 
