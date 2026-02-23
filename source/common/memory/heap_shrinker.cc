@@ -24,8 +24,8 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
       timer_interval_ = std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(shrink_heap_config->timer_interval()));
     }
-    if (shrink_heap_config->max_unfreed_memory_bytes() > 0) {
-      max_unfreed_memory_bytes_ = shrink_heap_config->max_unfreed_memory_bytes();
+    if (shrink_heap_config->has_max_unfreed_memory_bytes()) {
+      max_unfreed_memory_bytes_ = shrink_heap_config->max_unfreed_memory_bytes().value();
     }
   }
 
