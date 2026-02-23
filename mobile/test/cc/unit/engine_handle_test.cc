@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Platform {
 namespace {
 
-TEST(EngineHandleTest, CreateFromHandleIsNonOwning) {
+TEST(EngineHandleTest, CreateFromHandleIsNotHandlingTermination) {
   absl::Notification engine_running;
   EngineBuilder builder;
   builder.enableLogger(false).setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
