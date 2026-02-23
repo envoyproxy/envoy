@@ -152,13 +152,11 @@ OverrideHostLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext*
 }
 
 HostSelectionResponse
-OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+OverrideHostLoadBalancer::LoadBalancerImpl::chooseHostInternal(LoadBalancerContext* context) {
   if (!context || !context->requestStreamInfo()) {
     // If there is no context or no request stream info, we can't use the
     // metadata, so we just return a host from the fallback picker.
-    auto response = fallback_picker_lb_->chooseHost(context);
-    addSelectedEndpointKey(context, response);
-    return response;
+    return fallback_picker_lb_->chooseHost(context);
   }
 
   OverrideHostFilterState* override_host_state = nullptr;
@@ -176,15 +174,11 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
 
   if (override_host_state->empty()) {
     ENVOY_LOG(trace, "No overridden hosts were found. Using fallback LB policy.");
-    auto response = fallback_picker_lb_->chooseHost(context);
-    addSelectedEndpointKey(context, response);
-    return response;
+    return fallback_picker_lb_->chooseHost(context);
   }
 
   if (HostConstSharedPtr host = getEndpoint(*override_host_state); host != nullptr) {
-    HostSelectionResponse response{host};
-    addSelectedEndpointKey(context, response);
-    return response;
+    return {host};
   }
 
   // If some endpoints were found, but none of them are available in
@@ -193,7 +187,12 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
   // policy.
   ENVOY_LOG(trace, "Failed to find any endpoints from metadata in the cluster. "
                    "Using fallback LB policy.");
-  auto response = fallback_picker_lb_->chooseHost(context);
+  return fallback_picker_lb_->chooseHost(context);
+}
+
+HostSelectionResponse
+OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+  auto response = chooseHostInternal(context);
   addSelectedEndpointKey(context, response);
   return response;
 }

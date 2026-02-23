@@ -136,6 +136,8 @@ private:
 
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
+    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
+
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
     OptRef<Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
