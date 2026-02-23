@@ -5,6 +5,8 @@ licenses(["notice"])  # Apache 2
 py_test(
     name = "fetch_test",
     srcs = ["fetch_test.py"],
+    data = [
+        "//library/python:envoy_engine.so",
+    ],
     main = "fetch_test.py",
-    deps = ["//library/python:envoy_engine"],
 )

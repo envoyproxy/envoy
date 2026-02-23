@@ -6,10 +6,10 @@ load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
-load("@rules_python//python:pip.bzl", "pip_parse")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
 load("@rules_proto//proto:toolchains.bzl", "rules_proto_toolchains")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
+load("@rules_python//python:pip.bzl", "pip_parse")
 
 def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")

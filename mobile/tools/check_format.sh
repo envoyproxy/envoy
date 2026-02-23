@@ -52,8 +52,8 @@ fi
 FORMAT_ARGS+=(
     --namespace_check_excluded_paths
     ./envoy ./examples/ ./library/java/ ./library/kotlin
-    ./library/objective-c ./test/java ./test/java
-    ./test/objective-c ./test/swift ./experimental/swift
+    ./library/objective-c ./library/python/ ./test/java ./test/java
+    ./test/objective-c ./test/python ./test/swift ./experimental/swift
     --build_fixer_check_excluded_paths
     ./envoy ./BUILD ./dist)
 
