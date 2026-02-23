@@ -789,7 +789,7 @@ TEST_F(OverloadManagerImplTest, ShrinkHeapWithTypedConfig) {
   auto config_opt = manager->getShrinkHeapConfig();
   ASSERT_TRUE(config_opt.has_value());
   EXPECT_EQ(config_opt->timer_interval().seconds(), 5);
-  EXPECT_EQ(config_opt->max_unfreed_memory_bytes(), 52428800);
+  EXPECT_EQ(config_opt->max_unfreed_memory_bytes().value(), 52428800);
 }
 
 TEST_F(OverloadManagerImplTest, ShrinkHeapWithWrongTypedConfig) {

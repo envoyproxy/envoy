@@ -6,6 +6,7 @@ import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -149,7 +150,7 @@ message ShrinkHeapConfig {
   // back to the system. This is used as the threshold passed to
   // tcmalloc::MallocExtension::ReleaseMemoryToSystem().
   // If not specified, defaults to 104857600 (100MB).
-  uint64 max_unfreed_memory_bytes = 2;
+  google.protobuf.UInt64Value max_unfreed_memory_bytes = 2;
 }
 
 message OverloadAction {

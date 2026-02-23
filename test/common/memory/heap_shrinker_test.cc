@@ -117,7 +117,7 @@ TEST_F(HeapShrinkerTest, CustomTimerInterval) {
 TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
   Server::OverloadActionCb action_cb;
   envoy::config::overload::v3::ShrinkHeapConfig config;
-  config.set_max_unfreed_memory_bytes(50 * 1024 * 1024); // 50MB
+  config.mutable_max_unfreed_memory_bytes()->set_value(50 * 1024 * 1024); // 50MB
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
       .WillRepeatedly(Return(absl::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
