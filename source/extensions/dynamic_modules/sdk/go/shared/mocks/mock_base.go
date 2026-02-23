@@ -716,25 +716,6 @@ func (mr *MockHttpFilterHandleMockRecorder) Log(level, format any, args ...any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockHttpFilterHandle)(nil).Log), varargs...)
 }
 
-// RecordHistogramValue mocks base method.
-func (m *MockHttpFilterHandle) RecordHistogramValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
-	m.ctrl.T.Helper()
-	varargs := []any{id, value}
-	for _, a := range tagsValues {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "RecordHistogramValue", varargs...)
-	ret0, _ := ret[0].(shared.MetricsResult)
-	return ret0
-}
-
-// RecordHistogramValue indicates an expected call of RecordHistogramValue.
-func (mr *MockHttpFilterHandleMockRecorder) RecordHistogramValue(id, value any, tagsValues ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{id, value}, tagsValues...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHistogramValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).RecordHistogramValue), varargs...)
-}
-
 // ReceivedRequestBody mocks base method.
 func (m *MockHttpFilterHandle) ReceivedRequestBody() shared.BodyBuffer {
 	m.ctrl.T.Helper()
@@ -761,6 +742,25 @@ func (m *MockHttpFilterHandle) ReceivedResponseBody() shared.BodyBuffer {
 func (mr *MockHttpFilterHandleMockRecorder) ReceivedResponseBody() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceivedResponseBody", reflect.TypeOf((*MockHttpFilterHandle)(nil).ReceivedResponseBody))
+}
+
+// RecordHistogramValue mocks base method.
+func (m *MockHttpFilterHandle) RecordHistogramValue(id shared.MetricID, value uint64, tagsValues ...string) shared.MetricsResult {
+	m.ctrl.T.Helper()
+	varargs := []any{id, value}
+	for _, a := range tagsValues {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RecordHistogramValue", varargs...)
+	ret0, _ := ret[0].(shared.MetricsResult)
+	return ret0
+}
+
+// RecordHistogramValue indicates an expected call of RecordHistogramValue.
+func (mr *MockHttpFilterHandleMockRecorder) RecordHistogramValue(id, value any, tagsValues ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{id, value}, tagsValues...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHistogramValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).RecordHistogramValue), varargs...)
 }
 
 // RequestHeaders mocks base method.

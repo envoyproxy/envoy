@@ -1,6 +1,10 @@
-package shared
+package utility
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
+)
 
 func isSameChunks(bufferedChunk [][]byte, receivedChunk [][]byte) bool {
 	if len(bufferedChunk) != len(receivedChunk) {
@@ -14,7 +18,7 @@ func isSameChunks(bufferedChunk [][]byte, receivedChunk [][]byte) bool {
 	return true
 }
 
-func getBodyContent(bufferedBody, receivedBody BodyBuffer) []byte {
+func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
 	var bodySize int
 	if bufferedBody != nil {
 		bodySize += int(bufferedBody.GetSize())
@@ -54,14 +58,14 @@ func getBodyContent(bufferedBody, receivedBody BodyBuffer) []byte {
 // latest received body.
 // This should only be called after we see the end of the request, which means the end_of_stream flag
 // is true in the OnRequestBody callback or we are in the OnRequestTrailers callback.
-func ReadWholeRequestBody(hanlde HttpFilterHandle) []byte {
-	return getBodyContent(hanlde.BufferedRequestBody(), hanlde.ReceivedRequestBody())
+func ReadWholeRequestBody(handle shared.HttpFilterHandle) []byte {
+	return getBodyContent(handle.BufferedRequestBody(), handle.ReceivedRequestBody())
 }
 
 // ReadWholeResponseBody reads the whole response body by combining the buffered body and the
 // latest received body.
 // This should only be called after we see the end of the response, which means the end_of_stream flag
 // is true in the OnResponseBody callback or we are in the OnResponseTrailers callback.
-func ReadWholeResponseBody(hanlde HttpFilterHandle) []byte {
-	return getBodyContent(hanlde.BufferedResponseBody(), hanlde.ReceivedResponseBody())
+func ReadWholeResponseBody(handle shared.HttpFilterHandle) []byte {
+	return getBodyContent(handle.BufferedResponseBody(), handle.ReceivedResponseBody())
 }
