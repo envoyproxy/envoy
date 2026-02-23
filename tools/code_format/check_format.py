@@ -911,28 +911,24 @@ class FormatChecker:
                     error_messages.append("  %s:%s" % (file_path, num))
             return error_messages
 
+
     def clang_format(self, file_path, check=False):
-        result = []
-        if check:
-            fmt_proc = subprocess.Popen(
-                [self.config.clang_format_path, file_path],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            diff_proc = subprocess.Popen(
-                ["diff", file_path, "-"],
-                stdin=fmt_proc.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            fmt_proc.stdout.close()
-            output, _ = diff_proc.communicate()
-            if diff_proc.returncode not in (0, 1):
-                result = [f"clang-format check failed for file: {file_path}"]
-            elif output:
-                result = output.decode('utf-8').strip().split("\n")
-        else:
-            ret = subprocess.run(
-                [self.config.clang_format_path, "-i", file_path],
-                capture_output=True)
-            if ret.returncode != 0:
-                result = [f"clang-format rewrite error: {file_path}"]
-        return result
+            result = []
+            quoted_path = shlex.quote(file_path)
+            command = (
+                f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
+                if check else f"{self.config.clang_format_path} -i {quoted_path}")
+    
+            if check:
+                result = self.execute_command(command, "clang-format check failed", file_path)
+            else:
+                ret = subprocess.run(
+                    [self.config.clang_format_path, "-i", file_path],
+                    capture_output=True)
+                if ret.returncode != 0:
+                    result = [f"clang-format rewrite error: {file_path}"]
+    
+            return result
 
     def check_format(self, file_path, fail_on_diff=False):
         error_messages = []
