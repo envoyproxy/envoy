@@ -118,8 +118,7 @@ StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
 }
 
 Tcp::ConnectionPool::ConnectionData*
-TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
-                               absl::string_view downstream_local_close_reason) {
+TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view close_details) {
   // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
@@ -134,9 +133,8 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose;
     // Because the tcp client idle_timeout is fired by TcpProxy starting on downstream connection
     // so we will set the local_close_reason to the upstream here.
-    if (downstream_local_close_reason ==
-        StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout) {
-      local_close_reason_ = downstream_local_close_reason;
+    if (!close_details.empty()) {
+      local_close_reason_ = std::string(close_details);
     }
 
     upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,

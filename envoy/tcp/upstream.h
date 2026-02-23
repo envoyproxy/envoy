@@ -156,8 +156,7 @@ public:
              is supported for this upstream.
    */
   virtual Tcp::ConnectionPool::ConnectionData*
-  onDownstreamEvent(Network::ConnectionEvent event,
-                    absl::string_view downstream_local_close_reason = "") PURE;
+  onDownstreamEvent(Network::ConnectionEvent event, absl::string_view close_details = "") PURE;
 
   /* Called to convert underlying transport socket from non-secure mode
    * to secure mode. Implemented only by start_tls transport socket.

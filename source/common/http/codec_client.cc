@@ -67,8 +67,8 @@ void CodecClient::connect() {
   }
 }
 
-void CodecClient::close(Network::ConnectionCloseType type, absl::string_view local_close_reason) {
-  connection_->close(type, local_close_reason);
+void CodecClient::close(Network::ConnectionCloseType type, absl::string_view details) {
+  connection_->close(type, details);
 }
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
