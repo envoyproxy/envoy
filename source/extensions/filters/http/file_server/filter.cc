@@ -142,7 +142,7 @@ void FileServerFilter::errorFromFile(Http::Code code, absl::string_view log_mess
 
 void FileServerFilter::onDestroy() {
   file_streamer_.abort();
-  file_server_config_.clear();
+  file_server_config_.reset();
 }
 
 } // namespace FileServer
