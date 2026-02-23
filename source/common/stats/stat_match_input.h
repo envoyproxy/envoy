@@ -40,20 +40,12 @@ public:
   StatTagValueInput(const std::string& tag_name) : tag_name_(tag_name) {}
 
   Matcher::DataInputGetResult get(const Envoy::Stats::StatMatchingData& data) const override {
-    if (!tag_name_storage_) {
-      tag_name_storage_ = std::make_unique<StatNameManagedStorage>(
-          tag_name_, const_cast<SymbolTable&>(data.symbolTable()));
-    }
-
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            data.tagValue(tag_name_storage_->statName())};
+            data.tagValue(tag_name_)};
   }
 
 private:
   const std::string tag_name_;
-  // Storage for the tag name, initialized lazily when the symbol table is available.
-  // We need an interned StatName to match the tags in the stats system.
-  mutable std::unique_ptr<StatNameManagedStorage> tag_name_storage_;
 };
 
 class StatTagValueInputFactory : public Matcher::DataInputFactory<Envoy::Stats::StatMatchingData> {

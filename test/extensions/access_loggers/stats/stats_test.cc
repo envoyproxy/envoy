@@ -950,7 +950,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
   logger_->log(formatter_context_, stream_info_);
 }
 
-TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
+TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTag) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
     counters:
@@ -973,7 +973,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
                       name: generic_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        insert_tag:
+                        upsert_tag:
                           tag_name: foo
                           tag_value: baz
         value_fixed: 1
@@ -981,7 +981,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
 
   initialize(yaml);
 
-  // Case 1: Filter matches (tag foo=bar), so insert tag action is executed.
+  // Case 1: Filter matches (tag foo=bar), so upsert tag action is executed.
   EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
       .WillOnce(
           testing::Invoke([this](const Stats::StatName& name,
@@ -1110,7 +1110,7 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
   logger_->log(formatter_context_, stream_info_);
 }
 
-TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnGauge) {
+TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTagOnGauge) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
     gauges:
@@ -1133,7 +1133,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnGauge) {
                       name: generic_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        insert_tag:
+                        upsert_tag:
                           tag_name: foo
                           tag_value: baz
         value_fixed: 1
@@ -1147,7 +1147,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnGauge) {
   auto* mock_scope = dynamic_cast<MockScopeWithGauge*>(scope_.get());
   ASSERT_TRUE(mock_scope != nullptr);
 
-  // Case 1: Filter matches (tag foo=bar), so insert tag action is executed.
+  // Case 1: Filter matches (tag foo=bar), so upsert tag action is executed.
   EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, _))
       .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode) -> Stats::Gauge& {
@@ -1160,7 +1160,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnGauge) {
   logger_->log(formatter_context_, stream_info_);
 }
 
-TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnHistogram) {
+TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTagOnHistogram) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
     histograms:
@@ -1183,7 +1183,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnHistogram) {
                       name: generic_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        insert_tag:
+                        upsert_tag:
                           tag_name: foo
                           tag_value: baz
         unit: Bytes
@@ -1195,7 +1195,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTagOnHistogram) {
   auto* mock_scope = dynamic_cast<MockScopeWithGauge*>(scope_.get());
   ASSERT_TRUE(mock_scope != nullptr);
 
-  // Case 1: Filter matches (tag foo=bar), so insert tag action is executed.
+  // Case 1: Filter matches (tag foo=bar), so upsert tag action is executed.
   EXPECT_CALL(*mock_scope, histogramFromStatNameWithTags(_, _, _))
       .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Histogram::Unit) -> Stats::Histogram& {

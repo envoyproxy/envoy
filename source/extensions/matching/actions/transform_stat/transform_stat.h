@@ -16,8 +16,10 @@ namespace TransformStat {
 using ProtoTransformStat = envoy::extensions::matching::actions::transform_stat::v3::TransformStat;
 
 struct ActionContext {
-  ActionContext(Envoy::Stats::SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ActionContext(Envoy::Stats::SymbolTable& symbol_table, Envoy::Stats::StatNamePool& pool)
+      : symbol_table_(symbol_table), pool_(pool) {}
   Envoy::Stats::SymbolTable& symbol_table_;
+  Envoy::Stats::StatNamePool& pool_;
 };
 
 class TransformStatAction {
@@ -49,28 +51,25 @@ public:
   Result apply(Envoy::Stats::StatNameTagVector&) const override;
 };
 
-class InsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
+class UpsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  InsertTag(const ProtoTransformStat::InsertTag& config, Envoy::Stats::SymbolTable& symbol_table);
+  UpsertTag(Envoy::Stats::StatName tag_name, Envoy::Stats::StatName tag_value);
 
   Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
 
 private:
-  // Using StatNameManagedStorage (interned) because:
-  // 1. tag_name matching requires exact symbolic match with tags from StatNamePool.
-  // 2. tag_value is static config, so interning is efficient for repeated use.
-  const Envoy::Stats::StatNameManagedStorage tag_name_storage_;
-  const Envoy::Stats::StatNameManagedStorage tag_value_storage_;
+  const Envoy::Stats::StatName tag_name_;
+  const Envoy::Stats::StatName tag_value_;
 };
 
 class DropTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  DropTag(const ProtoTransformStat::DropTag& config, Envoy::Stats::SymbolTable& symbol_table);
+  explicit DropTag(Envoy::Stats::StatName target_tag_name);
 
   Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
 
 private:
-  const Envoy::Stats::StatNameManagedStorage target_tag_name_storage_;
+  const Envoy::Stats::StatName target_tag_name_;
 };
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {

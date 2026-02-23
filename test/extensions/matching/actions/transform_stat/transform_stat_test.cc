@@ -30,7 +30,7 @@ public:
 
   Stats::SymbolTable symbol_table_;
   Stats::StatNamePool pool_{symbol_table_};
-  ActionContext action_context_{symbol_table_};
+  ActionContext action_context_{symbol_table_, pool_};
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Matcher::ActionConstSharedPtr action_;
 };
@@ -48,11 +48,11 @@ TEST_F(TransformStatTest, DropStat) {
   EXPECT_EQ(TransformStatAction::Result::Drop, stat_action->apply(tags));
 }
 
-TEST_F(TransformStatTest, InsertTag) {
+TEST_F(TransformStatTest, UpsertTag) {
   TransformStat config;
-  auto* insert_tag = config.mutable_insert_tag();
-  insert_tag->set_tag_name("foo");
-  insert_tag->set_tag_value("bar");
+  auto* upsert_tag = config.mutable_upsert_tag();
+  upsert_tag->set_tag_name("foo");
+  upsert_tag->set_tag_value("bar");
 
   createAction(config);
 
@@ -131,9 +131,9 @@ TEST_F(TransformStatTest, CombinedAction) {
   TransformStat config;
   auto* drop_tag = config.mutable_drop_tag();
   drop_tag->set_target_tag_name("foo");
-  auto* insert_tag = config.mutable_insert_tag();
-  insert_tag->set_tag_name("bar");
-  insert_tag->set_tag_value("baz");
+  auto* upsert_tag = config.mutable_upsert_tag();
+  upsert_tag->set_tag_name("bar");
+  upsert_tag->set_tag_value("baz");
 
   createAction(config);
 
@@ -141,7 +141,7 @@ TEST_F(TransformStatTest, CombinedAction) {
   ASSERT_NE(stat_action, nullptr);
 
   // Input: [foo=1, other=2]
-  // Expected Output: [other=2] (insert_tag is ignored due to precedence)
+  // Expected Output: [other=2] (upsert_tag is ignored due to precedence)
   Envoy::Stats::StatNameTagVector tags;
   tags.emplace_back(pool_.add("foo"), pool_.add("1"));
   tags.emplace_back(pool_.add("other"), pool_.add("2"));
@@ -149,7 +149,7 @@ TEST_F(TransformStatTest, CombinedAction) {
   EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
   ASSERT_EQ(1, tags.size());
   // drop_tag removed "foo".
-  // insert_tag is skipped.
+  // upsert_tag is skipped.
   // "other" remains.
 
   EXPECT_EQ("other", symbol_table_.toString(tags[0].first));
@@ -159,9 +159,9 @@ TEST_F(TransformStatTest, CombinedAction) {
 TEST_F(TransformStatTest, CombinedDropStat) {
   TransformStat config;
   config.mutable_drop_stat();
-  auto* insert_tag = config.mutable_insert_tag();
-  insert_tag->set_tag_name("bar");
-  insert_tag->set_tag_value("baz");
+  auto* upsert_tag = config.mutable_upsert_tag();
+  upsert_tag->set_tag_name("bar");
+  upsert_tag->set_tag_value("baz");
 
   createAction(config);
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());

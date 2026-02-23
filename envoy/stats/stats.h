@@ -293,7 +293,8 @@ public:
   virtual std::string fullName() const PURE;
 
   virtual const SymbolTable& symbolTable() const PURE;
-  virtual std::string tagValue(const StatName& name) const PURE;
+
+  virtual std::string tagValue(absl::string_view name) const PURE;
 
   virtual ~StatMatchingData() = default;
 };

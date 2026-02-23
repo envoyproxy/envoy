@@ -20,9 +20,12 @@ public:
     if (action_config.has_drop_stat()) {
       return std::make_shared<DropStat>(action_config.drop_stat(), context.symbol_table_);
     } else if (action_config.has_drop_tag()) {
-      return std::make_shared<DropTag>(action_config.drop_tag(), context.symbol_table_);
-    } else if (action_config.has_insert_tag()) {
-      return std::make_shared<InsertTag>(action_config.insert_tag(), context.symbol_table_);
+      const auto& drop_tag = action_config.drop_tag();
+      return std::make_shared<DropTag>(context.pool_.add(drop_tag.target_tag_name()));
+    } else if (action_config.has_upsert_tag()) {
+      const auto& upsert_tag = action_config.upsert_tag();
+      return std::make_shared<UpsertTag>(context.pool_.add(upsert_tag.tag_name()),
+                                         context.pool_.add(upsert_tag.tag_value()));
     }
 
     return std::make_shared<NoOpAction>(context.symbol_table_);

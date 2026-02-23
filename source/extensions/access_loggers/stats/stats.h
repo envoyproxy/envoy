@@ -47,6 +47,8 @@ private:
     Formatter::FormatterPtr value_formatter_;
   };
 
+  // The construction of NameAndTags can only be made at initialization time because it needs to
+  // intern tag names into StatNames via the StatNamePool in the main thread.
   class NameAndTags {
   public:
     NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
