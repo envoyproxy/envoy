@@ -24,14 +24,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 message A2a {
   // Traffic handling mode for non-A2A traffic.
   enum TrafficMode {
-    // Default unspecified value. Treated as PASS_THROUGH.
-    TRAFFIC_MODE_UNSPECIFIED = 0;
-
     // Proxies the HTTP request and response without A2A spec check.
-    PASS_THROUGH = 1;
+    PASS_THROUGH = 0;
 
     // Reject requests that are not following A2A spec.
-    REJECT = 2;
+    REJECT = 1;
   }
 
   // Configures how the filter handles non-A2A traffic.

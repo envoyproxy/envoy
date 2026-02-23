@@ -14,8 +14,6 @@ A2aFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "a2a.");
   return A2aFilterStats{A2A_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
-
-// constexpr absl::string_view kA2aMetadataNamespace = "envoy.filters.http.a2a";
 } // namespace
 
 A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
