@@ -143,7 +143,7 @@ message ScaleTimersOverloadActionConfig {
 message ShrinkHeapConfig {
   // The interval at which shrink heap action checks if memory should be released.
   // If not specified, defaults to 10 seconds.
-  google.protobuf.Duration timer_interval = 1;
+  google.protobuf.Duration timer_interval = 1 [(validate.rules).duration = {gte {seconds: 1}}];
 
   // Maximum amount of unfreed memory in bytes to keep before releasing memory
   // back to the system. This is used as the threshold passed to
