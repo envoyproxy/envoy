@@ -12,8 +12,7 @@ absl::StatusOr<std::shared_ptr<Engine>>
 Engine::createFromInternalEngineHandle(int64_t internal_engine_handle) {
   auto* internal_engine = reinterpret_cast<::Envoy::InternalEngine*>(internal_engine_handle);
   if (internal_engine == nullptr) {
-    return absl::InvalidArgumentError(
-        "can't cast internal_engine_handle to an InternalEngine*");
+    return absl::InvalidArgumentError("can't cast internal_engine_handle to an InternalEngine*");
   }
   return std::shared_ptr<Engine>(new Engine(internal_engine, /*owns_engine=*/false));
 }
