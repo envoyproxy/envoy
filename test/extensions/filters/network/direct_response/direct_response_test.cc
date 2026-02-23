@@ -1,4 +1,5 @@
-#include "envoy/extensions/filters/network/direct_response/v3/config.pb.validate.h"
+
+#include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 
 #include "source/extensions/filters/network/direct_response/filter.h"
 

@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "test/common/http/filters/test_remote_response/filter.pb.h"
-#include "test/common/http/filters/test_remote_response/filter.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

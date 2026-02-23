@@ -1,7 +1,6 @@
 #include "test/integration/filters/test_listener_filter.h"
 
 #include "test/integration/filters/test_listener_filter.pb.h"
-#include "test/integration/filters/test_listener_filter.pb.validate.h"
 
 namespace Envoy {
 

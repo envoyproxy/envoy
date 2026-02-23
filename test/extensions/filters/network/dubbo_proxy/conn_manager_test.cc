@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/app_exception.h"

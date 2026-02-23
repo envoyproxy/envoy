@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
-#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"

@@ -10,7 +10,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/crash_filter.pb.h"
-#include "test/integration/filters/crash_filter.pb.validate.h"
 
 namespace Envoy {
 

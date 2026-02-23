@@ -3,9 +3,7 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
 #include "envoy/http/header_validator_factory.h"
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -17,7 +15,6 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
-#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
 #include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"

@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/admin/v3/config_dump_shared.pb.h"
-#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

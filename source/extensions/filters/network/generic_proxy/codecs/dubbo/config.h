@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/common/dubbo/codec.h"

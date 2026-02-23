@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.h"
-#include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.validate.h"
 #include "envoy/http/early_header_mutation.h"
 
 #include "source/common/http/header_mutation.h"

@@ -1,6 +1,6 @@
 #include "source/extensions/router/cluster_specifiers/matcher/config.h"
 
-#include "envoy/extensions/router/cluster_specifiers/matcher/v3/matcher.pb.validate.h"
+#include "envoy/extensions/router/cluster_specifiers/matcher/v3/matcher.pb.h"
 
 #include "source/common/router/matcher_visitor.h"
 

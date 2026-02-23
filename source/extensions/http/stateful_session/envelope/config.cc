@@ -1,6 +1,6 @@
 #include "source/extensions/http/stateful_session/envelope/config.h"
 
-#include "envoy/extensions/http/stateful_session/envelope/v3/envelope.pb.validate.h"
+#include "envoy/extensions/http/stateful_session/envelope/v3/envelope.pb.h"
 
 namespace Envoy {
 namespace Extensions {

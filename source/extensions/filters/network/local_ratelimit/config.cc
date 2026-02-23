@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/local_ratelimit/config.h"
 
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
-#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.validate.h"
 
 #include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 

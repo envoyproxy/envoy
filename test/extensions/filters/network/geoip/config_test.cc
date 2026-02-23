@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
-#include "envoy/extensions/filters/network/geoip/v3/geoip.pb.validate.h"
 
 #include "source/extensions/filters/network/geoip/config.h"
 

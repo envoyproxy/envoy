@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

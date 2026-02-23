@@ -9,7 +9,6 @@
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
-#include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

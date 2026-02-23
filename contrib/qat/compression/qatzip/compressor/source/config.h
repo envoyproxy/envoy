@@ -7,7 +7,6 @@
 #include "source/common/http/headers.h"
 
 #include "contrib/envoy/extensions/compression/qatzip/compressor/v3alpha/qatzip.pb.h"
-#include "contrib/envoy/extensions/compression/qatzip/compressor/v3alpha/qatzip.pb.validate.h"
 
 #ifndef QAT_DISABLED
 #include "contrib/qat/compression/qatzip/compressor/source/qatzip_compressor_impl.h"

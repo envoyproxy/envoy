@@ -2,7 +2,6 @@
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/subscription.h"
 #include "envoy/filter/config_provider_manager.h"

@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/adaptive_concurrency/config.h"
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
-#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"

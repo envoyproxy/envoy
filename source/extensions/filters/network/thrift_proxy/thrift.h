@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/common/assert.h"

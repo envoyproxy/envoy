@@ -1,7 +1,6 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/config_validator.h"
 #include "envoy/config/core/v3/base.pb.h"
 

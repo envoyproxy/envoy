@@ -1,6 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "source/common/router/context_impl.h"
 #include "source/common/singleton/manager_impl.h"

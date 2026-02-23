@@ -5,7 +5,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_filter.h"
 
 namespace Envoy {

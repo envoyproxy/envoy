@@ -8,7 +8,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 
 #include "contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.pb.h"
-#include "contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha/postgres_inspector.pb.validate.h"
 #include "contrib/postgres_inspector/filters/listener/source/postgres_inspector.h"
 
 namespace Envoy {

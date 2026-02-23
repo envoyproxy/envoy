@@ -5,7 +5,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
-#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/percent.pb.h"

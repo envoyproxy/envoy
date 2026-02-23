@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
-#include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/handshaker.h"

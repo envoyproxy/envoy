@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 

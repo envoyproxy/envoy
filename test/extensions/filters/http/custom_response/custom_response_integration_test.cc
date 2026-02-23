@@ -1,7 +1,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"

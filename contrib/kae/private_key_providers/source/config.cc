@@ -10,7 +10,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.validate.h"
 #include "openssl/ssl.h"
 
 #ifndef KAE_DISABLED

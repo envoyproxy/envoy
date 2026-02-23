@@ -1,7 +1,8 @@
-#include "envoy/config/core/v3/health_check.pb.validate.h"
+
+#include "envoy/config/core/v3/health_check.pb.h"
 
 #include "test/common/upstream/health_check_fuzz.h"
-#include "test/common/upstream/health_check_fuzz.pb.validate.h"
+#include "test/common/upstream/health_check_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {

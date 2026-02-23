@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"

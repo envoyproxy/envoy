@@ -2,7 +2,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 

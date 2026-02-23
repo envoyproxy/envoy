@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"

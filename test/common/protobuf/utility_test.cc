@@ -2,11 +2,8 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/filter.pb.h"
-#include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 

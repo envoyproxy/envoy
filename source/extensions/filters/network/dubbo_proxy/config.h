@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"

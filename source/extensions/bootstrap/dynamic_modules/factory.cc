@@ -2,7 +2,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"

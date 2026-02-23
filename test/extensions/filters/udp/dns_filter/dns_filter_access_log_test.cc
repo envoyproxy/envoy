@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/credential_injector/v3/credential_injector.pb.h"
-#include "envoy/extensions/filters/http/credential_injector/v3/credential_injector.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

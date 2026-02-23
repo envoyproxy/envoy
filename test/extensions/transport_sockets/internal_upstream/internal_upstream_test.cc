@@ -1,6 +1,5 @@
 #include "envoy/common/hashable.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
-#include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.validate.h"
 
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"

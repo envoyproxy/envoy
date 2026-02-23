@@ -1,9 +1,6 @@
 #include "envoy/admin/v3/config_dump_shared.pb.h"
-#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
 #include "source/extensions/filters/network/dubbo_proxy/config.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter_config.h"

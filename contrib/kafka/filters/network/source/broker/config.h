@@ -4,7 +4,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
-#include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

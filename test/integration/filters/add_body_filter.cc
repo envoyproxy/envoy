@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/add_body_filter.pb.h"
-#include "test/integration/filters/add_body_filter.pb.validate.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {

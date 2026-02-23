@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "envoy/extensions/matching/http/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/matcher/matcher.h"
 

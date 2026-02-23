@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
 #include "source/common/http/message_impl.h"

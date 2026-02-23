@@ -6,7 +6,6 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
-#include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"

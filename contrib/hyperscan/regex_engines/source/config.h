@@ -3,7 +3,6 @@
 #include "envoy/common/regex.h"
 
 #include "contrib/envoy/extensions/regex_engines/hyperscan/v3alpha/hyperscan.pb.h"
-#include "contrib/envoy/extensions/regex_engines/hyperscan/v3alpha/hyperscan.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

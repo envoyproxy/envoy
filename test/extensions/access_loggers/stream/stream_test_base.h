@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/stream/v3/stream.pb.h"
 #include "envoy/registry/registry.h"
 

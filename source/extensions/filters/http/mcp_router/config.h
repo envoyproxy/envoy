@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
-#include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

@@ -16,7 +16,6 @@
 #endif
 
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

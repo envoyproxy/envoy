@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/reverse_tunnel_reporter.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
-#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
 #include "envoy/registry/registry.h"

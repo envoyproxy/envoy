@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.h"
-#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/quic/envoy_quic_client_packet_writer_factory.h"

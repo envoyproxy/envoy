@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
-#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

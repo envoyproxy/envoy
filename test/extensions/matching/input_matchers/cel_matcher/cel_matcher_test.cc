@@ -3,7 +3,7 @@
 #include <exception>
 #include <memory>
 
-#include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/matcher/matcher.h"
@@ -23,6 +23,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 namespace Extensions {

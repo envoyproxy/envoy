@@ -5,7 +5,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"

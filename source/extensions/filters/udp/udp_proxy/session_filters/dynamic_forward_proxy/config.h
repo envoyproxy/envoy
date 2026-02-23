@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 

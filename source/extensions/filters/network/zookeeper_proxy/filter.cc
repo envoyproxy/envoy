@@ -5,7 +5,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
-#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"

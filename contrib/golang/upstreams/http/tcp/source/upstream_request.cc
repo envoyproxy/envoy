@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
+#include <typeindex>
 #include <utility>
 
 #include "envoy/upstream/upstream.h"

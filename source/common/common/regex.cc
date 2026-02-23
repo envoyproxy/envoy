@@ -2,9 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/regex_engines/v3/google_re2.pb.h"
-#include "envoy/extensions/regex_engines/v3/google_re2.pb.validate.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
-#include "envoy/type/matcher/v3/regex.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"

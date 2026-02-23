@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
-#include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 
 #include "source/extensions/tracers/common/factory_base.h"
 

@@ -1,6 +1,5 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
-#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/filters/network/ext_authz/config.h"

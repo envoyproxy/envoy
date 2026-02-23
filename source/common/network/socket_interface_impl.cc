@@ -2,7 +2,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
-#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.validate.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"

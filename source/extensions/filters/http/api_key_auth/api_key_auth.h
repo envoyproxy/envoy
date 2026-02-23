@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.pb.h"
-#include "envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"

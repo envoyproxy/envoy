@@ -2,7 +2,6 @@
 #include <string>
 
 #include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
-#include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"

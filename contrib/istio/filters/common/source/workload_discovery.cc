@@ -12,9 +12,7 @@
 #include "source/common/init/target_impl.h"
 
 #include "contrib/envoy/extensions/filters/common/workload_discovery/v3/discovery.pb.h"
-#include "contrib/envoy/extensions/filters/common/workload_discovery/v3/discovery.pb.validate.h"
 #include "contrib/envoy/extensions/filters/common/workload_discovery/v3/extension.pb.h"
-#include "contrib/envoy/extensions/filters/common/workload_discovery/v3/extension.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/http/injected_credentials/generic/v3/generic.pb.h"
-#include "envoy/extensions/http/injected_credentials/generic/v3/generic.pb.validate.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/http/injected_credentials/common/factory.h"

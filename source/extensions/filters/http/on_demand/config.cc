@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/on_demand/config.h"
 
-#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
+#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 

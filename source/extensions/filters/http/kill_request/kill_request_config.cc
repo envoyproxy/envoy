@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/kill_request/kill_request_config.h"
 
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
-#include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/kill_request/kill_request_filter.h"

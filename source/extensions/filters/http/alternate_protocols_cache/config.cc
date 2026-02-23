@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
-#include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.validate.h"
 
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/filter.h"
