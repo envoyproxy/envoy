@@ -303,7 +303,7 @@ public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false),
+        cluster_refresh_cb_set_(false), request_buffer_overflowed_(false),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
         upstream_request_started_(false), orca_load_report_received_(false) {}
@@ -677,6 +677,7 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
+  bool cluster_refresh_cb_set_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;

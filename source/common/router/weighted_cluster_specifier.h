@@ -1,11 +1,15 @@
 #pragma once
 
 #include "envoy/router/cluster_specifier_plugin.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/router/delegating_route_impl.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Router {
@@ -15,6 +19,41 @@ using ClusterWeightProto = envoy::config::route::v3::WeightedCluster::ClusterWei
 
 class WeightedClusterEntry;
 class WeightedClusterSpecifierPlugin;
+
+/**
+ * Filter state key for tracking attempted weighted clusters during retries.
+ * This allows the weighted cluster selection logic to avoid re-selecting
+ * clusters that have already been tried and failed.
+ */
+inline constexpr absl::string_view kWeightedClusterAttemptedClustersKey =
+    "envoy.weighted_cluster.attempted_clusters";
+
+/**
+ * FilterState object that tracks which weighted clusters have been attempted
+ * during the lifetime of a request (including retries). When a cluster is
+ * attempted and fails, its name is added to this set. On subsequent retries,
+ * the weighted cluster selection logic will zero out the weight of any
+ * previously-attempted clusters to ensure the retry lands on a different cluster.
+ */
+class AttemptedClustersFilterState : public StreamInfo::FilterState::Object {
+public:
+  void addAttemptedCluster(const std::string& cluster_name) {
+    attempted_clusters_.insert(cluster_name);
+  }
+
+  bool hasAttempted(const std::string& cluster_name) const {
+    return attempted_clusters_.contains(cluster_name);
+  }
+
+  size_t size() const { return attempted_clusters_.size(); }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return absl::StrJoin(attempted_clusters_, ",");
+  }
+
+private:
+  absl::flat_hash_set<std::string> attempted_clusters_;
+};
 
 struct WeightedClustersConfigEntry {
 public:
@@ -64,12 +103,37 @@ public:
 
   absl::Status validateClusters(const Upstream::ClusterManager& cm) const override;
 
+  /**
+   * Attempt to select an alternative weighted cluster for a retry. Records the failed
+   * cluster in filter state and re-picks, skipping previously attempted single-endpoint
+   * clusters. Multi-endpoint clusters return nullptr (host-level retry predicates handle them).
+   *
+   * @param failed_cluster_name the cluster that just failed.
+   * @param parent_route the parent route (used by pickWeightedCluster to create new entries).
+   * @param headers the downstream request headers.
+   * @param stream_info the stream info (filter state will be modified).
+   * @param random_value the same random value used in the original cluster selection.
+   * @return RouteConstSharedPtr a new route targeting a different cluster, or nullptr.
+   */
+  RouteConstSharedPtr retryRoute(const std::string& failed_cluster_name,
+                                 RouteConstSharedPtr parent_route,
+                                 const Http::RequestHeaderMap& headers,
+                                 StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const;
+
+  /** @return true if retry-aware load balancing is enabled and there are alternatives. */
+  bool hasRetryAwareAlternatives() const {
+    return retry_aware_lb_ && weighted_clusters_.size() > 1;
+  }
+
 private:
   RouteConstSharedPtr pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
                                           const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
   uint64_t healthawareClusterWeight(const std::string& cluster_name, uint64_t config_weight) const;
+  uint64_t retryAwareClusterWeight(const std::string& cluster_name, uint64_t config_weight,
+                                   const AttemptedClustersFilterState* attempted_clusters) const;
 
   Runtime::Loader& loader_;
   Upstream::ClusterManager& cluster_manager_;
@@ -77,6 +141,7 @@ private:
   const std::string runtime_key_prefix_;
   const bool use_hash_policy_{};
   const bool health_aware_lb_{true};
+  const bool retry_aware_lb_{true};
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_{0};
 };

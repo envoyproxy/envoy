@@ -96,6 +96,18 @@ public:
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
+  void setClusterRefreshCallback(ClusterRefreshFunction callback) override {
+    cluster_refresh_callback_ = std::move(callback);
+  }
+
+  RouteConstSharedPtr refreshClusterOnRetry(const Http::RequestHeaderMap& headers,
+                                            StreamInfo::StreamInfo& stream_info) override {
+    if (cluster_refresh_callback_) {
+      return cluster_refresh_callback_(headers, stream_info);
+    }
+    return nullptr;
+  }
+
   bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
 
 private:
@@ -135,6 +147,8 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+
+  ClusterRefreshFunction cluster_refresh_callback_;
 
   // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
   uint32_t retry_on_{};

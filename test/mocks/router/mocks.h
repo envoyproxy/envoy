@@ -234,6 +234,9 @@ public:
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
+  MOCK_METHOD(void, setClusterRefreshCallback, (ClusterRefreshFunction callback));
+  MOCK_METHOD(RouteConstSharedPtr, refreshClusterOnRetry,
+              (const Http::RequestHeaderMap& headers, StreamInfo::StreamInfo& stream_info));
 
   DoRetryCallback callback_;
 };
@@ -466,6 +469,7 @@ public:
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
   MOCK_METHOD(void, refreshRouteCluster,
               (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
+  MOCK_METHOD(RetryState::ClusterRefreshFunction, clusterRefreshCallback, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -589,6 +593,7 @@ public:
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
   MOCK_METHOD(void, refreshRouteCluster,
               (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
+  MOCK_METHOD(RetryState::ClusterRefreshFunction, clusterRefreshCallback, (), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;

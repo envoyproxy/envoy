@@ -20,6 +20,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
@@ -11887,6 +11888,246 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(4194304U, route->requestBodyBufferLimit());
+}
+
+// =============================================================================
+// Retry-aware weighted cluster selection tests
+// =============================================================================
+
+// Verify that the retry-aware weighted cluster logic zeroes out the weight of
+// previously attempted clusters (stored in filter state) and selects a different one.
+TEST_F(RouteMatcherTest, WeightedClusterRetryAwareSelectionSkipsAttemptedCluster) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 50
+              - name: cluster2
+                weight: 50
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // First request: random_value=10 selects cluster1 (10 % 100 = 10, in [0, 50))
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  auto route = config.route(headers, stream_info, 10).route;
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+
+  // Now simulate a retry: record cluster1 as attempted in filter state.
+  auto attempted = std::make_shared<Router::AttemptedClustersFilterState>();
+  attempted->addAttemptedCluster("cluster1");
+  stream_info.filterState()->setData(
+      std::string(Router::kWeightedClusterAttemptedClustersKey), attempted,
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+
+  // Same random_value=10, but now cluster1 has weight 0 → total_weight=50,
+  // selected_value = 10 % 50 = 10, falls into cluster2's range [0, 50).
+  auto retry_route = config.route(headers, stream_info, 10).route;
+  ASSERT_NE(nullptr, retry_route);
+  EXPECT_EQ("cluster2", retry_route->routeEntry()->clusterName());
+}
+
+// Verify that the clusterRefreshCallback() on a WeightedClusterEntry returns a valid
+// callback that performs retry-aware cluster selection.
+TEST_F(RouteMatcherTest, WeightedClusterClusterRefreshCallback) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 50
+              - name: cluster2
+                weight: 50
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Get the initial route (cluster1).
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  auto route = config.route(headers, stream_info, 10).route;
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+
+  // Get the cluster refresh callback from the route entry.
+  auto callback = route->routeEntry()->clusterRefreshCallback();
+  ASSERT_NE(nullptr, callback);
+
+  // Call the callback — it should record cluster1 as attempted and select cluster2.
+  auto retry_route = callback(headers, stream_info);
+  ASSERT_NE(nullptr, retry_route);
+  EXPECT_EQ("cluster2", retry_route->routeEntry()->clusterName());
+}
+
+// Verify that two high-weight "bad" clusters are systematically eliminated across
+// chained retries, eventually forcing selection to a low-weight "good" cluster.
+// This simulates the real router behavior: each retry updates the callback,
+// and the FilterState accumulates all previously attempted clusters.
+//
+//   Weights: bad1(45), bad2(45), good(10)  — random_value=20
+//   Initial:  20 % 100 = 20  → bad1 [0,45)     ← selected, fails
+//   Retry 1:  bad1 zeroed → total=55, 20 % 55 = 20 → bad2 [0,45) ← selected, fails
+//   Retry 2:  bad1+bad2 zeroed → total=10, 20 % 10 = 0 → good [0,10) ← selected ✓
+//
+TEST_F(RouteMatcherTest, WeightedClusterChainedRetriesAccumulateAttemptedClusters) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: bad1
+                weight: 45
+              - name: bad2
+                weight: 45
+              - name: good
+                weight: 10
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"bad1", "bad2", "good"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+
+  // --- Initial request ---
+  // random_value=20: 20 % 100 = 20, falls in bad1's range [0, 45)
+  auto route = config.route(headers, stream_info, 20).route;
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("bad1", route->routeEntry()->clusterName());
+
+  // Get the callback that captures "bad1" as the cluster to record on failure.
+  auto callback = route->routeEntry()->clusterRefreshCallback();
+  ASSERT_NE(nullptr, callback);
+
+  // --- Retry 1: bad1 just failed ---
+  // Callback records "bad1" in FilterState, re-picks.
+  // Weights: bad1=0, bad2=45, good=10 → total=55
+  // 20 % 55 = 20, falls in bad2's range [0, 45)
+  auto retry1_route = callback(headers, stream_info);
+  ASSERT_NE(nullptr, retry1_route);
+  EXPECT_EQ("bad2", retry1_route->routeEntry()->clusterName());
+
+  // Verify FilterState accumulated "bad1".
+  auto* attempted = stream_info.filterState()->getDataReadOnly<Router::AttemptedClustersFilterState>(
+      std::string(Router::kWeightedClusterAttemptedClustersKey));
+  ASSERT_NE(nullptr, attempted);
+  EXPECT_EQ(1, attempted->size());
+  EXPECT_TRUE(attempted->hasAttempted("bad1"));
+
+  // Simulate what the router does: update the callback to the new route entry.
+  // This is the crucial step — without it, retry 2 would record "bad1" again
+  // instead of "bad2", and bad2 could be re-selected.
+  callback = retry1_route->routeEntry()->clusterRefreshCallback();
+  ASSERT_NE(nullptr, callback);
+
+  // --- Retry 2: bad2 also failed ---
+  // Callback records "bad2" in FilterState, re-picks.
+  // Weights: bad1=0, bad2=0, good=10 → total=10
+  // 20 % 10 = 0, falls in good's range [0, 10)
+  auto retry2_route = callback(headers, stream_info);
+  ASSERT_NE(nullptr, retry2_route);
+  EXPECT_EQ("good", retry2_route->routeEntry()->clusterName());
+
+  // Verify FilterState accumulated both "bad1" and "bad2".
+  attempted = stream_info.filterState()->getDataReadOnly<Router::AttemptedClustersFilterState>(
+      std::string(Router::kWeightedClusterAttemptedClustersKey));
+  ASSERT_NE(nullptr, attempted);
+  EXPECT_EQ(2, attempted->size());
+  EXPECT_TRUE(attempted->hasAttempted("bad1"));
+  EXPECT_TRUE(attempted->hasAttempted("bad2"));
+}
+
+// Verify that when all clusters have been attempted, the retry-aware logic falls back
+// to original weights (panic mode) and still returns a valid route.
+TEST_F(RouteMatcherTest, WeightedClusterRetryAwarePanicMode) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 50
+              - name: cluster2
+                weight: 50
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Mark both clusters as attempted.
+  auto attempted = std::make_shared<Router::AttemptedClustersFilterState>();
+  attempted->addAttemptedCluster("cluster1");
+  attempted->addAttemptedCluster("cluster2");
+  stream_info.filterState()->setData(
+      std::string(Router::kWeightedClusterAttemptedClustersKey), attempted,
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+
+  // Should still return a route (panic mode — original weights used).
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  auto route = config.route(headers, stream_info, 10).route;
+  ASSERT_NE(nullptr, route);
+  // With panic mode, original weights are used — cluster1 is selected for random_value=10.
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+// Verify that a single-cluster weighted route returns no callback (no alternatives).
+TEST_F(RouteMatcherTest, WeightedClusterSingleClusterNoCallback) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: only_cluster
+                weight: 100
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"only_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  auto route = config.route(headers, 10).route;
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("only_cluster", route->routeEntry()->clusterName());
+
+  // Single cluster → no callback (hasRetryAwareAlternatives() is false).
+  auto callback = route->routeEntry()->clusterRefreshCallback();
+  EXPECT_EQ(nullptr, callback);
 }
 
 } // namespace
