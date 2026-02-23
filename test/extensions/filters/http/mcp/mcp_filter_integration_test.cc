@@ -529,13 +529,11 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
 
   auto ts = upstream_request_->headers().get(Http::LowerCaseString("tracestate"));
   ASSERT_FALSE(ts.empty());
-  EXPECT_EQ("rojo=00f067aa0ba902b7",
-            ts[0]->value().getStringView());
+  EXPECT_EQ("rojo=00f067aa0ba902b7", ts[0]->value().getStringView());
 
   auto bg = upstream_request_->headers().get(Http::LowerCaseString("baggage"));
   ASSERT_FALSE(bg.empty());
-  EXPECT_EQ("userId=alice",
-            bg[0]->value().getStringView());
+  EXPECT_EQ("userId=alice", bg[0]->value().getStringView());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());

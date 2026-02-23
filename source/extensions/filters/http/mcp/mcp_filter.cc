@@ -355,8 +355,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   // Handle tracing field extraction and header injection.
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
-    const Protobuf::Value* meta_value =
-        parser_->getNestedValue(std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    const Protobuf::Value* meta_value = parser_->getNestedValue(
+        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
     auto headers = decoder_callbacks_->requestHeaders();
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();

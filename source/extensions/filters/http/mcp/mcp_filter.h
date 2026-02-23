@@ -54,7 +54,8 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
-  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>&
+  const absl::optional<
+      envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>&
   propagateTraceContext() const {
     return propagate_trace_context_;
   }
@@ -85,7 +86,8 @@ public:
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
-  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>
+  const absl::optional<
+      envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>
       propagate_trace_context_;
   const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>
       propagate_baggage_;
