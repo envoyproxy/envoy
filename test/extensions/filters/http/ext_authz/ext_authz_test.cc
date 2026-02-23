@@ -495,8 +495,8 @@ public:
     auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
     ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
     auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-    EXPECT_EQ(actual->processingEffect(), Extensions::HttpFilters::ExternalProcessing::
-                                              ProcessingEffect::Effect::InvalidMutationRejected);
+    EXPECT_EQ(actual->processingEffect(),
+              Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
   }
 
   static constexpr const char* invalid_key_ = "invalid-\nkey";
@@ -735,8 +735,7 @@ TEST_F(HttpFilterTest, MutationAppliedEffect) {
   auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-  EXPECT_EQ(actual->processingEffect(),
-            Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect::MutationApplied);
+  EXPECT_EQ(actual->processingEffect(), Filters::Common::ProcessingEffect::Effect::MutationApplied);
 }
 
 TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
@@ -781,8 +780,7 @@ TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_EQ(actual->processingEffect(),
-            Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect::
-                MutationRejectedSizeLimitExceeded);
+            Filters::Common::ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
 }
 
 struct DecoderHeaderMutationRulesTestOpts {

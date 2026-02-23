@@ -28,7 +28,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,8 +74,7 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
   // Returns true if the ext_authz stream failed open.
   const absl::optional<bool> failedOpen() const { return failed_open_; }
-  const absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>&
-  processingEffect() const {
+  const absl::optional<Filters::Common::ProcessingEffect::Effect>& processingEffect() const {
     return last_processing_effect_;
   }
 
@@ -89,8 +88,7 @@ public:
     upstream_host_ = std::move(upstream_host);
   }
   void setFailedOpen() { failed_open_ = true; }
-  void setLastProcessingEffect(
-      const Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect& effect) {
+  void setLastProcessingEffect(const Filters::Common::ProcessingEffect::Effect& effect) {
     last_processing_effect_ = effect;
   }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
@@ -120,8 +118,7 @@ private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
   // The last processing effect applied by the ext_authz filter.
-  absl::optional<Extensions::HttpFilters::ExternalProcessing::ProcessingEffect::Effect>
-      last_processing_effect_;
+  absl::optional<Filters::Common::ProcessingEffect::Effect> last_processing_effect_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;
@@ -480,7 +477,7 @@ private:
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
-  void updateEffect(const absl::optional<ExternalProcessing::ProcessingEffect::Effect>& effect);
+  void updateEffect(const absl::optional<Filters::Common::ProcessingEffect::Effect>& effect);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

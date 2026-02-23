@@ -13,7 +13,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,9 +26,9 @@ namespace {
 constexpr uint32_t kDefaultPerRouteTimeoutMs = 200;
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
-using Extensions::HttpFilters::ExternalProcessing::ProcessingEffect;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
+using Filters::Common::ProcessingEffect::Effect;
 
 void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
@@ -569,7 +569,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
 }
 
-void Filter::updateEffect(const absl::optional<ProcessingEffect::Effect>& effect) {
+void Filter::updateEffect(const absl::optional<Effect>& effect) {
   if (!config_->emitFilterStateStats() || logging_info_ == nullptr) {
     return;
   }
@@ -651,7 +651,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "Rejecting response with invalid header append action.",
                        *decoder_callbacks_);
       rejectResponse();
-      updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+      updateEffect(Effect::InvalidMutationRejected);
       return;
     }
     ENVOY_STREAM_LOG(trace, "Ignoring response headers with invalid header append action.",
@@ -707,7 +707,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -719,7 +719,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
                          key, value);
         rejectResponse();
-        updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -734,7 +734,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -746,7 +746,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
                          key, value);
         rejectResponse();
-        updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -777,7 +777,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           if (!headersWithinLimits(*request_headers_)) {
             stats_.request_header_limits_reached_.inc();
             rejectResponse();
-            updateEffect(ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+            updateEffect(Effect::MutationRejectedSizeLimitExceeded);
             return;
           }
         }
@@ -791,7 +791,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.",
                          *decoder_callbacks_, key, value);
         rejectResponse();
-        updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -824,7 +824,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -836,12 +836,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting disallowed header removal '{}'.", *decoder_callbacks_,
                          key);
         rejectResponse();
-        updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
     if (req_header_mutations) {
-      updateEffect(ProcessingEffect::Effect::MutationApplied);
+      updateEffect(Effect::MutationApplied);
     }
 
     if (!response->response_headers_to_add.empty()) {
@@ -853,7 +853,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
       }
@@ -870,7 +870,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
       }
@@ -887,7 +887,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
       }
@@ -906,7 +906,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
       }
@@ -928,7 +928,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid query parameter {}={}.", *decoder_callbacks_,
                            key, value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
@@ -960,7 +960,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->setPath(new_path);
       if (!headersWithinLimits(*request_headers_)) {
         stats_.request_header_limits_reached_.inc();
-        updateEffect(ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+        updateEffect(Effect::MutationRejectedSizeLimitExceeded);
         rejectResponse();
         return;
       }
@@ -1005,7 +1005,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
                            value);
           rejectResponse();
-          updateEffect(ProcessingEffect::Effect::InvalidMutationRejected);
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
       }
@@ -1046,7 +1046,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             }
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, key, value);
             response_headers.addCopy(Http::LowerCaseString(key), value);
-            updateEffect(ProcessingEffect::Effect::MutationApplied);
+            updateEffect(Effect::MutationApplied);
           }
         },
         absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
