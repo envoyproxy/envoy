@@ -77,6 +77,7 @@ envoy_cc_test(
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
@@ -106,6 +107,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_admin_handler_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_init_target_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
@@ -113,6 +115,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
+        "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",

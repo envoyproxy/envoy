@@ -1005,6 +1005,8 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_processing_effect)%");
     (*json_format->mutable_fields())["failed_open_field"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
+    (*json_format->mutable_fields())["received_immediate_response_field"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:received_immediate_response)%");
     (*json_format->mutable_fields())["field_grpc_status_before_first_call"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:grpc_status_before_first_call)%");
 

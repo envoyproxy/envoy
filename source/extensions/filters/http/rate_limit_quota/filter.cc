@@ -257,7 +257,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 
   // Perform the matching.
-  Matcher::MatchResult match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(
+  Matcher::ActionMatchResult match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(
       *matcher_, *data_ptr_, [&](const Matcher::ActionConstSharedPtr& skipped_action) {
         // The filter handles Matchers with keep_matching as if they're previewing changes.
         return handlePreviewMatch(skipped_action);
