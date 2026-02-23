@@ -362,6 +362,134 @@ TEST(MatchingData, FilterStateInput) {
   }
 }
 
+// Helper filter state object that supports field access for testing FilterStateInput with field.
+class TestFieldFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  TestFieldFilterStateObject(const absl::flat_hash_map<std::string, std::string>& fields)
+      : fields_(fields) {}
+
+  bool hasFieldSupport() const override { return true; }
+
+  FieldType getField(absl::string_view field_name) const override {
+    auto it = fields_.find(std::string(field_name));
+    if (it != fields_.end()) {
+      return absl::string_view(it->second);
+    }
+    return absl::monostate{};
+  }
+
+  absl::optional<std::string> serializeAsString() const override {
+    return "serialized_whole_object";
+  }
+
+private:
+  absl::flat_hash_map<std::string, std::string> fields_;
+};
+
+TEST(MatchingData, FilterStateInputWithField) {
+  std::string key = "composite_state";
+  std::string field = "my_field";
+  FilterStateInput<MatchingData> input(key, field);
+
+  MockConnectionSocket socket;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  // No filter state object set — should return monostate.
+  {
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+
+  // Set a filter state object with field support.
+  filter_state.setData(
+      key,
+      std::make_shared<TestFieldFilterStateObject>(absl::flat_hash_map<std::string, std::string>{
+          {"my_field", "field_value"}, {"other_field", "other_value"}}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Should return the specific field value, not the serialized whole object.
+  {
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "field_value");
+  }
+
+  // Access a different field via a different input instance.
+  {
+    FilterStateInput<MatchingData> other_input(key, "other_field");
+    const auto result = other_input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(absl::get<std::string>(result.data_), "other_value");
+  }
+
+  // Access a non-existent field — should return monostate.
+  {
+    FilterStateInput<MatchingData> missing_input(key, "nonexistent");
+    const auto result = missing_input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+  }
+}
+
+TEST(MatchingData, FilterStateInputWithFieldFallbackToSerialize) {
+  // When field is specified but the object does NOT support field access,
+  // it should fall back to serializeAsString().
+  std::string key = "string_state";
+  std::string field = "some_field";
+  FilterStateInput<MatchingData> input(key, field);
+
+  MockConnectionSocket socket;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  // StringAccessorImpl does NOT support field access.
+  filter_state.setData(key, std::make_shared<Router::StringAccessorImpl>("plain_value"),
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    // Falls back to serializeAsString() since object doesn't support field access.
+    EXPECT_EQ(absl::get<std::string>(result.data_), "plain_value");
+  }
+}
+
+TEST(MatchingData, FilterStateInputWithoutFieldUsesSerialize) {
+  // When no field is specified, should always use serializeAsString() even if object
+  // supports field access.
+  std::string key = "composite_state";
+  FilterStateInput<MatchingData> input(key); // No field.
+
+  MockConnectionSocket socket;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata metadata;
+  MatchingDataImpl data(socket, filter_state, metadata);
+
+  filter_state.setData(
+      key,
+      std::make_shared<TestFieldFilterStateObject>(
+          absl::flat_hash_map<std::string, std::string>{{"my_field", "field_value"}}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  {
+    const auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    // Should return serialized whole object, not a field value.
+    EXPECT_EQ(absl::get<std::string>(result.data_), "serialized_whole_object");
+  }
+}
+
 TEST(UdpMatchingData, UdpDestinationIPInput) {
   DestinationIPInput<UdpMatchingData> input;
   const Address::Ipv4Instance ip("127.0.0.1", 8080);
