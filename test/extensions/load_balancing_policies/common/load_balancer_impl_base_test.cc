@@ -639,7 +639,9 @@ TEST(ZoneAwareLbCoalesceDisabledTest, FallbackPathExercised) {
   NiceMock<MockPrioritySet> priority_set;
   auto info = std::make_shared<NiceMock<MockClusterInfo>>();
 
-  TestZoneAwareLb lb(priority_set, stats, runtime, random, 50, {});
+  ZoneAwareLoadBalancerBase::LocalityLbConfig locality_config;
+  locality_config.mutable_locality_weighted_lb_config();
+  TestZoneAwareLb lb(priority_set, stats, runtime, random, 50, locality_config);
 
   MockHostSet& host_set = *priority_set.getMockHostSet(0);
   host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};

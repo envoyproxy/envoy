@@ -651,6 +651,7 @@ TEST(EdfLbCoalesceDisabledTest, FallbackPathExercised) {
   auto info = std::make_shared<NiceMock<MockClusterInfo>>();
 
   envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config;
+  config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   Event::SimulatedTimeSystem time_system;
   LeastRequestLoadBalancer lb(priority_set, nullptr, stats, runtime, random, 50, config,
                               time_system);
