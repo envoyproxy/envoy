@@ -60,5 +60,6 @@ message A2a {
 
 // This configuration allows overriding the default attribute extraction
 // behavior for specific A2A methods.
+// TODO(tyxia) - add more fields to support more override use cases.
 message ParserConfig {
 }
