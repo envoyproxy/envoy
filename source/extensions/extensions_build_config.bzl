@@ -632,7 +632,7 @@ EXTENSIONS = {
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",
 
     # Typed Metadata
-    "envoy.tracers.opentelemetry.resource_typed_metadata": "//source/extensions/tracers/opentelemetry/resource_typed_metadata:config",
+    "envoy.tracers.opentelemetry.resource_typed_metadata": "//source/extensions/tracers/opentelemetry/resource_detectors/per_route:resource_typed_metadata",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

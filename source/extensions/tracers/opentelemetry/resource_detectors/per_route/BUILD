@@ -30,7 +30,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "resource_typed_metadata",
     srcs = ["resource_typed_metadata.cc"],
     hdrs = ["resource_typed_metadata.h"],
