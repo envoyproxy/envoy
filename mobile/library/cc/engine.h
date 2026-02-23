@@ -40,7 +40,7 @@ public:
   Envoy::InternalEngine* engine() { return engine_; }
 
 private:
-  Engine(::Envoy::InternalEngine* engine, bool owns_engine = true);
+  Engine(::Envoy::InternalEngine* engine, bool handle_termination = true);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -50,7 +50,7 @@ private:
   friend class ::Envoy::BaseClientIntegrationTest;
 
   Envoy::InternalEngine* engine_;
-  const bool owns_engine_;
+  const bool handle_termination_;
   StreamClientSharedPtr stream_client_;
 };
 
