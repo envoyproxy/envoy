@@ -465,25 +465,25 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
           resizePerPriorityState();
           bool p0_changed = dirty_priorities_.contains(0);
+          if (local_priority_set_ && p0_changed) {
+            regenerateLocalityRoutingStructures();
+          }
           if (locality_weighted_balancing_) {
             for (uint32_t priority : dirty_priorities_) {
               rebuildLocalityWrrForPriority(priority);
             }
           }
           dirty_priorities_.clear();
-          if (local_priority_set_ && p0_changed) {
-            regenerateLocalityRoutingStructures();
-          }
         });
   } else {
     priority_update_cb_ = priority_set_.addPriorityUpdateCb(
         [this](uint32_t priority, const HostVector&, const HostVector&) {
           resizePerPriorityState();
-          if (locality_weighted_balancing_) {
-            rebuildLocalityWrrForPriority(priority);
-          }
           if (local_priority_set_ && priority == 0) {
             regenerateLocalityRoutingStructures();
+          }
+          if (locality_weighted_balancing_) {
+            rebuildLocalityWrrForPriority(priority);
           }
         });
   }
