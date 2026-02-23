@@ -165,8 +165,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
     ),
     tcmalloc = dict(
-        version = "5da4a882003102fba0c0c0e8f6372567057332eb",
-        sha256 = "fd92d64d8302f1677570fdff844e8152c314e559a6c788c6bfc3844954d0dabd",
+        version = "12f255231938d30493186b0a037feedd70f5a1c1",
+        sha256 = "2a6bef88f8cccda4a63a2f4bb09e655b3ee5ea0a2ce68d16e6ea2d5f5c4be9c1",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
     ),
@@ -542,8 +542,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "4b9143d5a85d6bd89b281ddc69606edf7934734f",
-        sha256 = "5abc4d44c53f7b51e4c5e060e292c1ea1413feb3a876f2fe5b18b3c80a1fb7c4",
+        version = "9711fb297e4d60826f516ccc80d71b81c9c7de12",
+        sha256 = "de7b01e62b1dfb4f15ba41b6a3b9b41b2d1e8b827efda859dd774a198a32f0d0",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

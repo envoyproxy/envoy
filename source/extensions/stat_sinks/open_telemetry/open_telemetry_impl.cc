@@ -300,7 +300,7 @@ template <class StatType>
 OtlpMetricsFlusherImpl::MetricConfig
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   auto evaluate = [&](auto& data) -> MetricConfig {
-    const ::Envoy::Matcher::MatchResult result =
+    const ::Envoy::Matcher::ActionMatchResult result =
         Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
     ASSERT(result.isComplete());
     if (result.isMatch()) {

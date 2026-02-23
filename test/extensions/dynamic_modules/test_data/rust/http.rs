@@ -46,6 +46,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
+    "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
@@ -708,6 +709,49 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     assert_eq!(filter_state.unwrap().as_slice(), b"stream_complete_value");
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the typed filter state
+/// related callbacks.
+struct TypedFilterStateCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TypedFilterStateCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(TypedFilterStateCallbacksFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`] to test the
+/// typed filter state callbacks.
+struct TypedFilterStateCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TypedFilterStateCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Set typed filter state using the registered test factory key.
+    let ok =
+      envoy_filter.set_filter_state_typed(b"envoy.test.http_typed_object_for_rust", b"typed_value");
+    assert!(ok);
+
+    // Read it back via the typed getter.
+    let result = envoy_filter.get_filter_state_typed(b"envoy.test.http_typed_object_for_rust");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().as_slice(), b"typed_value");
+
+    // Non-existing key should return None.
+    let result = envoy_filter.get_filter_state_typed(b"nonexistent_key");
+    assert!(result.is_none());
+
+    // Setting with a key that has no registered factory should fail.
+    let ok = envoy_filter.set_filter_state_typed(b"no.such.factory", b"value");
+    assert!(!ok);
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 

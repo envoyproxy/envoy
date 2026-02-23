@@ -105,3 +105,13 @@ envoy_cc_test(
         "//source/common/tracing:trace_context_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "tracing_validation_test",
+    srcs = ["tracing_validation_test.cc"],
+    deps = [
+        "//source/common/tracing:tracing_validation_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)

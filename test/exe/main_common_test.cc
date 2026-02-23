@@ -242,7 +242,10 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         // Allocating a fixed-size large array that results in OOM on gcc
         // results in a compile-time error on clang of "array size too big",
         // so dynamically find a size that is too large.
-        const uint64_t initial = 1 << 30;
+        // Start with a size that exceeds the x86_64 virtual address space limit (128TB)
+        // so that mmap fails immediately and tcmalloc prints its "Unable to allocate"
+        // message to stderr.
+        const uint64_t initial = uint64_t{1} << 46;
         for (uint64_t size = initial;
              size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {

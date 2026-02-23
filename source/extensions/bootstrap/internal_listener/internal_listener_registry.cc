@@ -29,7 +29,7 @@ InternalListenerExtension::InternalListenerExtension(
       [registry = tls_registry_]() { return registry; });
 }
 
-void InternalListenerExtension::onServerInitialized() {
+void InternalListenerExtension::onServerInitialized(Server::Instance&) {
   std::shared_ptr<TlsInternalListenerRegistry> internal_listener =
       server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
           SINGLETON_MANAGER_REGISTERED_NAME(internal_listener_registry));

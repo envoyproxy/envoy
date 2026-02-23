@@ -45,10 +45,10 @@ regexes:
 - regex: ^/asdf/.+
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching will be performed case-insensitively.
@@ -59,10 +59,10 @@ regexes:
   caseless: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_TRUE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching a `.` will not exclude newlines.
@@ -73,10 +73,10 @@ regexes:
   dot_all: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_TRUE(matcher_->match("/asdf/\n"));
-  EXPECT_FALSE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that `^` and `$` anchors match any newlines in data.
@@ -87,10 +87,10 @@ regexes:
   multiline: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("/asdf/1"));
-  EXPECT_FALSE(matcher_->match("/ASDF/1"));
-  EXPECT_FALSE(matcher_->match("/asdf/\n"));
-  EXPECT_TRUE(matcher_->match("\n/asdf/1"));
+  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that expressions which can match against an empty string.
@@ -101,7 +101,7 @@ regexes:
   allow_empty: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match(""));
+  EXPECT_EQ(matcher_->match(""), ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
@@ -112,7 +112,7 @@ regexes:
   utf8: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("😀"));
+  EXPECT_EQ(matcher_->match("😀"), ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using Unicode properties for character classes.
@@ -124,7 +124,7 @@ regexes:
   ucp: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("Á"));
+  EXPECT_EQ(matcher_->match("Á"), ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using logical combination.
@@ -141,7 +141,7 @@ regexes:
   combination: true
 )EOF");
 
-  EXPECT_TRUE(matcher_->match("a"));
+  EXPECT_EQ(matcher_->match("a"), ::Envoy::Matcher::MatchResult::Matched);
 }
 #endif
 
