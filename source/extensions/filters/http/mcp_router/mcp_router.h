@@ -31,6 +31,7 @@ enum class McpMethod {
   ResourcesRead,
   ResourcesSubscribe,
   ResourcesUnsubscribe,
+  ResourcesTemplatesList,
   PromptsList,
   PromptsGet,
   CompletionComplete,
@@ -110,6 +111,7 @@ private:
   void handleResourcesRead();
   void handleResourcesSubscribe();
   void handleResourcesUnsubscribe();
+  void handleResourcesTemplatesList();
   // Helper for resource methods that route to a single backend based on URI.
   void handleSingleBackendResourceMethod(absl::string_view method_name);
   // Prompts.
@@ -123,6 +125,7 @@ private:
   std::string aggregateInitialize(const std::vector<BackendResponse>& responses);
   std::string aggregateToolsList(const std::vector<BackendResponse>& responses);
   std::string aggregateResourcesList(const std::vector<BackendResponse>& responses);
+  std::string aggregateResourcesTemplatesList(const std::vector<BackendResponse>& responses);
   std::string aggregatePromptsList(const std::vector<BackendResponse>& responses);
   // Extracts JSON-RPC payload from a response, handling SSE event wrapping.
   std::string extractJsonRpcFromResponse(const BackendResponse& response);

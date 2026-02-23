@@ -241,6 +241,13 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: matching
+  change: |
+    Added an optional ``field`` parameter to
+    :ref:`FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`.
+    When set, ``FilterStateInput`` calls ``getField()`` on the filter state object instead of
+    ``serializeAsString()``, enabling direct matching on individual fields within composite filter
+    state objects such as proxy protocol TLVs stored via ``tlv_location: FILTER_STATE``.
 - area: ratelimit
   change: |
     Added per-descriptor ``x-ratelimit-*`` headers support. See the
@@ -293,6 +300,12 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
     that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
     returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
+- area: dynamic_modules
+  change: |
+    Added :ref:`cluster
+    <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`
+    support for dynamic modules, enabling custom service discovery and host management to be implemented
+    in dynamic modules.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
@@ -411,6 +424,9 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``resources/list`` fanout aggregation.
+- area: mcp_router
+  change: |
+    Added support for MCP ``resources/templates/list`` method with fanout aggregation.
 - area: tcp_proxy
   change: |
     Added :ref:`proxy_protocol_tlv_merge_policy
@@ -438,5 +454,8 @@ new_features:
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
     standard JSON-REST HTTP requests.
+- area: mcp_router
+  change: |
+    Added SSE response support for MCP ``prompts/list`` fanout aggregation.
 
 deprecated:
