@@ -45,3 +45,20 @@ except for the ``%v`` and ``%_`` flags, as they may break the JSON structure log
 
 .. note::
   Setting both ``application_log_config.log_format`` and CLI option ``--log-format`` is not allowed, and will cause a bootstrap error.
+
+.. _config_application_logging_events:
+
+Event logging
+-------------
+
+Envoy can also emit events with stable names. Unlike the regular application or access logs, these event logs are not
+buffered and should be consumed immediately, and they can be used as a form of inter-process communication with a
+managing agent or an xDS server. To enable this feature, please set the field :ref:`json_format
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event_log>`. These are well-known structured
+events:
+
+.. csv-table::
+   :header: Component, Event, Body, Description
+   :widths: 1, 1, 1, 2
+
+   xds_event, listener_warmed, ``linstener_name``, Listener is warmed on all workers, as a result of a listener update

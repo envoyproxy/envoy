@@ -104,7 +104,8 @@ const static bool should_log = true;
   FUNCTION(websocket)                                                                              \
   FUNCTION(golang)                                                                                 \
   FUNCTION(stats_sinks)                                                                            \
-  FUNCTION(dynamic_modules)
+  FUNCTION(dynamic_modules)                                                                        \
+  FUNCTION(xds_event)
 
 // clang-format off
 enum class Id {
@@ -541,6 +542,8 @@ public:
 #define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
+#define GET_XDS_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::xds_event)
+
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 /**
@@ -646,6 +649,14 @@ public:
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
     ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
+                                                              fmt::format(__VA_ARGS__));           \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                      \
+  do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
                                                               fmt::format(__VA_ARGS__));           \
