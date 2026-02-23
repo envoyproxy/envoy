@@ -46,10 +46,6 @@ public:
     return traffic_mode_;
   }
 
-  bool shouldRejectNonA2a() const {
-    return traffic_mode_ == envoy::extensions::filters::http::a2a::v3::A2a::REJECT;
-  }
-
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const A2aParserConfig& parserConfig() const { return parser_config_; }
 
