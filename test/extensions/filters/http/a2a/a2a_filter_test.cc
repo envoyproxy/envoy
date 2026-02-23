@@ -23,7 +23,6 @@ public:
   A2aFilterTest() {
     envoy::extensions::filters::http::a2a::v3::A2a proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::PASS_THROUGH);
-    proto_config.set_clear_route_cache(true);
 
     config_ =
         std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());

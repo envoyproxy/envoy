@@ -50,8 +50,6 @@ public:
     return traffic_mode_ == envoy::extensions::filters::http::a2a::v3::A2a::REJECT;
   }
 
-  bool clearRouteCache() const { return clear_route_cache_; }
-
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const A2aParserConfig& parserConfig() const { return parser_config_; }
 
@@ -59,7 +57,6 @@ public:
 
 private:
   const envoy::extensions::filters::http::a2a::v3::A2a::TrafficMode traffic_mode_;
-  const bool clear_route_cache_;
   const uint32_t max_request_body_size_;
   A2aParserConfig parser_config_;
   A2aFilterStats stats_;
@@ -86,12 +83,7 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
-  void handleParseError(absl::string_view error_msg);
-  Http::FilterDataStatus completeParsing();
-
   const A2aFilterConfigSharedPtr config_;
-  uint32_t bytes_parsed_{0};
-  bool parsing_complete_{false};
   std::unique_ptr<A2aJsonParser> parser_;
   bool is_a2a_request_{false};
   bool is_json_post_request_{false};

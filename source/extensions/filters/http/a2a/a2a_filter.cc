@@ -19,7 +19,6 @@ A2aFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
 A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
                                  const std::string& stats_prefix, Stats::Scope& scope)
     : traffic_mode_(proto_config.traffic_mode()),
-      clear_route_cache_(proto_config.clear_route_cache()),
       max_request_body_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_request_body_size, 8192)),
       parser_config_(A2aParserConfig::createDefault()), stats_(generateStats(stats_prefix, scope)) {

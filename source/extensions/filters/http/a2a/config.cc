@@ -22,13 +22,6 @@ Http::FilterFactoryCb A2aFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-A2aFilterConfigFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::a2a::v3::A2aOverride& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const A2aOverrideConfig>(proto_config);
-}
-
 /**
  * Static registration for the A2A filter. @see RegisterFactory.
  */
