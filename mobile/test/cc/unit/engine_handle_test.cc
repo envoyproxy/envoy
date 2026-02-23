@@ -31,8 +31,7 @@ TEST(EngineHandleTest, CreateFromHandleIsNotHandlingTermination) {
 TEST(EngineHandleTest, CreateFromNullHandleReturnsError) {
   auto handle_engine_or = Engine::createFromInternalEngineHandle(0);
   ASSERT_FALSE(handle_engine_or.ok());
-  EXPECT_EQ(handle_engine_or.status().message(),
-            "can't cast internal_engine_handle to an InternalEngine*");
+  EXPECT_EQ(handle_engine_or.status().message(), "Invalid internal engine handle.");
 }
 
 } // namespace
