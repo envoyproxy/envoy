@@ -111,12 +111,6 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
                                        absl::nullopt, "file_server_rejected_not_end_stream");
     return Http::FilterHeadersStatus::StopIteration;
   }
-  if (config->asyncFileManager() == nullptr) {
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, absl::nullopt, "file_server_no_file_manager_configured");
-    return Http::FilterHeadersStatus::StopIteration;
-  }
   // Parse range header, if present, into start and end (otherwise or on error, 0,0)
   auto [start, end] = parseRangeHeader(headers);
   is_head_ = headers.Method()->value() == Http::Headers::get().MethodValues.Head;

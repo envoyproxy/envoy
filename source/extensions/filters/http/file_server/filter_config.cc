@@ -31,20 +31,16 @@ absl::StatusOr<std::shared_ptr<const FileServerConfig>>
 FileServerConfig::create(const ProtoFileServerConfig& config,
                          Envoy::Server::Configuration::ServerFactoryContext& context) {
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
-  if (config.manager_config().manager_type_case() !=
-      envoy::extensions::common::async_files::v3::AsyncFileManagerConfig::MANAGER_TYPE_NOT_SET) {
-    TRY_ASSERT_MAIN_THREAD {
-      // TODO(ravenblack): make getAsyncFileManager use StatusOr instead of throw.
-      auto async_file_manager = factory->getAsyncFileManager(config.manager_config());
-      return std::make_shared<const FileServerConfig>(config, std::move(factory),
-                                                      std::move(async_file_manager));
-    }
-    END_TRY
-    catch (const EnvoyException& e) {
-      return absl::InvalidArgumentError(e.what());
-    }
+  TRY_ASSERT_MAIN_THREAD {
+    // TODO(ravenblack): make getAsyncFileManager use StatusOr instead of throw.
+    auto async_file_manager = factory->getAsyncFileManager(config.manager_config());
+    return std::make_shared<const FileServerConfig>(config, std::move(factory),
+                                                    std::move(async_file_manager));
   }
-  return std::make_shared<const FileServerConfig>(config, nullptr, nullptr);
+  END_TRY
+  catch (const EnvoyException& e) {
+    return absl::InvalidArgumentError(e.what());
+  }
 }
 
 FileServerConfig::FileServerConfig(const ProtoFileServerConfig& config,

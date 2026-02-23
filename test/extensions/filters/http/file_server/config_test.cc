@@ -82,6 +82,8 @@ public:
 
 TEST_F(FileServerConfigTest, EmptyDirectoryBehaviorIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 directory_behaviors:
   - {}
 )"),
@@ -92,6 +94,8 @@ directory_behaviors:
 
 TEST_F(FileServerConfigTest, OverpopulatedDirectoryBehaviorIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 directory_behaviors:
   - default_file: "index.html"
     list: {}
@@ -103,6 +107,8 @@ directory_behaviors:
 
 TEST_F(FileServerConfigTest, DuplicateDirectoryFilesIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 directory_behaviors:
   - default_file: "index.html"
   - default_file: "index.html"
@@ -113,6 +119,8 @@ directory_behaviors:
 
 TEST_F(FileServerConfigTest, DuplicateDirectoryListIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 directory_behaviors:
   - list: {}
   - list: {}
@@ -124,6 +132,8 @@ directory_behaviors:
 
 TEST_F(FileServerConfigTest, DuplicateRequestPathPrefixIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 path_mappings:
   - request_path_prefix: "/banana"
     file_path_prefix: "/banana"
@@ -136,19 +146,14 @@ path_mappings:
 
 TEST_F(FileServerConfigTest, SuffixForContentTypeContainingPeriodIsError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 content_types:
   "txt": "text/plain"
   ".html": "text/html"
 )"),
                                                            "stats", mock_factory_context_);
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr(".html")));
-}
-
-TEST_F(FileServerConfigTest, EmptyConfigIsOk) {
-  std::shared_ptr<const FileServerConfig> config = captureConfigFromProto(emptyConfig());
-  EXPECT_THAT(config->contentTypeForPath("xxx.txt"), Eq(""));
-  EXPECT_THAT(config->asyncFileManager(), IsNull());
-  EXPECT_THAT(config->directoryBehavior(0), Eq(absl::nullopt));
 }
 
 TEST_F(FileServerConfigTest, ValidConfigPopulatesConfigObjectAppropriately) {
@@ -212,19 +217,14 @@ directory_behaviors:
 TEST_F(FileServerConfigTest, DuplicateDirectoryFilesIsConfigErrorInRouteConfig) {
   auto status_or = factory()->createRouteSpecificFilterConfig(
       configFromYaml(R"(
+manager_config:
+  thread_pool: {}
 directory_behaviors:
   - default_file: "index.html"
   - default_file: "index.html"
 )"),
       mock_server_factory_context_, ProtobufMessage::getNullValidationVisitor());
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("index.html")));
-}
-
-TEST_F(FileServerConfigTest, EmptyConfigIsOkInRouteConfig) {
-  std::shared_ptr<const FileServerConfig> config = makeRouteConfig(emptyConfig());
-  EXPECT_THAT(config->contentTypeForPath("xxx.txt"), Eq(""));
-  EXPECT_THAT(config->asyncFileManager(), IsNull());
-  EXPECT_THAT(config->directoryBehavior(0), Eq(absl::nullopt));
 }
 
 TEST_F(FileServerConfigTest, InvalidFileManagerConfigFailsInRouteConfig) {

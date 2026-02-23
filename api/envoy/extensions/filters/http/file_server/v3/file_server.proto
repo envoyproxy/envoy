@@ -54,10 +54,8 @@ message FileServerConfig {
   }
 
   // A configuration for the AsyncFileManager to be used to read from the filesystem.
-  //
-  // This may be unset to allow for per-route-only configs. If this is unset when
-  // a ``path_mapping`` is matched, a 500 Internal Server Error response is served.
-  common.async_files.v3.AsyncFileManagerConfig manager_config = 1;
+  common.async_files.v3.AsyncFileManagerConfig manager_config = 1
+      [(validate.rules).message = {required: true}];
 
   // The longest matching path_mapping takes precedence.
   repeated PathMapping path_mappings = 2;
