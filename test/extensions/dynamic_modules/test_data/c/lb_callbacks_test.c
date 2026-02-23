@@ -57,10 +57,11 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
   return state;
 }
 
-int64_t
-envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
-                                       envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-                                       envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+bool envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index) {
   lb_state* state = (lb_state*)lb_module_ptr;
 
   // Test all host-related callbacks.
@@ -89,6 +90,33 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
     envoy_dynamic_module_type_host_health health =
         envoy_dynamic_module_callback_lb_get_host_health(lb_envoy_ptr, 0, 0);
     (void)health;
+  }
+
+  // Test all-hosts callbacks (address, weight, active requests, connections, locality).
+  if (host_count > 0) {
+    envoy_dynamic_module_type_envoy_buffer host_address_result = {NULL, 0};
+    bool host_found = envoy_dynamic_module_callback_lb_get_host_address(
+        lb_envoy_ptr, 0, 0, &host_address_result);
+    (void)host_found;
+
+    uint32_t host_weight = envoy_dynamic_module_callback_lb_get_host_weight(
+        lb_envoy_ptr, 0, 0);
+    (void)host_weight;
+
+    uint64_t active_rq = envoy_dynamic_module_callback_lb_get_host_active_requests(
+        lb_envoy_ptr, 0, 0);
+    (void)active_rq;
+
+    uint64_t active_cx = envoy_dynamic_module_callback_lb_get_host_active_connections(
+        lb_envoy_ptr, 0, 0);
+    (void)active_cx;
+
+    envoy_dynamic_module_type_envoy_buffer region = {NULL, 0};
+    envoy_dynamic_module_type_envoy_buffer zone = {NULL, 0};
+    envoy_dynamic_module_type_envoy_buffer sub_zone = {NULL, 0};
+    bool locality_found = envoy_dynamic_module_callback_lb_get_host_locality(
+        lb_envoy_ptr, 0, 0, &region, &zone, &sub_zone);
+    (void)locality_found;
   }
 
   // Test context callbacks if context is available.
@@ -121,12 +149,14 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
   }
 
   if (healthy_count == 0) {
-    return -1;
+    return false;
   }
 
   size_t index = state->next_index % healthy_count;
   state->next_index++;
-  return (int64_t)index;
+  *result_priority = 0;
+  *result_index = (uint32_t)index;
+  return true;
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

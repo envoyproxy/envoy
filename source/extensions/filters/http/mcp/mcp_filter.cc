@@ -72,10 +72,18 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
 }
 
 bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const {
-  // Check if this is a POST request with JSON content
+  // Check if this is a POST request with JSON content.
+  // Content-Type is JSON if it is exactly "application/json" or starts with
+  // "application/json" followed by ';' or ' ' (for parameters like charset).
+  // This rejects related but distinct types like application/json-patch+json.
+  const absl::string_view content_type = headers.getContentTypeValue();
+  const auto& json_ct = Http::Headers::get().ContentTypeValues.Json;
+  bool is_json_content_type =
+      absl::StartsWith(content_type, json_ct) &&
+      (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
+       content_type[json_ct.size()] == ' ');
   bool is_post_request =
-      headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+      headers.getMethodValue() == Http::Headers::get().MethodValues.Post && is_json_content_type;
 
   if (!is_post_request) {
     return false;
@@ -285,6 +293,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
+      (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
+          .set_bool_value(is_mcp_request_);
       decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }

@@ -46,7 +46,7 @@ public:
   ~InternalListenerExtension() override = default;
 
   // Server::Configuration::BootstrapExtension
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
   void onWorkerThreadInitialized() override {};
 
 private:

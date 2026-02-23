@@ -295,7 +295,7 @@ tcmalloc:
   project_name: "tcmalloc"
   project_desc: "Fast, multi-threaded malloc implementation"
   project_url: "https://github.com/google/tcmalloc"
-  release_date: "2024-12-27"
+  release_date: "2025-09-26"
   use_category:
   - dataplane_core
   - controlplane

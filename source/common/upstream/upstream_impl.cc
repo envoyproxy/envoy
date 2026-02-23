@@ -649,13 +649,10 @@ Host::CreateConnectionData HostImplBase::createConnection(
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
     ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
-        happy_eyeballs_config;
-    if (cluster.happyEyeballsConfig().has_value()) {
-      happy_eyeballs_config = cluster.happyEyeballsConfig();
-    } else {
-      happy_eyeballs_config = defaultHappyEyeballsConfig();
-    }
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+        happy_eyeballs_config =
+            cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
+                                                      : defaultHappyEyeballsConfig();
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,
         transport_socket_options, host, options, happy_eyeballs_config);

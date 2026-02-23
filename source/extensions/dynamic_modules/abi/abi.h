@@ -1723,6 +1723,47 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_typed is called by the module to set the
+ * typed filter state with the given key. Unlike set_filter_state_bytes which stores a raw
+ * StringAccessor, this uses the registered ObjectFactory for the key to create a properly typed
+ * filter state object via createFromBytes. This is required for interoperability with built-in
+ * Envoy filters that read filter state as typed objects (e.g., tcp_proxy reads
+ * PerConnectionCluster).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the stream info is not available, no
+ * ObjectFactory is registered for the key, the factory fails to create the object, or the key
+ * already exists and is marked as read-only.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_typed is called by the module to get the
+ * serialized bytes value of a typed filter state object with the given key. This retrieves the
+ * object generically and calls serializeAsString to get the bytes representation. This works with
+ * any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
 /**
@@ -3272,6 +3313,44 @@ bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_typed is called by the module to set
+ * typed filter state using the registered ObjectFactory for the key. Unlike set_filter_state_bytes
+ * which stores a raw StringAccessor, this creates a properly typed filter state object via
+ * ObjectFactory::createFromBytes. This is required for interoperability with built-in Envoy
+ * filters that read filter state as typed objects (e.g., tcp_proxy reads PerConnectionCluster
+ * via the key "envoy.tcp_proxy.cluster").
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if no ObjectFactory is registered for the
+ * key, the factory fails to create the object, or the key already exists and is marked as
+ * read-only.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_typed is called by the module to get
+ * the serialized bytes value of a typed filter state object with the given key. This retrieves
+ * the object generically and calls serializeAsString to get the bytes representation. This works
+ * with any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the serialized value owned by Envoy will be stored.
+ * @return true if the key exists and the object supports serialization, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // ---------------------------- Dynamic Metadata Callbacks ---------------------
 
 /**
@@ -4137,6 +4216,155 @@ void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer hash);
 
+// --------------------- Socket Property Getters (Protocol Detection & SSL) ----
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the connection socket. This returns the value
+ * previously set by a listener filter (e.g., TLS inspector).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol is called by the
+ * module to get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the protocol string owned by Envoy will be stored.
+ * @return true if the transport protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size is called
+ * by the module to get the count of requested application protocols (ALPN) from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of application protocols, or 0 if none are available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols is called by
+ * the module to get the requested application protocols (ALPN) from the connection socket. The
+ * module should first call get_requested_application_protocols_size to get the count and allocate
+ * the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocols_out is a pre-allocated array owned by the module where Envoy will populate the
+ *   protocol strings. The module must allocate this array with at least the size returned by
+ *   get_requested_application_protocols_size.
+ * @return true if the protocols were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja3_hash` is called by the module to get the
+ * `JA3` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja4_hash` is called by the module to get the
+ * `JA4` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_ssl is called by the module to check if the
+ * connection has SSL/TLS information available on the socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if SSL/TLS connection information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of URI SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of DNS SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
 // --------------------------- Address Operations -----------------------------
 
 /**
@@ -4281,12 +4509,28 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
- * the socket immediately.
+ * the socket immediately. If details is non-empty, the termination reason is set on the
+ * connection's stream info before closing.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param details is the optional termination reason string owned by the module. Can be empty.
  */
 void envoy_dynamic_module_callback_listener_filter_close_socket(
-    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_write_to_socket is called by the module to write
+ * data directly to the raw socket. This is useful for protocol negotiation at the listener filter
+ * level, such as writing SSL support responses in Postgres or MySQL handshake packets.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param data is the data to write owned by the module.
+ * @return the number of bytes written, or -1 if the write failed or callbacks are not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
 
 // ---------------------- Socket Option Callbacks ------------------------------
 
@@ -5358,6 +5602,17 @@ bool envoy_dynamic_module_callback_access_logger_get_route_name(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * Get the virtual cluster name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if virtual cluster name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Check if this is a health check request.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -5375,6 +5630,17 @@ bool envoy_dynamic_module_callback_access_logger_is_health_check(
  */
 uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the connection termination details.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if termination details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_connection_termination_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 // -----------------Access Logger Callbacks - Address Information---------------
 
@@ -5399,6 +5665,30 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
  * @return true if address is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream direct remote address (physical peer address before XFF processing).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream direct local address (physical listener address).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
@@ -5460,6 +5750,195 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream TLS cipher suite. The buffer uses thread-local storage and is valid until the
+ * next call to this function or `get_downstream_tls_cipher` on the same thread.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cipher suite is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream TLS session ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if session ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate issuer.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if issuer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream local certificate subject (Envoy's own certificate for the upstream connection).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
 
 // ------------------ Access Logger Callbacks - Connection/TLS Info ------------
 
@@ -5524,6 +6003,193 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream TLS cipher suite. The buffer uses thread-local storage and is valid until the
+ * next call to this function or `get_upstream_tls_cipher` on the same thread.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cipher suite is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream TLS session ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if session ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate issuer.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if issuer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate serial number.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if serial number is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate SHA1 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream local certificate subject (Envoy's own certificate).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if the downstream peer certificate was presented.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if a peer certificate was presented, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Check if the downstream peer certificate was validated.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if the peer certificate was validated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
 
 // ---------------- Access Logger Callbacks - Metadata and Dynamic State -------
 
@@ -6535,6 +7201,277 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_module_buffer path_prefix);
 
 // =============================================================================
+// ============================ Cluster Extension ==============================
+// =============================================================================
+
+// =============================================================================
+// Cluster Dynamic Module Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cluster_config_envoy_ptr is a raw pointer to the cluster configuration
+ * object in Envoy. This is passed to the module when creating a new in-module cluster
+ * configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_cluster_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_config_module_ptr is a pointer to an in-module cluster
+ * configuration corresponding to an Envoy cluster configuration. The config is responsible for
+ * creating new cluster instances.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_config_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_envoy_ptr is a raw pointer to the DynamicModuleCluster class
+ * in Envoy. This is passed to the module when creating a new cluster and used to access cluster
+ * operations such as adding/removing hosts.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_module_ptr is a pointer to an in-module cluster instance
+ * corresponding to an Envoy cluster.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_envoy_ptr is a raw pointer to the load balancer instance
+ * in Envoy. This provides thread-local access to the cluster's host set for load balancing
+ * decisions. One load balancer instance is created per worker thread.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_lb_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_module_ptr is a pointer to an in-module load balancer
+ * instance. The load balancer is responsible for selecting hosts for requests.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_lb_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_lb_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_host_envoy_ptr is a pointer to a Host in Envoy's cluster. This
+ * represents an upstream endpoint that can receive traffic.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer remains valid as long as the host is part of the
+ * cluster's host set.
+ */
+typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_context_envoy_ptr is a pointer to the LoadBalancerContext in
+ * Envoy. This provides per-request information for load balancing decisions such as hash keys and
+ * downstream headers.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
+ * envoy_dynamic_module_on_cluster_lb_choose_host call.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
+
+// =============================================================================
+// Cluster Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cluster_config_new is called by the main thread when a cluster
+ * configuration referencing this module is loaded. The module should parse the configuration and
+ * return a pointer to the in-module configuration object.
+ *
+ * @param config_envoy_ptr is the pointer to the Envoy cluster configuration object.
+ * @param name is the cluster name identifying the implementation within the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_cluster_config_module_ptr is the pointer to the in-module
+ * cluster configuration. Returning nullptr indicates a failure, and the cluster configuration
+ * will be rejected.
+ */
+envoy_dynamic_module_type_cluster_config_module_ptr envoy_dynamic_module_on_cluster_config_new(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cluster_config_destroy is called when the cluster configuration is
+ * destroyed. The module should release any resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ */
+void envoy_dynamic_module_on_cluster_config_destroy(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_new is called when a new cluster instance is created.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object, which can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
+ * @return envoy_dynamic_module_type_cluster_module_ptr is the pointer to the in-module cluster.
+ * Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_init is called when cluster initialization begins. The module
+ * should perform initial host discovery and call
+ * envoy_dynamic_module_callback_cluster_pre_init_complete when the initial set of hosts is ready.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ */
+void envoy_dynamic_module_on_cluster_init(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
+ * should release any resources associated with the cluster.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_destroy(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_new is called when a new load balancer instance is created
+ * for a worker thread. Each worker thread gets its own load balancer instance.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object, which provides
+ * thread-local access to the cluster's host set via callbacks such as
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count.
+ * @return envoy_dynamic_module_type_cluster_lb_module_ptr is the pointer to the in-module load
+ * balancer. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_lb_module_ptr envoy_dynamic_module_on_cluster_lb_new(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_destroy is called when the load balancer is destroyed.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ */
+void envoy_dynamic_module_on_cluster_lb_destroy(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_choose_host is called to select a host for a request.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ * @param context_envoy_ptr is the per-request load balancer context. Can be nullptr.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the selected host.
+ * Returning nullptr means no host was selected.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// Cluster Dynamic Module Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_hosts adds multiple hosts to the cluster in a single
+ * batch operation. This triggers only one priority set update regardless of how many hosts are
+ * added, avoiding the overhead of updating the priority set per host.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param addresses is the array of host addresses in ``ip:port`` format (e.g.,
+ * ``127.0.0.1:8080``). Each address is owned by the module.
+ * @param weights is the array of load balancing weights for each host (1-128).
+ * @param count is the number of hosts to add. Must match the length of both arrays.
+ * @param result_host_ptrs is the output array of host pointers. On success, each entry is set to
+ * the corresponding created host pointer. On failure, the array contents are undefined. The array
+ * must be pre-allocated by the caller with at least ``count`` entries.
+ * @return true if all hosts were added successfully, false if any host failed (e.g., invalid
+ * address or weight). On failure, no hosts are added.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights, size_t count,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
+ * envoy_dynamic_module_callback_cluster_remove_hosts removes multiple hosts from the cluster in a
+ * single batch operation. This triggers only one priority set update regardless of how many hosts
+ * are removed.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param host_envoy_ptrs is the array of host pointers to remove, as returned by
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param count is the number of hosts to remove.
+ * @return the number of hosts that were successfully removed. Hosts not found in the cluster are
+ * skipped.
+ */
+size_t envoy_dynamic_module_callback_cluster_remove_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    const envoy_dynamic_module_type_cluster_host_envoy_ptr* host_envoy_ptrs, size_t count);
+
+/**
+ * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host
+ * discovery is complete. The module must call this during or after
+ * envoy_dynamic_module_on_cluster_init to allow Envoy to start routing traffic to this cluster.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ */
+void envoy_dynamic_module_callback_cluster_pre_init_complete(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
+ * hosts at the given priority level in the cluster's host set.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level (typically 0 for default priority).
+ * @return the number of healthy hosts at the given priority level.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
+ * index at the given priority level.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host in the healthy host list.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the host,
+ * or nullptr if the index is out of bounds.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+// =============================================================================
 // =============================== Load Balancer ===============================
 // =============================================================================
 //
@@ -6648,18 +7585,23 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
 
 /**
  * envoy_dynamic_module_on_lb_choose_host is called when a host needs to be selected
- * for an upstream request. The module should return the index of the selected host.
+ * for an upstream request. The module should select a host by writing the priority level
+ * and host index (within the healthy hosts at that priority) into the output parameters.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param lb_module_ptr is the pointer to the in-module load balancer instance.
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext (may be null).
- * @return the index of the selected host in the healthy hosts list, or a negative value
- *         if no host should be selected (which will result in no upstream connection).
+ * @param result_priority is the output parameter for the priority level of the selected host.
+ * @param result_index is the output parameter for the index of the selected host within the
+ * healthy hosts at the given priority.
+ * @return true if a host was selected (result_priority and result_index are populated),
+ * false if no host should be selected (which will result in no upstream connection).
  */
-int64_t envoy_dynamic_module_on_lb_choose_host(
+bool envoy_dynamic_module_on_lb_choose_host(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
     envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index);
 
 /**
  * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
@@ -6763,6 +7705,76 @@ uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
  */
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_health(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_address returns the address of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_weight returns the load balancing weight
+ * of a host by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_active_requests returns the number of active
+ * requests for a host by index within all hosts at a given priority. This is essential for
+ * implementing least-request, peak EWMA, and similar load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the number of active requests, or 0 if the host was not found.
+ */
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_active_connections returns the number of active
+ * connections for a host by index within all hosts at a given priority. This is useful for
+ * connection-aware load balancing decisions.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the number of active connections, or 0 if the host was not found.
+ */
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_locality returns the locality information
+ * (region, zone, sub_zone) for a host by index within all hosts at a given priority.
+ * This enables zone-aware and locality-aware load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param region is the output for the region string. Can be null if not needed.
+ * @param zone is the output for the zone string. Can be null if not needed.
+ * @param sub_zone is the output for the sub-zone string. Can be null if not needed.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_locality(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone);
 
 /**
  * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from

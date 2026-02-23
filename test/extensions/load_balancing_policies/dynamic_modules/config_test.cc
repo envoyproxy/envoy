@@ -197,6 +197,9 @@ protected:
     ON_CALL(*host1_, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
     ON_CALL(*host2_, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
     ON_CALL(*host3_, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Degraded));
+    ON_CALL(*host1_, locality()).WillByDefault(ReturnRef(default_locality_));
+    ON_CALL(*host2_, locality()).WillByDefault(ReturnRef(default_locality_));
+    ON_CALL(*host3_, locality()).WillByDefault(ReturnRef(default_locality_));
 
     // Get the mock host set from the priority set and configure it.
     auto* mock_host_set = priority_set_.getMockHostSet(0);
@@ -220,6 +223,7 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Event::SimulatedTimeSystem time_source_;
   const std::string cluster_name_{"test_cluster"};
+  envoy::config::core::v3::Locality default_locality_;
 
   std::shared_ptr<NiceMock<Upstream::MockHost>> host1_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host2_;
@@ -393,8 +397,35 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidIndex) {
   auto lb = thread_aware_lb->factory()->create(params);
   ASSERT_NE(lb, nullptr);
 
-  // Module returns index 9999 which is way beyond the number of hosts.
-  // Should log a warning and return nullptr.
+  // Module returns priority=0, index=9999 which is way beyond the number of hosts. Should log a
+  // warning and return nullptr.
+  auto response = lb->chooseHost(nullptr);
+  EXPECT_EQ(response.host, nullptr);
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidPriority) {
+  // Test that when the module returns an invalid priority, we get nullptr.
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_invalid_priority");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  // Module returns priority=99, index=0 which is an invalid priority. Should log a warning and
+  // return nullptr.
   auto response = lb->chooseHost(nullptr);
   EXPECT_EQ(response.host, nullptr);
 }
@@ -494,6 +525,14 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_health(nullptr, 0, 0),
             envoy_dynamic_module_type_host_health_Unhealthy);
 
+  // Test new all-hosts callbacks with null lb_envoy_ptr.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0), 0);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr, nullptr, nullptr));
+
   // Test context callbacks with null.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, nullptr));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr), 0);
@@ -537,6 +576,14 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_healthy_host_weight(lb_ptr, 999, 0), 0);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_health(lb_ptr, 999, 0),
             envoy_dynamic_module_type_host_health_Unhealthy);
+
+  // Test new all-hosts callbacks with invalid priority.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(lb_ptr, 999, 0, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 999, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 999, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 999, 0), 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 999, 0, nullptr, nullptr,
+                                                                  nullptr));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
@@ -567,6 +614,14 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_healthy_host_weight(lb_ptr, 0, 999), 0);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_health(lb_ptr, 0, 999),
             envoy_dynamic_module_type_host_health_Unhealthy);
+
+  // Test new all-hosts callbacks with invalid host index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(lb_ptr, 0, 999, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 999), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 999), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 999), 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 999, nullptr, nullptr,
+                                                                  nullptr));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
@@ -620,6 +675,87 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
             envoy_dynamic_module_type_host_health_Healthy);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_health(lb_ptr, 0, 2),
             envoy_dynamic_module_type_host_health_Degraded);
+
+  // Test all-hosts address callback.
+  envoy_dynamic_module_type_envoy_buffer host_addr_result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_address(lb_ptr, 0, 0, &host_addr_result));
+  EXPECT_NE(host_addr_result.ptr, nullptr);
+  EXPECT_GT(host_addr_result.length, 0);
+
+  // Test all-hosts weight callback.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 0), 1);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 1), 2);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 2), 3);
+
+  // Test active requests callback.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 0), 0);
+
+  // Test locality callback.
+  envoy_dynamic_module_type_envoy_buffer region_result = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer zone_result = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer sub_zone_result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region_result,
+                                                                 &zone_result, &sub_zone_result));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
+  // Set up locality on hosts.
+  envoy::config::core::v3::Locality locality1;
+  locality1.set_region("us-east");
+  locality1.set_zone("us-east-1a");
+  locality1.set_sub_zone("subnet-1");
+  ON_CALL(*host1_, locality()).WillByDefault(ReturnRef(locality1));
+
+  // Set active request/connection stats on hosts.
+  host1_->stats().rq_active_.set(5);
+  host1_->stats().cx_active_.set(3);
+  host2_->stats().rq_active_.set(10);
+  host2_->stats().cx_active_.set(7);
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  // Verify active requests.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 0), 5);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 1), 10);
+
+  // Verify active connections.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 0), 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 1), 7);
+
+  // Verify locality.
+  envoy_dynamic_module_type_envoy_buffer region = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer zone = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer sub_zone = {nullptr, 0};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region, &zone, &sub_zone));
+  EXPECT_EQ(absl::string_view(region.ptr, region.length), "us-east");
+  EXPECT_EQ(absl::string_view(zone.ptr, zone.length), "us-east-1a");
+  EXPECT_EQ(absl::string_view(sub_zone.ptr, sub_zone.length), "subnet-1");
+
+  // Test locality with partial null output buffers.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region, nullptr, nullptr));
+  EXPECT_EQ(absl::string_view(region.ptr, region.length), "us-east");
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {

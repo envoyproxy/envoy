@@ -107,17 +107,18 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   collector_->shared_span_context_ = shared_span_context;
 
   const bool split_spans_for_request = zipkin_config.split_spans_for_request();
+  const bool timestamp_trace_ids = zipkin_config.timestamp_trace_ids();
 
   auto stats = std::make_shared<ZipkinTracerStats>(ZipkinTracerStats{
       ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(context.scope(), "tracing.zipkin."))});
 
   tls_->set([&context, c = collector_, t = trace_context_option_, stats, trace_id_128bit,
-             split_spans_for_request](
+             split_spans_for_request, timestamp_trace_ids](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     TracerPtr tracer = std::make_unique<Tracer>(
         context.localInfo().clusterName(), context.localInfo().address(),
         context.api().randomGenerator(), trace_id_128bit, c->shared_span_context_,
-        context.timeSource(), split_spans_for_request);
+        context.timeSource(), split_spans_for_request, timestamp_trace_ids);
     tracer->setTraceContextOption(t);
     auto reporter = std::make_unique<ReporterImpl>(dispatcher, context.clusterManager(),
                                                    context.runtime(), stats, c);

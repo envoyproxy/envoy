@@ -79,6 +79,22 @@ TEST(SessionCodecTest, ParseEmptyBackendSessions) {
   EXPECT_TRUE(result->backend_sessions.empty());
 }
 
+// Mixed case: only a subset of backends have sessions. The composite session encodes only those.
+TEST(SessionCodecTest, BuildAndParsePartialBackendSessions) {
+  absl::flat_hash_map<std::string, std::string> sessions = {{"backend1", "session-abc"}};
+
+  std::string composite = SessionCodec::buildCompositeSessionId("route1", "user1", sessions);
+
+  auto result = SessionCodec::parseCompositeSessionId(composite);
+  ASSERT_TRUE(result.ok());
+  EXPECT_EQ(result->route, "route1");
+  EXPECT_EQ(result->subject, "user1");
+  // Only backend1 should be present; backend2 is absent (session-less).
+  EXPECT_EQ(result->backend_sessions.size(), 1);
+  EXPECT_EQ(result->backend_sessions["backend1"], "session-abc");
+  EXPECT_EQ(result->backend_sessions.count("backend2"), 0);
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters
