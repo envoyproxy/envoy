@@ -211,17 +211,11 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
   const Config::MetadataKey& metadata_key = config_.selectedEndpointKey().value();
   if (metadata_key.path_.size() < 1) {
     // Should not be possible based on proto validation, catching anyways.
+    ENVOY_LOG(trace, "Path was not provided in selected_endpoint_key.");
     return;
   }
 
   Protobuf::Struct updated_metadata;
-
-  // Copy existing struct for the metadata key if it exists, to avoid removing paths.
-  const auto& existing_metadata = context->requestStreamInfo()->dynamicMetadata();
-  const auto existing_key = existing_metadata.filter_metadata().find(metadata_key.key_);
-  if (existing_key != existing_metadata.filter_metadata().end()) {
-    updated_metadata = existing_key->second;
-  }
 
   (*updated_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(selected_endpoint);
 

@@ -136,8 +136,6 @@ private:
 
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
-    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
-
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
     OptRef<Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -154,6 +152,8 @@ private:
   private:
     HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
+
+    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
 
     void addSelectedEndpointKey(LoadBalancerContext* context, HostSelectionResponse& response);
 

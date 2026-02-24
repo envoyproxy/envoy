@@ -49,7 +49,7 @@ public:
     ON_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
         .WillByDefault(
             testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
-              (*metadata_.mutable_filter_metadata())[std::string(name)] = value;
+              (*metadata_.mutable_filter_metadata())[std::string(name)].MergeFrom(value);
             }));
   }
 
@@ -804,7 +804,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHostsChosen
   EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
 }
 
-TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadateDoesNotOverwriteEnvoyLb) {
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataDoesNotOverwriteEnvoyLb) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
