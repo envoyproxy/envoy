@@ -19,6 +19,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 
+namespace MetadataKeys {
+// Core A2A fields
+constexpr absl::string_view FilterName = "a2a_proxy";
+} // namespace MetadataKeys
 /**
  * All A2A filter stats. @see stats_macros.h
  */
@@ -79,8 +83,13 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
+  void handleParseError(absl::string_view error_msg);
+  Http::FilterDataStatus completeParsing();
+
   const A2aFilterConfigSharedPtr config_;
   std::unique_ptr<A2aJsonParser> parser_;
+  uint32_t bytes_parsed_{0};
+  bool parsing_complete_{false};
   bool is_a2a_request_{false};
   bool is_json_post_request_{false};
 };

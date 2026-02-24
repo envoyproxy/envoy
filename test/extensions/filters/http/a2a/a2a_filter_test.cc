@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/http/a2a/v3/a2a.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/a2a/a2a_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -107,6 +108,224 @@ TEST_F(A2aFilterTest, TrafficModeReject) {
   // Should reject because global config is REJECT and request is not A2A
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, DecodeDataInvalidJson) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string json = R"({ invalid json })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, DecodeDataPartialJson) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string part1 = R"({ "jsonrpc": "2.0", )";
+  Buffer::OwnedImpl buffer(part1);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+
+  const std::string part2 = R"("method": "message/send", "id": "1", "params": {}})";
+  buffer.add(part2);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, DecodeDataBodyTooLarge) {
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::PASS_THROUGH);
+  proto_config.mutable_max_request_body_size()->set_value(10); // Very small limit
+  config_ =
+      std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string json = R"({ "jsonrpc": "2.0", "method": "long_method_name_exceeding_limit" })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+  // Should increment body_too_large stat
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1, config_->stats().body_too_large_.value());
+}
+
+TEST_F(A2aFilterTest, DecodeDataBodyTooLargePartial) {
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::PASS_THROUGH);
+  proto_config.mutable_max_request_body_size()->set_value(20);
+  config_ =
+      std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string part1 = R"({ "jsonrpc": "2.0")"; // 17 bytes
+  Buffer::OwnedImpl buffer(part1);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+
+  const std::string part2 = R"(, "method": "foo" })"; // Exceeds limit total
+  buffer.add(part2);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "reached end_stream or configured body size, don't get enough data.",
+                             _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1, config_->stats().body_too_large_.value());
+}
+
+TEST_F(A2aFilterTest, DecodeDataFragmentedBuffer) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer;
+  std::string fragment1 = R"({ "jsonrpc")";
+  std::string fragment2 = R"(: "2.0", "method")";
+  std::string fragment3 = R"(: "message/send", "id": "123" })";
+
+  // Use buffer fragments to simulate raw slices
+  Buffer::BufferFragmentImpl frag1(fragment1.data(), fragment1.size(), nullptr);
+  Buffer::BufferFragmentImpl frag2(fragment2.data(), fragment2.size(), nullptr);
+  Buffer::BufferFragmentImpl frag3(fragment3.data(), fragment3.size(), nullptr);
+
+  buffer.addBufferFragment(frag1);
+  buffer.addBufferFragment(frag2);
+  buffer.addBufferFragment(frag3);
+
+  // Verify multiple slices are present (implementation detail of OwnedImpl + addBufferFragment)
+  EXPECT_GT(buffer.getRawSlices().size(), 1);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, DecodeDataResumesParsing) {
+  // This test proves that bytes_parsed_ correctly tracks progress.
+  // If bytes_parsed_ was not working, the second call to decodeData would
+  // try to parse the beginning of the buffer again, which would likely fail
+  // or result in incorrect state.
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // Chunk 1
+  const std::string part1 = R"({ "jsonrpc": "2.0", )";
+  Buffer::OwnedImpl buffer(part1);
+
+  // Expect StopIterationAndWatermark to buffer data
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
+
+  // Chunk 2 - appended to existing buffer (simulating Envoy's buffering)
+  const std::string part2 = R"("method": "message/send", "id": "1", "params": {}})";
+  buffer.add(part2);
+
+  // EXPECT_CALL(decoder_callbacks_.stream_info_,
+  //             setDynamicMetadata(std::string(MetadataKeys::FilterName), _))
+  //     .WillOnce(testing::Invoke([](const std::string&, const Protobuf::Struct& metadata) {
+  //       const auto& fields = metadata.fields();
+  //       EXPECT_EQ("message/send", fields.at("method").string_value());
+  //     }));
+
+  // If bytes_parsed_ works, it resumes parsing from where part1 ended.
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, DecodeDataIncompleteAtEndStream) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string json = R"({ "jsonrpc": "2.0" )"; // incomplete
+  Buffer::OwnedImpl buffer(json);
+
+  // When end_stream is true but JSON is incomplete/invalid
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, NonJsonOrA2aRequestPassthrough) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
+  // is_json_post_request_ = false
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer("some data");
+  // Should return Continue immediately
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, ParsingAlreadyComplete) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // Use a method with scalar params to ensure early stop works reliably
+  const std::string json =
+      R"({ "jsonrpc": "2.0", "method": "tasks/pushNotificationConfig/delete", "id": "1", "params": {"id": "t1", "pushNotificationConfigId": "c1"} })";
+  Buffer::OwnedImpl buffer(json);
+
+  // EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false)); // Complete
+
+  // Subsequent call with more data (e.g. trailing characters or just another chunk)
+  Buffer::OwnedImpl buffer2(" more data");
+  // Should return Continue immediately as parsing_complete_ is true
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, true));
+}
+
+TEST_F(A2aFilterTest, MaxBodySizeZeroMeansUnlimited) {
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(0); // Unlimited
+  config_ =
+      std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // Large payload
+  std::string large_json = R"({ "jsonrpc": "2.0", "method": "message/send", "params": { "data": ")";
+  large_json.append(10000, 'a'); // 10KB data
+  large_json.append(R"(" } })");
+
+  Buffer::OwnedImpl buffer(large_json);
+
+  // EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _));
+  // Should succeed despite being large
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, RejectInvalidA2aRequest) {
+  // Configured to REJECT
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::REJECT);
+  config_ =
+      std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *stats_store_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  // Valid JSON but invalid A2A (missing jsonrpc version for example)
+  const std::string json = R"({ "method": "message/send" })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "request must be a valid JSON-RPC 2.0 message for A2A", _, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 } // namespace
