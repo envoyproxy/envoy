@@ -37,8 +37,7 @@ TEST(GolangFilterConfigTest, InvalidateEmptyConfig) {
                                         "stats", context)
           .status()
           .IgnoreError(),
-      Envoy::ProtoValidationException,
-      "ConfigValidationError.LibraryId: value length must be at least 1 characters");
+      Envoy::ProtoValidationException, "library_id: value length must be at least 1 characters");
 }
 
 TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
