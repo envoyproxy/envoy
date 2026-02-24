@@ -26,6 +26,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scope_provider_singleton_lib",
+    srcs = ["scope_provider_singleton.cc"],
+    hdrs = ["scope_provider_singleton.h"],
+    deps = [
+        "//envoy/singleton:instance_interface",
+        "//envoy/stats:stats_interface",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/grpc:common_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "stat_match_input_lib",
     srcs = ["stat_match_input.cc"],
     hdrs = ["stat_match_input.h"],

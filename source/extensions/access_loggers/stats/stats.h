@@ -4,6 +4,7 @@
 #include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
 #include "envoy/stats/tag.h"
 
+#include "source/common/stats/scope_provider_singleton.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {
@@ -83,6 +84,7 @@ private:
   void emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
                        const StreamInfo::StreamInfo& stream_info) const;
 
+  const Stats::ScopeProviderSingleton::ScopeWrapperPtr scope_wrapper_;
   const Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_name_pool_;
 

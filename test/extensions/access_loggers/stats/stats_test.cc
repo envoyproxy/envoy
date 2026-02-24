@@ -1,9 +1,12 @@
+#include "envoy/config/metrics/v3/scope.pb.h"
 #include "envoy/stats/sink.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -11,8 +14,10 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -69,6 +74,8 @@ public:
 
 class StatsAccessLoggerTest : public testing::Test {
 public:
+  void TearDown() override { logger_.reset(); }
+
   void initialize(std::string config_yaml = {}) {
     const std::string default_config_yaml = R"EOF(
       stat_prefix: test_stat_prefix
@@ -106,12 +113,14 @@ public:
     ON_CALL(store_, gauge(_, _)).WillByDefault(testing::ReturnRef(*gauge_));
 
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+
     EXPECT_CALL(store_.mockScope(), createScope_(_))
-        .WillOnce(Invoke([this](const std::string& name) {
-          scope_name_storage_ =
+        .WillRepeatedly(Invoke([this](const std::string& name) {
+          auto scope_name_storage =
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
-              scope_name_storage_->statName(), store_);
+              scope_name_storage->statName(), store_);
+
           ON_CALL(*scope, gaugeFromStatNameWithTags(_, _, _))
               .WillByDefault(Invoke(
                   [scope_ptr = scope.get()](const Stats::StatName& name,
@@ -120,8 +129,20 @@ public:
                     return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
                                                                                   import_mode);
                   }));
-          scope_ = scope;
-          return scope_;
+
+          ON_CALL(*scope, counterFromStatNameWithTags(_, _))
+              .WillByDefault(
+                  Invoke([scope_ptr = scope.get()](
+                             const Stats::StatName& name,
+                             Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
+                    return scope_ptr->counterFromStatNameWithTags_(name, tags);
+                  }));
+
+          if (name != "scope_discovery") {
+            scope_ = scope;
+          }
+          name_storages_.push_back(std::move(scope_name_storage));
+          return scope;
         }));
 
     logger_ = std::make_unique<StatsAccessLog>(config, context_, std::move(filter_),
@@ -131,8 +152,9 @@ public:
   AccessLog::FilterPtr filter_;
   NiceMock<Stats::MockStore> store_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
+  // name_storages_ must be destroyed after scope_ and logger_ to keep StatNames valid.
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages_;
   std::shared_ptr<Stats::MockScope> scope_;
-  std::unique_ptr<Stats::StatNameDynamicStorage> scope_name_storage_;
   std::unique_ptr<StatsAccessLog> logger_;
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -735,6 +757,334 @@ TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
                             "Stats logger gauge set operation must have a valid log type.");
+}
+
+TEST(StatsAccessLoggerDynamicTest, DynamicScope) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    dynamic_scope:
+      resource_name: "my_scope"
+      config_source:
+        ads: {}
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  NiceMock<Stats::MockStore> store;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  std::shared_ptr<Stats::MockScope> scope;
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages;
+
+  // We need to ensure context.server_context_.scope() returns our mock scope
+  // because ScopeProviderSingleton uses it to create scopes.
+  ON_CALL(context.server_context_, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  // Also need to mock context.scope() because getScopeWrapper uses it to create the specific scope.
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+
+  Config::MockSubscription* subscription = new NiceMock<Config::MockSubscription>();
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+
+  EXPECT_CALL(context.server_context_.xds_manager_,
+              subscribeToSingletonResource("my_scope", _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+              absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& cb,
+              Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            callbacks = &cb;
+            return std::unique_ptr<Config::Subscription>(subscription);
+          }));
+
+  // Capture the scope created for "my_scope".
+  EXPECT_CALL(store.mockScope(), createScope_("my_scope"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto scope_name_storage =
+            std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope =
+            std::make_shared<NiceMock<MockScopeWithGauge>>(scope_name_storage->statName(), store);
+
+        ON_CALL(*new_scope, gaugeFromStatNameWithTags(_, _, _))
+            .WillByDefault(
+                Invoke([scope_ptr = new_scope.get()](
+                           const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
+                  return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
+                                                                                import_mode);
+                }));
+
+        ON_CALL(*new_scope, counterFromStatNameWithTags(_, _))
+            .WillByDefault(Invoke([scope_ptr = new_scope.get()](
+                                      const Stats::StatName& name,
+                                      Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
+              return scope_ptr->counterFromStatNameWithTags_(name, tags);
+            }));
+
+        scope = new_scope;
+        return new_scope;
+      }));
+
+  // ScopeProviderSingleton also creates "scope_discovery" scope.
+  EXPECT_CALL(store.mockScope(), createScope_("scope_discovery"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope = std::make_shared<NiceMock<Stats::MockScope>>(storage->statName(), store);
+        name_storages.push_back(std::move(storage));
+        return new_scope;
+      }));
+
+  auto logger = std::make_unique<StatsAccessLog>(config, context, nullptr,
+                                                 std::vector<Formatter::CommandParserPtr>{});
+
+  ASSERT_NE(callbacks, nullptr);
+  // Scope is not null because fallback scope is created.
+  ASSERT_TRUE(scope != nullptr);
+
+  // Trigger update.
+  envoy::config::metrics::v3::Scope scope_config;
+  std::vector<Config::DecodedResourceRef> resources;
+  auto resource = std::make_unique<Config::DecodedResourceImpl>(
+      std::make_unique<envoy::config::metrics::v3::Scope>(scope_config), "my_scope",
+      std::vector<std::string>{}, "version");
+  resources.push_back(*resource);
+  EXPECT_OK(callbacks->onConfigUpdate(resources, "version"));
+
+  ASSERT_TRUE(scope != nullptr);
+  EXPECT_EQ(scope->symbolTable().toString(scope->prefix()), "my_scope");
+
+  Formatter::Context formatter_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  EXPECT_CALL(*scope, counterFromStatNameWithTags(_, _));
+  logger->log(formatter_context, stream_info);
+}
+
+TEST(StatsAccessLoggerDynamicTest, DynamicScopeUpdateFailsForWrongResource) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    dynamic_scope:
+      resource_name: "my_scope"
+      config_source:
+        ads: {}
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  NiceMock<Stats::MockStore> store;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  ON_CALL(context.server_context_, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context.server_context_, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  auto subscription = new NiceMock<Config::MockSubscription>();
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+
+  EXPECT_CALL(context.server_context_.xds_manager_,
+              subscribeToSingletonResource("my_scope", _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+              absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& cb,
+              Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            callbacks = &cb;
+            return std::unique_ptr<Config::Subscription>(subscription);
+          }));
+
+  // ScopeProviderSingleton also creates "scope_discovery" scope.
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages;
+  EXPECT_CALL(store.mockScope(), createScope_("scope_discovery"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope = std::make_shared<NiceMock<Stats::MockScope>>(storage->statName(), store);
+        name_storages.push_back(std::move(storage));
+        return new_scope;
+      }));
+
+  EXPECT_CALL(store.mockScope(), createScope_("my_scope"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope = std::make_shared<NiceMock<Stats::MockScope>>(storage->statName(), store);
+        name_storages.push_back(std::move(storage));
+        return new_scope;
+      }));
+
+  auto logger = std::make_unique<StatsAccessLog>(config, context, nullptr,
+                                                 std::vector<Formatter::CommandParserPtr>{});
+  ASSERT_NE(callbacks, nullptr);
+
+  // Provide resource with different name
+  envoy::config::metrics::v3::Scope scope_config;
+  std::vector<Config::DecodedResourceRef> resources;
+  auto resource = std::make_unique<Config::DecodedResourceImpl>(
+      std::make_unique<envoy::config::metrics::v3::Scope>(scope_config), "wrong_scope",
+      std::vector<std::string>{}, "version");
+  resources.push_back(*resource);
+  auto status = callbacks->onConfigUpdate(resources, "version");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Unexpected resource name: wrong_scope");
+}
+
+TEST(StatsAccessLoggerDynamicTest, DynamicScopeResourceRemoval) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    dynamic_scope:
+      resource_name: "my_scope"
+      config_source:
+        ads: {}
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  NiceMock<Stats::MockStore> store;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  ON_CALL(context.server_context_, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context.server_context_, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  auto subscription = new NiceMock<Config::MockSubscription>();
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+
+  EXPECT_CALL(context.server_context_.xds_manager_,
+              subscribeToSingletonResource("my_scope", _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+              absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& cb,
+              Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            callbacks = &cb;
+            return std::unique_ptr<Config::Subscription>(subscription);
+          }));
+
+  std::shared_ptr<Stats::MockScope> scope;
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages;
+  EXPECT_CALL(store.mockScope(), createScope_("my_scope"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto scope_name_storage =
+            std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope =
+            std::make_shared<NiceMock<MockScopeWithGauge>>(scope_name_storage->statName(), store);
+        scope = new_scope;
+        return new_scope;
+      }));
+
+  // ScopeProviderSingleton also creates "scope_discovery" scope.
+  EXPECT_CALL(store.mockScope(), createScope_("scope_discovery"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope = std::make_shared<NiceMock<Stats::MockScope>>(storage->statName(), store);
+        name_storages.push_back(std::move(storage));
+        return new_scope;
+      }));
+
+  auto logger = std::make_unique<StatsAccessLog>(config, context, nullptr,
+                                                 std::vector<Formatter::CommandParserPtr>{});
+  ASSERT_NE(callbacks, nullptr);
+
+  // Trigger add
+  envoy::config::metrics::v3::Scope scope_config;
+  std::vector<Config::DecodedResourceRef> resources;
+  auto resource = std::make_unique<Config::DecodedResourceImpl>(
+      std::make_unique<envoy::config::metrics::v3::Scope>(scope_config), "my_scope",
+      std::vector<std::string>{}, "version");
+  resources.push_back(*resource);
+  EXPECT_OK(callbacks->onConfigUpdate(resources, "version"));
+  ASSERT_TRUE(scope != nullptr);
+
+  // Trigger remove
+  std::vector<Config::DecodedResourceRef> empty_added;
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add(std::string("my_scope"));
+  EXPECT_OK(callbacks->onConfigUpdate(empty_added, removed_resources, "version2"));
+}
+
+TEST(StatsAccessLoggerDynamicTest, DynamicScopeWithEvictable) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    dynamic_scope:
+      resource_name: "my_scope"
+      config_source:
+        ads: {}
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  envoy::extensions::access_loggers::stats::v3::Config config;
+  TestUtility::loadFromYaml(yaml, config);
+
+  NiceMock<Stats::MockStore> store;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  ON_CALL(context.server_context_, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store.mockScope()));
+  ON_CALL(context.server_context_, messageValidationVisitor())
+      .WillByDefault(testing::ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  auto subscription = new NiceMock<Config::MockSubscription>();
+  Config::SubscriptionCallbacks* callbacks = nullptr;
+
+  EXPECT_CALL(context.server_context_.xds_manager_,
+              subscribeToSingletonResource("my_scope", _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+              absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& cb,
+              Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            callbacks = &cb;
+            return std::unique_ptr<Config::Subscription>(subscription);
+          }));
+
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages;
+  EXPECT_CALL(store.mockScope(), createScope_("my_scope"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto scope_name_storage =
+            std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope =
+            std::make_shared<NiceMock<MockScopeWithGauge>>(scope_name_storage->statName(), store);
+        return new_scope;
+      }));
+
+  // ScopeProviderSingleton also creates "scope_discovery" scope.
+  EXPECT_CALL(store.mockScope(), createScope_("scope_discovery"))
+      .WillRepeatedly(Invoke([&](const std::string& name) {
+        auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, store.symbolTable());
+        auto new_scope = std::make_shared<NiceMock<Stats::MockScope>>(storage->statName(), store);
+        name_storages.push_back(std::move(storage));
+        return new_scope;
+      }));
+
+  auto logger = std::make_unique<StatsAccessLog>(config, context, nullptr,
+                                                 std::vector<Formatter::CommandParserPtr>{});
+  ASSERT_NE(callbacks, nullptr);
+
+  // Trigger add with evictable=true
+  envoy::config::metrics::v3::Scope scope_config;
+  scope_config.set_evictable(true);
+
+  std::vector<Config::DecodedResourceRef> resources;
+  auto resource = std::make_unique<Config::DecodedResourceImpl>(
+      std::make_unique<envoy::config::metrics::v3::Scope>(scope_config), "my_scope",
+      std::vector<std::string>{}, "version");
+  resources.push_back(*resource);
+
+  EXPECT_CALL(store.mockScope(), checkCreateScopeArgs(true, _));
+  EXPECT_OK(callbacks->onConfigUpdate(resources, "version"));
 }
 
 } // namespace StatsAccessLog

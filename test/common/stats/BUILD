@@ -94,6 +94,20 @@ envoy_benchmark_test(
 )
 
 envoy_cc_test(
+    name = "scope_provider_singleton_test",
+    srcs = ["scope_provider_singleton_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:scope_provider_singleton_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
     rbe_pool = "6gig",

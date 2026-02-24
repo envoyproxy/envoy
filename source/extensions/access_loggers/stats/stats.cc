@@ -113,8 +113,15 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+      scope_wrapper_(config.has_dynamic_scope()
+                         ? Stats::ScopeProviderSingleton::getScopeWrapper(
+                               context, config.dynamic_scope().resource_name(),
+                               config.dynamic_scope().config_source())
+                         : nullptr),
+      scope_(scope_wrapper_
+                 ? nullptr
+                 : context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
+      stat_name_pool_(context.statsScope().symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
           histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
@@ -276,6 +283,11 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
 
 void StatsAccessLog::emitLogConst(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
+  Stats::ScopeSharedPtr scope = scope_wrapper_ ? scope_wrapper_->getScope() : scope_;
+  if (!scope) {
+    return;
+  }
+
   for (const auto& histogram : histograms_) {
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
@@ -286,9 +298,9 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope_);
+    auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope);
     auto& histogram_stat =
-        scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
+        scope->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 
@@ -306,8 +318,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = counter.value_fixed_;
     }
 
-    auto [tags, storage] = counter.stat_.tags(context, stream_info, *scope_);
-    auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
+    auto [tags, storage] = counter.stat_.tags(context, stream_info, *scope);
+    auto& counter_stat = scope->counterFromStatNameWithTags(counter.stat_.name_, tags);
     counter_stat.add(value);
   }
 
@@ -318,6 +330,11 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
 void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
+  Stats::ScopeSharedPtr scope = scope_wrapper_ ? scope_wrapper_->getScope() : scope_;
+  if (!scope) {
+    return;
+  }
+
   auto it = std::find_if(gauge.operations_.begin(), gauge.operations_.end(),
                          [&](const auto& op) { return op.first == context.accessLogType(); });
   if (it == gauge.operations_.end()) {
@@ -339,16 +356,16 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
   Gauge::OperationType op = it->second;
 
-  auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
+  auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope);
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
-  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+  auto& gauge_stat = scope->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }

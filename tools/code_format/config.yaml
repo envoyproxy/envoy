@@ -111,6 +111,7 @@ paths:
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
+    - source/common/stats/scope_provider_singleton.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
     - source/common/grpc/google_grpc_utils.cc

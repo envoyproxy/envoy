@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
+import "envoy/config/metrics/v3/scope.proto";
 import "envoy/data/accesslog/v3/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -29,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
@@ -157,4 +158,7 @@ message Config {
 
   // The gauges this logger will emit.
   repeated Gauge gauges = 5;
+
+  // The dynamic scope configuration for the stats logger.
+  config.metrics.v3.DynamicScope dynamic_scope = 6;
 }
