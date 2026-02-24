@@ -1,3 +1,4 @@
+#include "source/common/json/json_utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -342,6 +343,179 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
   const auto value = values[index]->value().getStringView();
   *result_buffer = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
   return true;
+}
+
+bool envoy_dynamic_module_callback_lb_set_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data) {
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->setHostData(priority, index, data);
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data) {
+  if (lb_envoy_ptr == nullptr || data == nullptr) {
+    if (data != nullptr) {
+      *data = 0;
+    }
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->getHostData(priority, index, data);
+}
+
+// Thread-local storage for the serialized metadata value returned to the module.
+// NOLINTNEXTLINE(cpp-core-guidelines-avoid-non-const-global-variables)
+thread_local std::string metadata_scratch_buffer;
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& metadata = hosts[index]->metadata();
+  if (metadata == nullptr) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& filter_metadata = metadata->filter_metadata();
+  absl::string_view filter_name_view(filter_name.ptr, filter_name.length);
+  auto filter_it = filter_metadata.find(std::string(filter_name_view));
+  if (filter_it == filter_metadata.end()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& fields = filter_it->second.fields();
+  absl::string_view key_view(key.ptr, key.length);
+  auto field_it = fields.find(std::string(key_view));
+  if (field_it == fields.end()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  // Serialize the value as JSON into the thread-local scratch buffer.
+  metadata_scratch_buffer.clear();
+  Envoy::Json::Utility::appendValueToString(field_it->second, metadata_scratch_buffer);
+  result->ptr = metadata_scratch_buffer.data();
+  result->length = metadata_scratch_buffer.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_lb_get_locality_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->healthyHostsPerLocality().get().size();
+}
+
+size_t envoy_dynamic_module_callback_lb_get_locality_host_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    return 0;
+  }
+  return localities[locality_index].size();
+}
+
+bool envoy_dynamic_module_callback_lb_get_locality_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index,
+    size_t host_index, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts_in_locality = localities[locality_index];
+  if (host_index >= hosts_in_locality.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = hosts_in_locality[host_index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto weights = host_sets[priority]->localityWeights();
+  if (weights == nullptr || locality_index >= weights->size()) {
+    return 0;
+  }
+  return (*weights)[locality_index];
+}
+
+uint64_t
+envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  return getLb(lb_envoy_ptr)->random().random();
+}
+
+uint64_t envoy_dynamic_module_callback_lb_get_monotonic_time_ns(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  auto now = getLb(lb_envoy_ptr)->timeSource().monotonicTime();
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 }
 
 } // extern "C"

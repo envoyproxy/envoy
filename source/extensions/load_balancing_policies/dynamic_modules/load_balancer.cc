@@ -7,9 +7,11 @@ namespace DynamicModules {
 
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(DynamicModuleLbConfigSharedPtr config,
                                                      const Upstream::PrioritySet& priority_set,
-                                                     const std::string& cluster_name)
+                                                     const std::string& cluster_name,
+                                                     Random::RandomGenerator& random,
+                                                     TimeSource& time_source)
     : config_(std::move(config)), priority_set_(priority_set), cluster_name_(cluster_name),
-      in_module_lb_(nullptr) {
+      random_(random), time_source_(time_source), in_module_lb_(nullptr) {
   // Create the in-module load balancer instance.
   in_module_lb_ = config_->on_lb_new_(config_->in_module_config_, this);
   if (in_module_lb_ == nullptr) {
@@ -72,6 +74,42 @@ absl::optional<Upstream::SelectedPoolAndConnection>
 DynamicModuleLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext*,
                                                     const Upstream::Host&, std::vector<uint8_t>&) {
   return absl::nullopt;
+}
+
+bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  if (data == 0) {
+    per_host_data_.erase({priority, index});
+  } else {
+    per_host_data_[{priority, index}] = data;
+  }
+  return true;
+}
+
+bool DynamicModuleLoadBalancer::getHostData(uint32_t priority, size_t index,
+                                            uintptr_t* data) const {
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  auto it = per_host_data_.find({priority, index});
+  if (it != per_host_data_.end()) {
+    *data = it->second;
+  } else {
+    *data = 0;
+  }
+  return true;
 }
 
 } // namespace DynamicModules
