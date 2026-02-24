@@ -216,8 +216,15 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
   }
 
   Protobuf::Struct updated_metadata;
+  Protobuf::Struct* updated_metadata_ptr = &updated_metadata;
 
-  (*updated_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(selected_endpoint);
+  for (size_t i = 0; i + 1 < metadata_key.path_.size(); i++) {
+    Protobuf::Value& current_val = (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i]];
+    updated_metadata_ptr = current_val.mutable_struct_value();
+  }
+
+  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back()].set_string_value(
+      selected_endpoint);
 
   // Set the value of the metadata key to be the host:port
   context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, updated_metadata);
