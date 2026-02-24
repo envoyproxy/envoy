@@ -435,8 +435,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   // Validate node_id, cluster_id, and tenant_id if validation is configured.
   auto& connection = parent_.read_callbacks_->connection();
-  const bool validation_passed = parent_.config_->validateIdentifiers(
-      node_id, cluster_id, tenant_id, connection.streamInfo());
+  const bool validation_passed =
+      parent_.config_->validateIdentifiers(node_id, cluster_id, tenant_id, connection.streamInfo());
 
   // Emit validation metadata if configured.
   parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_passed,
@@ -444,7 +444,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   if (!validation_passed) {
     parent_.stats_.validation_failed_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
+    ENVOY_CONN_LOG(debug,
+                   "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
                    parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id);
     sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, absl::nullopt,
                    "reverse_tunnel_validation_failed");
