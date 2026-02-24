@@ -36,11 +36,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. code-block:: yaml
 //
 //    override_host_sources:
-//      - header: "x-gateway-destination-endpoint"
-//      - metadata:
-//          key: "envoy.lb"
-//          path:
-//          - key: "x-gateway-destination-endpoint"
+//    - header: "x-gateway-destination-endpoint"
+//    - metadata:
+//        key: "envoy.lb"
+//        path:
+//        - key: "x-gateway-destination-endpoint"
 //
 // If no valid host in the override host list, then the specified fallback load balancing policy is used. This allows load
 // balancing to degrade to a a built in policy (i.e. Round Robin) in case external endpoint picker fails.
@@ -51,10 +51,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. code-block:: yaml
 //
 //    override_host_sources:
-//      - metadata:
-//          key: "envoy.lb"
-//          path:
-//          - key: "x-gateway-destination-endpoint"
+//    - metadata:
+//        key: "envoy.lb"
+//        path:
+//        - key: "x-gateway-destination-endpoint"
 //    selected_endpoint_key:
 //      key: "envoy.lb"
 //      path:
