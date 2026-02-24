@@ -29,6 +29,10 @@ private:
   void emitLogConst(const Formatter::Context& context,
                     const StreamInfo::StreamInfo& stream_info) const;
 
+  Stats::ScopeSharedPtr scope() const {
+    return scope_wrapper_ ? scope_wrapper_->getScope() : scope_;
+  }
+
   class DynamicTag {
   public:
     DynamicTag(const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
