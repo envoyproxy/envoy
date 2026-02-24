@@ -89,8 +89,6 @@ private:
   Buffer::OwnedImpl request_body_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };
 
 } // namespace McpJsonRestBridge

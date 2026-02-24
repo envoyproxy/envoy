@@ -94,6 +94,7 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
         Grpc::Status::WellKnownGrpcStatus::InvalidArgument, "mcp_json_rest_bridge_filter_not_post");
     return Http::FilterHeadersStatus::StopIteration;
   }
+
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -109,19 +110,29 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  std::string full_body = request_body_.toString();
-  json request_body_json = json::parse(full_body, nullptr, false);
+  const size_t total_size = request_body_.length();
+  void* linearized_data = request_body_.linearize(total_size);
+  const char* json_ptr = static_cast<const char*>(linearized_data);
+  json request_body_json = json::parse(json_ptr, json_ptr + total_size,
+                                       /*parser_callback_t=*/nullptr, /*allow_exceptions=*/false);
 
   if (request_body_json.is_discarded()) {
     ENVOY_LOG(error, "Failed to parse JSON-RPC request body.");
     sendErrorResponse(Http::Code::BadRequest,
                       "mcp_json_rest_bridge_filter_failed_to_parse_json_rpc_request",
                       generateErrorJsonResponse(-32700, "JSON parse error").dump());
-    return Http::FilterDataStatus::Continue;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   handleMcpMethod(request_body_json);
+
   // TODO(guoyilin42): Clear the route cache if needed.
+
+  if (mcp_operation_ == McpOperation::Initialization ||
+      mcp_operation_ == McpOperation::InitializationAck ||
+      mcp_operation_ == McpOperation::OperationFailed) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
 
   return Http::FilterDataStatus::Continue;
 }
