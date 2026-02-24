@@ -178,6 +178,7 @@ proto_library(
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
         "//envoy/extensions/filters/common/set_filter_state/v3:pkg",
+        "//envoy/extensions/filters/http/a2a/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
         "//envoy/extensions/filters/http/admission_control/v3:pkg",
         "//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg",

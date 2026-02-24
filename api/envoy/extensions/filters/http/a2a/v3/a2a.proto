@@ -4,10 +4,11 @@ package envoy.extensions.filters.http.a2a.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
-import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.a2a.v3";
 option java_outer_classname = "A2aProto";
@@ -32,7 +33,7 @@ message A2a {
   }
 
   // Configures how the filter handles non-A2A traffic.
-  TrafficMode traffic_mode = 1 [(validate.rules).enum = { defined_only: true }];
+  TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum size of the request body to buffer for JSON-RPC validation.
   // If the request body exceeds this size, the request is rejected with ``413
@@ -44,8 +45,7 @@ message A2a {
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in
   // production.
-  google.protobuf.UInt32Value max_request_body_size = 3
-      [(validate.rules).uint32 = { lte: 10485760 }];
+  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
 
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
@@ -53,6 +53,5 @@ message A2a {
 
 // This configuration allows overriding the default attribute extraction
 // behavior for specific A2A methods.
-// TODO(tyxia) - add more fields to support more override use cases.
 message ParserConfig {
 }
