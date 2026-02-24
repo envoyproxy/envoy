@@ -209,6 +209,10 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
 
   const std::string selected_endpoint = response.host->address()->asString();
   const Config::MetadataKey& metadata_key = config_.selectedEndpointKey().value();
+  if (metadata_key.path_.size() < 1) {
+    // Should not be possible based on proto validation, catching anyways.
+    return;
+  }
 
   Protobuf::Struct selected_endpoint_metadata;
   (*selected_endpoint_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(
