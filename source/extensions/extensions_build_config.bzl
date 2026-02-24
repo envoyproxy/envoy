@@ -24,6 +24,7 @@ EXTENSIONS = {
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
     "envoy.clusters.composite":                         "//source/extensions/clusters/composite:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
+    "envoy.clusters.dynamic_modules":                   "//source/extensions/clusters/dynamic_modules:cluster",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",

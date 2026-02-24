@@ -1,7 +1,7 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
-use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
+use std::sync::atomic::{AtomicBool, AtomicUsize}; // These are used for testing, not for actual concurrency.
 
 #[test]
 fn test_loggers() {
@@ -2828,6 +2828,86 @@ fn test_bootstrap_extension_admin_request_default() {
   TEST_ADMIN_RESPONSE.with(|cell| {
     assert!(cell.borrow().is_empty());
   });
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_timer_fired_identity() {
+  // Verify that the timer identity passed to on_timer_fired matches the raw pointer.
+  static FIRED_TIMER_ID: AtomicUsize = AtomicUsize::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_timer_fired(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      timer: &dyn EnvoyBootstrapExtensionTimer,
+    ) {
+      FIRED_TIMER_ID.store(timer.id(), std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Use two different fake pointer values as timer identities.
+  let fake_timer_a = 0xAAAA_usize as *mut std::os::raw::c_void;
+  let fake_timer_b = 0xBBBB_usize as *mut std::os::raw::c_void;
+
+  // Fire timer A and verify the recorded id matches.
+  FIRED_TIMER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    std::ptr::null_mut(),
+    config_ptr,
+    fake_timer_a,
+  );
+  assert_eq!(
+    FIRED_TIMER_ID.load(std::sync::atomic::Ordering::SeqCst),
+    fake_timer_a as usize
+  );
+
+  // Fire timer B and verify the recorded id matches a different value.
+  FIRED_TIMER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    std::ptr::null_mut(),
+    config_ptr,
+    fake_timer_b,
+  );
+  assert_eq!(
+    FIRED_TIMER_ID.load(std::sync::atomic::Ordering::SeqCst),
+    fake_timer_b as usize
+  );
+
+  // The two timer ids must be different.
+  assert_ne!(fake_timer_a as usize, fake_timer_b as usize);
 
   // Clean up.
   unsafe {
