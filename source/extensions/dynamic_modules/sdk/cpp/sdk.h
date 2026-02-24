@@ -486,6 +486,15 @@ public:
   virtual BodyBuffer& bufferedRequestBody() = 0;
 
   /**
+   * Returns reference to the latest received request body chunk.
+   * NOTE: This is only valid in the onRequestBody callback, and it retrieves the latest received
+   * body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+   * should use bufferedRequestBody() to get the currently buffered body in the chain.
+   * @return Reference to BodyBuffer containing the latest received request body chunk.
+   */
+  virtual BodyBuffer& receivedRequestBody() = 0;
+
+  /**
    * Returns reference to request trailers.
    * @return Reference to StreamHeaderMap containing request trailers.
    */
@@ -502,6 +511,15 @@ public:
    * @return Reference to BodyBuffer containing response body.
    */
   virtual BodyBuffer& bufferedResponseBody() = 0;
+
+  /**
+   * Returns reference to the latest received response body chunk.
+   * NOTE: This is only valid in the onResponseBody callback, and it retrieves the latest received
+   * body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+   * should use bufferedResponseBody() to get the currently buffered body in the chain.
+   * @return Reference to BodyBuffer containing the latest received response body chunk.
+   */
+  virtual BodyBuffer& receivedResponseBody() = 0;
 
   /**
    * Returns reference to response trailers.
@@ -814,6 +832,28 @@ public:
 };
 
 using HttpFilterConfigFactoryPtr = std::unique_ptr<HttpFilterConfigFactory>;
+
+namespace Utility {
+
+/**
+ * Reads the whole request body by combining the buffered body and the latest received body.
+ * This should only be called after we see the end of the request, which means the end_of_stream
+ * flag is true in the onRequestBody callback or we are in the onRequestTrailers callback.
+ * @param handle The HTTP filter handle.
+ * @return The combined request body as a string.
+ */
+std::string readWholeRequestBody(HttpFilterHandle& handle);
+
+/**
+ * Reads the whole response body by combining the buffered body and the latest received body.
+ * This should only be called after we see the end of the response, which means the end_of_stream
+ * flag is true in the onResponseBody callback or we are in the onResponseTrailers callback.
+ * @param handle The HTTP filter handle.
+ * @return The combined response body as a string.
+ */
+std::string readWholeResponseBody(HttpFilterHandle& handle);
+
+} // namespace Utility
 
 class HttpFilterConfigFactoryRegistry {
 public:

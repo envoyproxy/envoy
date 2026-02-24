@@ -335,11 +335,15 @@ public:
 
   BodyBuffer& bufferedRequestBody() override { return buffered_request_body_; }
 
+  BodyBuffer& receivedRequestBody() override { return received_request_body_; }
+
   HeaderMap& requestTrailers() override { return request_trailers_; }
 
   HeaderMap& responseHeaders() override { return response_headers_; }
 
   BodyBuffer& bufferedResponseBody() override { return buffered_response_body_; }
+
+  BodyBuffer& receivedResponseBody() override { return received_response_body_; }
 
   HeaderMap& responseTrailers() override { return response_trailers_; }
 

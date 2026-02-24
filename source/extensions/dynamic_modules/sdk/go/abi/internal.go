@@ -704,6 +704,10 @@ func (h *dymHttpFilterHandle) BufferedRequestBody() shared.BodyBuffer {
 	return &h.bufferedRequestBody
 }
 
+func (h *dymHttpFilterHandle) ReceivedRequestBody() shared.BodyBuffer {
+	return &h.receivedRequestBody
+}
+
 func (h *dymHttpFilterHandle) RequestTrailers() shared.HeaderMap {
 	return &h.requestTrailerMap
 }
@@ -714,6 +718,10 @@ func (h *dymHttpFilterHandle) ResponseHeaders() shared.HeaderMap {
 
 func (h *dymHttpFilterHandle) BufferedResponseBody() shared.BodyBuffer {
 	return &h.bufferedResponseBody
+}
+
+func (h *dymHttpFilterHandle) ReceivedResponseBody() shared.BodyBuffer {
+	return &h.receivedResponseBody
 }
 
 func (h *dymHttpFilterHandle) ResponseTrailers() shared.HeaderMap {
