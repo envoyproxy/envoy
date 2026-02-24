@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/init/target_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -42,6 +43,8 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionAdminRequestType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 
 class DynamicModuleBootstrapExtension;
 
@@ -96,6 +99,13 @@ public:
   sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
+  /**
+   * Signals that the module's initialization is complete. This unblocks the init manager and
+   * allows Envoy to start accepting traffic. An init target is automatically registered for every
+   * bootstrap extension, so the module must call this exactly once to unblock startup.
+   */
+  void signalInitComplete();
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -113,6 +123,7 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -127,6 +138,10 @@ public:
 
   // The stats store for accessing metrics.
   Stats::Store& stats_store_;
+
+  // The init target for blocking Envoy startup until the module signals readiness.
+  // Created during config construction and registered with the init manager.
+  std::unique_ptr<Init::TargetImpl> init_target_;
 
   // ----------------------------- Metrics Support -----------------------------
   // Handle classes for storing defined metrics. These follow the same pattern as the HTTP
@@ -305,6 +320,11 @@ public:
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
+
+  // Temporary storage for the admin response body. Set by the
+  // envoy_dynamic_module_callback_bootstrap_extension_admin_set_response callback during
+  // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
+  std::string admin_response_body_;
 
 private:
   /**

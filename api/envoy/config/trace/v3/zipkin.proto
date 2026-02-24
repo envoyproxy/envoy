@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Zipkin tracer.
 // [#extension: envoy.tracers.zipkin]
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ZipkinConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
@@ -173,4 +173,10 @@ message ZipkinConfig {
   //   * Hostname: Uses cluster name as fallback
   //   * Path: ``/api/v2/spans``
   core.v3.HttpService collector_service = 9;
+
+  // Determines whether trace IDs will include a timestamp in the first 4 bytes.
+  // When enabled, trace IDs are generated with the format: [32-bit epoch seconds][32-bit random].
+  // The default value is false, which results in fully random trace IDs.
+  // For 128-bit trace IDs, the timestamp is encoded in the high 32 bits of the high 64-bit word.
+  bool timestamp_trace_ids = 10;
 }

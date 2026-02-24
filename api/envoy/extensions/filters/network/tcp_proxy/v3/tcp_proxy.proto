@@ -59,7 +59,28 @@ enum UpstreamConnectMode {
   ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
 }
 
-// [#next-free-field: 23]
+// Specifies how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state
+// (e.g., downstream TLVs parsed by the proxy_protocol listener filter).
+enum ProxyProtocolTlvMergePolicy {
+  // Add configured TLVs only if no PROXY protocol state exists (e.g., no downstream TLVs).
+  // If state exists, ignore configured TLVs and use only the existing TLVs.
+  // This is the default for backward compatibility.
+  ADD_IF_ABSENT = 0;
+
+  // Overwrite existing TLVs (e.g., downstream TLVs) by type with configured TLVs.
+  // Non-conflicting TLVs from both sources are preserved.
+  // If no state exists, add all configured TLVs.
+  // Source/destination addresses from existing state are preserved.
+  OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD = 1;
+
+  // Append configured TLVs to existing TLVs (e.g., downstream TLVs), preserving all TLVs
+  // from both sources (PROXY protocol v2 allows duplicate types).
+  // If no state exists, add all configured TLVs.
+  // Source/destination addresses from existing state are preserved.
+  APPEND_IF_EXISTS_OR_ADD = 2;
+}
+
+// [#next-free-field: 24]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -327,22 +348,22 @@ message TcpProxy {
   // Additional access log options for the TCP proxy.
   TcpAccessLogOptions access_log_options = 17;
 
-  // If set, the specified ``PROXY`` protocol TLVs (Type-Length-Value) are added to the ``PROXY`` protocol state
-  // created by the TCP proxy filter. These TLVs are sent in the PROXY protocol v2 header to the upstream.
-  //
-  // This field only takes effect when the TCP proxy filter is creating new ``PROXY`` protocol state and an
-  // upstream proxy protocol transport socket is configured in the cluster. If the connection already
-  // contains ``PROXY`` protocol state (including any TLVs) parsed by a downstream proxy protocol listener
-  // upstream proxy protocol transport socket is configured in the cluster. If the connection already
-  // contains PROXY protocol state (including any TLVs) parsed by a downstream proxy protocol listener
-  // filter, the TLVs specified here are ignored.
+  // TLVs to add to the PROXY protocol header sent upstream. Behavior when PROXY protocol
+  // state already exists (e.g., downstream TLVs from proxy_protocol listener filter) is
+  // controlled by ``proxy_protocol_tlv_merge_policy``.
   //
   // .. note::
-  //   To ensure the specified TLVs are allowed in the upstream ``PROXY`` protocol header, you must also
-  //   configure passthrough TLVs on the upstream proxy protocol transport. See
-  //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
-  //   for details.
+  //   To ensure the TLVs are allowed upstream, configure passthrough TLVs on the upstream
+  //   proxy protocol transport. See :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs
+  //   <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>` for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
+
+  // Specifies how TLVs in ``proxy_protocol_tlvs`` are merged with existing PROXY protocol state
+  // (e.g., downstream TLVs from the proxy_protocol listener filter). See
+  // :ref:`ProxyProtocolTlvMergePolicy
+  // <envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`.
+  ProxyProtocolTlvMergePolicy proxy_protocol_tlv_merge_policy = 23
+      [(validate.rules).enum = {defined_only: true}];
 
   // Specifies when to establish the upstream connection.
   //

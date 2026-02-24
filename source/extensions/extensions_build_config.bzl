@@ -24,6 +24,7 @@ EXTENSIONS = {
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
     "envoy.clusters.composite":                         "//source/extensions/clusters/composite:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
+    "envoy.clusters.dynamic_modules":                   "//source/extensions/clusters/dynamic_modules:cluster",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
@@ -94,6 +95,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
+    "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
 
     #
@@ -123,6 +125,7 @@ EXTENSIONS = {
     # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+    "envoy.matching.inputs.dynamic_module_data_input":  "//source/extensions/matching/http/dynamic_modules:data_input_lib",
 
     #
     # Dynamic Metadata Matching Input
@@ -192,6 +195,7 @@ EXTENSIONS = {
     "envoy.filters.http.json_to_metadata":              "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.mcp":                           "//source/extensions/filters/http/mcp:config",
+    "envoy.filters.http.mcp_json_rest_bridge":          "//source/extensions/filters/http/mcp_json_rest_bridge:config",
     "envoy.filters.http.mcp_router":                    "//source/extensions/filters/http/mcp_router:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default. kill_request is not built into most prebuilt images.

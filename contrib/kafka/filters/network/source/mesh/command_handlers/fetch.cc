@@ -41,7 +41,7 @@ void FetchRequestHolder::startProcessing() {
   const TopicToPartitionsMap requested_topics = interest();
 
   {
-    absl::MutexLock lock(&state_mutex_);
+    absl::MutexLock lock(state_mutex_);
     for (const auto& topic_and_partitions : requested_topics) {
       const std::string& topic_name = topic_and_partitions.first;
       for (const int32_t partition : topic_and_partitions.second) {
@@ -81,7 +81,7 @@ void FetchRequestHolder::markFinishedByTimer() {
   ENVOY_LOG(trace, "Request {} timed out", toString());
   bool doCleanup = false;
   {
-    absl::MutexLock lock(&state_mutex_);
+    absl::MutexLock lock(state_mutex_);
     timer_ = nullptr;
     if (!finished_) {
       finished_ = true;
@@ -103,7 +103,7 @@ constexpr int32_t MINIMAL_MSG_CNT = 3;
 // - Kafka-consumer thread - when have the records delivered,
 // - dispatcher thread  - when we start processing and check whether anything was cached.
 CallbackReply FetchRequestHolder::receive(InboundRecordSharedPtr message) {
-  absl::MutexLock lock(&state_mutex_);
+  absl::MutexLock lock(state_mutex_);
   if (!finished_) {
     // Store a new record.
     const KafkaPartition kp = {message->topic_, message->partition_};
@@ -155,7 +155,7 @@ void FetchRequestHolder::cleanup(bool unregister) {
 }
 
 bool FetchRequestHolder::finished() const {
-  absl::MutexLock lock(&state_mutex_);
+  absl::MutexLock lock(state_mutex_);
   return finished_;
 }
 
@@ -174,7 +174,7 @@ AbstractResponseSharedPtr FetchRequestHolder::computeAnswer() const {
 
   std::vector<FetchableTopicResponse> responses;
   {
-    absl::MutexLock lock(&state_mutex_);
+    absl::MutexLock lock(state_mutex_);
     responses = converter_.convert(messages_);
   }
   const FetchResponse data = {responses};

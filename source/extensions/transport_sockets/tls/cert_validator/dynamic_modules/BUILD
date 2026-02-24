@@ -14,11 +14,13 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/router:string_accessor_interface",
         "//envoy/ssl:context_config_interface",
         "//source/common/common:statusor_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/tls:stats_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",

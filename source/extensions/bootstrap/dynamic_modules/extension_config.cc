@@ -40,6 +40,16 @@ DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() 
   }
 }
 
+void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
+  if (init_target_ == nullptr) {
+    IS_ENVOY_BUG("dynamic modules: signal_init_complete called but no init target registered");
+    return;
+  }
+  init_target_->ready();
+  ENVOY_LOG(debug, "dynamic modules: init target signaled complete, Envoy may start accepting "
+                   "traffic");
+}
+
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_config_scheduled_ != nullptr) {
     on_bootstrap_extension_config_scheduled_(thisAsVoidPtr(), in_module_config_, event_id);
@@ -232,9 +242,21 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_timer_fired.status();
   }
 
+  auto on_admin_request = dynamic_module->getFunctionPointer<OnBootstrapExtensionAdminRequestType>(
+      "envoy_dynamic_module_on_bootstrap_extension_admin_request");
+  if (!on_admin_request.ok()) {
+    return on_admin_request.status();
+  }
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
       stats_store);
+
+  // Always register an init target so that Envoy blocks traffic until the module signals readiness.
+  // This must happen before calling the module constructor so the module can call
+  // signal_init_complete during config creation.
+  config->init_target_ = std::make_unique<Init::TargetImpl>("dynamic_modules_bootstrap", []() {});
+  context.initManager().add(*config->init_target_);
 
   const void* extension_config_module_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {extension_name.data(), extension_name.size()},
@@ -254,6 +276,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
   config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
+  config->on_bootstrap_extension_admin_request_ = on_admin_request.value();
 
   return config;
 }

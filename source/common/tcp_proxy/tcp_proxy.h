@@ -264,6 +264,10 @@ public:
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
       return proxy_protocol_tlvs_;
     }
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+    proxyProtocolTlvMergePolicy() const {
+      return proxy_protocol_tlv_merge_policy_;
+    }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -299,6 +303,9 @@ public:
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
     std::vector<TlvFormatter> dynamic_tlv_formatters_;
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+        proxy_protocol_tlv_merge_policy_{
+            envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;

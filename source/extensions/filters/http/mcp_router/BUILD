@@ -50,7 +50,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/sse:sse_parser_lib",
         "//source/common/json:json_loader_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

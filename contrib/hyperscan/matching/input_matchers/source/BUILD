@@ -34,10 +34,19 @@ envoy_cmake(
         "PYTHON_EXECUTABLE": "$(PYTHON3)",
     },
     default_cache_entries = {},
-    env = {
-        "NM": "$$EXT_BUILD_ROOT/$(NM)",
-        "OBJCOPY": "$$EXT_BUILD_ROOT/$(OBJCOPY)",
-    },
+    env = select({
+        # When using non-hermetic LLVM toolchain the paths to objcopy and nm will point
+        # to the host objcopy and nm, so there is no need to prefix those with the path
+        # to the directory with external dependencies.
+        "@envoy_repo//:use_local_llvm": {
+            "NM": "$(NM)",
+            "OBJCOPY": "$(OBJCOPY)",
+        },
+        "//conditions:default": {
+            "NM": "$$EXT_BUILD_ROOT/$(NM)",
+            "OBJCOPY": "$$EXT_BUILD_ROOT/$(OBJCOPY)",
+        },
+    }),
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
             "Pool": "linux_x64_xlarge",

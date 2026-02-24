@@ -12,10 +12,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
@@ -39,6 +39,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Filters::Common::MutationRules::Checker;
+using Filters::Common::ProcessingEffect::Effect;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
@@ -74,6 +75,7 @@ constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_c
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
 constexpr absl::string_view FailedOpenField = "failed_open";
+constexpr absl::string_view ReceivedImmediateResponseField = "received_immediate_response";
 constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
 constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
 constexpr absl::string_view ResponseHeaderProcessingEffectField =
@@ -370,9 +372,8 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 }
 
 // Handles the potential cases on when to update the effect field.
-ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
-                                                ProcessingEffect::Effect new_effect) {
-  if (new_effect != ProcessingEffect::Effect::None) {
+Effect updateProcessingEffect(Effect current_effect, Effect new_effect) {
+  if (new_effect != Effect::None) {
     // Do nothing. Default value is None and we want to log the most recent effect that is not none.
     return new_effect;
   }
@@ -381,8 +382,7 @@ ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current
 
 void ExtProcLoggingInfo::recordProcessingEffect(
     ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction,
-    ProcessingEffect::Effect processing_effect) {
+    envoy::config::core::v3::TrafficDirection traffic_direction, Effect processing_effect) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
   switch (callback_state) {
   case ProcessorState::CallbackState::HeadersCallback:
@@ -475,6 +475,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
   (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
+  (*struct_msg->mutable_fields())[ReceivedImmediateResponseField].set_bool_value(
+      received_immediate_response_);
   (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
       static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
@@ -614,6 +616,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == FailedOpenField) {
     return failed_open_;
+  }
+  if (field_name == ReceivedImmediateResponseField) {
+    return received_immediate_response_;
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
@@ -1864,6 +1869,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = handleStreamingImmediateResponse(response->streamed_immediate_response());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
+    logging_info_->setReceivedImmediateResponse();
     if (config_->disableImmediateResponse()) {
       ENVOY_STREAM_LOG(debug, "Filter has disable_immediate_response configured. ",
                        *decoder_callbacks_,
@@ -2071,7 +2077,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      ProcessingEffect::Effect imm_resp_effect = ProcessingEffect::Effect::None;
+      Effect imm_resp_effect = Effect::None;
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
           stats_.rejected_header_mutations_, imm_resp_effect);

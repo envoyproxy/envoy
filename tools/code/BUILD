@@ -10,6 +10,20 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+CODE_CHECKS = [
+    "changelog",
+    "extensions_fuzzed",
+    "extensions_metadata",
+    "extensions_owners",
+    "extensions_registered",
+    "glint",
+    "gofmt",
+    "python_flake8",
+    "runtime_guards",
+    "shellcheck",
+    "yamllint",
+]
+
 FUZZ_FILTER_COUNT = (
     len(READFILTER_FUZZ_FILTERS) +
     len(READFILTER_NOFUZZ_FILTERS)
@@ -34,6 +48,7 @@ py_console_script_binary(
         "--extensions_build_config=$(location :extensions_build_config)",
         "--extensions_fuzzed_count=%s" % FUZZ_FILTER_COUNT,
         "--path=%s" % PATH,
+        "-c %s" % " ".join(CODE_CHECKS),
         "-b shellcheck:$(location @shellcheck)",
         "-b gofmt:$(location @go_sdk//:bin/gofmt)",
         "-x bazel/repo.bzl",
@@ -64,12 +79,14 @@ genrule(
         --extensions_build_config=$(location :extensions_build_config) \
         --extensions_fuzzed_count=%s \
         --path=%s \
+        -c %s \
         -b shellcheck:$(location @shellcheck) \
         -b gofmt:$(location @go_sdk//:bin/gofmt) \
       > $@ 2>&1 || :
     """ % (
         FUZZ_FILTER_COUNT,
         PATH,
+        " ".join(CODE_CHECKS),
     ),
     tags = ["no-remote-exec"],
     tools = [

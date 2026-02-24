@@ -17,7 +17,9 @@ Common messages
   ../extensions/matching/common_inputs/stats/v3/stats.proto
   ../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto
   ../config/core/v3/config_source.proto
+  ../extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto
   ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
+  ../extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
   ../config/core/v3/extension.proto
