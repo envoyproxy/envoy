@@ -48,6 +48,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 // implemented, and tested.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
+RUNTIME_GUARD(envoy_reloadable_features_enable_overload_manager_close_idle_http_connections);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
@@ -106,7 +107,6 @@ RUNTIME_GUARD(envoy_reloadable_features_wasm_use_effective_ctx_for_foreign_funct
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_enable_overload_manager_close_idle_http_connections);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
