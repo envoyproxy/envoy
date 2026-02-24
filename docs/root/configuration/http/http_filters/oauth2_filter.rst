@@ -275,5 +275,5 @@ The OAuth2 filter outputs statistics in the ``<stat_prefix>.`` namespace.
   oauth_passthrough, Counter, Total request that matched a passthrough header.
   oauth_success, Counter, Total requests that were allowed.
   oauth_unauthorization_rq, Counter, Total unauthorized requests.
-  oauth_refreshtoken_success, Counter, Total successfull requests for update access token using by refresh token
+  oauth_refreshtoken_success, Counter, Total successful requests for update access token using by refresh token
   oauth_refreshtoken_failure, Counter, Total failed requests for update access token using by refresh token

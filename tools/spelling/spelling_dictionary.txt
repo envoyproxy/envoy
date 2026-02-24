@@ -227,7 +227,7 @@ dnsresolvers
 eb
 endpos
 eps
-fo
+of
 gb
 ghi
 golang
@@ -393,7 +393,7 @@ OS
 OSI
 OSS
 OSX
-OT
+to
 OTLP
 OU
 OVFL

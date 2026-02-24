@@ -86,7 +86,7 @@ internally within the service, that may be useful when examining the end-to-end 
 Alternatively the trace context can be manually propagated by the service:
 
 * When using the LightStep tracer, Envoy relies on the service to propagate the
-  :ref:`config_http_conn_man_headers_x-ot-span-context` HTTP header
+  :ref:`config_http_conn_man_headers_x-to-span-context` HTTP header
   while sending HTTP requests to other services.
 
 * When using the Zipkin tracer, Envoy relies on the service to propagate the

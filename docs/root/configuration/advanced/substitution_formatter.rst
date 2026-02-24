@@ -921,7 +921,7 @@ Current supported substitution commands include:
     * ``%DYNAMIC_METADATA(com.unknown_filter)%`` will log: ``-``
     * ``%DYNAMIC_METADATA(com.test.my_filter:unknown_key)%`` will log: ``-``
     * ``%DYNAMIC_METADATA(com.test.my_filter:test_object):2%`` will log (no truncation for struct): ``{"inner_key": "bar"}``
-    * ``%DYNAMIC_METADATA(com.test.my_filter:test_key):2%`` will log (truncation at 2 characters): ``fo``
+    * ``%DYNAMIC_METADATA(com.test.my_filter:test_key):2%`` will log (truncation at 2 characters): ``of``
 
   TCP
     Not implemented. It will appear as ``"-"`` in the access logs.

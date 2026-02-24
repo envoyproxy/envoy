@@ -195,8 +195,8 @@ changes:
     subsequently invoked services.
 - area: tracing
   change: |
-    when using the Zipkin tracer, it is no longer necessary to propagate the :ref:`x-ot-span-context
-    <config_http_conn_man_headers_x-ot-span-context>` header. See more on trace context propagation :ref:`here
+    when using the Zipkin tracer, it is no longer necessary to propagate the :ref:`x-to-span-context
+    <config_http_conn_man_headers_x-to-span-context>` header. See more on trace context propagation :ref:`here
     <arch_overview_tracing>`.
 - area: transport sockets
   change: |

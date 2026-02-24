@@ -218,7 +218,7 @@ bug_fixes:
 - area: oauth2
   change: |
     Fixed a bug in the OAuth2 filter that caused multiple concurrent login flows to interfere with each other. This could
-    lead to incorrect behavior when multiple requests initiated seperate OAuth2 logins at the same time.
+    lead to incorrect behavior when multiple requests initiated separate OAuth2 logins at the same time.
 - area: dynamic modules
   change: |
     Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.

@@ -556,16 +556,16 @@ following features are available:
 See the architecture overview on
 :ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
 
-.. _config_http_conn_man_headers_x-ot-span-context:
+.. _config_http_conn_man_headers_x-to-span-context:
 
-x-ot-span-context
+x-to-span-context
 -----------------
 
-The ``x-ot-span-context`` HTTP header is used by Envoy to establish proper parent-child relationships
+The ``x-to-span-context`` HTTP header is used by Envoy to establish proper parent-child relationships
 between tracing spans when used with the LightStep tracer.
 For example, an egress span is a child of an ingress
-span (if the ingress span was present). Envoy injects the ``x-ot-span-context`` header on ingress requests and
-forwards it to the local service. Envoy relies on the application to propagate ``x-ot-span-context`` on
+span (if the ingress span was present). Envoy injects the ``x-to-span-context`` header on ingress requests and
+forwards it to the local service. Envoy relies on the application to propagate ``x-to-span-context`` on
 the egress call to an upstream. See more on tracing :ref:`here <arch_overview_tracing>`.
 
 .. _config_http_conn_man_headers_x-b3-traceid:

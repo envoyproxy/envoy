@@ -306,7 +306,7 @@ deprecated:
       envoy.stat_sinks.dog_statsd, envoy.dog_statsd
       envoy.stat_sinks.metrics_service, envoy.metrics_service
       envoy.stat_sinks.statsd, envoy.statsd
-      envoy.tracers.dynamic_ot, envoy.dynamic.ot
+      envoy.tracers.dynamic_ot, envoy.dynamic.to
       envoy.tracers.lightstep, envoy.lightstep
       envoy.tracers.zipkin, envoy.zipkin
 
