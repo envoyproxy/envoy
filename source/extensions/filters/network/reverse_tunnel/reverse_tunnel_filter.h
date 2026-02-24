@@ -44,17 +44,20 @@ public:
 
   // Returns true if validation is configured.
   bool hasValidation() const {
-    return node_id_formatter_ != nullptr || cluster_id_formatter_ != nullptr;
+    return node_id_formatter_ != nullptr || cluster_id_formatter_ != nullptr ||
+           tenant_id_formatter_ != nullptr;
   }
 
-  // Validates the extracted node_id and cluster_id against expected values.
+  // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
   // Returns true if validation passes or no validation is configured.
   bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
+                           absl::string_view tenant_id,
                            const StreamInfo::StreamInfo& stream_info) const;
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
-                              bool validation_passed, StreamInfo::StreamInfo& stream_info) const;
+                              absl::string_view tenant_id, bool validation_passed,
+                              StreamInfo::StreamInfo& stream_info) const;
 
   // Returns the required cluster name for validation.
   const std::string& requiredClusterName() const { return required_cluster_name_; }
@@ -63,7 +66,8 @@ private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Formatter::FormatterConstSharedPtr node_id_formatter,
-      Formatter::FormatterConstSharedPtr cluster_id_formatter);
+      Formatter::FormatterConstSharedPtr cluster_id_formatter,
+      Formatter::FormatterConstSharedPtr tenant_id_formatter);
 
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
@@ -73,6 +77,7 @@ private:
   // Validation configuration.
   Formatter::FormatterConstSharedPtr node_id_formatter_;
   Formatter::FormatterConstSharedPtr cluster_id_formatter_;
+  Formatter::FormatterConstSharedPtr tenant_id_formatter_;
   const bool emit_dynamic_metadata_{false};
   const std::string dynamic_metadata_namespace_;
 
