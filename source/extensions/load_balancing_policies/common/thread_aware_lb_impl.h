@@ -181,6 +181,7 @@ private:
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   const bool locality_weighted_balancing_{};
   Common::CallbackHandlePtr priority_update_cb_;
+  Common::CallbackHandlePtr member_update_cb_;
 };
 
 class TypedHashLbConfigBase : public LoadBalancerConfig {
