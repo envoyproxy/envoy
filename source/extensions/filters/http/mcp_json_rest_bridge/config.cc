@@ -22,19 +22,6 @@ Http::FilterFactoryCb McpJsonRestBridgeFilterConfigFactory::createFilterFactoryF
   };
 }
 
-Http::FilterFactoryCb
-McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
-    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext&) {
-
-  auto config = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
-
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<McpJsonRestBridgeFilter>(config));
-  };
-}
-
 // TODO(guoyilin): Read route-specific config (perFilterConfig/mostSpecificPerFilterConfig) in the
 // filter.
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

@@ -86,12 +86,10 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   if (request_headers.getMethodValue() != "POST") {
     ENVOY_LOG(warn, "Only POST method is supported for MCP. Received: {}",
               request_headers.getMethodValue());
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::MethodNotAllowed, "Method Not Allowed",
-        [](Http::ResponseHeaderMap& headers) {
-          headers.addCopy(Http::LowerCaseString("allow"), "POST");
-        },
-        Grpc::Status::WellKnownGrpcStatus::InvalidArgument, "mcp_json_rest_bridge_filter_not_post");
+    // TODO(guoyilin42): Consider adding an Allow header when doing error handling.
+    decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed, "Method Not Allowed", nullptr,
+                                       Grpc::Status::WellKnownGrpcStatus::InvalidArgument,
+                                       "mcp_json_rest_bridge_filter_not_post");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
