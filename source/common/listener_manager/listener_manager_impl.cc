@@ -854,18 +854,18 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
     removeListenerInternal(listener.name(), true);
     return;
   }
-  const auto worker_pending_init =
-    std::make_shared<std::atomic<uint64_t>>(workers_.size());
+  const auto worker_pending_init = std::make_shared<std::atomic<uint64_t>>(workers_.size());
+  const std::string listener_name = listener.name();
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, absl::nullopt, listener, [name = listener.name(), worker_pending_init]() {
-                            if (--(*worker_pending_init) == 0) {
-                              ENVOY_EVENT_TO_LOGGER(GET_XDS_EVENT_LOGGER(), debug, "listener_warmed", name);
-                            }
-                          });
+    addListenerToWorker(*worker, absl::nullopt, listener, [worker_pending_init, listener_name]() {
+      if (--(*worker_pending_init) == 0) {
+        ENVOY_EVENT_TO_LOGGER(GET_XDS_EVENT_LOGGER(), info, "listener_warmed", "{}", listener_name);
+      }
+    });
   }
 
-  auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
-  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+  auto existing_active_listener = getListenerByName(active_listeners_, listener_name);
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener_name);
 
   (*existing_warming_listener)->debugLog("warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {

@@ -421,6 +421,7 @@ private:
   std::unique_ptr<Server::GuardDog> worker_guard_dog_;
   bool terminated_{false};
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
+  std::unique_ptr<Logger::EventPipeDelegate> event_logger_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;

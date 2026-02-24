@@ -542,7 +542,7 @@ public:
 #define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
-#define GET_XDS_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::xds_event)
+#define GET_XDS_EVENT_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::xds_event)
 
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 

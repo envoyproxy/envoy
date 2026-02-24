@@ -100,6 +100,8 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
           listener_manager_.addOrUpdateListener(listener, resource.get().version(), true);
       if (!update_or_error.status().ok()) {
         onError(std::string(update_or_error.status().message()));
+        ENVOY_EVENT_TO_LOGGER(GET_XDS_EVENT_LOGGER(), info, "listener_rejected", "{}",
+                              listener_name);
         continue;
       }
       if (update_or_error.value()) {

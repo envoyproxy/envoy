@@ -117,6 +117,7 @@ InstanceBase::~InstanceBase() {
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
+  event_logger_.reset();
   file_logger_.reset();
 
   // Destruct the ListenerManager explicitly, before InstanceBase's local init_manager_ is
@@ -486,6 +487,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
     RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+    if (const auto event_log_path = bootstrap_.application_log_config().event_log().pipe_path();
+        !event_log_path.empty()) {
+      auto logger_or_error = Logger::EventPipeDelegate::create(*api_, event_log_path, stats_store_,
+                                                               Logger::Registry::getSink());
+      RETURN_IF_NOT_OK_REF(logger_or_error.status());
+      event_logger_ = *std::move(logger_or_error);
+    }
   }
 
 #ifdef ENVOY_PERFETTO

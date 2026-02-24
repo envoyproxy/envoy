@@ -299,6 +299,9 @@ envoy_cc_library(
         ":macros",
         ":minimal_logger_lib",
         "//envoy/access_log:access_log_interface",
+        "//envoy/api:api_interface",
+        "//envoy/filesystem:filesystem_interface",
+        "//envoy/stats:stats_macros",
     ],
 )
 

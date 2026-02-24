@@ -55,10 +55,11 @@ Envoy can also emit events with stable names. Unlike the regular application or 
 buffered and should be consumed immediately, and they can be used as a form of inter-process communication with a
 managing agent or an xDS server. To enable this feature, please set the field :ref:`json_format
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event_log>`. These are well-known structured
-events:
+event types:
 
 .. csv-table::
    :header: Component, Event, Body, Description
    :widths: 1, 1, 1, 2
 
-   xds_event, listener_warmed, ``linstener_name``, Listener is warmed on all workers, as a result of a listener update
+   xds_event, listener_warmed, ``listener_name``, New listener is warmed on all workers, as a result of a listener LDS update.
+   xds_event, listener_rejected, ``listener_name``, Listener is rejected during an LDS update.
