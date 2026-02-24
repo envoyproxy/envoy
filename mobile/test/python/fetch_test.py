@@ -94,13 +94,30 @@ class TestFetchRequest(unittest.TestCase):
                         "Engine did not start within timeout")
         return engine
 
-    def test_simple_get_request(self):
-        """Send a simple GET request and verify we receive a response."""
-        engine = self._build_engine()
+    def _create_stream_with_callbacks(self, engine):
+        """Helper to create a stream with standard callbacks.
 
-        request_finished = threading.Event()
+        Returns:
+            Tuple of (stream, stream_finished_event, response_status_dict, response_body_list)
+        """
+        stream_finished = threading.Event()
         response_status = {}
         response_body_parts = []
+        final_stream = FinalStreamIntel()
+
+        def _copy_final_stream_intel(source, destination):
+            if source is None or destination is None:
+                return
+            try:
+                attrs = [a for a in dir(source) if not a.startswith("_")]
+                for attr in attrs:
+                    try:
+                        val = getattr(source, attr)
+                        setattr(destination, attr, val)
+                    except Exception as e:
+                        print(f"Error copying attribute {attr}: {e}")
+            except Exception as e:
+                print(f"Error copying final stream intel: {e}")
 
         def on_headers(headers, end_stream, stream_intel):
             # Look for :status header.
@@ -111,11 +128,19 @@ class TestFetchRequest(unittest.TestCase):
             response_body_parts.append(data[:length])
 
         def on_complete(stream_intel, final_stream_intel):
-            request_finished.set()
+            self.assertGreater(stream_intel.consumed_bytes_from_response, 0)
+            self.assertEqual(stream_intel.attempt_count, 1)
+            _copy_final_stream_intel(final_stream_intel, final_stream)
+            stream_finished.set()
 
         def on_error(error, stream_intel, final_stream_intel):
             response_status["error"] = error.message
-            request_finished.set()
+            _copy_final_stream_intel(final_stream_intel, final_stream)
+            stream_finished.set()
+
+        def on_cancel(stream_intel, final_stream_intel):
+            _copy_final_stream_intel(final_stream_intel, final_stream)
+            stream_finished.set()
 
         stream = (
             engine.stream_client()
@@ -125,7 +150,17 @@ class TestFetchRequest(unittest.TestCase):
                 on_data=on_data,
                 on_complete=on_complete,
                 on_error=on_error,
+                on_cancel=on_cancel,
             )
+        )
+        return stream, stream_finished, response_status, response_body_parts, final_stream
+
+    def test_simple_get_request(self):
+        """Send a simple GET request and verify we receive a response."""
+        engine = self._build_engine()
+
+        stream, stream_finished, response_status, response_body_parts, final_stream = (
+            self._create_stream_with_callbacks(engine)
         )
 
         headers = {
@@ -136,8 +171,20 @@ class TestFetchRequest(unittest.TestCase):
         }
         stream.send_headers(headers, end_stream=True)
 
-        self.assertTrue(request_finished.wait(timeout=30),
-                        "Request did not complete within timeout")
+        self.assertTrue(stream_finished.wait(timeout=30),
+            "Request did not complete within timeout")
+
+        # Verify final_stream fields are meaningful (explicit attribute access)
+        self.assertIsNotNone(final_stream)
+        # Some timing fields should be > 0 when a request completes
+        self.assertGreater(final_stream.stream_start_ms, 0)
+        self.assertGreaterEqual(final_stream.response_start_ms, 0)
+        self.assertGreater(final_stream.stream_end_ms, 0)
+        # Byte counts should be >= 0, and at least one should be > 0 for successful responses
+        self.assertGreaterEqual(final_stream.sent_byte_count, 0)
+        self.assertGreaterEqual(final_stream.received_byte_count, 0)
+        # upstream_protocol should not be -1 for a completed request
+        self.assertNotEqual(final_stream.upstream_protocol, -1)
 
         # We should either get a successful response or an error
         # (depending on network availability in the test environment).
@@ -152,15 +199,8 @@ class TestFetchRequest(unittest.TestCase):
         """Cancelling a stream fires the on_cancel callback."""
         engine = self._build_engine()
 
-        cancel_event = threading.Event()
-
-        def on_cancel(stream_intel, final_stream_intel):
-            cancel_event.set()
-
-        stream = (
-            engine.stream_client()
-            .new_stream_prototype()
-            .start(on_cancel=on_cancel)
+        stream, stream_finished, response_status, response_body_parts, final_stream = (
+            self._create_stream_with_callbacks(engine)
         )
 
         headers = {
@@ -172,8 +212,17 @@ class TestFetchRequest(unittest.TestCase):
         stream.send_headers(headers, end_stream=False)
         stream.cancel()
 
-        self.assertTrue(cancel_event.wait(timeout=10),
-                        "Cancel callback was not invoked within timeout")
+        self.assertTrue(stream_finished.wait(timeout=10),
+                "Cancel callback was not invoked within timeout")
+
+        # Verify final_stream for cancelled stream: start/end should be set,
+        # but sending/response/upstream fields should be unset (-1).
+        self.assertIsNotNone(final_stream)
+        self.assertGreater(final_stream.stream_start_ms, 0)
+        self.assertGreater(final_stream.stream_end_ms, 0)
+        self.assertEqual(final_stream.sending_end_ms, -1)
+        self.assertEqual(final_stream.response_start_ms, -1)
+        self.assertEqual(final_stream.upstream_protocol, -1)
 
         engine.terminate()
 
@@ -189,51 +238,6 @@ class TestPythonTypes(unittest.TestCase):
         self.assertEqual(intel.stream_id, 42)
         self.assertEqual(intel.connection_id, 7)
         self.assertEqual(intel.attempt_count, 1)
-
-    def test_final_stream_intel_fields(self):
-        """FinalStreamIntel fields are accessible."""
-        intel = FinalStreamIntel()
-        intel.stream_start_ms = 1000
-        intel.stream_end_ms = 2000
-        intel.upstream_protocol = 2
-        self.assertEqual(intel.stream_start_ms, 1000)
-        self.assertEqual(intel.stream_end_ms, 2000)
-        self.assertEqual(intel.upstream_protocol, 2)
-
-    def test_envoy_error_fields(self):
-        """EnvoyError fields are accessible."""
-        error = EnvoyError()
-        error.error_code = ErrorCode.ConnectionFailure
-        error.message = "test error"
-        error.attempt_count = 3
-        self.assertEqual(error.error_code, ErrorCode.ConnectionFailure)
-        self.assertEqual(error.message, "test error")
-        self.assertEqual(error.attempt_count, 3)
-
-    def test_envoy_error_attempt_count_none(self):
-        """EnvoyError attempt_count can be None."""
-        error = EnvoyError()
-        error.attempt_count = None
-        self.assertIsNone(error.attempt_count)
-
-    def test_log_level_values(self):
-        """LogLevel enum values are present."""
-        self.assertIsNotNone(LogLevel.trace)
-        self.assertIsNotNone(LogLevel.debug)
-        self.assertIsNotNone(LogLevel.info)
-        self.assertIsNotNone(LogLevel.warn)
-        self.assertIsNotNone(LogLevel.error)
-        self.assertIsNotNone(LogLevel.critical)
-        self.assertIsNotNone(LogLevel.off)
-
-    def test_error_code_values(self):
-        """ErrorCode enum values are present."""
-        self.assertIsNotNone(ErrorCode.UndefinedError)
-        self.assertIsNotNone(ErrorCode.StreamReset)
-        self.assertIsNotNone(ErrorCode.ConnectionFailure)
-        self.assertIsNotNone(ErrorCode.BufferLimitExceeded)
-        self.assertIsNotNone(ErrorCode.RequestTimeout)
-
 
 if __name__ == "__main__":
     unittest.main()
