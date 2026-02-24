@@ -41,15 +41,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "abi_impl_test",
-    srcs = ["abi_impl_test.cc"],
-    deps = [
-        "//source/extensions/dynamic_modules:abi_impl",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "util",
     srcs = ["util.cc"],
