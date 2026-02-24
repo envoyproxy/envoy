@@ -1822,55 +1822,6 @@ TEST_F(McpFilterTest, TraceStateHeadersClearedEvenIfMissingInMeta) {
   EXPECT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
 }
 
-TEST_F(McpFilterTest, TraceStateHeaderNotClearedWhenConfigured) {
-  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.mutable_propagate_trace_context()
-      ->mutable_clear_trace_ctx_headers_on_valid_meta_traceparent()
-      ->set_value(false);
-  proto_config.mutable_propagate_baggage();
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
-  filter_ = std::make_unique<McpFilter>(config_);
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"},
-                                         {"accept", "application/json, text/event-stream"},
-                                         {"traceparent", "original-traceparent"},
-                                         {"tracestate", "original-tracestate"},
-                                         {"baggage", "original-baggage"}};
-  ON_CALL(decoder_callbacks_, requestHeaders())
-      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
-  filter_->decodeHeaders(headers, false);
-
-  // Invalid traceparent in meta
-  std::string json = R"({
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "id": 1,
-    "params": {
-      "name": "test",
-      "_meta": {
-        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
-      }
-    }
-  })";
-  Buffer::OwnedImpl buffer(json);
-
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
-
-  // Override traceparent since it was present and valid.
-  ASSERT_FALSE(headers.get(Http::LowerCaseString("traceparent")).empty());
-  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
-            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
-  // Tracestate and baggage should be unchanged.
-  ASSERT_FALSE(headers.get(Http::LowerCaseString("tracestate")).empty());
-  EXPECT_EQ("original-tracestate",
-            headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
-  ASSERT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
-  EXPECT_EQ("original-baggage",
-            headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
-}
-
 TEST_F(McpFilterTest, TracingHeadersNotClearedWhenTraceParentInvalid) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.mutable_propagate_trace_context();

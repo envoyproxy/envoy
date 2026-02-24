@@ -60,7 +60,6 @@ const Http::LowerCaseString& baggageHeader() {
 
 void injectTraceContext(
     const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-    const envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig& config,
     Http::RequestHeaderMap& headers) {
   const auto& tp_it = meta_fields.find("traceparent");
   if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
@@ -72,12 +71,8 @@ void injectTraceContext(
     return;
   }
 
-  // Clear traceparent and tracestate if configured. Default is true if not set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, clear_trace_ctx_headers_on_valid_meta_traceparent,
-                                      true)) {
-    headers.remove(traceparentHeader());
-    headers.remove(tracestateHeader());
-  }
+  headers.remove(traceparentHeader());
+  headers.remove(tracestateHeader());
 
   headers.setCopy(traceparentHeader(), tp);
 
@@ -373,7 +368,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
       if (config_->propagateTraceContext().has_value()) {
-        injectTraceContext(meta_fields, *config_->propagateTraceContext(), *headers);
+        injectTraceContext(meta_fields, *headers);
       }
       if (config_->propagateBaggage().has_value()) {
         injectBaggage(meta_fields, *headers);
