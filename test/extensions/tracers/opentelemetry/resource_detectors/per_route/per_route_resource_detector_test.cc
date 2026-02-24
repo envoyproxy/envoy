@@ -48,6 +48,11 @@ TEST(PerRouteResourceDetectorTest, ValidTypedMetadata) {
   EXPECT_EQ(detector.detect(mock_stream_info)->schema_url_, "schema_url");
 }
 
+TEST(PerRouteResourceDetectorTest, InvalidStructInput) {
+  ResourceTypedRouteMetadataFactory factory;
+  EXPECT_THROW(factory.parse(Protobuf::Struct()), EnvoyException);
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace Tracers
