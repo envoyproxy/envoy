@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -379,6 +381,27 @@ public:
   virtual absl::optional<double> getMetadataNumber(absl::string_view ns, absl::string_view key) = 0;
 
   /**
+   * Retrieves a bool metadata value by namespace and key.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @return The bool value if found, otherwise nullopt.
+   */
+  virtual absl::optional<bool> getMetadataBool(absl::string_view ns, absl::string_view key) = 0;
+
+  /**
+   * Retrieves all keys in a metadata namespace.
+   * @param ns The metadata namespace.
+   * @return Vector of key strings.
+   */
+  virtual std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) = 0;
+
+  /**
+   * Retrieves all namespace names in the metadata.
+   * @return Vector of namespace name strings.
+   */
+  virtual std::vector<absl::string_view> getMetadataNamespaces() = 0;
+
+  /**
    * Sets a string metadata value.
    * @param ns The metadata namespace.
    * @param key The metadata key.
@@ -394,6 +417,19 @@ public:
    * @param value The numeric value to set.
    */
   virtual void setMetadata(absl::string_view ns, absl::string_view key, double value) = 0;
+
+  /**
+   * Sets a bool metadata value.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The bool value to set.
+   */
+  virtual void setMetadata(absl::string_view ns, absl::string_view key, bool value) = 0;
+
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  void setMetadata(absl::string_view ns, absl::string_view key, const char* value) {
+    setMetadata(ns, key, absl::string_view(value));
+  }
 
   /**
    * Retrieves the serialized filter state value of the stream.
@@ -422,6 +458,13 @@ public:
    * @return Pair of double and bool indicating if attribute was found.
    */
   virtual absl::optional<uint64_t> getAttributeNumber(AttributeID id) = 0;
+
+  /**
+   * Retrieves a boolean attribute value.
+   * @param id The attribute ID.
+   * @return The bool value if found, otherwise nullopt.
+   */
+  virtual absl::optional<bool> getAttributeBool(AttributeID id) = 0;
 
   /**
    * Sends a local response with status code, body, and detail.
