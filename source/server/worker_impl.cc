@@ -61,6 +61,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
       [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().ResetStreams, *dispatcher_,
+      [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_overload_"
                                      "manager_close_idle_http_connections")) {
     overload_manager.registerForAction(
