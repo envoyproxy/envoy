@@ -837,6 +837,8 @@ namespace Utility {
 
 /**
  * Reads the whole request body by combining the buffered body and the latest received body.
+ * This will copy all request body content into a module owned string.
+ *
  * This should only be called after we see the end of the request, which means the end_of_stream
  * flag is true in the onRequestBody callback or we are in the onRequestTrailers callback.
  * @param handle The HTTP filter handle.
@@ -846,6 +848,8 @@ std::string readWholeRequestBody(HttpFilterHandle& handle);
 
 /**
  * Reads the whole response body by combining the buffered body and the latest received body.
+ * This will copy all response body content into a module owned string.
+ *
  * This should only be called after we see the end of the response, which means the end_of_stream
  * flag is true in the onResponseBody callback or we are in the onResponseTrailers callback.
  * @param handle The HTTP filter handle.

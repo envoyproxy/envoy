@@ -56,6 +56,8 @@ func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
 
 // ReadWholeRequestBody reads the whole request body by combining the buffered body and the
 // latest received body.
+// This will copy all request body content into a module owned `[]byte`.
+//
 // This should only be called after we see the end of the request, which means the end_of_stream flag
 // is true in the OnRequestBody callback or we are in the OnRequestTrailers callback.
 func ReadWholeRequestBody(handle shared.HttpFilterHandle) []byte {
@@ -64,6 +66,8 @@ func ReadWholeRequestBody(handle shared.HttpFilterHandle) []byte {
 
 // ReadWholeResponseBody reads the whole response body by combining the buffered body and the
 // latest received body.
+// This will copy all response body content into a module owned `[]byte`.
+//
 // This should only be called after we see the end of the response, which means the end_of_stream flag
 // is true in the OnResponseBody callback or we are in the OnResponseTrailers callback.
 func ReadWholeResponseBody(handle shared.HttpFilterHandle) []byte {
