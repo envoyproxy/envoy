@@ -424,7 +424,7 @@ new_features:
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
 - area: mcp
   change: |
-    Added options ``extract_trace_context`` and ``extract_baggage`` for extracting traceparent & tracestate
+    Added options ``propagate_trace_context`` and ``propagate_baggage`` for extracting traceparent & tracestate
     and baggage from mcp params, respectively.
 - area: mcp_json_rest_bridge
   change: |
