@@ -1,5 +1,3 @@
-#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
-
 #include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "test/test_common/test_runtime.h"
@@ -45,14 +43,11 @@ private:
 };
 
 TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
-
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.set_max_heap_size_bytes(1000);
   auto stats_reader = std::make_unique<MockMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, reservedHeapBytes()).WillOnce(Return(800));
   EXPECT_CALL(*stats_reader, unmappedHeapBytes()).WillOnce(Return(100));
   EXPECT_CALL(*stats_reader, freeMappedHeapBytes()).WillOnce(Return(200));
-  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+  auto monitor = std::make_unique<FixedHeapMonitor>(1000, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -65,11 +60,9 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsageRuntimeUseAllocated) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.fixed_heap_use_allocated", "true"}});
 
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.set_max_heap_size_bytes(1000);
   auto stats_reader = std::make_unique<MockMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, allocatedHeapBytes()).WillOnce(Return(600));
-  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+  auto monitor = std::make_unique<FixedHeapMonitor>(1000, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -79,16 +72,13 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsageRuntimeUseAllocated) {
 }
 
 TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
-
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   const uint64_t max_heap = 1024 * 1024 * 1024;
-  config.set_max_heap_size_bytes(max_heap);
   auto stats_reader = std::make_unique<MemoryStatsReader>();
   const double expected_usage =
       (stats_reader->reservedHeapBytes() - stats_reader->unmappedHeapBytes() -
        stats_reader->freeMappedHeapBytes()) /
       static_cast<double>(max_heap);
-  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+  auto monitor = std::make_unique<FixedHeapMonitor>(max_heap, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -99,13 +89,11 @@ TEST(FixedHeapMonitorTest, ComputesUsageRuntimeUseAllocatedWithRealMemoryStats) 
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.fixed_heap_use_allocated", "true"}});
 
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   const uint64_t max_heap = 1024 * 1024 * 1024;
-  config.set_max_heap_size_bytes(max_heap);
   auto stats_reader = std::make_unique<MemoryStatsReader>();
   const double expected_pressure =
       stats_reader->allocatedHeapBytes() / static_cast<double>(max_heap);
-  auto monitor = std::make_unique<FixedHeapMonitor>(config, std::move(stats_reader));
+  auto monitor = std::make_unique<FixedHeapMonitor>(max_heap, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);

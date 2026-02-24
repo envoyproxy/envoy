@@ -27,8 +27,11 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":fixed_heap_monitor",
+        "//envoy/common:exception_lib",
         "//envoy/registry",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/config:datasource_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
