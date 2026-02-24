@@ -22,6 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Validation configuration for reverse tunnel identifiers.
 // Validates the node ID, cluster ID, and tenant ID extracted from reverse tunnel handshake headers
 // against expected values specified using format strings.
+// [#next-free-field: 6]
 message Validation {
   // Format string to extract the expected node identifier for validation.
   // The formatted value is compared against the ``x-envoy-reverse-tunnel-node-id`` header
