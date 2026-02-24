@@ -175,6 +175,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: logging
+  change: |
+    Added :ref:`application_log_format <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event
+    log>` to the application logging. This allows low-overhead low-latency communication with an agent managing Envoy.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
