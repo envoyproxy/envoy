@@ -214,12 +214,19 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
     return;
   }
 
-  Protobuf::Struct selected_endpoint_metadata;
-  (*selected_endpoint_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(
-      selected_endpoint);
+  Protobuf::Struct updated_metadata;
+
+  // Copy existing struct for the metadata key if it exists, to avoid removing paths.
+  const auto& existing_metadata = context->requestStreamInfo()->dynamicMetadata();
+  const auto existing_key = existing_metadata.filter_metadata().find(metadata_key.key_);
+  if (existing_key != existing_metadata.filter_metadata().end()) {
+    updated_metadata = existing_key->second;
+  }
+
+  (*updated_metadata.mutable_fields())[metadata_key.path_[0]].set_string_value(selected_endpoint);
 
   // Set the value of the metadata key to be the host:port
-  context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, selected_endpoint_metadata);
+  context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, updated_metadata);
 }
 
 absl::optional<absl::string_view>

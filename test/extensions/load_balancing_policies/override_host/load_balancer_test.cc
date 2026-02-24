@@ -804,6 +804,43 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHostsChosen
   EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
 }
 
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadateDoesNotOverwriteEnvoyLb) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(
+      makeDefaultConfigWithSelectedEndpointKey("x-gateway-destination-endpoint-served"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  // Set metadata under "envoy.lb" before choosing a host.
+  Protobuf::Struct new_metadata;
+  (*new_metadata.mutable_fields())["canary"].set_string_value("false");
+  load_balancer_context_.requestStreamInfo()->setDynamicMetadata("envoy.lb", new_metadata);
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+
+  // Expect that the pre-existing metadata under envoy.lb was not removed.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value =
+      ::Envoy::Config::Metadata::metadataValue(&metadata, "envoy.lb", "canary");
+  EXPECT_EQ(metadata_value.string_value(), "false");
+}
 } // namespace
 } // namespace OverrideHost
 } // namespace LoadBalancingPolicies
