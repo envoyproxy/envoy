@@ -705,7 +705,7 @@ TEST_F(InvalidMutationTest, InvalidRequestHeadersSet) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_EQ(actual->requestProcessingEffect(),
-          Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
 }
 
 TEST_F(InvalidMutationTest, InvalidRequestHeadersAppend) {
@@ -717,7 +717,7 @@ TEST_F(InvalidMutationTest, InvalidRequestHeadersAppend) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_EQ(actual->requestProcessingEffect(),
-          Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
 }
 
 TEST_F(InvalidMutationTest, InvalidRequestHeadersAdd) {
@@ -729,7 +729,7 @@ TEST_F(InvalidMutationTest, InvalidRequestHeadersAdd) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_EQ(actual->requestProcessingEffect(),
-          Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
 }
 
 TEST_F(InvalidMutationTest, InvalidRequestQueryParams) {
@@ -741,7 +741,7 @@ TEST_F(InvalidMutationTest, InvalidRequestQueryParams) {
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
   EXPECT_EQ(actual->requestProcessingEffect(),
-          Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
 }
 
 TEST_F(HttpFilterTest, MutationAppliedEffect) {
@@ -778,7 +778,8 @@ TEST_F(HttpFilterTest, MutationAppliedEffect) {
   auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
   ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
   auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-  EXPECT_EQ(actual->requestProcessingEffect(), Filters::Common::ProcessingEffect::Effect::MutationApplied);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::MutationApplied);
 }
 
 TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
