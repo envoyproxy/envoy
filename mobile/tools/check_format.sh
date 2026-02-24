@@ -76,6 +76,13 @@ else
   fi
 fi
 
+# Install Black if not present
+if ! command -v black &> /dev/null
+then
+    echo "black not found, installing..."
+    python -m pip install black
+fi
+
 PYTHON_DIRS=(
   "library/python"
   "test/python"
