@@ -642,6 +642,9 @@ public:
  *
  * By default these named logs are not handled, but a custom log sink may intercept them by
  * implementing the logWithStableName function.
+ *
+ * The event name should not contain special characters to ease log parsing. Recommended characters
+ * are [a-z_].
  */
 #define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
   ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, ##__VA_ARGS__)

@@ -514,14 +514,16 @@ TEST_F(FileSystemImplTest, StatOnFifoReturnsOtherFileType) {
     EXPECT_EQ(info_result.return_value_.name_, "test_envoy_fifo");
   }
 }
+#endif
 
+#ifndef WIN32
 TEST_F(FileSystemImplTest, OpenFifoNonBlockNoReader) {
   const std::string fifo_path = TestEnvironment::temporaryPath("fifo_no_reader");
   ::mkfifo(fifo_path.c_str(), 0666);
   FilePathAndType file_info{Filesystem::DestinationType::File, fifo_path};
   FilePtr file = file_system_.createFile(file_info);
 
-  // Opening a fifo fails with non-block without readers.
+  // Opening a FIFO fails with non-block without readers.
   const Api::IoCallBoolResult open_result = file->open(FlagSet{
       (1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::NonBlock)});
   EXPECT_FALSE(open_result.return_value_) << open_result.err_->getErrorDetails();
@@ -552,7 +554,6 @@ TEST_F(FileSystemImplTest, OpenFifoNonBlock) {
       << fmt::format("{}", result.err_->getErrorDetails());
   EXPECT_EQ(0, ::unlink(fifo_path.c_str()));
 }
-
 #endif
 
 #ifndef WIN32

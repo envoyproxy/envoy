@@ -117,17 +117,17 @@ message Bootstrap {
       }
     }
 
-    // Optional field to set the application logs format. If this field is set, it will override
-    // the default log format. Setting both this field and :option:`--log-format` command line
-    // option is not allowed, and will cause a bootstrap error.
-    LogFormat log_format = 1;
-
     message EventLog {
       // Path to a FIFO or a pipe file to receive the stable events. The file is
       // opened as a non-blocking, non-buffered stream. By default, events are written as
       // individual lines in the following format: ``[LEVEL] COMPONENT EVENT BODY\n``.
       string pipe_path = 1;
     }
+
+    // Optional field to set the application logs format. If this field is set, it will override
+    // the default log format. Setting both this field and :option:`--log-format` command line
+    // option is not allowed, and will cause a bootstrap error.
+    LogFormat log_format = 1;
 
     // Optional event log. Please see :ref:`event application logging <config_application_logging_events>`.
     EventLog event_log = 2;

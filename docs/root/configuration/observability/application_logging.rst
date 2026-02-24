@@ -51,14 +51,14 @@ except for the ``%v`` and ``%_`` flags, as they may break the JSON structure log
 Event logging
 -------------
 
-Envoy can also emit events with stable names. Unlike the regular application or access logs, these event logs are not
-buffered and should be consumed immediately, and they can be used as a form of inter-process communication with a
-managing agent or an xDS server. To enable this feature, please set the field :ref:`json_format
-<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event_log>`. These are well-known structured
-event types:
+Envoy can also emit events with *stable event names*. Unlike the regular application or access logs, these event logs
+are not buffered and should be consumed immediately, and they can be used as a form of inter-process communication with
+a managing agent or an xDS server. To enable this feature, please set the field :ref:`json_format
+<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event_log>`. Consult the following table for the
+well-known structured event types:
 
 .. csv-table::
-   :header: Component, Event, Body, Description
+   :header: Log component, Event name, Body, Description
    :widths: 1, 1, 1, 2
 
    xds_event, listener_warmed, ``listener_name``, New listener is warmed on all workers, as a result of a listener LDS update.
