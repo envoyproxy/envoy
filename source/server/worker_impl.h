@@ -74,6 +74,7 @@ private:
   void stopAcceptingConnectionsCb(OverloadActionState state);
   void rejectIncomingConnectionsCb(OverloadActionState state);
   void resetStreamsUsingExcessiveMemory(OverloadActionState state);
+  void closeIdleHttpConnectionsCb(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;
@@ -83,6 +84,7 @@ private:
   Stats::Counter& reset_streams_counter_;
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
+  Event::TimerPtr idle_connection_timer_;
 };
 
 } // namespace Server

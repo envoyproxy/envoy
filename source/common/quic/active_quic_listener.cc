@@ -1,8 +1,10 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <memory>
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
@@ -10,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/session_idle_list.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -39,7 +42,7 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-    bool reject_new_connections)
+    bool reject_new_connections, bool close_idle_connections_when_overloaded)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
@@ -91,12 +94,13 @@ ActiveQuicListener::ActiveQuicListener(
       listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
     }
   }
-  // TODO(panting): Pass in a non-null session_idle_list when configured.
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_, debug_visitor_factory, /*session_idle_list=*/nullptr);
+      *connection_id_generator_, debug_visitor_factory,
+      close_idle_connections_when_overloaded ? std::make_unique<Http::SessionIdleList>(dispatcher)
+                                             : nullptr);
 
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
@@ -272,6 +276,10 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
   quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
 }
 
+void ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
+  quic_dispatcher_->closeIdleQuicConnections(is_saturated);
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -280,7 +288,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
-      context_(context), reject_new_connections_(config.reject_new_connections()) {
+      context_(context), reject_new_connections_(config.reject_new_connections()),
+      close_idle_connections_when_overloaded_(config.close_idle_connections_when_overloaded()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -452,7 +461,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
-      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
+      close_idle_connections_when_overloaded_);
 }
 
 } // namespace Quic

@@ -1,5 +1,6 @@
 #include "source/server/worker_impl.h"
 
+#include <chrono>
 #include <functional>
 #include <memory>
 
@@ -10,11 +11,15 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
 namespace Server {
 namespace {
+
+constexpr std::chrono::milliseconds kCloseIdleHttpConnectionsInterval =
+    std::chrono::milliseconds(1000);
 
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher, uint32_t index,
                                               OverloadManager& overload_manager,
@@ -56,9 +61,12 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
       [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
-  overload_manager.registerForAction(
-      OverloadActionNames::get().ResetStreams, *dispatcher_,
-      [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_overload_"
+                                     "manager_close_idle_http_connections")) {
+    overload_manager.registerForAction(
+        OverloadActionNames::get().CloseIdleHttpConnections, *dispatcher_,
+        [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state); });
+  }
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -184,6 +192,36 @@ void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
   uint64_t streams_reset_count =
       dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
   reset_streams_counter_.add(streams_reset_count);
+}
+
+void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
+  if (state.value().value() == 0.0) {
+    if (idle_connection_timer_) {
+      idle_connection_timer_->disableTimer();
+    }
+    return;
+  }
+
+  const bool is_saturated = state.isSaturated();
+  if (!idle_connection_timer_) {
+    idle_connection_timer_ = dispatcher_->createTimer([this, is_saturated]() {
+      if (handler_) {
+        handler_->closeIdleHttpConnections(is_saturated);
+      }
+    });
+  } else {
+    idle_connection_timer_->disableTimer();
+    idle_connection_timer_ = dispatcher_->createTimer([this, is_saturated]() {
+      if (handler_) {
+        handler_->closeIdleHttpConnections(is_saturated);
+      }
+    });
+  }
+
+  if (!idle_connection_timer_->enabled()) {
+    std::chrono::milliseconds interval = kCloseIdleHttpConnectionsInterval;
+    idle_connection_timer_->enableTimer(interval);
+  }
 }
 
 } // namespace Server

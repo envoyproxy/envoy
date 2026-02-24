@@ -29,20 +29,18 @@ public:
   // TODO(bencebeky): Tune this value.
   static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
-                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
-                     Network::SocketSharedPtr&& listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     QuicStatNames& quic_stat_names,
-                     uint32_t packets_to_read_to_connection_count_ratio,
-                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-                     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-                     QuicConnectionIdGeneratorPtr&& cid_generator,
-                     QuicConnectionIdWorkerSelector worker_selector,
-                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-                     bool reject_new_connections = false);
+  ActiveQuicListener(
+      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
+      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
+      uint32_t packets_to_read_to_connection_count_ratio,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+      QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+      bool reject_new_connections = false, bool close_idle_connections_when_overloaded = false);
 
   ~ActiveQuicListener() override;
 
@@ -72,6 +70,8 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+
+  void onCloseIdleHttpConnections(bool is_saturated) override;
 
 protected:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
@@ -166,6 +166,7 @@ private:
   bool reject_new_connections_{};
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
+  bool close_idle_connections_when_overloaded_{false};
 };
 
 } // namespace Quic
