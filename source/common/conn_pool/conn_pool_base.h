@@ -74,7 +74,7 @@ public:
   // Closes the underlying connection.
   virtual void
   close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
-        absl::string_view details = "") = 0;
+        absl::string_view details = "") PURE;
   // Returns the ID of the underlying connection.
   virtual uint64_t id() const PURE;
   // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.

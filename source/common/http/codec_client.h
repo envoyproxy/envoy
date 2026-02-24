@@ -82,7 +82,7 @@ public:
    * pending write data.
    */
   void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush,
-             absl::string_view local_close_reason = absl::string_view());
+             absl::string_view details = "");
 
   /**
    * Send a codec level go away indication to the peer.
