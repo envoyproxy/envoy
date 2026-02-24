@@ -2398,14 +2398,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
-      vec![
-        abi::envoy_dynamic_module_type_envoy_buffer {
-          ptr: std::ptr::null(),
-          length: 0,
-        };
-        count
-      ];
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_keys(
         self.raw_ptr,
@@ -2436,14 +2435,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     if count == 0 {
       return None;
     }
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
-      vec![
-        abi::envoy_dynamic_module_type_envoy_buffer {
-          ptr: std::ptr::null(),
-          length: 0,
-        };
-        count
-      ];
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
         self.raw_ptr,

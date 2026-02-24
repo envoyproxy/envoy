@@ -240,8 +240,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(worker_index, 0);
 
     // ConnectionMtls is a bool attribute; without TLS it should return None.
-    let mtls = envoy_filter
-      .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+    let mtls =
+      envoy_filter.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
     assert!(mtls.is_none());
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -665,12 +665,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     assert!(no_keys.is_none());
 
     // Test get_metadata_namespaces.
-    let namespaces = envoy_filter.get_metadata_namespaces(
-      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-    );
+    let namespaces =
+      envoy_filter.get_metadata_namespaces(abi::envoy_dynamic_module_type_metadata_source::Dynamic);
     assert!(namespaces.is_some());
     let namespaces = namespaces.unwrap();
-    assert!(namespaces.len() > 0);
+    assert!(!namespaces.is_empty());
     let ns_strs: Vec<&str> = namespaces
       .iter()
       .map(|ns| std::str::from_utf8(ns.as_slice()).unwrap())
