@@ -56,8 +56,10 @@ def main():
         status = {"value": 0}  # 0 = success
 
         def on_headers(headers, end_stream, stream_intel):
-            print(f"Received headers on connection: {stream_intel.connection_id}",
-                  file=sys.stderr)
+            print(
+                f"Received headers on connection: {stream_intel.connection_id}",
+                file=sys.stderr,
+            )
             for key, values in headers.items():
                 for val in values:
                     print(f"  {key}: {val}", file=sys.stderr)
@@ -75,8 +77,10 @@ def main():
         def on_error(error, stream_intel, final_stream_intel):
             status["value"] = 1
             duration = final_stream_intel.stream_end_ms - final_stream_intel.stream_start_ms
-            print(f"Request failed after {duration}ms with error: {error.message}",
-                  file=sys.stderr)
+            print(
+                f"Request failed after {duration}ms with error: {error.message}",
+                file=sys.stderr,
+            )
             request_finished.set()
 
         def on_cancel(stream_intel, final_stream_intel):

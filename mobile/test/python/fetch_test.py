@@ -25,8 +25,7 @@ class TestEngineLifecycle(unittest.TestCase):
             .set_on_engine_running(lambda: engine_running.set())
             .build()
         )
-        self.assertTrue(engine_running.wait(timeout=30),
-                        "Engine did not start within timeout")
+        self.assertTrue(engine_running.wait(timeout=30), "Engine did not start within timeout")
         result = engine.terminate()
         self.assertEqual(result, 0)  # ENVOY_SUCCESS
 
@@ -35,8 +34,7 @@ class TestEngineLifecycle(unittest.TestCase):
         engine_running = threading.Event()
         builder = EngineBuilder()
         result = (
-            builder
-            .set_log_level(LogLevel.warn)
+            builder.set_log_level(LogLevel.warn)
             .add_connect_timeout_seconds(30)
             .add_dns_refresh_seconds(120)
             .add_dns_failure_refresh_seconds(2, 10)
@@ -77,6 +75,7 @@ class TestEngineLifecycle(unittest.TestCase):
         self.assertIsInstance(stats, str)
         engine.terminate()
 
+
 class TestFetchRequest(unittest.TestCase):
     """Tests for making HTTP requests through Envoy Mobile."""
 
@@ -90,8 +89,7 @@ class TestFetchRequest(unittest.TestCase):
             .set_on_engine_running(lambda: engine_running.set())
             .build()
         )
-        self.assertTrue(engine_running.wait(timeout=30),
-                        "Engine did not start within timeout")
+        self.assertTrue(engine_running.wait(timeout=30), "Engine did not start within timeout")
         return engine
 
     def _create_stream_with_callbacks(self, engine):
@@ -153,15 +151,25 @@ class TestFetchRequest(unittest.TestCase):
                 on_cancel=on_cancel,
             )
         )
-        return stream, stream_finished, response_status, response_body_parts, final_stream
+        return (
+            stream,
+            stream_finished,
+            response_status,
+            response_body_parts,
+            final_stream,
+        )
 
     def test_simple_get_request(self):
         """Send a simple GET request and verify we receive a response."""
         engine = self._build_engine()
 
-        stream, stream_finished, response_status, response_body_parts, final_stream = (
-            self._create_stream_with_callbacks(engine)
-        )
+        (
+            stream,
+            stream_finished,
+            response_status,
+            response_body_parts,
+            final_stream,
+        ) = self._create_stream_with_callbacks(engine)
 
         headers = {
             ":method": "GET",
@@ -171,8 +179,7 @@ class TestFetchRequest(unittest.TestCase):
         }
         stream.send_headers(headers, end_stream=True)
 
-        self.assertTrue(stream_finished.wait(timeout=30),
-            "Request did not complete within timeout")
+        self.assertTrue(stream_finished.wait(timeout=30), "Request did not complete within timeout")
 
         # Verify final_stream fields are meaningful (explicit attribute access)
         self.assertIsNotNone(final_stream)
@@ -199,9 +206,13 @@ class TestFetchRequest(unittest.TestCase):
         """Cancelling a stream fires the on_cancel callback."""
         engine = self._build_engine()
 
-        stream, stream_finished, response_status, response_body_parts, final_stream = (
-            self._create_stream_with_callbacks(engine)
-        )
+        (
+            stream,
+            stream_finished,
+            response_status,
+            response_body_parts,
+            final_stream,
+        ) = self._create_stream_with_callbacks(engine)
 
         headers = {
             ":method": "GET",
@@ -212,8 +223,10 @@ class TestFetchRequest(unittest.TestCase):
         stream.send_headers(headers, end_stream=False)
         stream.cancel()
 
-        self.assertTrue(stream_finished.wait(timeout=10),
-                "Cancel callback was not invoked within timeout")
+        self.assertTrue(
+            stream_finished.wait(timeout=10),
+            "Cancel callback was not invoked within timeout",
+        )
 
         # Verify final_stream for cancelled stream: start/end should be set,
         # but sending/response/upstream fields should be unset (-1).
@@ -225,6 +238,7 @@ class TestFetchRequest(unittest.TestCase):
         self.assertEqual(final_stream.upstream_protocol, -1)
 
         engine.terminate()
+
 
 class TestPythonTypes(unittest.TestCase):
     """Tests for Python type wrappers."""
@@ -238,6 +252,7 @@ class TestPythonTypes(unittest.TestCase):
         self.assertEqual(intel.stream_id, 42)
         self.assertEqual(intel.connection_id, 7)
         self.assertEqual(intel.attempt_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

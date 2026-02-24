@@ -75,3 +75,19 @@ else
     exit 1
   fi
 fi
+
+PYTHON_DIRS=(
+  "library/python"
+  "test/python"
+  "examples/python"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  black "${PYTHON_DIRS[@]}"
+else
+  NEEDS_FORMAT=$(black --check "${PYTHON_DIRS[@]}" 2>&1)
+  if [[ -n "${NEEDS_FORMAT}" ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
+    exit 1
+  fi
+fi
