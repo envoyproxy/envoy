@@ -122,6 +122,53 @@ impl AccessLogger for TestAccessLogger {
     let _trace_id = ctx.get_trace_id();
     let _span_id = ctx.get_span_id();
 
+    // Test connection termination details.
+    let _termination_details = ctx.connection_termination_details();
+
+    // Test direct address accessors.
+    let _direct_remote = ctx.downstream_direct_remote_address();
+    let _direct_local = ctx.downstream_direct_local_address();
+
+    // Test extended downstream TLS fields.
+    let _tls_cipher = ctx.downstream_tls_cipher();
+    let _tls_session_id = ctx.downstream_tls_session_id();
+    let _peer_issuer = ctx.downstream_peer_issuer();
+    let _peer_serial = ctx.downstream_peer_serial();
+    let _peer_sha1 = ctx.downstream_peer_fingerprint_1();
+    let _local_subject = ctx.downstream_local_subject();
+
+    // Test upstream connection/TLS fields.
+    let _upstream_conn_id = ctx.upstream_connection_id();
+    let _upstream_tls_ver = ctx.upstream_tls_version();
+    let _upstream_cipher = ctx.upstream_tls_cipher();
+    let _upstream_session = ctx.upstream_tls_session_id();
+    let _upstream_subject = ctx.upstream_peer_subject();
+    let _upstream_issuer = ctx.upstream_peer_issuer();
+
+    // Test downstream certificate status and validity.
+    let _cert_presented = ctx.downstream_peer_cert_presented();
+    let _cert_validated = ctx.downstream_peer_cert_validated();
+    let _cert_v_start = ctx.downstream_peer_cert_v_start();
+    let _cert_v_end = ctx.downstream_peer_cert_v_end();
+
+    // Test downstream SAN accessors.
+    let _ds_peer_uri = ctx.downstream_peer_uri_san();
+    let _ds_local_uri = ctx.downstream_local_uri_san();
+    let _ds_peer_dns = ctx.downstream_peer_dns_san();
+    let _ds_local_dns = ctx.downstream_local_dns_san();
+
+    // Test upstream extended certificate fields.
+    let _us_local_subj = ctx.upstream_local_subject();
+    let _us_peer_digest = ctx.upstream_peer_cert_digest();
+    let _us_cert_v_start = ctx.upstream_peer_cert_v_start();
+    let _us_cert_v_end = ctx.upstream_peer_cert_v_end();
+
+    // Test upstream SAN accessors.
+    let _us_peer_uri = ctx.upstream_peer_uri_san();
+    let _us_local_uri = ctx.upstream_local_uri_san();
+    let _us_peer_dns = ctx.upstream_peer_dns_san();
+    let _us_local_dns = ctx.upstream_local_dns_san();
+
     // Test response trailer access.
     let _response_trailer = ctx.get_response_trailer("x-trailer");
 
