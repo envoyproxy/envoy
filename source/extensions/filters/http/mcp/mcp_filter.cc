@@ -46,6 +46,18 @@ McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
+
 void injectTraceContext(
     const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
     const envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig& config,
@@ -63,17 +75,17 @@ void injectTraceContext(
   // Clear traceparent and tracestate if configured. Default is true if not set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, clear_trace_ctx_headers_on_valid_meta_traceparent,
                                       true)) {
-    headers.remove(Http::LowerCaseString("traceparent"));
-    headers.remove(Http::LowerCaseString("tracestate"));
+    headers.remove(traceparentHeader());
+    headers.remove(tracestateHeader());
   }
 
-  headers.setCopy(Http::LowerCaseString("traceparent"), tp);
+  headers.setCopy(traceparentHeader(), tp);
 
   const auto& ts_it = meta_fields.find("tracestate");
   if (ts_it != meta_fields.end() && ts_it->second.kind_case() == Protobuf::Value::kStringValue) {
     const std::string& ts = ts_it->second.string_value();
     if (Envoy::Tracing::isValidTraceState(ts)) {
-      headers.setCopy(Http::LowerCaseString("tracestate"), ts);
+      headers.setCopy(tracestateHeader(), ts);
     }
   }
 }
@@ -87,7 +99,7 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
 
   const std::string& bg = bg_it->second.string_value();
   if (Envoy::Tracing::isValidBaggage(bg)) {
-    headers.setCopy(Http::LowerCaseString("baggage"), bg);
+    headers.setCopy(baggageHeader(), bg);
   }
 }
 } // namespace
