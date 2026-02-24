@@ -59,7 +59,9 @@ jobs:
         include:
         - name: Format all
           args: check
-          command: ./tools/check_format.sh
+          command: |
+            python3 -m pip install black==24.3.0
+            ./tools/check_format.sh
           target: format-all
           timeout-minutes: 45
         - name: Swift lint

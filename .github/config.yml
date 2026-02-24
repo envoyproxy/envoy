@@ -64,6 +64,11 @@ checks:
     required: true
     on-run:
     - mobile-cc
+  mobile-python-tests:
+    name: Mobile/Python tests
+    required: true
+    on-run:
+    - mobile-python-tests
   mobile-coverage:
     name: Mobile/Coverage
     required: true
