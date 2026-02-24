@@ -99,9 +99,11 @@ public:
   MOCK_METHOD(void, clearRouteCache, (), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));
+  MOCK_METHOD(BodyBuffer&, receivedRequestBody, (), (override));
   MOCK_METHOD(HeaderMap&, requestTrailers, (), (override));
   MOCK_METHOD(HeaderMap&, responseHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedResponseBody, (), (override));
+  MOCK_METHOD(BodyBuffer&, receivedResponseBody, (), (override));
   MOCK_METHOD(HeaderMap&, responseTrailers, (), (override));
   MOCK_METHOD(const RouteSpecificConfig*, getMostSpecificConfig, (), (override));
   MOCK_METHOD(std::shared_ptr<Scheduler>, getScheduler, (), (override));

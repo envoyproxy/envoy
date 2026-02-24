@@ -21,12 +21,12 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/allowed_override_modes_set.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
@@ -93,9 +93,9 @@ public:
   };
 
   struct ProcessingEffects {
-    ProcessingEffect::Effect header_effect_;
-    ProcessingEffect::Effect body_effect_;
-    ProcessingEffect::Effect trailer_effect_;
+    Extensions::Filters::Common::ProcessingEffect::Effect header_effect_;
+    Extensions::Filters::Common::ProcessingEffect::Effect body_effect_;
+    Extensions::Filters::Common::ProcessingEffect::Effect trailer_effect_;
   };
 
   using GrpcCalls = struct GrpcCallStats;
@@ -112,9 +112,10 @@ public:
     return grpc_status_before_first_call_;
   }
 
-  void recordProcessingEffect(ProcessorState::CallbackState callback_state,
-                              envoy::config::core::v3::TrafficDirection traffic_direction,
-                              ProcessingEffect::Effect processing_effect);
+  void
+  recordProcessingEffect(ProcessorState::CallbackState callback_state,
+                         envoy::config::core::v3::TrafficDirection traffic_direction,
+                         Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {

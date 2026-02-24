@@ -4181,6 +4181,83 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(2, membership_changes);
 }
 
+// Adds 100 hosts to P0 and 50 hosts to P1.
+class TestMultiPriorityBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  TestMultiPriorityBatchUpdateCb(std::shared_ptr<MockClusterInfo> info) : info_(info) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    HostVectorSharedPtr hosts_p0 = std::make_shared<HostVector>();
+    for (int i = 0; i < 100; i++) {
+      hosts_p0->push_back(makeTestHost(info_, fmt::format("tcp://127.0.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p0 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        0,
+        updateHostsParams(hosts_p0, hosts_per_locality_p0,
+                          std::make_shared<const HealthyHostVector>(*hosts_p0),
+                          hosts_per_locality_p0),
+        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+
+    HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
+    for (int i = 0; i < 50; i++) {
+      hosts_p1->push_back(makeTestHost(info_, fmt::format("tcp://127.1.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p1 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        1,
+        updateHostsParams(hosts_p1, hosts_per_locality_p1,
+                          std::make_shared<const HealthyHostVector>(*hosts_p1),
+                          hosts_per_locality_p1),
+        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+  }
+
+  std::shared_ptr<MockClusterInfo> info_;
+};
+
+// Verify MemberUpdateCb fires once per batch while PriorityUpdateCb fires per priority.
+// This is important for consumers like load balancers that can coalesce work
+// by tracking dirty priorities in PriorityUpdateCb and refreshing in MemberUpdateCb.
+TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+
+  uint32_t priority_cb_count = 0;
+  uint32_t member_cb_count = 0;
+  absl::flat_hash_set<uint32_t> dirty_priorities;
+
+  auto priority_update_cb = priority_set.addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        priority_cb_count++;
+        dirty_priorities.insert(priority);
+        return absl::OkStatus();
+      });
+
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    member_cb_count++;
+    EXPECT_EQ(2, dirty_priorities.size());
+    EXPECT_TRUE(dirty_priorities.contains(0));
+    EXPECT_TRUE(dirty_priorities.contains(1));
+    dirty_priorities.clear();
+  });
+
+  TestMultiPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+
+  // PriorityUpdateCb fires once per priority (2 priorities updated).
+  EXPECT_EQ(2, priority_cb_count);
+  // MemberUpdateCb fires once for the entire batch.
+  EXPECT_EQ(1, member_cb_count);
+  // Dirty set was cleared inside MemberUpdateCb.
+  EXPECT_TRUE(dirty_priorities.empty());
+
+  // Final state should have all hosts.
+  EXPECT_EQ(100, priority_set.hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(50, priority_set.hostSetsPerPriority()[1]->hosts().size());
+}
+
 // Helper class used to test MainPrioritySetImpl.
 class TestMainPrioritySetImpl : public MainPrioritySetImpl {
 public:

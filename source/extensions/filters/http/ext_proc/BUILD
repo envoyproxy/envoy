@@ -26,7 +26,6 @@ envoy_cc_library(
         ":matching_utils_lib",
         ":mutation_utils_lib",
         ":on_processing_response_interface",
-        ":processing_effect_lib",
         ":processing_request_modifier_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
@@ -38,6 +37,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
+        "//source/extensions/filters/common/processing_effect:processing_effect_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "@abseil-cpp//absl/status",
@@ -93,13 +93,13 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
-        ":processing_effect_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
+        "//source/extensions/filters/common/processing_effect:processing_effect_lib",
         "@abseil-cpp//absl/status",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
@@ -154,10 +154,4 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_library(
-    name = "processing_effect_lib",
-    hdrs = ["processing_effect.h"],
-    tags = ["skip_on_windows"],
 )

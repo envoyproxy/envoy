@@ -22,11 +22,13 @@ Future development may include support for other languages.
 Currently, dynamic modules are supported at the following extension points:
 
 * As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`.
+* As a :ref:`cluster <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`.
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`.
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
