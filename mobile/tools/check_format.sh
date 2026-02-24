@@ -79,8 +79,8 @@ fi
 # Install Black if not present
 if ! command -v black &> /dev/null
 then
-    echo "black not found, installing..."
-    python -m pip install black
+    echo "black not found."
+    exit 1
 fi
 
 PYTHON_DIRS=(
