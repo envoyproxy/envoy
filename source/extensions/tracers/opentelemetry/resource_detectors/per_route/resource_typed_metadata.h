@@ -34,7 +34,8 @@ public:
   parse(const Protobuf::Any& data) const override;
 
   std::set<std::string> configTypes() override {
-    return {"envoy.extensions.tracers.opentelemetry.resource_detectors.v3.PerRouteResourceMetadata"};
+    return {
+        "envoy.extensions.tracers.opentelemetry.resource_detectors.v3.PerRouteResourceMetadata"};
   }
 };
 

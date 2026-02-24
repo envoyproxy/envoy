@@ -12,6 +12,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "per_route_resource_detector_test",
+    srcs = ["per_route_resource_detector_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry.resource_detectors.per_route"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/tracers/opentelemetry/resource_detectors/per_route:per_route_resource_detector",
+        "//source/extensions/tracers/opentelemetry/resource_detectors/per_route:resource_typed_metadata",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "per_route_resource_detector_integration_test",
     srcs = [
         "per_route_resource_detector_integration_test.cc",
