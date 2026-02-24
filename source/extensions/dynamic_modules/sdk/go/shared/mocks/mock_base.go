@@ -529,6 +529,21 @@ func (mr *MockHttpFilterHandleMockRecorder) DecrementGaugeValue(id, value any, t
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecrementGaugeValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).DecrementGaugeValue), varargs...)
 }
 
+// GetAttributeBool mocks base method.
+func (m *MockHttpFilterHandle) GetAttributeBool(attributeID shared.AttributeID) (bool, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAttributeBool", attributeID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetAttributeBool indicates an expected call of GetAttributeBool.
+func (mr *MockHttpFilterHandleMockRecorder) GetAttributeBool(attributeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAttributeBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetAttributeBool), attributeID)
+}
+
 // GetAttributeNumber mocks base method.
 func (m *MockHttpFilterHandle) GetAttributeNumber(attributeID shared.AttributeID) (float64, bool) {
 	m.ctrl.T.Helper()
@@ -586,6 +601,49 @@ func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuf
 func (mr *MockHttpFilterHandleMockRecorder) GetFilterState(key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterState), key)
+}
+
+// GetMetadataBool mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataBool(source shared.MetadataSourceType, metadataNamespace, key string) (bool, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataBool", source, metadataNamespace, key)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataBool indicates an expected call of GetMetadataBool.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataBool(source, metadataNamespace, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataBool), source, metadataNamespace, key)
+}
+
+// GetMetadataKeys mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataKeys(source shared.MetadataSourceType, metadataNamespace string) []shared.UnsafeEnvoyBuffer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataKeys", source, metadataNamespace)
+	ret0, _ := ret[0].([]shared.UnsafeEnvoyBuffer)
+	return ret0
+}
+
+// GetMetadataKeys indicates an expected call of GetMetadataKeys.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataKeys(source, metadataNamespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataKeys", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataKeys), source, metadataNamespace)
+}
+
+// GetMetadataNamespaces mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSourceType) []shared.UnsafeEnvoyBuffer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataNamespaces", source)
+	ret0, _ := ret[0].([]shared.UnsafeEnvoyBuffer)
+	return ret0
+}
+
+// GetMetadataNamespaces indicates an expected call of GetMetadataNamespaces.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataNamespaces(source any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataNamespaces", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataNamespaces), source)
 }
 
 // GetMetadataNumber mocks base method.
