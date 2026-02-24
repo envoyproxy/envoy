@@ -765,7 +765,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointStoredInMetadata) {
   EXPECT_EQ(metadata_value.string_value(), "1.2.3.4:80");
 }
 
-TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHosts) {
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHostsChosen) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
@@ -773,8 +773,8 @@ TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataMultipleHosts) {
                                     Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://3.5.8.13:80", us_central1_a, 1, 0,
                                     Host::HealthStatus::DEGRADED)};
-  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
-      {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}, {host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
 
   createLoadBalancer(
