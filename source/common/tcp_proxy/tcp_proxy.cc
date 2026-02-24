@@ -1197,9 +1197,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 
   if (upstream_) {
     absl::string_view downstream_local_close_reason =
-        idle_timeout_triggered_
-            ? absl::string_view(StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout)
-            : "";
+        read_callbacks_->connection().localCloseReason();
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(
         upstream_->onDownstreamEvent(event, downstream_local_close_reason));
     if (conn_data != nullptr &&
@@ -1357,7 +1355,6 @@ void Filter::onUpstreamConnection() {
 void Filter::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "Session timed out", read_callbacks_->connection());
   config_->stats().idle_timeout_.inc();
-  idle_timeout_triggered_ = true;
 
   // This results in also closing the upstream connection.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
