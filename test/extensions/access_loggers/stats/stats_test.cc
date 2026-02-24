@@ -152,7 +152,6 @@ public:
   AccessLog::FilterPtr filter_;
   NiceMock<Stats::MockStore> store_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
-  // name_storages_ must be destroyed after scope_ and logger_ to keep StatNames valid.
   std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages_;
   std::shared_ptr<Stats::MockScope> scope_;
   std::unique_ptr<StatsAccessLog> logger_;
