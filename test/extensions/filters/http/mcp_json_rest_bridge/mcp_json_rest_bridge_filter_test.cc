@@ -45,14 +45,9 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::OK, testing::Eq(kExpectedResponse), _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
-        if (modify_headers) {
-          Http::TestResponseHeaderMapImpl response_headers;
-          modify_headers(response_headers);
-        }
-      }));
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
 
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0", "id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
@@ -76,9 +71,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
                           std::function<void(Http::ResponseHeaderMap&)> modify_headers,
                           absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
-        if (modify_headers) {
-          modify_headers(response_headers);
-        }
+        modify_headers(response_headers);
         EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-length"))[0]
                       ->value()
                       .getStringView(),
@@ -87,6 +80,144 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
 
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
 
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::Eq(R"json({"code":-32601,"message":"Missing method field"})json"), _,
+                     _, testing::Eq("mcp_json_rest_bridge_filter_method_not_found")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0", "id":0})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::BadRequest,
+          testing::Eq(
+              R"json({"code":-32601,"message":"Method unsupported_method is not supported"})json"),
+          _, _, testing::Eq("mcp_json_rest_bridge_filter_method_not_supported")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":0,"method":"unsupported_method"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::BadRequest,
+          testing::Eq(R"json({"code":-32601,"message":"Method field is not a string"})json"), _, _,
+          testing::Eq("mcp_json_rest_bridge_filter_method_not_string")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":0,"method":123})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, MissingIdFieldReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             testing::Eq(R"json({"code":-32600,"message":"Missing ID field"})json"),
+                             _, _, testing::Eq("mcp_json_rest_bridge_filter_id_not_found")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithNonNumericStringReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             testing::Eq(R"json({"code":-32600,"message":"Missing ID field"})json"),
+                             _, _, testing::Eq("mcp_json_rest_bridge_filter_id_not_found")))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        if (modify_headers) {
+          Http::TestResponseHeaderMapImpl response_headers;
+          modify_headers(response_headers);
+        }
+      }));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":"invalid","method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithFloatReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             testing::Eq(R"json({"code":-32600,"message":"Missing ID field"})json"),
+                             _, _, testing::Eq("mcp_json_rest_bridge_filter_id_not_found")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":123.45,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::Eq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
+                     testing::Eq("mcp_json_rest_bridge_filter_failed_to_parse_json_rpc_request")))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {}));
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0", "id":123)json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
