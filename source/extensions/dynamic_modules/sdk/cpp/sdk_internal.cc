@@ -238,7 +238,7 @@ public:
     return value;
   }
 
-  std::vector<std::string> getMetadataKeys(absl::string_view ns) override {
+  std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) override {
     size_t count = envoy_dynamic_module_callback_http_get_metadata_keys_count(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
         envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()});
@@ -252,7 +252,7 @@ public:
     if (!ret) {
       return {};
     }
-    std::vector<std::string> keys;
+    std::vector<absl::string_view> keys;
     keys.reserve(count);
     for (size_t i = 0; i < count; i++) {
       keys.emplace_back(buffers[i].ptr, buffers[i].length);
@@ -260,7 +260,7 @@ public:
     return keys;
   }
 
-  std::vector<std::string> getMetadataNamespaces() override {
+  std::vector<absl::string_view> getMetadataNamespaces() override {
     size_t count = envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic);
     if (count == 0) {
@@ -272,7 +272,7 @@ public:
     if (!ret) {
       return {};
     }
-    std::vector<std::string> namespaces;
+    std::vector<absl::string_view> namespaces;
     namespaces.reserve(count);
     for (size_t i = 0; i < count; i++) {
       namespaces.emplace_back(buffers[i].ptr, buffers[i].length);

@@ -393,13 +393,13 @@ public:
    * @param ns The metadata namespace.
    * @return Vector of key strings.
    */
-  virtual std::vector<std::string> getMetadataKeys(absl::string_view ns) = 0;
+  virtual std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) = 0;
 
   /**
    * Retrieves all namespace names in the metadata.
    * @return Vector of namespace name strings.
    */
-  virtual std::vector<std::string> getMetadataNamespaces() = 0;
+  virtual std::vector<absl::string_view> getMetadataNamespaces() = 0;
 
   /**
    * Sets a string metadata value.
