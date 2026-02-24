@@ -104,8 +104,7 @@ message QuicProtocolOptions {
   // If not specified, the default value is 16.
   // This is an equivalent of the TCP listener option
   // max_connections_to_accept_per_socket_event.
-  google.protobuf.UInt32Value max_sessions_per_event_loop = 14
-      [(validate.rules).uint32 = { gt: 0 }];
+  google.protobuf.UInt32Value max_sessions_per_event_loop = 14 [(validate.rules).uint32 = {gt: 0}];
 
   // If true, the listener will proactively close idle QUIC connections when
   // the overload manager reports that the node is saturated.
