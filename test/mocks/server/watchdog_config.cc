@@ -31,6 +31,7 @@ MockWatchdog::MockWatchdog(int miss, int megamiss, int kill, int multikill,
   ON_CALL(*this, multiKillTimeout()).WillByDefault(Return(multikill_));
   ON_CALL(*this, multiKillThreshold()).WillByDefault(Return(multikill_threshold_));
   ON_CALL(*this, actions).WillByDefault(Return(actions_));
+  ON_CALL(*this, deferredDeletesBatchSize()).WillByDefault(Return(0));
 }
 
 } // namespace Configuration

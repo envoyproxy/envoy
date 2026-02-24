@@ -167,6 +167,12 @@ public:
                                 std::chrono::milliseconds min_touch_interval) PURE;
 
   /**
+   * Set the maximum number of deferred deletions to process per event loop iteration.
+   * @param batch_size Max items per iteration. 0 disables batching (default).
+   */
+  virtual void setDeferredDeletesBatchSize(uint32_t batch_size) PURE;
+
+  /**
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;

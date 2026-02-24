@@ -63,6 +63,12 @@ public:
    */
   virtual Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>
   actions() const PURE;
+
+  /**
+   * @return uint32_t the maximum number of deferred deletions to process per event loop iteration.
+   *         0 means unbounded (all items processed in a single pass).
+   */
+  virtual uint32_t deferredDeletesBatchSize() const PURE;
 };
 
 class StatsConfig {

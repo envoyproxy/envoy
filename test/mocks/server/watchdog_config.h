@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(double, multiKillThreshold, (), (const));
   MOCK_METHOD(Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>,
               actions, (), (const));
+  MOCK_METHOD(uint32_t, deferredDeletesBatchSize, (), (const));
 
   std::chrono::milliseconds miss_;
   std::chrono::milliseconds megamiss_;

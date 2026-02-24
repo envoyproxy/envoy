@@ -73,8 +73,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
-      deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
-          [this]() -> void { clearDeferredDeleteList(); })),
+      deferred_delete_cb_(base_scheduler_.createSchedulableCallback([this]() -> void {
+        if (!clearDeferredDeleteListInternal(deferred_deletes_batch_size_)) {
+          deferred_delete_cb_->scheduleCallbackCurrentIteration();
+        }
+      })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_), scaled_timer_manager_(scaled_timer_factory(*this)) {
   ASSERT(!name_.empty());
@@ -111,16 +114,22 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope,
   });
 }
 
-void DispatcherImpl::clearDeferredDeleteList() {
+void DispatcherImpl::clearDeferredDeleteList() { clearDeferredDeleteListInternal(0); }
+
+bool DispatcherImpl::clearDeferredDeleteListInternal(size_t max_to_delete) {
   ASSERT(isThreadSafe());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
 
   size_t num_to_delete = to_delete->size();
   if (deferred_deleting_ || !num_to_delete) {
-    return;
+    return true;
   }
 
-  ENVOY_LOG(trace, "clearing deferred deletion list (size={})", num_to_delete);
+  const size_t batch_size =
+      (max_to_delete > 0) ? std::min(num_to_delete, max_to_delete) : num_to_delete;
+
+  ENVOY_LOG(trace, "clearing deferred deletion list (size={}, batch={})", num_to_delete,
+            batch_size);
 
   // Swap the current deletion vector so that if we do deferred delete while we are deleting, we
   // use the other vector. We will get another callback to delete that vector.
@@ -136,12 +145,24 @@ void DispatcherImpl::clearDeferredDeleteList() {
   // Calling clear() on the vector does not specify which order destructors run in. We want to
   // destroy in FIFO order so just do it manually. This required 2 passes over the vector which is
   // not optimal but can be cleaned up later if needed.
-  for (size_t i = 0; i < num_to_delete; i++) {
+  for (size_t i = 0; i < batch_size; i++) {
     (*to_delete)[i].reset();
+  }
+
+  if (batch_size < num_to_delete) {
+    // Bounded path: move unprocessed items to the active deletion vector so they will be picked
+    // up in subsequent event loop iterations. Items added during destruction (via deferredDelete)
+    // are already in current_to_delete_; appending remaining items after them preserves
+    // approximate FIFO ordering.
+    for (size_t i = batch_size; i < num_to_delete; i++) {
+      current_to_delete_->emplace_back(std::move((*to_delete)[i]));
+    }
   }
 
   to_delete->clear();
   deferred_deleting_ = false;
+
+  return current_to_delete_->empty();
 }
 
 Network::ServerConnectionPtr

@@ -147,6 +147,7 @@ private:
   EventToActionsMap events_to_actions_;
   Thread::MutexBasicLockable mutex_;
   bool run_thread_ ABSL_GUARDED_BY(mutex_);
+  const uint32_t deferred_deletes_batch_size_;
 };
 
 } // namespace Server

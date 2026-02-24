@@ -547,7 +547,7 @@ message Watchdogs {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Watchdog";
 
@@ -605,6 +605,17 @@ message Watchdog {
   // nonresponsive threads required for the ``multikill_timeout``.
   // If not specified the default is ``0``.
   type.v3.Percent multikill_threshold = 5;
+
+  // The maximum number of deferred object deletions to process per event loop iteration.
+  // When a large number of connections are closed simultaneously (e.g., after an EDS endpoint
+  // membership update), their cleanup is queued for deferred deletion. Processing all
+  // of them in a single pass can stall the event loop for seconds, causing connection timeouts
+  // and a self-sustaining degradation loop. Setting this to a non-zero value splits the work
+  // across multiple event loop iterations, allowing timers and I/O events to fire between
+  // batches. The value should be low enough that a single batch completes well within the
+  // ``miss_timeout`` (default 200ms). If not specified, the default is ``0`` (disabled --
+  // all pending deletions are processed in one pass, preserving existing behavior).
+  google.protobuf.UInt32Value deferred_deletes_batch_size = 8;
 }
 
 // Fatal actions to run while crashing. Actions can be safe (meaning they are

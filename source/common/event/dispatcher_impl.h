@@ -55,6 +55,10 @@ public:
    */
   event_base& base() { return base_scheduler_.base(); }
 
+  void setDeferredDeletesBatchSize(uint32_t batch_size) override {
+    deferred_deletes_batch_size_ = batch_size;
+  }
+
   // Event::Dispatcher
   const std::string& name() override { return name_; }
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -130,6 +134,13 @@ private:
   void runPostCallbacks();
   void runThreadLocalDelete();
 
+  // Internal implementation of deferred delete processing. When max_to_delete is 0, all pending
+  // items are processed (used by the public clearDeferredDeleteList API for shutdown/cleanup
+  // paths). When max_to_delete > 0, at most that many items are destroyed per call, allowing the
+  // event loop to process timers and connection events between batches. Returns true if no items
+  // remain.
+  bool clearDeferredDeleteListInternal(size_t max_to_delete);
+
   // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
   void touchWatchdog();
 
@@ -159,6 +170,7 @@ private:
   bool shutdown_called_{false};
 
   SchedulableCallbackPtr deferred_delete_cb_;
+  uint32_t deferred_deletes_batch_size_{0};
 
   SchedulableCallbackPtr post_cb_;
   Thread::MutexBasicLockable post_lock_;

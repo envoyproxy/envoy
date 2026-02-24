@@ -25,6 +25,10 @@ public:
     impl_.registerWatchdog(watchdog, min_touch_interval);
   }
 
+  void setDeferredDeletesBatchSize(uint32_t batch_size) override {
+    impl_.setDeferredDeletesBatchSize(batch_size);
+  }
+
   TimeSource& timeSource() override { return impl_.timeSource(); }
 
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override {

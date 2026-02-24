@@ -1451,6 +1451,50 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeDeferredDelete) {
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
+TEST_F(DispatcherWithWatchdogTest, BoundedDeferredDeleteProcessesAllItemsInBatches) {
+  const uint32_t batch_size = 32;
+  const size_t num_items = batch_size + 20;
+  size_t destroyed_count = 0;
+
+  dispatcher_->setDeferredDeletesBatchSize(batch_size);
+
+  // Add items from a timer callback so they enter the deferred delete list during event loop
+  // execution, after the initial runPostCallbacks() flush that occurs at the start of run().
+  auto add_timer = dispatcher_->createTimer([&]() {
+    for (size_t i = 0; i < num_items; i++) {
+      dispatcher_->deferredDelete(
+          std::make_unique<TestDeferredDeletable>([&destroyed_count]() { destroyed_count++; }));
+    }
+  });
+  add_timer->enableTimer(std::chrono::milliseconds(0));
+
+  auto exit_timer = dispatcher_->createTimer([&]() { dispatcher_->exit(); });
+  exit_timer->enableTimer(std::chrono::milliseconds(10));
+
+  // Expect at least 2 touches from the batching (one per batch of clearDeferredDeleteListInternal),
+  // plus touches from the timer callbacks themselves.
+  EXPECT_CALL(*watchdog_, touch()).Times(testing::AtLeast(2));
+  dispatcher_->run(Dispatcher::RunType::Block);
+  EXPECT_EQ(destroyed_count, num_items);
+}
+
+TEST_F(DispatcherWithWatchdogTest, DeferredDeleteBatchSizeZeroProcessesAll) {
+  // Default batch size is 0 (disabled). Verify all items are processed in a single pass with
+  // exactly one watchdog touch, preserving the original behavior.
+  const size_t num_items = 100;
+  size_t destroyed_count = 0;
+
+  for (size_t i = 0; i < num_items; i++) {
+    dispatcher_->deferredDelete(
+        std::make_unique<TestDeferredDeletable>([&destroyed_count]() { destroyed_count++; }));
+  }
+
+  InSequence s;
+  EXPECT_CALL(*watchdog_, touch());
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(destroyed_count, num_items);
+}
+
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
   MockFunction<void()> callback;
 

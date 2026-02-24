@@ -245,6 +245,8 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
   multikill_threshold_ = PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
   actions_ = watchdog.actions();
+  deferred_deletes_batch_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(watchdog, deferred_deletes_batch_size, 0);
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

@@ -91,7 +91,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
         return map;
       }(config)),
-      run_thread_(true) {
+      run_thread_(true), deferred_deletes_batch_size_(config.deferredDeletesBatchSize()) {
   start(api);
 }
 
@@ -202,6 +202,7 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id,
     watched_dogs_.push_back(std::move(watched_dog));
   }
   dispatcher.registerWatchdog(new_watchdog, wd_interval);
+  dispatcher.setDeferredDeletesBatchSize(deferred_deletes_batch_size_);
   new_watchdog->touch();
   return new_watchdog;
 }
