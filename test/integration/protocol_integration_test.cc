@@ -186,6 +186,8 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ProtocolIntegrationTest, StrictDns) {
@@ -211,6 +213,8 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.
