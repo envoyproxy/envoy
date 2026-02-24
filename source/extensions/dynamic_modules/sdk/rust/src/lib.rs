@@ -8,9 +8,11 @@ pub mod access_log;
 pub mod buffer;
 pub mod cert_validator;
 pub mod matcher;
+pub mod utility;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
+pub use utility::{read_whole_request_body, read_whole_response_body};
 
 #[cfg(test)]
 #[path = "./lib_test.rs"]
@@ -980,6 +982,39 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Get the bool-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool>;
+
+  /// Set the bool-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool);
+
+  /// Get all keys in the given metadata namespace.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the key names,
+  /// or `None` if the namespace is not found.
+  fn get_metadata_keys<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Get all namespace names in the metadata.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the namespace names,
+  /// or `None` if no namespaces exist.
+  fn get_metadata_namespaces<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -1233,6 +1268,14 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -2308,6 +2351,118 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_keys(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys_count(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+      )
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        buffers.as_mut_ptr() as *mut _,
+      )
+    };
+    if success {
+      Some(
+        buffers
+          .into_iter()
+          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
+          .collect(),
+      )
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_namespaces(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces_count(self.raw_ptr, source)
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
+        self.raw_ptr,
+        source,
+        buffers.as_mut_ptr() as *mut _,
+      )
+    };
+    if success {
+      Some(
+        buffers
+          .into_iter()
+          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
+          .collect(),
+      )
+    } else {
+      None
+    }
+  }
+
   fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
@@ -2675,6 +2830,25 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let mut result: i64 = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_get_attribute_int(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_bool(
         self.raw_ptr,
         attribute_id,
         &mut result as *mut _ as *mut _,
