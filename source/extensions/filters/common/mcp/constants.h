@@ -21,6 +21,18 @@ constexpr absl::string_view JSONRPC_VERSION = "2.0";
 constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr absl::string_view METHOD_FIELD = "method";
 constexpr absl::string_view ID_FIELD = "id";
+constexpr absl::string_view RESULT_FIELD = "result";
+
+// MCP Initialize constants
+constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
+constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
+constexpr absl::string_view TOOLS_FIELD = "tools";
+constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
+constexpr absl::string_view SERVER_INFO_FIELD = "serverInfo";
+constexpr absl::string_view NAME_FIELD = "name";
+constexpr absl::string_view VERSION_FIELD = "version";
+constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 

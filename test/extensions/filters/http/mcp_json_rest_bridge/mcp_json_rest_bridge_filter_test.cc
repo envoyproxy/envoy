@@ -33,14 +33,15 @@ public:
 };
 
 TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalResponse) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/mcp"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"host", "test-host"}};
 
   // It should return StopIteration because body is needed for POST requests.
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
   constexpr absl::string_view kExpectedResponse =
-      R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-11-25","serverInfo":{"name":"mcp-json-rest-bridge","version":"1.0.0"}}})json";
+      R"json({"id":0,"jsonrpc":"2.0","result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2025-11-25","serverInfo":{"name":"test-host","version":"1.0.0"}}})json";
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::OK, testing::Eq(kExpectedResponse), _, _, _))

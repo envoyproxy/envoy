@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
+#include "source/extensions/filters/common/mcp/constants.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -7,12 +9,10 @@ namespace McpJsonRestBridge {
 namespace {
 
 using ::nlohmann::json;
-
-constexpr absl::string_view kLatestSupportedMcpVersion = "2025-11-25";
-constexpr absl::string_view kServerName = "mcp-json-rest-bridge";
+namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 absl::StatusOr<int> getSessionId(const json& json_rpc) {
-  if (auto it = json_rpc.find("id"); it != json_rpc.end()) {
+  if (auto it = json_rpc.find(McpConstants::ID_FIELD); it != json_rpc.end()) {
     if (it->is_number_integer()) {
       return it->get<int>();
     }
@@ -27,17 +27,19 @@ absl::StatusOr<int> getSessionId(const json& json_rpc) {
   return absl::InvalidArgumentError("JSON-RPC request does not have an ID.");
 }
 
-json generateInitializeResponse(int session_id) {
+json generateInitializeResponse(int session_id, absl::string_view server_name) {
   json ret;
-  ret["jsonrpc"] = "2.0";
-  ret["id"] = session_id;
+  ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
+  ret[McpConstants::ID_FIELD] = session_id;
 
   json result;
-  result["protocolVersion"] = kLatestSupportedMcpVersion;
-  result["capabilities"]["tools"]["listChanged"] = false;
-  result["serverInfo"]["name"] = kServerName;
-  result["serverInfo"]["version"] = "1.0.0";
-  ret["result"] = result;
+  result[McpConstants::PROTOCOL_VERSION_FIELD] = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
+  result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
+        [McpConstants::LIST_CHANGED_FIELD] = false;
+  result[McpConstants::SERVER_INFO_FIELD][McpConstants::NAME_FIELD] = server_name;
+  result[McpConstants::SERVER_INFO_FIELD][McpConstants::VERSION_FIELD] =
+      McpConstants::DEFAULT_SERVER_VERSION;
+  ret[McpConstants::RESULT_FIELD] = result;
   return ret;
 }
 
@@ -51,7 +53,8 @@ json generateErrorJsonResponse(int error_code, absl::string_view error_message) 
 } // namespace
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
-    const McpJsonRestBridgeProtoConfig& proto_config)
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+        proto_config)
     : proto_config_(proto_config) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_to_http_rule_[tool.name()] = tool.http_rule();
@@ -59,7 +62,8 @@ McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge config: {}", proto_config_.DebugString());
 }
 
-absl::StatusOr<HttpRule>
+// TODO(guoyilin42): Use it for future tools/call implementation.
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
 McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   auto it = tool_to_http_rule_.find(tool_name);
   if (it == tool_to_http_rule_.end()) {
@@ -72,6 +76,12 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   mcp_operation_ = McpOperation::Undecided;
+  server_name_ = std::string(request_headers.getHostValue());
+
+  if (request_headers.getPathValue() != "/mcp") {
+    // Only intercept /mcp requests
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   if (request_headers.getMethodValue() != "POST") {
     ENVOY_LOG(warn, "Only POST method is supported for MCP. Received: {}",
@@ -82,7 +92,7 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
           headers.addCopy(Http::LowerCaseString("allow"), "POST");
         },
         Grpc::Status::WellKnownGrpcStatus::InvalidArgument, "mcp_json_rest_bridge_filter_not_post");
-    return Http::FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::StopIteration;
   }
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -111,6 +121,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   }
 
   handleMcpMethod(request_body_json);
+  // TODO(guoyilin42): Clear the route cache if needed.
 
   return Http::FilterDataStatus::Continue;
 }
@@ -136,16 +147,17 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
     return;
   }
 
-  std::string method = json_rpc["method"];
-  if (method == "tools/list") {
+  std::string method = json_rpc[McpConstants::METHOD_FIELD];
+  if (method == McpConstants::Methods::TOOLS_LIST) {
     mcp_operation_ = McpOperation::ToolsList;
     // TODO(guoyilin42): handle tools/list request.
-  } else if (method == "initialize") {
+  } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
-    if (json_rpc.contains("params") && json_rpc["params"].contains("protocolVersion") &&
-        json_rpc["params"]["protocolVersion"].is_string()) {
+    if (json_rpc.contains("params") &&
+        json_rpc["params"].contains(McpConstants::PROTOCOL_VERSION_FIELD) &&
+        json_rpc["params"][McpConstants::PROTOCOL_VERSION_FIELD].is_string()) {
       decoder_callbacks_->sendLocalReply(
-          Http::Code::OK, generateInitializeResponse(*session_id_).dump(), nullptr,
+          Http::Code::OK, generateInitializeResponse(*session_id_, server_name_).dump(), nullptr,
           Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize");
       return;
     }
@@ -154,7 +166,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
         generateErrorJsonResponse(-32602, "Missing valid protocolVersion in initialize "
                                           "request")
             .dump());
-  } else if (method == "notifications/initialized") {
+  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     mcp_operation_ = McpOperation::InitializationAck;
     decoder_callbacks_->sendLocalReply(
         Http::Code::Accepted, "",
@@ -162,7 +174,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
           headers.addCopy(Http::LowerCaseString("content-length"), "0");
         },
         Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize_ack");
-  } else if (method == "tools/call") {
+  } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
     // TODO(guoyilin42): handle tools/call request.
   } else {
@@ -189,15 +201,16 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
   if (session_id.ok()) {
     session_id_ = *session_id;
   }
-  if (!json_rpc.contains("method")) {
+  if (!json_rpc.contains(McpConstants::METHOD_FIELD)) {
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_method_not_found",
                       generateErrorJsonResponse(-32601, "Missing method field").dump());
     return absl::InvalidArgumentError("Missing method field");
-  } else if (!json_rpc["method"].is_string()) {
+  } else if (!json_rpc[McpConstants::METHOD_FIELD].is_string()) {
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_method_not_string",
                       generateErrorJsonResponse(-32601, "Method field is not a string").dump());
     return absl::InvalidArgumentError("Method field is not a string");
-  } else if (json_rpc["method"] == "notifications/initialized") {
+  } else if (json_rpc[McpConstants::METHOD_FIELD] ==
+             McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     // The notifications/initialized request is not required to have an ID
     // field.
   } else if (!session_id.ok()) {

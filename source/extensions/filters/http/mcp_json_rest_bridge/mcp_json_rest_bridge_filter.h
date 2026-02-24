@@ -14,13 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
-namespace {
-
-using McpJsonRestBridgeProtoConfig =
-    ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge;
-using HttpRule = ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule;
-
-} // namespace
 
 /**
  * Configuration for the MCP JSON REST Bridge filter.
@@ -28,13 +21,18 @@ using HttpRule = ::envoy::extensions::filters::http::mcp_json_rest_bridge::v3::H
 class McpJsonRestBridgeFilterConfig : public Router::RouteSpecificFilterConfig,
                                       public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgeFilterConfig(const McpJsonRestBridgeProtoConfig& proto_config);
+  explicit McpJsonRestBridgeFilterConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config);
 
-  absl::StatusOr<HttpRule> getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getHttpRule(absl::string_view tool_name) const;
 
 private:
-  absl::flat_hash_map<std::string, HttpRule> tool_to_http_rule_;
-  McpJsonRestBridgeProtoConfig proto_config_;
+  absl::flat_hash_map<std::string,
+                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+      tool_to_http_rule_;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
@@ -56,13 +54,6 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
-  }
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
-    encoder_callbacks_ = &callbacks;
-  }
 
 private:
   // Handles "method" field in the MCP request.
@@ -89,13 +80,12 @@ private:
     ToolsList = 4,
     // Clients send a tools/call request to invoke a tool.
     ToolsCall = 5,
-    // OAuth resource metadata endpoint.
-    OauthResourceMetadata = 6,
-    // MCP operation failed. See go/api-proxy-mcp-error-handling for details.
-    OperationFailed = 7,
+    // MCP operation failed.
+    OperationFailed = 6,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   absl::optional<int> session_id_;
+  std::string server_name_;
   Buffer::OwnedImpl request_body_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;

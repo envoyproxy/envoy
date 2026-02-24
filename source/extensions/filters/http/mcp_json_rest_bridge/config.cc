@@ -35,6 +35,8 @@ McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoWithServerCont
   };
 }
 
+// TODO(guoyilin): Read route-specific config (perFilterConfig/mostSpecificPerFilterConfig) in the
+// filter.
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 McpJsonRestBridgeFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
