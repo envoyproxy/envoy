@@ -8,7 +8,7 @@ explicitly manage callers to an application and protect it from unexpected or fo
 filter supports configuration with either a safe-list (ALLOW) or block-list (DENY) set of policies,
 or a matcher with different actions, based off properties of the connection (IPs, ports, SSL subject)
 as well as the incoming request's HTTP headers. This filter also supports policy in both enforcement
-and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
+and shadow mode, shadow mode won't affect real users, it is used to test that a new set of policies
 work before rolling out to production.
 
 When a request is denied, the :ref:`RESPONSE_CODE_DETAILS<config_access_log_format_response_code_details>`

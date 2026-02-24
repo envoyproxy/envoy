@@ -195,7 +195,6 @@ public:
    */
   uint64_t handlerStats(const StatsParams& params) {
     Buffer::OwnedImpl data;
-    // TODO(ggreenway): add a test variation that does protobuf
     auto request_headers = Http::RequestHeaderMapImpl::create();
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     if (params.format_ == StatsFormat::Prometheus) {
@@ -451,3 +450,57 @@ BENCHMARK_CAPTURE(BM_HistogramsJson, per_endpoint_stats_disabled, false)
     ->Unit(benchmark::kMillisecond);
 BENCHMARK_CAPTURE(BM_HistogramsJson, per_endpoint_stats_enabled, true)
     ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_TraditionalHistogramsPrometheusProtobuf(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(false);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  // Traditional histogram protobuf output (no native_histogram_max_buckets)
+  params.parse("?format=prometheus&type=Histograms&prom_protobuf=1", response);
+
+  uint64_t count;
+  for (auto _ : state) { // NOLINT
+    count = test_context.handlerStats(params);
+  }
+
+  auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
+  state.SetLabel(label);
+}
+BENCHMARK(BM_TraditionalHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);
+
+static void BM_TraditionalHistogramsPrometheusText(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(false);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  // Traditional histogram protobuf output (no native_histogram_max_buckets)
+  params.parse("?format=prometheus&type=Histograms", response);
+
+  uint64_t count;
+  for (auto _ : state) { // NOLINT
+    count = test_context.handlerStats(params);
+  }
+
+  auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
+  state.SetLabel(label);
+}
+BENCHMARK(BM_TraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_NativeHistogramsPrometheusProtobuf(benchmark::State& state) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(false);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=prometheus&type=Histograms&prom_protobuf=1&histogram_buckets="
+               "prometheusnative&native_histogram_max_buckets=19",
+               response);
+
+  uint64_t count;
+  for (auto _ : state) { // NOLINT
+    count = test_context.handlerStats(params);
+  }
+
+  auto label = absl::StrCat("output per iteration: ", count, " (max 19 buckets/histogram)");
+  state.SetLabel(label);
+}
+BENCHMARK(BM_NativeHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);

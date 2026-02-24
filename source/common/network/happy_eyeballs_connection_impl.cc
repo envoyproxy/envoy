@@ -1,5 +1,7 @@
 #include "source/common/network/happy_eyeballs_connection_impl.h"
 
+#include <set>
+
 #include "envoy/network/address.h"
 
 #include "source/common/network/connection_impl.h"
@@ -15,10 +17,9 @@ HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options,
-    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
         happy_eyeballs_config)
-    : dispatcher_(dispatcher),
-      address_list_(sortAddressesWithConfig(address_list, happy_eyeballs_config)),
+    : dispatcher_(dispatcher), address_list_(sortAddresses(address_list, happy_eyeballs_config)),
       upstream_local_address_selector_(upstream_local_address_selector),
       socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
       host_(host), options_(options) {}
@@ -52,112 +53,109 @@ size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_;
 size_t HappyEyeballsConnectionProvider::totalConnections() { return address_list_.size(); }
 
 namespace {
-bool hasMatchingAddressFamily(const Address::InstanceConstSharedPtr& a,
-                              const Address::InstanceConstSharedPtr& b) {
-  return (a->type() == Address::Type::Ip && b->type() == Address::Type::Ip &&
-          a->ip()->version() == b->ip()->version());
-}
 
-bool hasMatchingIpVersion(const Address::IpVersion& ip_version,
-                          const Address::InstanceConstSharedPtr& addr) {
-  return (addr->type() == Address::Type::Ip && addr->ip()->version() == ip_version);
+struct AddressFamily {
+  Address::Type type;
+  absl::optional<Address::IpVersion> version;
+
+  bool operator==(const AddressFamily& other) const {
+    return type == other.type && version == other.version;
+  }
+
+  bool operator<(const AddressFamily& other) const {
+    if (type != other.type) {
+      return type < other.type;
+    }
+    return version < other.version;
+  }
+};
+
+AddressFamily getFamily(const Address::InstanceConstSharedPtr& addr) {
+  if (addr->type() == Address::Type::Ip) {
+    return {Address::Type::Ip, addr->ip()->version()};
+  }
+  return {addr->type(), absl::nullopt};
 }
 
 } // namespace
 
 std::vector<Address::InstanceConstSharedPtr> HappyEyeballsConnectionProvider::sortAddresses(
-    const std::vector<Address::InstanceConstSharedPtr>& in) {
-  std::vector<Address::InstanceConstSharedPtr> address_list;
-  address_list.reserve(in.size());
-  // Iterator which will advance through all addresses matching the first family.
-  auto first = in.begin();
-  // Iterator which will advance through all addresses not matching the first family.
-  // This initial value is ignored and will be overwritten in the loop below.
-  auto other = in.begin();
-  while (first != in.end() || other != in.end()) {
-    if (first != in.end()) {
-      address_list.push_back(*first);
-      first = std::find_if(first + 1, in.end(),
-                           [&](const auto& val) { return hasMatchingAddressFamily(in[0], val); });
-    }
-
-    if (other != in.end()) {
-      other = std::find_if(other + 1, in.end(),
-                           [&](const auto& val) { return !hasMatchingAddressFamily(in[0], val); });
-
-      if (other != in.end()) {
-        address_list.push_back(*other);
-      }
-    }
-  }
-  ASSERT(address_list.size() == in.size());
-  return address_list;
-}
-
-std::vector<Address::InstanceConstSharedPtr>
-HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     const std::vector<Address::InstanceConstSharedPtr>& in,
-    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
         happy_eyeballs_config) {
-  if (!happy_eyeballs_config.has_value()) {
-    return sortAddresses(in);
-  }
   // Sort the addresses according to https://datatracker.ietf.org/doc/html/rfc8305#section-4.
   // Currently the first_address_family version and count options are supported. This allows
-  // specifying the address family version to prefer over the other, and the number (count)
-  // of addresses in that family to attempt before moving to the other family.
-  // If no family version is specified, the version is taken from the first
-  // address in the list. The default count is 1. As an example, assume the
-  // family version is v6, and the count is 3, then the output list will be:
-  // [3*v6, 1*v4, 3*v6, 1*v4, ...] (assuming sufficient addresses exist in the input).
+  // specifying the address family version to prefer over others, and the number (count) of
+  // addresses in that family to attempt before moving to the next family.
+  //
+  // If no family version is specified, the version is taken from the first address in the list.
+  // The default count is 1. As an example, assume the first family version is v6, and the count
+  // is 3, then the output list will be:
+  //
+  //     [3*v6, 1*v4, 3*v6, 1*v4, ...]
+  //
+  // assuming sufficient addresses exist in the input.
+  //
+  // This implementation generalizes this to multiple address types (IPv4, IPv6, Pipe, Internal).
   ENVOY_LOG_EVENT(trace, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in.size());
 
-  // First_family_ip_version defaults to the first valid ip version
-  // unless overwritten by happy_eyeballs_config. There must be at least one
-  // entry in the vector that is passed to the function.
   ASSERT(!in.empty());
-  Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
-  const auto first_address_family_count =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(*happy_eyeballs_config, first_address_family_count, 1);
-  switch (happy_eyeballs_config->first_address_family_version()) {
+  AddressFamily preferred_family = getFamily(in[0]);
+  switch (happy_eyeballs_config.first_address_family_version()) {
   case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::V4:
-    first_family_ip_version = Address::IpVersion::v4;
+    preferred_family = {Address::Type::Ip, Address::IpVersion::v4};
     break;
   case envoy::config::cluster::v3::UpstreamConnectionOptions::V6:
-    first_family_ip_version = Address::IpVersion::v6;
+    preferred_family = {Address::Type::Ip, Address::IpVersion::v6};
+    break;
+  case envoy::config::cluster::v3::UpstreamConnectionOptions::PIPE:
+    preferred_family = {Address::Type::Pipe, absl::nullopt};
+    break;
+  case envoy::config::cluster::v3::UpstreamConnectionOptions::INTERNAL:
+    preferred_family = {Address::Type::EnvoyInternal, absl::nullopt};
     break;
   default:
     break;
   }
 
-  auto first = std::find_if(in.begin(), in.end(), [&](const auto& val) {
-    return hasMatchingIpVersion(first_family_ip_version, val);
-  });
-  auto other = std::find_if(in.begin(), in.end(), [&](const auto& val) {
-    return !hasMatchingIpVersion(first_family_ip_version, val);
-  });
-
-  while (first != in.end() || other != in.end()) {
-    uint32_t count = 0;
-    while (first != in.end() && ++count <= first_address_family_count) {
-      address_list.push_back(*first);
-      first = std::find_if(first + 1, in.end(), [&](const auto& val) {
-        return hasMatchingIpVersion(first_family_ip_version, val);
-      });
+  // Group addresses by family, preserving original family order except placing preferred_family
+  // in the first position. Store each family with an index that will be used for iterating through
+  // the bucket of addresses with that address family.
+  std::vector<std::pair<AddressFamily, uint32_t>> family_order;
+  std::map<AddressFamily, std::vector<Address::InstanceConstSharedPtr>> buckets;
+  for (const auto& addr : in) {
+    AddressFamily family = getFamily(addr);
+    auto& bucket = buckets[family];
+    if (bucket.empty()) {
+      if (family == preferred_family) {
+        family_order.insert(family_order.begin(), {family, 0});
+      } else {
+        family_order.push_back({family, 0});
+      }
     }
+    bucket.push_back(addr);
+  }
 
-    if (other != in.end()) {
-      address_list.push_back(*other);
-      other = std::find_if(other + 1, in.end(), [&](const auto& val) {
-        return !hasMatchingIpVersion(first_family_ip_version, val);
-      });
+  const auto first_address_family_count =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(happy_eyeballs_config, first_address_family_count, 1);
+
+  // Loop through address families.
+  for (int i = 0; address_list.size() < in.size(); i = (i + 1) % family_order.size()) {
+    std::vector<Address::InstanceConstSharedPtr>& bucket = buckets[family_order[i].first];
+    // Push first_address_family_count addresses for the preferred family. We can't just check if
+    // i == 0 because the preferred family may not be present.
+    int num_addrs_to_push =
+        (family_order[i].first == preferred_family) ? first_address_family_count : 1;
+    for (int j = 0; family_order[i].second < bucket.size() && j < num_addrs_to_push; ++j) {
+      address_list.push_back(std::move(bucket[family_order[i].second++]));
     }
   }
+
   ASSERT(address_list.size() == in.size());
   return address_list;
 }

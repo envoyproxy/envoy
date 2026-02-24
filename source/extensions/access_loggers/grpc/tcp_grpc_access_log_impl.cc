@@ -21,11 +21,12 @@ TcpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcCommon::GrpcAccessLog
 TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                    const TcpGrpcAccessLogConfig config,
                                    ThreadLocal::SlotAllocator& tls,
-                                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+                                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                                   const Formatter::CommandParserPtrVector& command_parsers)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const TcpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
-      common_properties_config_(config.common_config()) {
+      common_properties_config_(config.common_config(), command_parsers) {
   THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(config_->common_config()));
   tls_slot_->set(
       [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {

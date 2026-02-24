@@ -290,6 +290,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
         "@abseil-cpp//absl/types:optional",
     ]) + envoy_select_enable_http_datagrams([
@@ -449,6 +450,7 @@ envoy_cc_library(
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
         "//envoy/network:listener_interface",
+        "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_core_server_lib",
         "@quiche//:quic_core_utils_lib",
     ]),

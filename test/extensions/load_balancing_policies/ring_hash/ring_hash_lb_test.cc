@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -1149,6 +1150,39 @@ TEST(TypedRingHashLbConfigTest, TypedRingHashLbConfigTest) {
     EXPECT_EQ(envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash::MURMUR_HASH_2,
               typed_config.lb_config_.hash_function());
   }
+}
+
+TEST(RingHashCoalesceDisabledTest, FallbackPathExercised) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "false"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  NiceMock<MockPrioritySet> priority_set;
+  NiceMock<MockPrioritySet> worker_priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto lb = std::make_unique<RingHashLoadBalancer>(
+      priority_set, stats, *stats_store.rootScope(), context.runtime_loader_, context.api_.random_,
+      50, typed_config.lb_config_, typed_config.hash_policy_);
+  EXPECT_TRUE(lb->initialize().ok());
+
+  MockHostSet& host_set = *priority_set.getMockHostSet(0);
+  host_set.hosts_ = {makeTestHost(info, "tcp://127.0.0.1:80")};
+  host_set.healthy_hosts_ = host_set.hosts_;
+  host_set.runCallbacks({}, {});
+
+  LoadBalancerParams lb_params{worker_priority_set, {}};
+  auto worker_lb = lb->factory()->create(lb_params);
+  EXPECT_NE(nullptr, worker_lb);
 }
 
 } // namespace

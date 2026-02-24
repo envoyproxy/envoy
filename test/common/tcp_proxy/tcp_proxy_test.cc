@@ -3284,6 +3284,264 @@ TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
   EXPECT_NE(nullptr, filter_.get());
 }
 
+// Test that merge config option merges tcp_proxy TLV entries with existing downstream ones.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDownstreamState) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("tcp_proxy_value");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state (simulating proxy_protocol listener filter).
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+  downstream_tlvs.push_back({0xE2, {'o', 't', 'h', 'e', 'r'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs are set.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 3 TLVs: 1 from tcp_proxy + 2 from downstream.
+  ASSERT_EQ(3, tlvs.size());
+
+  // tcp_proxy TLV is first (takes precedence).
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("tcp_proxy_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Downstream TLVs follow.
+  EXPECT_EQ(0xE1, tlvs[1].type);
+  EXPECT_EQ("downstream", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+
+  EXPECT_EQ(0xE2, tlvs[2].type);
+  EXPECT_EQ("other", std::string(tlvs[2].value.begin(), tlvs[2].value.end()));
+
+  // Verify addresses are preserved from downstream.
+  EXPECT_EQ(downstream_src_addr->asString(), header->value().src_addr_->asString());
+  EXPECT_EQ(downstream_dst_addr->asString(), header->value().dst_addr_->asString());
+}
+
+// Test that tcp_proxy TLVs override downstream TLVs with the same type when merging.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsPrecedence) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xE1); // Same type as downstream TLV
+  tlv->set_value("overridden");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state with a conflicting TLV type.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'o', 'r', 'i', 'g', 'i', 'n', 'a', 'l'}});
+  downstream_tlvs.push_back({0xE2, {'k', 'e', 'e', 'p'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 2 TLVs: 0xE1 overridden by tcp_proxy, 0xE2 kept from downstream.
+  ASSERT_EQ(2, tlvs.size());
+
+  // tcp_proxy TLV overrides downstream TLV with same type.
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("overridden", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Non-conflicting downstream TLV is preserved.
+  EXPECT_EQ(0xE2, tlvs[1].type);
+  EXPECT_EQ("keep", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+}
+
+// Test that tcp_proxy TLVs are ignored when downstream state exists and merge is disabled.
+TEST_P(TcpProxyTest, NoMergeWithDownstreamTlvsWhenDisabled) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("should_be_ignored");
+  // The merge config option defaults to false.
+
+  // Set up existing downstream proxy protocol state.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify only downstream TLVs are present (tcp_proxy TLVs were ignored).
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should only have the downstream TLV.
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("downstream", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+}
+
+// Test that merge with dynamic TLVs works correctly.
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDynamicTlv) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF2);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DYNAMIC_METADATA(envoy.test:key)%");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
+
+  // Set dynamic metadata.
+  filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"envoy.test", Protobuf::Struct()});
+  auto& test_struct = (*filter_callbacks_.connection_.stream_info_.metadata_
+                            .mutable_filter_metadata())["envoy.test"];
+  (*test_struct.mutable_fields())["key"].set_string_value("dynamic_value");
+
+  // Set up existing downstream proxy protocol state.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', 's', 't', 'r', 'e', 'a', 'm'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the merged TLVs.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  // Should have 2 TLVs: dynamic from tcp_proxy + 1 from downstream.
+  ASSERT_EQ(2, tlvs.size());
+
+  // Dynamic TLV from tcp_proxy.
+  EXPECT_EQ(0xF2, tlvs[0].type);
+  EXPECT_EQ("dynamic_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Downstream TLV.
+  EXPECT_EQ(0xE1, tlvs[1].type);
+  EXPECT_EQ("downstream", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+}
+
+// Test that APPEND mode preserves all TLVs including duplicates.
+TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv1 = config.add_proxy_protocol_tlvs();
+  tlv1->set_type(0xE1); // Same type as one downstream TLV
+  tlv1->set_value("tcp_proxy_e1");
+  auto* tlv2 = config.add_proxy_protocol_tlvs();
+  tlv2->set_type(0xF0); // Different type
+  tlv2->set_value("tcp_proxy_f0");
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::APPEND_IF_EXISTS_OR_ADD);
+
+  // Set up existing downstream proxy protocol state with duplicate types.
+  Network::ProxyProtocolTLVVector downstream_tlvs;
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', '1'}});
+  downstream_tlvs.push_back({0xE1, {'d', 'o', 'w', 'n', '2'}}); // Duplicate type
+  downstream_tlvs.push_back({0xE2, {'d', 'o', 'w', 'n', '3'}});
+
+  auto downstream_src_addr = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto downstream_dst_addr = *Network::Utility::resolveUrl("tcp://10.0.0.2:5678");
+
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::Network::ProxyProtocolFilterState::key(),
+      std::make_shared<Envoy::Network::ProxyProtocolFilterState>(
+          Network::ProxyProtocolDataWithVersion{
+              {downstream_src_addr, downstream_dst_addr, downstream_tlvs},
+              Network::ProxyProtocolVersion::V2}),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify all TLVs are preserved (3 downstream + 2 tcp_proxy = 5 total).
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+
+  ASSERT_EQ(5, tlvs.size());
+
+  // Downstream TLVs come first.
+  EXPECT_EQ(0xE1, tlvs[0].type);
+  EXPECT_EQ("down1", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  EXPECT_EQ(0xE1, tlvs[1].type); // Duplicate type preserved
+  EXPECT_EQ("down2", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+
+  EXPECT_EQ(0xE2, tlvs[2].type);
+  EXPECT_EQ("down3", std::string(tlvs[2].value.begin(), tlvs[2].value.end()));
+
+  // tcp_proxy TLVs appended.
+  EXPECT_EQ(0xE1, tlvs[3].type); // Same type as downstream, but both preserved
+  EXPECT_EQ("tcp_proxy_e1", std::string(tlvs[3].value.begin(), tlvs[3].value.end()));
+
+  EXPECT_EQ(0xF0, tlvs[4].type);
+  EXPECT_EQ("tcp_proxy_f0", std::string(tlvs[4].value.begin(), tlvs[4].value.end()));
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

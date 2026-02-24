@@ -1108,6 +1108,40 @@ TEST_F(OAuth2Test, SetBearerToken) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
+TEST_F(OAuth2Test, SetBearerTokenWithTlsClientAuth) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_TLS_CLIENT_AUTH
+                 /* authType */));
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      // Cookies from other OAuth flows that should be ignored
+      {Http::Headers::get().Cookie.get(), "OauthNonce.123456789abcdef0=csrf_token_from_other_flow"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.123456789abcdef0=code_verifier_from_other_flow"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::TlsClientAuth));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 TEST_F(OAuth2Test, SetBearerTokenWithEncryptionDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "false"}});

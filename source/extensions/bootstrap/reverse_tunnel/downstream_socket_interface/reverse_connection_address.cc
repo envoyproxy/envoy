@@ -14,7 +14,7 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-static const std::string reverse_connection_address = "127.0.0.1:0";
+const std::string ReverseConnectionAddress::ReverseConnectionIp::address_str_ = "127.0.0.1";
 
 ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig& config)
     : config_(config) {
@@ -23,9 +23,10 @@ ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig
   logical_name_ = fmt::format("rc://{}:{}:{}@{}:{}", config.src_node_id, config.src_cluster_id,
                               config.src_tenant_id, config.remote_cluster, config.connection_count);
 
-  // Use localhost with a static port for the actual address string to pass IP validation
+  // Use localhost with the placeholder port for the actual address string.
   // This will be used by the filter chain manager for matching.
-  address_string_ = reverse_connection_address;
+  address_string_ = fmt::format("{}:{}", ReverseConnectionIp::address_str_,
+                                kReverseConnectionListenerPortPlaceholder);
 
   ENVOY_LOG_MISC(debug, "reverse connection address: logical_name={}, address={}", logical_name_,
                  address_string_);
@@ -50,10 +51,10 @@ absl::string_view ReverseConnectionAddress::asStringView() const { return addres
 const std::string& ReverseConnectionAddress::logicalName() const { return logical_name_; }
 
 const sockaddr* ReverseConnectionAddress::sockAddr() const {
-  // Return a valid localhost sockaddr structure for IP validation.
+  // Return a valid localhost sockaddr structure with placeholder port.
   static struct sockaddr_in addr;
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(0);                      // Port 0
+  addr.sin_port = htons(kReverseConnectionListenerPortPlaceholder);
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1
   return reinterpret_cast<const sockaddr*>(&addr);
 }

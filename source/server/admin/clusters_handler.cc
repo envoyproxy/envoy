@@ -45,12 +45,24 @@ ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(
 Http::Code ClustersHandler::handlerClusters(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response, AdminStream& admin_stream) {
   const auto format_value = Utility::formatParam(admin_stream.queryParams());
+  const auto filter_value = admin_stream.queryParams().getFirstValue("filter");
+
+  absl::optional<const re2::RE2> re2_filter;
+  if (filter_value.has_value() && !filter_value.value().empty()) {
+    re2::RE2::Options options;
+    options.set_log_errors(false);
+    re2_filter.emplace(filter_value.value(), options);
+    if (!re2_filter->ok()) {
+      response.add("Invalid re2 regex");
+      return Http::Code::BadRequest;
+    }
+  }
 
   if (format_value.has_value() && format_value.value() == "json") {
-    writeClustersAsJson(response);
+    writeClustersAsJson(re2_filter, response);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
-    writeClustersAsText(response);
+    writeClustersAsText(re2_filter, response);
   }
 
   return Http::Code::OK;
@@ -108,7 +120,8 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
+void ClustersHandler::writeClustersAsJson(const absl::optional<const re2::RE2>& filter,
+                                          Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -116,6 +129,9 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+    if (!shouldIncludeCluster(cluster_info->name(), filter)) {
+      continue;
+    }
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
@@ -199,13 +215,18 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
 }
 
 // TODO(efimki): Add support of text readouts stats.
-void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
+void ClustersHandler::writeClustersAsText(const absl::optional<const re2::RE2>& filter,
+                                          Buffer::Instance& response) {
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
   for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
     UNREFERENCED_PARAMETER(name);
     const Upstream::Cluster& cluster = cluster_ref.get();
     const std::string& cluster_name = cluster.info()->name();
+    if (!shouldIncludeCluster(cluster_name, filter)) {
+      continue;
+    }
+
     response.add(fmt::format("{}::observability_name::{}\n", cluster_name,
                              cluster.info()->observabilityName()));
     addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
@@ -268,6 +289,10 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
   }
 }
 
+bool ClustersHandler::shouldIncludeCluster(const std::string& cluster_name,
+                                           const absl::optional<const re2::RE2>& filter) {
+  return !filter.has_value() || re2::RE2::PartialMatch(cluster_name, filter.value());
+}
 void ClustersHandler::addOutlierInfo(const std::string& cluster_name,
                                      const Upstream::Outlier::Detector* outlier_detector,
                                      Buffer::Instance& response) {
