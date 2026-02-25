@@ -58,7 +58,6 @@ FORMAT_ARGS+=(
     ./envoy ./BUILD ./dist)
 
 export ENVOY_BAZEL_PREFIX="@envoy" && _bazel run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
-
 KTFMT="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"/ktfmt.sh
 KOTLIN_DIRS=(
   "library/kotlin"
@@ -76,21 +75,18 @@ else
   fi
 fi
 
-# install black 24.3.0 if not already installed
-if ! python3 -m black --version 2>/dev/null | grep -q "24.3.0"; then
-  echo "Installing black 24.3.0"
-  python3 -m pip install black==24.3.0
-fi
 
+_bazel build //tools:black
+BLACK_BIN=$(_bazel info bazel-bin)/tools/black
 PYTHON_DIRS=(
   "library/python"
   "test/python"
   "examples/python"
 )
 if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
-  python3 -m black "${PYTHON_DIRS[@]}"
+  "${BLACK_BIN}" "${PYTHON_DIRS[@]}"
 else
-  NEEDS_FORMAT=$(python3 -m black --check "${PYTHON_DIRS[@]}" 2>&1)
+  NEEDS_FORMAT=$("${BLACK_BIN}" --check "${PYTHON_DIRS[@]}" 2>&1)
   if [[ -n "${NEEDS_FORMAT}" ]]; then
     echo "ERROR: Run 'tools/check_format.sh fix' to fix"
     echo "${NEEDS_FORMAT}"
