@@ -1196,10 +1196,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                  static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
-    absl::string_view downstream_local_close_reason =
-        read_callbacks_->connection().localCloseReason();
+    absl::string_view downstream_close_details = read_callbacks_->connection().localCloseReason();
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(
-        upstream_->onDownstreamEvent(event, downstream_local_close_reason));
+        upstream_->onDownstreamEvent(event, downstream_close_details));
     if (conn_data != nullptr &&
         conn_data->connection().state() != Network::Connection::State::Closed) {
       config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
