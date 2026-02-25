@@ -10,11 +10,10 @@ export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    # Link libc++ statically to avoid runtime dependency on libc++.so.1
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ --sysroot=$${SYSROOT} -static-libgcc -Wl,-Bstatic -lc++ -lc++abi -Wl,-Bdynamic -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
 else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT} -static-libstdc++ -static-libgcc"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
 fi
 export CGO_CFLAGS="--sysroot=$${SYSROOT}"
 export CGO_CXXFLAGS="$${CXXFLAGS}"
@@ -68,11 +67,10 @@ SYSROOT="$$(realpath $$(dirname "$(location %s)"))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    # Link libc++ statically to avoid runtime dependency on libc++.so.1
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ --sysroot=$${SYSROOT} -static-libgcc -Wl,-Bstatic -lc++ -lc++abi -Wl,-Bdynamic -lm -pthread"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
 else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT} -static-libstdc++ -static-libgcc"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
 fi
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)
