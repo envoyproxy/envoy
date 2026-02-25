@@ -9962,9 +9962,6 @@ pub trait EnvoyLoadBalancer {
   /// Returns a random 64-bit unsigned integer from Envoy's random number generator.
   fn get_random(&self) -> u64;
 
-  /// Returns the current monotonic time in nanoseconds.
-  fn get_monotonic_time_ns(&self) -> u64;
-
   // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
   // -------------------------------------------------------------------------
@@ -10317,10 +10314,6 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
 
   fn get_random(&self) -> u64 {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_random(self.lb_ptr) }
-  }
-
-  fn get_monotonic_time_ns(&self) -> u64 {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_monotonic_time_ns(self.lb_ptr) }
   }
 
   fn has_context(&self) -> bool {

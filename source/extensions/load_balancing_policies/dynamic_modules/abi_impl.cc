@@ -509,13 +509,4 @@ envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_p
   return getLb(lb_envoy_ptr)->random().random();
 }
 
-uint64_t envoy_dynamic_module_callback_lb_get_monotonic_time_ns(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr) {
-  if (lb_envoy_ptr == nullptr) {
-    return 0;
-  }
-  auto now = getLb(lb_envoy_ptr)->timeSource().monotonicTime();
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-}
-
 } // extern "C"

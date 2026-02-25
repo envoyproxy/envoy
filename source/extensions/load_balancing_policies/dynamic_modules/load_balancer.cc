@@ -8,10 +8,9 @@ namespace DynamicModules {
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(DynamicModuleLbConfigSharedPtr config,
                                                      const Upstream::PrioritySet& priority_set,
                                                      const std::string& cluster_name,
-                                                     Random::RandomGenerator& random,
-                                                     TimeSource& time_source)
+                                                     Random::RandomGenerator& random)
     : config_(std::move(config)), priority_set_(priority_set), cluster_name_(cluster_name),
-      random_(random), time_source_(time_source), in_module_lb_(nullptr) {
+      random_(random), in_module_lb_(nullptr) {
   // Create the in-module load balancer instance.
   in_module_lb_ = config_->on_lb_new_(config_->in_module_config_, this);
   if (in_module_lb_ == nullptr) {

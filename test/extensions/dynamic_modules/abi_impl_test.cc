@@ -743,16 +743,6 @@ TEST(CommonAbiImplTest, LbGetRandomEnvoyBug) {
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_get_monotonic_time_ns triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetMonotonicTimeNsEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto time_ns = envoy_dynamic_module_callback_lb_get_monotonic_time_ns(nullptr);
-        EXPECT_EQ(time_ns, 0);
-      },
-      "not implemented in this context");
-}
-
 // =====================================================================
 // Matcher weak symbol stub tests
 // =====================================================================

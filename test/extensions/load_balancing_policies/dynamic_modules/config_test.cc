@@ -1195,48 +1195,6 @@ TEST_F(DynamicModulesLoadBalancerTest, RandomNumberGenerator) {
 }
 
 // =============================================================================
-// Time Source Tests
-// =============================================================================
-
-TEST_F(DynamicModulesLoadBalancerTest, MonotonicTime) {
-  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
-      config;
-  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_policy_name("test_lb");
-
-  Factory factory;
-  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
-
-  auto thread_aware_lb =
-      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
-                     cluster_info_, priority_set_, runtime_, random_, time_source_);
-  ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
-
-  Upstream::LoadBalancerParams params{priority_set_, nullptr};
-  auto lb = thread_aware_lb->factory()->create(params);
-  ASSERT_NE(lb, nullptr);
-
-  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
-
-  // Advance time to ensure a non-zero starting point (SimulatedTimeSystem starts at 0).
-  time_source_.advanceTimeWait(std::chrono::milliseconds(10));
-
-  // Get time and verify it's positive.
-  uint64_t time_ns = envoy_dynamic_module_callback_lb_get_monotonic_time_ns(lb_ptr);
-  EXPECT_GT(time_ns, 0);
-
-  // Advance time and verify it increases.
-  time_source_.advanceTimeWait(std::chrono::milliseconds(100));
-  uint64_t time_ns2 = envoy_dynamic_module_callback_lb_get_monotonic_time_ns(lb_ptr);
-  EXPECT_GT(time_ns2, time_ns);
-
-  // Null pointer handling.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_monotonic_time_ns(nullptr), 0);
-}
-
-// =============================================================================
 // Callbacks Test Module Integration Test
 // =============================================================================
 

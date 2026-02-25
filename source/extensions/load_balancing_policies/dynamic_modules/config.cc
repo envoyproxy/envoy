@@ -61,13 +61,12 @@ private:
 class LbFactory : public Upstream::LoadBalancerFactory {
 public:
   LbFactory(DynamicModuleLbConfigSharedPtr config, const std::string& cluster_name,
-            Random::RandomGenerator& random, TimeSource& time_source)
-      : config_(std::move(config)), cluster_name_(cluster_name), random_(random),
-        time_source_(time_source) {}
+            Random::RandomGenerator& random)
+      : config_(std::move(config)), cluster_name_(cluster_name), random_(random) {}
 
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
     return std::make_unique<DynamicModuleLoadBalancer>(config_, params.priority_set, cluster_name_,
-                                                       random_, time_source_);
+                                                       random_);
   }
 
   bool recreateOnHostChange() const override { return false; }
@@ -76,7 +75,6 @@ private:
   DynamicModuleLbConfigSharedPtr config_;
   const std::string cluster_name_;
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
 };
 
 } // namespace
@@ -85,12 +83,12 @@ Upstream::ThreadAwareLoadBalancerPtr
 Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::ClusterInfo& cluster_info,
                 const Upstream::PrioritySet& /*priority_set*/, Runtime::Loader&,
-                Random::RandomGenerator& random, TimeSource& time_source) {
+                Random::RandomGenerator& random, TimeSource& /*time_source*/) {
   const auto* typed_config = dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config.ptr());
   ASSERT(typed_config != nullptr, "Invalid dynamic module load balancer config");
 
-  return std::make_unique<ThreadAwareLb>(std::make_shared<LbFactory>(
-      typed_config->config(), cluster_info.name(), random, time_source));
+  return std::make_unique<ThreadAwareLb>(
+      std::make_shared<LbFactory>(typed_config->config(), cluster_info.name(), random));
 }
 
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>

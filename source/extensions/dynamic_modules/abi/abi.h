@@ -8025,16 +8025,6 @@ uint64_t
 envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_lb_get_monotonic_time_ns returns the current monotonic time
- * in nanoseconds. This is useful for time-based load balancing algorithms such as peak EWMA.
- *
- * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
- * @return the current monotonic time in nanoseconds.
- */
-uint64_t envoy_dynamic_module_callback_lb_get_monotonic_time_ns(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
-
-/**
  * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from
  * the load balancer context.
  *

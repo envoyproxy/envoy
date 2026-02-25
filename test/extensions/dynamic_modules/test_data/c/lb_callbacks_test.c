@@ -157,10 +157,6 @@ bool envoy_dynamic_module_on_lb_choose_host(
   uint64_t random_val = envoy_dynamic_module_callback_lb_get_random(lb_envoy_ptr);
   (void)random_val;
 
-  // Test monotonic time.
-  uint64_t time_ns = envoy_dynamic_module_callback_lb_get_monotonic_time_ns(lb_envoy_ptr);
-  (void)time_ns;
-
   // Test context callbacks if context is available.
   if (context_envoy_ptr != NULL) {
     // Test hash key computation.

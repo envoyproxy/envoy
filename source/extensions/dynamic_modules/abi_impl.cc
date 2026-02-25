@@ -603,13 +603,6 @@ envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_p
   return 0;
 }
 
-__attribute__((weak)) uint64_t
-envoy_dynamic_module_callback_lb_get_monotonic_time_ns(envoy_dynamic_module_type_lb_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_monotonic_time_ns: "
-               "not implemented in this context");
-  return 0;
-}
-
 // ---------------------- Matcher callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher extension abi_impl.cc when the matcher extension is used.
