@@ -2461,4 +2461,20 @@ TEST_F(ProtobufUtilityTest, CompareMapFieldsWire) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
 }
 
+TEST_F(ProtobufUtilityTest, ValidateRecurseIntoAnyUnresolvableType) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  cluster->set_name("test_cluster");
+  cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  auto* cluster_type = cluster->mutable_cluster_type();
+  cluster_type->set_name("test");
+  Protobuf::Any any;
+  any.set_type_url("type.googleapis.com/some.nonexistent.Type");
+  any.set_value("some_bytes");
+  *cluster_type->mutable_typed_config() = any;
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(bootstrap, /*recurse_into_any=*/true),
+                          EnvoyException,
+                          "Invalid type_url.*some.nonexistent.Type.*during traversal");
+}
+
 } // namespace Envoy
