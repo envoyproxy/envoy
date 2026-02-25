@@ -281,7 +281,7 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
-TEST_P(StatsAccessLogIntegrationTest, DynamicScope) {
+TEST_P(StatsAccessLogIntegrationTest, FileBasedDynamicScope) {
   const std::string dynamic_scope_yaml =
       TestEnvironment::writeStringToFileForTest("dynamic_scope.yaml", R"EOF(
 resources:
@@ -289,9 +289,10 @@ resources:
     name: my_dynamic_scope
     resource:
       "@type": "type.googleapis.com/envoy.config.metrics.v3.Scope"
+      max_counters: 2
 )EOF");
 
-  const std::string config_yaml = fmt::format(R"EOF(
+  const std::string logger1_yaml = fmt::format(R"EOF(
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
@@ -304,12 +305,33 @@ resources:
                       path: {}
                 counters:
                   - stat:
-                      name: my_counter
-                    value_fixed: 42
+                      name: counter1
+                    value_fixed: 1
 )EOF",
-                                              dynamic_scope_yaml);
+                                               dynamic_scope_yaml);
 
-  init(config_yaml);
+  const std::string logger2_yaml = fmt::format(R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                dynamic_scope:
+                  resource_name: my_dynamic_scope
+                  config_source:
+                    resource_api_version: V3
+                    path_config_source:
+                      path: {}
+                counters:
+                  - stat:
+                      name: counter2
+                    value_fixed: 2
+                  - stat:
+                      name: counter3
+                    value_fixed: 3
+)EOF",
+                                               dynamic_scope_yaml);
+
+  init({logger1_yaml, logger2_yaml});
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
@@ -323,7 +345,15 @@ resources:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
-  test_server_->waitForCounterEq("my_dynamic_scope.my_counter", 42);
+  // Two loggers share the same scope "my_dynamic_scope" with max_counters=2.
+  // logger1 creates counter1.
+  // logger2 creates counter2 and counter3.
+  // counter1 and counter2 should be created.
+  test_server_->waitForCounterEq("my_dynamic_scope.counter1", 1);
+  test_server_->waitForCounterEq("my_dynamic_scope.counter2", 2);
+  // counter3 should not be created because the limit is reached.
+  EXPECT_EQ(nullptr,
+            TestUtility::findCounter(test_server_->statStore(), "my_dynamic_scope.counter3"));
 }
 
 class StatsAccessLogAdsIntegrationTest : public AdsIntegrationTest {
