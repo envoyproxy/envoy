@@ -259,6 +259,17 @@ run:
     - test/integration/*
     - test/mocks/**/*
     - test/test_common/**/*
+  mobile-python-tests:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
   mobile-coverage:
     paths:
     - .bazelrc
