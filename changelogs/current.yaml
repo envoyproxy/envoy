@@ -82,6 +82,11 @@ minor_behavior_changes:
     Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
     containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
     guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
+- area: ext_authz
+  change: |
+    Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
+    headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
+    collected and can be accesses via method requestProcessingEffect() and failedOpen().
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -463,5 +468,11 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
+
+- area: ext_proc
+  change: |
+    Added :ref:`allow_content_length_header
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
+    the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
 
 deprecated:
