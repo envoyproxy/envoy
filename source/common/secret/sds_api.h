@@ -61,7 +61,7 @@ public:
          std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
          bool warm);
 
-  SecretData secretData();
+  const SecretData& secretData() const;
 
 protected:
   // Ordered for hash stability.
