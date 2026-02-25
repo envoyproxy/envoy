@@ -65,10 +65,10 @@ func (mr *MockBodyBufferMockRecorder) Drain(numBytes any) *gomock.Call {
 }
 
 // GetChunks mocks base method.
-func (m *MockBodyBuffer) GetChunks() [][]byte {
+func (m *MockBodyBuffer) GetChunks() []shared.UnsafeEnvoyBuffer {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChunks")
-	ret0, _ := ret[0].([][]byte)
+	ret0, _ := ret[0].([]shared.UnsafeEnvoyBuffer)
 	return ret0
 }
 
@@ -129,10 +129,10 @@ func (mr *MockHeaderMapMockRecorder) Add(key, value any) *gomock.Call {
 }
 
 // Get mocks base method.
-func (m *MockHeaderMap) Get(key string) []string {
+func (m *MockHeaderMap) Get(key string) []shared.UnsafeEnvoyBuffer {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", key)
-	ret0, _ := ret[0].([]string)
+	ret0, _ := ret[0].([]shared.UnsafeEnvoyBuffer)
 	return ret0
 }
 
@@ -143,10 +143,10 @@ func (mr *MockHeaderMapMockRecorder) Get(key any) *gomock.Call {
 }
 
 // GetAll mocks base method.
-func (m *MockHeaderMap) GetAll() [][2]string {
+func (m *MockHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll")
-	ret0, _ := ret[0].([][2]string)
+	ret0, _ := ret[0].([][2]shared.UnsafeEnvoyBuffer)
 	return ret0
 }
 
@@ -157,10 +157,10 @@ func (mr *MockHeaderMapMockRecorder) GetAll() *gomock.Call {
 }
 
 // GetOne mocks base method.
-func (m *MockHeaderMap) GetOne(key string) string {
+func (m *MockHeaderMap) GetOne(key string) shared.UnsafeEnvoyBuffer {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOne", key)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	return ret0
 }
 
@@ -219,7 +219,7 @@ func (m *MockHttpCalloutCallback) EXPECT() *MockHttpCalloutCallbackMockRecorder 
 }
 
 // OnHttpCalloutDone mocks base method.
-func (m *MockHttpCalloutCallback) OnHttpCalloutDone(calloutID uint64, result shared.HttpCalloutResult, headers [][2]string, body [][]byte) {
+func (m *MockHttpCalloutCallback) OnHttpCalloutDone(calloutID uint64, result shared.HttpCalloutResult, headers [][2]shared.UnsafeEnvoyBuffer, body []shared.UnsafeEnvoyBuffer) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnHttpCalloutDone", calloutID, result, headers, body)
 }
@@ -267,7 +267,7 @@ func (mr *MockHttpStreamCallbackMockRecorder) OnHttpStreamComplete(streamID any)
 }
 
 // OnHttpStreamData mocks base method.
-func (m *MockHttpStreamCallback) OnHttpStreamData(streamID uint64, body [][]byte, endStream bool) {
+func (m *MockHttpStreamCallback) OnHttpStreamData(streamID uint64, body []shared.UnsafeEnvoyBuffer, endStream bool) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnHttpStreamData", streamID, body, endStream)
 }
@@ -279,7 +279,7 @@ func (mr *MockHttpStreamCallbackMockRecorder) OnHttpStreamData(streamID, body, e
 }
 
 // OnHttpStreamHeaders mocks base method.
-func (m *MockHttpStreamCallback) OnHttpStreamHeaders(streamID uint64, headers [][2]string, endStream bool) {
+func (m *MockHttpStreamCallback) OnHttpStreamHeaders(streamID uint64, headers [][2]shared.UnsafeEnvoyBuffer, endStream bool) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnHttpStreamHeaders", streamID, headers, endStream)
 }
@@ -303,7 +303,7 @@ func (mr *MockHttpStreamCallbackMockRecorder) OnHttpStreamReset(streamID, reason
 }
 
 // OnHttpStreamTrailers mocks base method.
-func (m *MockHttpStreamCallback) OnHttpStreamTrailers(streamID uint64, trailers [][2]string) {
+func (m *MockHttpStreamCallback) OnHttpStreamTrailers(streamID uint64, trailers [][2]shared.UnsafeEnvoyBuffer) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnHttpStreamTrailers", streamID, trailers)
 }
@@ -545,10 +545,10 @@ func (mr *MockHttpFilterHandleMockRecorder) GetAttributeNumber(attributeID any) 
 }
 
 // GetAttributeString mocks base method.
-func (m *MockHttpFilterHandle) GetAttributeString(attributeID shared.AttributeID) (string, bool) {
+func (m *MockHttpFilterHandle) GetAttributeString(attributeID shared.AttributeID) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttributeString", attributeID)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -574,10 +574,10 @@ func (mr *MockHttpFilterHandleMockRecorder) GetData(key any) *gomock.Call {
 }
 
 // GetFilterState mocks base method.
-func (m *MockHttpFilterHandle) GetFilterState(key string) ([]byte, bool) {
+func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFilterState", key)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -604,10 +604,10 @@ func (mr *MockHttpFilterHandleMockRecorder) GetMetadataNumber(source, metadataNa
 }
 
 // GetMetadataString mocks base method.
-func (m *MockHttpFilterHandle) GetMetadataString(source shared.MetadataSourceType, metadataNamespace, key string) (string, bool) {
+func (m *MockHttpFilterHandle) GetMetadataString(source shared.MetadataSourceType, metadataNamespace, key string) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetadataString", source, metadataNamespace, key)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
