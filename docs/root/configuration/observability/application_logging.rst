@@ -61,5 +61,5 @@ well-known structured event types:
    :header: Log component, Event name, Body, Description
    :widths: 1, 1, 1, 2
 
-   xds_event, listener_warmed, ``listener_name``, New listener is warmed on all workers, as a result of a listener LDS update.
+   xds_event, listener_warmed, ``listener_name``, New listener is warmed on all workers as a result of a listener LDS update.
    xds_event, listener_rejected, ``listener_name``, Listener is rejected during an LDS update.
