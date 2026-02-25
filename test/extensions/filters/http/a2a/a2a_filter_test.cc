@@ -41,11 +41,6 @@ TEST_F(A2aFilterTest, ValidGetRequest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
-TEST_F(A2aFilterTest, ValidDeleteRequest) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "DELETE"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-}
-
 TEST_F(A2aFilterTest, ValidPostRequest) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));

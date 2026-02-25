@@ -69,7 +69,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
 private:
-  bool isValidA2aGetOrDeleteRequest(const Http::RequestHeaderMap& headers) const;
+  bool isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidA2aPostRequest(const Http::RequestHeaderMap& headers) const;
 
   bool shouldRejectRequest() const;

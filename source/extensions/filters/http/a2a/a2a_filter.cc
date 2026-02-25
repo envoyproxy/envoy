@@ -26,9 +26,8 @@ A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3
       parser_config_(A2aParserConfig::createDefault()), stats_(generateStats(stats_prefix, scope)) {
 }
 
-bool A2aFilter::isValidA2aGetOrDeleteRequest(const Http::RequestHeaderMap& headers) const {
-  return headers.getMethodValue() == Http::Headers::get().MethodValues.Get ||
-         headers.getMethodValue() == Http::Headers::get().MethodValues.Delete;
+bool A2aFilter::isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const {
+  return headers.getMethodValue() == Http::Headers::get().MethodValues.Get;
 }
 
 bool A2aFilter::isValidA2aPostRequest(const Http::RequestHeaderMap& headers) const {
@@ -58,28 +57,25 @@ uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBo
 
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
-  if (isValidA2aGetOrDeleteRequest(headers)) {
+  // TODO(tyxia): Only support GET and POST for now. Investigate if other methods should be
+  // supported in the future.
+  if (isValidA2aGetRequest(headers)) {
     is_a2a_request_ = true;
-    ENVOY_LOG(debug, "valid A2A GET/DELETE request, passing through");
+    ENVOY_LOG(debug, "valid A2A GET request, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (isValidA2aPostRequest(headers)) {
     is_json_post_request_ = true;
-    ENVOY_LOG(debug, "valid A2A Post request");
+    ENVOY_LOG(debug, "valid A2A POST request");
     if (end_stream) {
       is_a2a_request_ = false;
     } else {
-      // Need to buffer the body to check for JSON-RPC 2.0
+      // TODO(tyxia) Set the max request body size limit, depends on the way of handling the body
+      // data in decodeData.
       is_a2a_request_ = true;
 
-      const uint32_t max_size = getMaxRequestBodySize();
-      if (max_size > 0) {
-        decoder_callbacks_->setDecoderBufferLimit(max_size);
-        ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
-      }
-
-      // Stop iteration to buffer the body for validation
+      // Stop iteration to validate the body in decodeData (e.g., validate JSON-RPC 2.0).
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -105,7 +101,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance&, bool) {
     parser_ = std::make_unique<A2aJsonParser>(config_->parserConfig());
   }
 
-  // TODO(tyxia) Handle the parsing data.
+  // TODO(tyxia) Handle the data parsing.
   return Http::FilterDataStatus::Continue;
 }
 
