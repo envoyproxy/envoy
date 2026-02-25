@@ -87,13 +87,13 @@ message Mcp {
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
   // If set, extract and validate W3C trace context from the MCP request body and propagate it in
-  // HTTP headers `traceparent` and `tracestate`. The fields are validated and propagated according
-  // to the spec which can be found at `https://www.w3.org/TR/trace-context/`.
+  // HTTP headers ``traceparent`` and ``tracestate``. The fields are validated and propagated
+  // according to the spec which can be found at ``https://www.w3.org/TR/trace-context/``.
   // If unset (default), do not extract or inject trace context.
   TraceContextPropagationConfig propagate_trace_context = 6;
 
   // If set, extract and validate W3C baggage from the MCP request body and copy it to the
-  // HTTP header `baggage`. Validated according to the spec at `https://www.w3.org/TR/baggage/`.
+  // HTTP header ``baggage``. Validated according to the spec at ``https://www.w3.org/TR/baggage/``.
   // Note that this is independent of trace context extraction. Also note that if this is set, the
   // downstream request's baggage header will be overwritten if the MCP request body contains a
   // valid baggage field.
