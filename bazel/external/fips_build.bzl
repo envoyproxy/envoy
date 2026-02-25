@@ -16,7 +16,7 @@ export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ $${SYSROOT_FLAG}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread $${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread $${SYSROOT_FLAG}"
 else
     export CXXFLAGS="$${SYSROOT_FLAG}"
     export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread $${SYSROOT_FLAG}"
@@ -79,7 +79,7 @@ fi
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ $${SYSROOT_FLAG}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread $${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread $${SYSROOT_FLAG}"
 else
     export CXXFLAGS="$${SYSROOT_FLAG}"
     export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread $${SYSROOT_FLAG}"
