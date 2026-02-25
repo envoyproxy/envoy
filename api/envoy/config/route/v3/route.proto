@@ -9,6 +9,8 @@ import "envoy/config/route/v3/route_components.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -49,7 +51,10 @@ message RouteConfiguration {
   // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information.
   repeated string internal_only_headers = 3 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}},
+    (buf.validate.field).repeated = {
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}}
+    }
   ];
 
   // Specifies a list of HTTP headers that should be added to each response that
@@ -58,13 +63,18 @@ message RouteConfiguration {
   // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.v3.HeaderValueOption response_headers_to_add = 4
-      [(validate.rules).repeated = {max_items: 1000}];
+  repeated core.v3.HeaderValueOption response_headers_to_add = 4 [
+    (validate.rules).repeated = {max_items: 1000},
+    (buf.validate.field).repeated = {max_items: 1000}
+  ];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
   repeated string response_headers_to_remove = 5 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}},
+    (buf.validate.field).repeated = {
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}}
+    }
   ];
 
   // Specifies a list of HTTP headers that should be added to each request
@@ -73,13 +83,18 @@ message RouteConfiguration {
   // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.v3.HeaderValueOption request_headers_to_add = 6
-      [(validate.rules).repeated = {max_items: 1000}];
+  repeated core.v3.HeaderValueOption request_headers_to_add = 6 [
+    (validate.rules).repeated = {max_items: 1000},
+    (buf.validate.field).repeated = {max_items: 1000}
+  ];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
   repeated string request_headers_to_remove = 8 [
-    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}},
+    (buf.validate.field).repeated = {
+      items {string {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}}
+    }
   ];
 
   // Headers mutations at all levels are evaluated, if specified. By default, the order is from most
@@ -168,5 +183,6 @@ message Vhds {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
   // Configuration source specifier for VHDS.
-  core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  core.v3.ConfigSource config_source = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }

@@ -4,6 +4,8 @@ package envoy.extensions.quic.server_preferred_address.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -21,7 +23,8 @@ message DataSourceServerPreferredAddressConfig {
   // Addresses for server preferred address for a single address family (IPv4 or IPv6).
   message AddressFamilyConfig {
     // The server preferred address sent to clients. The data must contain an IP address string.
-    config.core.v3.DataSource address = 1 [(validate.rules).message = {required: true}];
+    config.core.v3.DataSource address = 1
+        [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
     // The server preferred address port sent to clients. The data must contain a integer port value.
     //

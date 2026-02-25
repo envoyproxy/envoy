@@ -6,6 +6,8 @@ import "envoy/config/cluster/v3/cluster.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -37,10 +39,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message RandomSubsetting {
   // subset_size indicates how many backends every client will be connected to.
   // The value must be greater than 0.
-  google.protobuf.UInt32Value subset_size = 1 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value subset_size = 1
+      [(validate.rules).uint32 = {gt: 0}, (buf.validate.field).uint32 = {gt: 0}];
 
   // The config for the child policy.
   // The value is required.
   config.cluster.v3.LoadBalancingPolicy child_policy = 2
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }

@@ -44,8 +44,7 @@ TEST_F(DataSourceServerPreferredAddressConfigTest, Validation) {
         cfg;
     cfg.mutable_ipv4_config()->mutable_dnat_address()->set_inline_string("127.0.0.1");
     EXPECT_THROW_WITH_REGEX(factory_.createServerPreferredAddressConfig(cfg, visitor_, context_),
-                            EnvoyException,
-                            ".*AddressFamilyConfigValidationError.Address: value is required.*");
+                            EnvoyException, "ipv4_config.address: value is required");
   }
   {
     // Cannot set port on address if dnat address isn't set.

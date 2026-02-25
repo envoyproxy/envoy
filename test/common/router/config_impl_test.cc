@@ -74,7 +74,7 @@ public:
         TestEnvironment::getOptionalEnvVar("GENRULE_OUTPUT_DIR");
     if (corpus_path) {
       static uint32_t n;
-      test::common::router::RouteTestCase route_test_case;
+      ::test::common::router::RouteTestCase route_test_case;
       route_test_case.mutable_config()->MergeFrom(config_);
       route_test_case.mutable_headers()->MergeFrom(Fuzz::toHeaders(headers));
       route_test_case.set_random_value(random_value);
@@ -5734,11 +5734,11 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RouteActionValidationError.PrefixRewrite:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.route.prefix_rewrite: "
+                          "value must be a valid HTTP header value");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRewrites) {
@@ -5753,11 +5753,11 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RouteActionValidationError.HostRewriteLiteral:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.route.host_rewrite_literal: value must be a "
+                          "valid HTTP header value");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInAutoHostRewrites) {
@@ -5772,11 +5772,11 @@ virtual_hosts:
       cluster: www
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RouteActionValidationError.HostRewriteHeader:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.route.host_rewrite_header: value must be a valid "
+                          "HTTP header name");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRedirect) {
@@ -5789,11 +5789,11 @@ virtual_hosts:
     redirect: { host_redirect: "new.host\ndroptable" }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RedirectActionValidationError.HostRedirect:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.redirect.host_redirect: "
+                          "value must be a valid HTTP header value");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPathRedirect) {
@@ -5806,11 +5806,11 @@ virtual_hosts:
     redirect: { path_redirect: "/new_path\ndroptable" }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RedirectActionValidationError.PathRedirect:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.redirect.path_redirect: "
+                          "value must be a valid HTTP header value");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewriteRedirect) {
@@ -5823,11 +5823,11 @@ virtual_hosts:
     redirect: { prefix_rewrite: "/new/prefix\ndroptable"}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                     creation_status_),
-      EnvoyException,
-      "RedirectActionValidationError.PrefixRewrite:.*value does not match regex pattern");
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException,
+                          "virtual_hosts.routes.redirect.prefix_rewrite: "
+                          "value must be a valid HTTP header value");
 }
 
 TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {
@@ -7328,7 +7328,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
                                          true, creation_status_),
-                          EnvoyException, "RouteValidationError.Match");
+                          EnvoyException, "virtual_hosts.routes.match: value is required");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -7364,7 +7364,9 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
                                          true, creation_status_),
-                          EnvoyException, "caused by field: \"action\", reason: is required");
+                          EnvoyException,
+                          "virtual_hosts.routes.action: exactly one "
+                          "field is required in oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {

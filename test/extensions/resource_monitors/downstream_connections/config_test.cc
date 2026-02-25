@@ -34,9 +34,8 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(config, context),
                           ProtoValidationException,
-                          "Proto constraint validation failed "
-                          "\\(DownstreamConnectionsConfigValidationError."
-                          "MaxActiveDownstreamConnections: value must be greater than 0");
+                          "max_active_downstream_connections: "
+                          "value must be greater than 0");
 }
 
 TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
@@ -73,9 +72,7 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
 
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(*config, context),
                           ProtoValidationException,
-                          "Proto constraint validation failed "
-                          "\\(DownstreamConnectionsConfigValidationError."
-                          "MaxActiveDownstreamConnections: value must be greater than 0");
+                          "max_active_downstream_connections: value must be greater than 0");
 }
 
 } // namespace

@@ -4,6 +4,8 @@ package envoy.config.core.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,6 +24,7 @@ message EventServiceConfig {
 
   oneof config_source_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specifies the gRPC service that hosts the event reporting service.
     GrpcService grpc_service = 1;

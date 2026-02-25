@@ -5,6 +5,8 @@ package envoy.extensions.filters.http.csrf.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -34,7 +36,7 @@ message CsrfPolicy {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_v3_api_enum_type.v3.FractionalPercent.DenominatorType>`.
   config.core.v3.RuntimeFractionalPercent filter_enabled = 1
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
   // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
   //

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.retry.previous_priorities;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -53,5 +55,6 @@ message PreviousPrioritiesConfig {
   // attempts.
   //
   // Must be greater than 0.
-  int32 update_frequency = 1 [(validate.rules).int32 = {gt: 0}];
+  int32 update_frequency = 1
+      [(validate.rules).int32 = {gt: 0}, (buf.validate.field).int32 = {gt: 0}];
 }

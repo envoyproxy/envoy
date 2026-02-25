@@ -1632,7 +1632,7 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
-                          "caused by HashPolicyValidationError\\.SourceIp");
+                          "hash_policies.source_ip: value must equal true");
 }
 
 // Make sure hash policy is null if it is not mentioned.
@@ -1754,7 +1754,7 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
-                          "caused by HashPolicyValidationError\\.Key");
+                          "hash_policies.key: value length must be at least 1 characters");
 }
 
 // Expect correct hash is created if hash_policy with key is mentioned.
