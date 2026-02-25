@@ -915,19 +915,19 @@ class FormatChecker:
     def clang_format(self, file_path, check=False):
         result = []
         quoted_path = shlex.quote(file_path)
-        command = (
-            f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
-            if check else f"{self.config.clang_format_path} -i {quoted_path}")
-
+        
         if check:
+            command = f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
             result = self.execute_command(command, "clang-format check failed", file_path)
         else:
             ret = subprocess.run(
                 [self.config.clang_format_path, "-i", file_path],
-                capture_output=True)
+                capture_output=True,
+                text=True
+            )
             if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
-
+        
         return result
 
     def check_format(self, file_path, fail_on_diff=False):
