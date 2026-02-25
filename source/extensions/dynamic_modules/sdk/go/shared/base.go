@@ -1,13 +1,63 @@
 //go:generate mockgen -source=base.go -destination=mocks/mock_base.go -package=mocks
 package shared
 
+import (
+	"strings"
+	"unsafe"
+)
+
+// UnsafeEnvoyBuffer is a struct that represents a buffer of data from Envoy.
+// It contains a pointer to the data and its length. The memory of the data is managed by Envoy.
+type UnsafeEnvoyBuffer struct {
+	// Pointer to the start of the buffer data.
+	Ptr *byte
+	// Length of the buffer data in bytes.
+	Len uint64
+}
+
+func (b UnsafeEnvoyBuffer) ToUnsafeBytes() []byte {
+	if b.Ptr == nil || b.Len == 0 {
+		return nil
+	}
+	// Use unsafe to create a byte slice that points to the buffer data without copying.
+	return unsafe.Slice(b.Ptr, b.Len)
+}
+
+// ToBytes converts the UnsafeEnvoyBuffer to a byte slice. It creates a copy of the data in Go memory.
+func (b UnsafeEnvoyBuffer) ToBytes() []byte {
+	if b.Ptr == nil || b.Len == 0 {
+		return nil
+	}
+	// Create a byte slice that copys the data from the buffer.
+	owned := make([]byte, b.Len)
+	// Use unsafe to copy the data from the buffer to the byte slice.
+	src := unsafe.Slice(b.Ptr, b.Len)
+	copy(owned, src)
+	return owned
+}
+
+func (b UnsafeEnvoyBuffer) ToUnsafeString() string {
+	if b.Ptr == nil || b.Len == 0 {
+		return ""
+	}
+	// Use unsafe to create a string that points to the buffer data without copying.
+	return unsafe.String(b.Ptr, b.Len)
+}
+
+func (b UnsafeEnvoyBuffer) ToString() string {
+	if b.Ptr == nil || b.Len == 0 {
+		return ""
+	}
+	return strings.Clone(b.ToUnsafeString())
+}
+
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
 type BodyBuffer interface {
-	// GetChunks retrieves the body content as a list of byte slices.
+	// GetChunks retrieves the body content as a list of UnsafeEnvoyBuffer chunks.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetChunks() [][]byte
+	GetChunks() []UnsafeEnvoyBuffer
 
 	// GetSize retrieves the total size of the body buffer.
 	GetSize() uint64
@@ -28,20 +78,20 @@ type HeaderMap interface {
 	// nil will be returned.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	Get(key string) []string
+	Get(key string) []UnsafeEnvoyBuffer
 
 	// GetOne retrieves a single header value for a given key.
 	// If there are multiple values for the key, the first one will be returned.
-	// If the key does not exist, an empty string will be returned.
+	// If the key does not exist, an empty UnsafeEnvoyBuffer will be returned.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetOne(key string) string
+	GetOne(key string) UnsafeEnvoyBuffer
 
-	// GetAll retrieves all header values. You should not mutate the returned map
+	// GetAll retrieves all header values. You should not mutate the returned slice
 	// directly.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetAll() [][2]string
+	GetAll() [][2]UnsafeEnvoyBuffer
 
 	// Set sets the header value for a given key.
 	Set(key string, value string)
@@ -234,7 +284,7 @@ const (
 
 type HttpCalloutCallback interface {
 	OnHttpCalloutDone(calloutID uint64, result HttpCalloutResult,
-		headers [][2]string, body [][]byte)
+		headers [][2]UnsafeEnvoyBuffer, body []UnsafeEnvoyBuffer)
 }
 
 type HttpStreamResetReason uint32
@@ -251,9 +301,9 @@ const (
 )
 
 type HttpStreamCallback interface {
-	OnHttpStreamHeaders(streamID uint64, headers [][2]string, endStream bool)
-	OnHttpStreamData(streamID uint64, body [][]byte, endStream bool)
-	OnHttpStreamTrailers(streamID uint64, trailers [][2]string)
+	OnHttpStreamHeaders(streamID uint64, headers [][2]UnsafeEnvoyBuffer, endStream bool)
+	OnHttpStreamData(streamID uint64, body []UnsafeEnvoyBuffer, endStream bool)
+	OnHttpStreamTrailers(streamID uint64, trailers [][2]UnsafeEnvoyBuffer)
 	OnHttpStreamComplete(streamID uint64)
 	OnHttpStreamReset(streamID uint64, reason HttpStreamResetReason)
 }
@@ -281,8 +331,8 @@ type HttpFilterHandle interface {
 	// @Param source the metadata source type.
 	// @Param metadataNamespace the metadata namespace.
 	// @Param key the metadata key.
-	// @Return the metadata value if found, otherwise nil.
-	GetMetadataString(source MetadataSourceType, metadataNamespace, key string) (string, bool)
+	// @Return the metadata value if found, otherwise an empty UnsafeEnvoyBuffer.
+	GetMetadataString(source MetadataSourceType, metadataNamespace, key string) (UnsafeEnvoyBuffer, bool)
 
 	// GetMetadataNumber retrieves the dynamic metadata number value of the stream.
 	// @Param source the metadata source type.
@@ -308,17 +358,23 @@ type HttpFilterHandle interface {
 	// @Param source the metadata source type.
 	// @Param metadataNamespace the metadata namespace.
 	// @Return the list of keys in the namespace, or nil if the namespace does not exist.
-	GetMetadataKeys(source MetadataSourceType, metadataNamespace string) []string
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetMetadataKeys(source MetadataSourceType, metadataNamespace string) []UnsafeEnvoyBuffer
 
 	// GetMetadataNamespaces retrieves all namespace names in the metadata.
 	// @Param source the metadata source type.
 	// @Return the list of namespace names, or nil if no namespaces exist.
-	GetMetadataNamespaces(source MetadataSourceType) []string
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetMetadataNamespaces(source MetadataSourceType) []UnsafeEnvoyBuffer
 
 	// GetFilterState retrieves the serialized filter state value of the stream.
 	// @Param key the filter state key.
-	// @Return the filter state value if found, otherwise nil.
-	GetFilterState(key string) ([]byte, bool)
+	// @Return the filter state value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetFilterState(key string) (UnsafeEnvoyBuffer, bool)
 
 	// SetFilterState sets the serialized filter state value of the stream.
 	// @Param key the filter state key.
@@ -326,9 +382,11 @@ type HttpFilterHandle interface {
 	SetFilterState(key string, value []byte)
 
 	// GetAttributeString retrieves the string attribute value of the stream.
-	// @Param key the attribute key.
-	// @Return the attribute value if found, otherwise nil.
-	GetAttributeString(attributeID AttributeID) (string, bool)
+	// @Param attributeID the attribute ID.
+	// @Return the attribute value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetAttributeString(attributeID AttributeID) (UnsafeEnvoyBuffer, bool)
 
 	// GetAttributeNumber retrieves the float attribute value of the stream.
 	// @Param key the attribute key.
