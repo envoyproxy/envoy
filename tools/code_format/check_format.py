@@ -911,16 +911,21 @@ class FormatChecker:
                     error_messages.append("  %s:%s" % (file_path, num))
             return error_messages
 
+
     def clang_format(self, file_path, check=False):
         result = []
+        quoted_path = shlex.quote(file_path)
         command = (
-            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
-            if check else f"{self.config.clang_format_path} -i {file_path}")
+            f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
+            if check else f"{self.config.clang_format_path} -i {quoted_path}")
 
         if check:
             result = self.execute_command(command, "clang-format check failed", file_path)
         else:
-            if os.system(command) != 0:
+            ret = subprocess.run(
+                [self.config.clang_format_path, "-i", file_path],
+                capture_output=True)
+            if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
 
         return result
