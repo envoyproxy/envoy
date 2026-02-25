@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.type.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -195,5 +197,8 @@ message HttpStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.HttpStatus";
 
   // Supplies HTTP response code.
-  StatusCode code = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+  StatusCode code = 1 [
+    (validate.rules).enum = {defined_only: true not_in: 0},
+    (buf.validate.field).enum = {defined_only: true not_in: 0}
+  ];
 }

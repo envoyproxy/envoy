@@ -8,6 +8,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -350,6 +352,7 @@ message DynamicParameterConstraints {
 
     oneof constraint_type {
       option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Matches this exact value.
       string value = 2;

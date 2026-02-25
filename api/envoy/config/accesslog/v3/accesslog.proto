@@ -11,6 +11,8 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -51,6 +53,7 @@ message AccessLogFilter {
 
   oneof filter_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Status code filter.
     StatusCodeFilter status_code_filter = 1;
@@ -114,10 +117,14 @@ message ComparisonFilter {
   }
 
   // Comparison operator.
-  Op op = 1 [(validate.rules).enum = {defined_only: true}];
+  Op op = 1 [
+    (validate.rules).enum = {defined_only: true},
+    (buf.validate.field).enum = {defined_only: true}
+  ];
 
   // Value to compare against.
-  core.v3.RuntimeUInt32 value = 2 [(validate.rules).message = {required: true}];
+  core.v3.RuntimeUInt32 value = 2
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 // Filters on HTTP response/status code.
@@ -126,7 +133,8 @@ message StatusCodeFilter {
       "envoy.config.filter.accesslog.v2.StatusCodeFilter";
 
   // Comparison.
-  ComparisonFilter comparison = 1 [(validate.rules).message = {required: true}];
+  ComparisonFilter comparison = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 // Filters based on the duration of the request or stream, in milliseconds.
@@ -138,7 +146,8 @@ message DurationFilter {
       "envoy.config.filter.accesslog.v2.DurationFilter";
 
   // Comparison.
-  ComparisonFilter comparison = 1 [(validate.rules).message = {required: true}];
+  ComparisonFilter comparison = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 // Filters for requests that are not health check requests. A health check
@@ -162,7 +171,8 @@ message RuntimeFilter {
 
   // Specifies a key used to look up a custom sampling rate from the runtime configuration. If a value is found for this
   // key, it will override the default sampling rate specified in ``percent_sampled``.
-  string runtime_key = 1 [(validate.rules).string = {min_len: 1}];
+  string runtime_key = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   // Defines the default sampling percentage when no runtime override is present. If not specified, the default is
   // **0%** (with a denominator of 100).
@@ -197,7 +207,8 @@ message AndFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AndFilter";
 
-  repeated AccessLogFilter filters = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated AccessLogFilter filters = 1
+      [(validate.rules).repeated = {min_items: 2}, (buf.validate.field).repeated = {min_items: 2}];
 }
 
 // Performs a logical “or” operation on the result of each individual filter.
@@ -207,7 +218,8 @@ message OrFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.OrFilter";
 
-  repeated AccessLogFilter filters = 2 [(validate.rules).repeated = {min_items: 2}];
+  repeated AccessLogFilter filters = 2
+      [(validate.rules).repeated = {min_items: 2}, (buf.validate.field).repeated = {min_items: 2}];
 }
 
 // Filters requests based on the presence or value of a request header.
@@ -217,7 +229,8 @@ message HeaderFilter {
 
   // Only requests with a header which matches the specified HeaderMatcher will
   // pass the filter check.
-  route.v3.HeaderMatcher header = 1 [(validate.rules).message = {required: true}];
+  route.v3.HeaderMatcher header = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 // Filters requests that received responses with an Envoy response flag set.
@@ -231,42 +244,80 @@ message ResponseFlagFilter {
   // Only responses with the any of the flags listed in this field will be
   // logged. This field is optional. If it is not specified, then any response
   // flag will pass the filter check.
-  repeated string flags = 1 [(validate.rules).repeated = {
-    items {
-      string {
-        in: "LH"
-        in: "UH"
-        in: "UT"
-        in: "LR"
-        in: "UR"
-        in: "UF"
-        in: "UC"
-        in: "UO"
-        in: "NR"
-        in: "DI"
-        in: "FI"
-        in: "RL"
-        in: "UAEX"
-        in: "RLSE"
-        in: "DC"
-        in: "URX"
-        in: "SI"
-        in: "IH"
-        in: "DPE"
-        in: "UMSDR"
-        in: "RFCF"
-        in: "NFCF"
-        in: "DT"
-        in: "UPE"
-        in: "NC"
-        in: "OM"
-        in: "DF"
-        in: "DO"
-        in: "DR"
-        in: "UDO"
+  repeated string flags = 1 [
+    (validate.rules).repeated = {
+      items {
+        string {
+          in: "LH"
+          in: "UH"
+          in: "UT"
+          in: "LR"
+          in: "UR"
+          in: "UF"
+          in: "UC"
+          in: "UO"
+          in: "NR"
+          in: "DI"
+          in: "FI"
+          in: "RL"
+          in: "UAEX"
+          in: "RLSE"
+          in: "DC"
+          in: "URX"
+          in: "SI"
+          in: "IH"
+          in: "DPE"
+          in: "UMSDR"
+          in: "RFCF"
+          in: "NFCF"
+          in: "DT"
+          in: "UPE"
+          in: "NC"
+          in: "OM"
+          in: "DF"
+          in: "DO"
+          in: "DR"
+          in: "UDO"
+        }
+      }
+    },
+    (buf.validate.field).repeated = {
+      items {
+        string {
+          in: "LH"
+          in: "UH"
+          in: "UT"
+          in: "LR"
+          in: "UR"
+          in: "UF"
+          in: "UC"
+          in: "UO"
+          in: "NR"
+          in: "DI"
+          in: "FI"
+          in: "RL"
+          in: "UAEX"
+          in: "RLSE"
+          in: "DC"
+          in: "URX"
+          in: "SI"
+          in: "IH"
+          in: "DPE"
+          in: "UMSDR"
+          in: "RFCF"
+          in: "NFCF"
+          in: "DT"
+          in: "UPE"
+          in: "NC"
+          in: "OM"
+          in: "DF"
+          in: "DO"
+          in: "DR"
+          in: "UDO"
+        }
       }
     }
-  }];
+  ];
 }
 
 // Filters gRPC requests based on their response status. If a gRPC status is not
@@ -296,7 +347,10 @@ message GrpcStatusFilter {
   }
 
   // Logs only responses that have any one of the gRPC statuses in this field.
-  repeated Status statuses = 1 [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+  repeated Status statuses = 1 [
+    (validate.rules).repeated = {items {enum {defined_only: true}}},
+    (buf.validate.field).repeated = {items {enum {defined_only: true}}}
+  ];
 
   // If included and set to true, the filter will instead block all responses
   // with a gRPC status or inferred gRPC status enumerated in statuses, and
@@ -327,8 +381,10 @@ message MetadataFilter {
 // Filters based on access log type.
 message LogTypeFilter {
   // Logs only records which their type is one of the types defined in this field.
-  repeated data.accesslog.v3.AccessLogType types = 1
-      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+  repeated data.accesslog.v3.AccessLogType types = 1 [
+    (validate.rules).repeated = {items {enum {defined_only: true}}},
+    (buf.validate.field).repeated = {items {enum {defined_only: true}}}
+  ];
 
   // If this field is set to true, the filter will instead block all records
   // with a access log type in types field, and allow all other records.

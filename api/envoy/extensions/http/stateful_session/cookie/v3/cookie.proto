@@ -4,6 +4,8 @@ package envoy.extensions.http.stateful_session.cookie.v3;
 
 import "envoy/type/http/v3/cookie.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -39,5 +41,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.http.stateful_session.cookie]
 message CookieBasedSessionState {
   // The cookie configuration used to track session state.
-  type.http.v3.Cookie cookie = 1 [(validate.rules).message = {required: true}];
+  type.http.v3.Cookie cookie = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }

@@ -9,6 +9,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -150,6 +152,7 @@ message StatsMatcher {
 
   oneof stats_matcher {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If `reject_all` is true, then all stats are disabled. If `reject_all` is false, then all
     // stats are enabled.
@@ -239,7 +242,10 @@ message TagSpecifier {
     // ``http.user_agent.downstream_cx_total`` as the tag extracted name. The tag
     // ``envoy.http_conn_manager_prefix`` will be added with the tag value
     // ``connection_manager_1``.
-    string regex = 2 [(validate.rules).string = {max_bytes: 1024}];
+    string regex = 2 [
+      (validate.rules).string = {max_bytes: 1024},
+      (buf.validate.field).string = {max_len: 1024}
+    ];
 
     // Specifies a fixed tag value for the ``tag_name``.
     string fixed_value = 3;
@@ -252,6 +258,7 @@ message TagSpecifier {
 message StatsdSink {
   oneof statsd_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
     // compliant listener. If specified, statistics will be flushed to this
@@ -303,6 +310,7 @@ message DogStatsdSink {
 
   oneof dog_statsd_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The UDP address of a running DogStatsD compliant listener. If specified,
     // statistics will be flushed to this address.

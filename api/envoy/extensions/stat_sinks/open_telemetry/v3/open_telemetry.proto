@@ -8,6 +8,7 @@ import "envoy/config/core/v3/http_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "opentelemetry/proto/common/v1/common.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
@@ -44,6 +45,7 @@ message SinkConfig {
 
   oneof protocol_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];

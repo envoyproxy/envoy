@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.resource_monitors.fixed_heap.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -22,5 +24,6 @@ message FixedHeapConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig";
 
-  uint64 max_heap_size_bytes = 1 [(validate.rules).uint64 = {gt: 0}];
+  uint64 max_heap_size_bytes = 1
+      [(validate.rules).uint64 = {gt: 0}, (buf.validate.field).uint64 = {gt: 0}];
 }

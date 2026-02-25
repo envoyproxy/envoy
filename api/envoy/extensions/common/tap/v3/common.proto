@@ -4,6 +4,8 @@ package envoy.extensions.common.tap.v3;
 
 import "envoy/config/tap/v3/common.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -23,6 +25,7 @@ message CommonExtensionConfig {
 
   oneof config_type {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the tap filter will be configured via an admin handler.
     AdminConfig admin_config = 1;
@@ -41,5 +44,6 @@ message AdminConfig {
 
   // Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
   // matched to the configured filter opaque ID to determine which filter to configure.
-  string config_id = 1 [(validate.rules).string = {min_len: 1}];
+  string config_id = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 }

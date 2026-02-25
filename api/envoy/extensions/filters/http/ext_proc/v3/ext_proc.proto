@@ -15,6 +15,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -214,10 +215,16 @@ message ExternalProcessor {
   // ``FULL_DUPLEX_STREAMED`` or ``GRPC``. Zero is a valid config which means
   // the timer will be triggered immediately. If not configured, default is
   // 200 milliseconds.
-  google.protobuf.Duration message_timeout = 7 [(validate.rules).duration = {
-    lte {seconds: 3600}
-    gte {}
-  }];
+  google.protobuf.Duration message_timeout = 7 [
+    (validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {}
+    },
+    (buf.validate.field).duration = {
+      lte {seconds: 3600}
+      gte {}
+    }
+  ];
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured ``ext_proc`` filters in an HTTP filter chain.
@@ -239,10 +246,16 @@ message ExternalProcessor {
   // Specify the upper bound of
   // :ref:`override_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>`
   // If not specified, by default it is 0, which will effectively disable the ``override_message_timeout`` API.
-  google.protobuf.Duration max_message_timeout = 10 [(validate.rules).duration = {
-    lte {seconds: 3600}
-    gte {}
-  }];
+  google.protobuf.Duration max_message_timeout = 10 [
+    (validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {}
+    },
+    (buf.validate.field).duration = {
+      lte {seconds: 3600}
+      gte {}
+    }
+  ];
 
   // Allow headers matching the ``forward_rules`` to be forwarded to the external processing server.
   // If not set, all headers are forwarded to the external processing server.
@@ -443,10 +456,12 @@ message HeaderForwardingRules {
 message ExtProcPerRoute {
   oneof override {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the filter for this particular vhost or route.
     // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1
+        [(validate.rules).bool = {const: true}, (buf.validate.field).bool = {const: true}];
 
     // Override aspects of the configuration for this route. A set of
     // overrides in a more specific configuration will override a "disabled"

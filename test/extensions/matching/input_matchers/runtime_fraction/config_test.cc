@@ -50,7 +50,7 @@ TEST(ConfigTest, InvalidConfig) {
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   EXPECT_THROW_WITH_REGEX(factory.createInputMatcherFactoryCb(*message, factory_context),
-                          EnvoyException, "RuntimeFraction: value is required");
+                          EnvoyException, "runtime_fraction: value is required");
 }
 } // namespace RuntimeFraction
 } // namespace InputMatchers
