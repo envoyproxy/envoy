@@ -84,10 +84,12 @@ PYTHON_DIRS=(
   "examples/python"
 )
 if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
-  "${BLACK_BIN}" "${PYTHON_DIRS[@]}"
+  "${BLACK_BIN}" --config pyproject.toml "${PYTHON_DIRS[@]}"
 else
-  NEEDS_FORMAT=$("${BLACK_BIN}" --check "${PYTHON_DIRS[@]}" 2>&1)
-  if [[ -n "${NEEDS_FORMAT}" ]]; then
+  NEEDS_FORMAT=$("${BLACK_BIN}" --config pyproject.toml --check "${PYTHON_DIRS[@]}" 2>&1 || echo "black failed, exit code=$?")
+  # If black reports that files need to be reformatted, it will exit with code 1, so "black failed, exit code=1" will be added to NEEDS_FORMAT;
+  # otherswise, NEEDS_FORMAT will just contain the black output.
+  if [[ -n "${NEEDS_FORMAT}" ]] && [[ "${NEEDS_FORMAT}" == *"black failed, exit code="* ]]; then
     echo "ERROR: Run 'tools/check_format.sh fix' to fix"
     echo "${NEEDS_FORMAT}"
     exit 1
