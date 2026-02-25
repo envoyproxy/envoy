@@ -1771,7 +1771,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  ASSERT_TRUE(quic_session->received_ipv4_alternate_server_address().has_value()));
+  ASSERT_TRUE(quic_session->received_ipv4_alternate_server_address().has_value());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1840,7 +1840,7 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
   EXPECT_TRUE(!quic_session->received_ipv4_alternate_server_address().has_value() &&
-              !quic_session->received_ipv6]_alternate_server_address().has_value());
+              !quic_session->received_ipv6_alternate_server_address().has_value());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_FALSE(quic_connection_->IsValidatingServerPreferredAddress());
   IntegrationStreamDecoderPtr response =
