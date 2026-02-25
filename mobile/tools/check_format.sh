@@ -76,6 +76,11 @@ else
   fi
 fi
 
+# install black 24.3.0 if not already installed
+if ! python3 -m black --version 2>/dev/null | grep -q "24.3.0"; then
+  echo "Installing black 24.3.0"
+  python3 -m pip install black==24.3.0
+fi
 
 PYTHON_DIRS=(
   "library/python"
