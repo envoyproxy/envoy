@@ -911,7 +911,6 @@ class FormatChecker:
                     error_messages.append("  %s:%s" % (file_path, num))
             return error_messages
 
-
     def clang_format(self, file_path, check=False):
         result = []
         quoted_path = shlex.quote(file_path)
@@ -927,7 +926,6 @@ class FormatChecker:
             )
             if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
-        
         return result
 
     def check_format(self, file_path, fail_on_diff=False):
