@@ -4,8 +4,6 @@
 
 #include "envoy/stats/stats.h"
 
-#include "source/common/stats/symbol_table.h"
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {

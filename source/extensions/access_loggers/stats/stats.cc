@@ -279,7 +279,7 @@ StatsAccessLog::NameAndTags::NameAndTags(
 
   if (cfg.has_rules()) {
     ActionValidationVisitor validation_visitor;
-    ActionContext action_context(context.statsScope().symbolTable(), pool);
+    ActionContext action_context(pool);
     Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory(
         action_context, context.serverFactoryContext(), validation_visitor);
     rules_ = factory.create(cfg.rules())();

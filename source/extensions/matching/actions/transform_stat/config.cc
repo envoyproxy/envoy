@@ -18,7 +18,7 @@ public:
         MessageUtil::downcastAndValidate<const ProtoTransformStat&>(config, validation_visitor);
 
     if (action_config.has_drop_stat()) {
-      return std::make_shared<DropStat>(action_config.drop_stat(), context.symbol_table_);
+      return std::make_shared<DropStat>(action_config.drop_stat());
     } else if (action_config.has_drop_tag()) {
       const auto& drop_tag = action_config.drop_tag();
       return std::make_shared<DropTag>(context.pool_.add(drop_tag.target_tag_name()));
@@ -28,7 +28,7 @@ public:
                                          context.pool_.add(upsert_tag.tag_value()));
     }
 
-    return std::make_shared<NoOpAction>(context.symbol_table_);
+    return std::make_shared<NoOpAction>();
   }
 
   std::string name() const override {

@@ -6,7 +6,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {

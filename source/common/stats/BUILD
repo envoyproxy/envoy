@@ -291,7 +291,7 @@ envoy_cc_library(
     name = "stat_matching_data_impl_lib",
     hdrs = ["stat_matching_data_impl.h"],
     deps = [
-        ":symbol_table_lib",
         "//envoy/stats:stats_interface",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

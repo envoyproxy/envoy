@@ -30,7 +30,7 @@ public:
 
   Stats::SymbolTable symbol_table_;
   Stats::StatNamePool pool_{symbol_table_};
-  ActionContext action_context_{symbol_table_, pool_};
+  ActionContext action_context_{pool_};
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Matcher::ActionConstSharedPtr action_;
 };

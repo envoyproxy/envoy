@@ -16,9 +16,7 @@ namespace TransformStat {
 using ProtoTransformStat = envoy::extensions::matching::actions::transform_stat::v3::TransformStat;
 
 struct ActionContext {
-  ActionContext(Envoy::Stats::SymbolTable& symbol_table, Envoy::Stats::StatNamePool& pool)
-      : symbol_table_(symbol_table), pool_(pool) {}
-  Envoy::Stats::SymbolTable& symbol_table_;
+  ActionContext(Envoy::Stats::StatNamePool& pool) : pool_(pool) {}
   Envoy::Stats::StatNamePool& pool_;
 };
 
@@ -46,7 +44,7 @@ public:
 
 class DropStat : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropStat(const ProtoTransformStat::DropStat&, Envoy::Stats::SymbolTable&) {}
+  explicit DropStat(const ProtoTransformStat::DropStat&) {}
 
   Result apply(Envoy::Stats::StatNameTagVector&) const override;
 };
@@ -74,7 +72,7 @@ private:
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit NoOpAction(Envoy::Stats::SymbolTable&) {}
+  explicit NoOpAction() {}
   Result apply(Envoy::Stats::StatNameTagVector&) const override;
 };
 
