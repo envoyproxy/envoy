@@ -4015,7 +4015,8 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnecti
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(data, false);
 
-  // Timer callback fires - closeSocket is called first, then during buffer drain enabled() is checked
+  // Timer callback fires - closeSocket is called first, then during buffer drain enabled() is
+  // checked
   EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose));
   EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   buffer_timer->invokeCallback();
@@ -4118,7 +4119,8 @@ TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutResets
   EXPECT_CALL(*buffer_timer1, enableTimer(timeout1, _));
   read_buffer.buffer.add("xy");
 
-  // setBufferHighWatermarkTimeout checks enabled() then disables, then schedules which checks enabled() again
+  // setBufferHighWatermarkTimeout checks enabled() then disables, then schedules which checks
+  // enabled() again
   EXPECT_CALL(*buffer_timer1, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*buffer_timer1, disableTimer());
   EXPECT_CALL(*buffer_timer1, enabled()).WillOnce(Return(false));
