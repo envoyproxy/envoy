@@ -5,12 +5,8 @@
 
 #include "envoy/extensions/filters/http/a2a/v3/a2a.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 
-#include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/a2a/a2a_json_parser.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 

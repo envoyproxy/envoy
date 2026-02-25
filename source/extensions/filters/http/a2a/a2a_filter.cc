@@ -1,8 +1,10 @@
 #include "source/extensions/filters/http/a2a/a2a_filter.h"
 
 #include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
