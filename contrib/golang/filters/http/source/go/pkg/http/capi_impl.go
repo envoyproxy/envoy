@@ -410,17 +410,10 @@ func (c *httpCApiImpl) HttpGetStringsValue(r unsafe.Pointer, id int) ([]string, 
 		return []string{}, true
 	}
 
-	// Parse null-separated strings
-	buf := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
-	result := make([]string, 0, int(count))
-	start := 0
-	for i := 0; i < len(buf); i++ {
-		if buf[i] == 0 {
-			result = append(result, string(buf[start:i]))
-			start = i + 1
-		}
-	}
-	return result, true
+	// Clone the memory from C++ to Go, then split on null separator
+	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
+	data := strings.Clone(value)
+	return strings.Split(data, "\x00"), true
 }
 
 func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{} {

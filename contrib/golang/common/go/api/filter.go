@@ -351,25 +351,34 @@ type SslConnection interface {
 	// PeerCertificateValidated returns whether the peer certificate was validated
 	PeerCertificateValidated() bool
 
-	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate
-	Sha256PeerCertificateDigest() (string, bool)
-	// SerialNumberPeerCertificate returns the serial number of the peer certificate
-	SerialNumberPeerCertificate() (string, bool)
-	// SubjectPeerCertificate returns the subject field of the peer certificate
-	SubjectPeerCertificate() (string, bool)
-	// IssuerPeerCertificate returns the issuer field of the peer certificate
-	IssuerPeerCertificate() (string, bool)
-	// SubjectLocalCertificate returns the subject field of the local certificate
-	SubjectLocalCertificate() (string, bool)
+	// Sha256PeerCertificateDigest returns the SHA256 digest of the peer certificate.
+	// Returns empty string if not available.
+	Sha256PeerCertificateDigest() string
+	// SerialNumberPeerCertificate returns the serial number of the peer certificate.
+	// Returns empty string if not available.
+	SerialNumberPeerCertificate() string
+	// SubjectPeerCertificate returns the subject field of the peer certificate.
+	// Returns empty string if not available.
+	SubjectPeerCertificate() string
+	// IssuerPeerCertificate returns the issuer field of the peer certificate.
+	// Returns empty string if not available.
+	IssuerPeerCertificate() string
+	// SubjectLocalCertificate returns the subject field of the local certificate.
+	// Returns empty string if not available.
+	SubjectLocalCertificate() string
 
-	// UriSanPeerCertificate returns the URI SANs of the peer certificate
-	UriSanPeerCertificate() ([]string, bool)
-	// UriSanLocalCertificate returns the URI SANs of the local certificate
-	UriSanLocalCertificate() ([]string, bool)
-	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate
-	DnsSansPeerCertificate() ([]string, bool)
-	// DnsSansLocalCertificate returns the DNS SANs of the local certificate
-	DnsSansLocalCertificate() ([]string, bool)
+	// UriSanPeerCertificate returns the URI SANs of the peer certificate.
+	// Returns nil if not available.
+	UriSanPeerCertificate() []string
+	// UriSanLocalCertificate returns the URI SANs of the local certificate.
+	// Returns nil if not available.
+	UriSanLocalCertificate() []string
+	// DnsSansPeerCertificate returns the DNS SANs of the peer certificate.
+	// Returns nil if not available.
+	DnsSansPeerCertificate() []string
+	// DnsSansLocalCertificate returns the DNS SANs of the local certificate.
+	// Returns nil if not available.
+	DnsSansLocalCertificate() []string
 
 	// ValidFromPeerCertificate returns the validity start time of the peer certificate as Unix timestamp
 	ValidFromPeerCertificate() (uint64, bool)
@@ -378,17 +387,21 @@ type SslConnection interface {
 
 	// TlsVersion returns the TLS version (e.g., "TLSv1.3")
 	TlsVersion() string
-	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA")
-	CiphersuiteString() (string, bool)
+	// CiphersuiteString returns the ciphersuite name (e.g., "AES128-SHA").
+	// Returns empty string if not available.
+	CiphersuiteString() string
 	// CiphersuiteId returns the ciphersuite ID
 	CiphersuiteId() (uint16, bool)
-	// SessionId returns the TLS session ID
-	SessionId() string
+	// SessionId returns the TLS session ID.
+	// The second return value indicates whether the value is available.
+	SessionId() (string, bool)
 
-	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate
-	UrlEncodedPemEncodedPeerCertificate() (string, bool)
-	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain
-	UrlEncodedPemEncodedPeerCertificateChain() (string, bool)
+	// UrlEncodedPemEncodedPeerCertificate returns the URL-encoded PEM-encoded peer certificate.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificate() string
+	// UrlEncodedPemEncodedPeerCertificateChain returns the URL-encoded PEM-encoded peer certificate chain.
+	// Returns empty string if not available.
+	UrlEncodedPemEncodedPeerCertificateChain() string
 }
 
 type SecretManager interface {

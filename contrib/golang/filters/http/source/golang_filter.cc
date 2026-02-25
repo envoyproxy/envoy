@@ -1328,11 +1328,13 @@ CAPIStatus Filter::getStringsValue(int id, uint64_t* value_data, int* value_len,
     RELEASE_ASSERT(false, absl::StrCat("invalid strings value id: ", id));
   }
 
-  // Serialize to null-separated string
+  // Serialize to null-separated string (null between strings, not after last)
   req_->strValue.clear();
-  for (const auto& s : strings) {
-    req_->strValue.append(s);
-    req_->strValue.push_back('\0');
+  for (size_t i = 0; i < strings.size(); ++i) {
+    if (i > 0) {
+      req_->strValue.push_back('\0');
+    }
+    req_->strValue.append(strings[i]);
   }
 
   *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
