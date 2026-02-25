@@ -469,4 +469,10 @@ new_features:
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
 
+- area: ext_proc
+  change: |
+    Added :ref:`allow_content_length_header
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
+    the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+
 deprecated:
