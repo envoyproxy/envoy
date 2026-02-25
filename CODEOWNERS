@@ -105,6 +105,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
+/*/extensions/filters/http/filter_chain @wbpcode @agrawroh
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
