@@ -45,15 +45,14 @@ using ::Envoy::Upstream::LoadBalancerParams;
 using ::Envoy::Upstream::LoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
-OverrideHostLbConfig::OverrideHostLbConfig(
-    std::vector<OverrideSource>&& override_host_sources,
-    absl::optional<Config::MetadataKey>&& selected_endpoint_key,
-    TypedLoadBalancerFactory* fallback_load_balancer_factory,
-    LoadBalancerConfigPtr&& fallback_load_balancer_config)
+OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                                           absl::optional<Config::MetadataKey>&& selected_host_key,
+                                           TypedLoadBalancerFactory* fallback_load_balancer_factory,
+                                           LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
                                  std::move(fallback_load_balancer_config)},
       override_host_sources_(std::move(override_host_sources)),
-      selected_endpoint_key_(std::move(selected_endpoint_key)) {}
+      selected_host_key_(std::move(selected_host_key)) {}
 
 OverrideHostLbConfig::OverrideSource
 OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
@@ -89,9 +88,9 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       makeOverrideSources(config.override_host_sources());
   RETURN_IF_NOT_OK(override_host_sources.status());
 
-  absl::optional<Config::MetadataKey> selected_endpoint_key;
-  if (config.has_selected_endpoint_key()) {
-    selected_endpoint_key.emplace(config.selected_endpoint_key());
+  absl::optional<Config::MetadataKey> selected_host_key;
+  if (config.has_selected_host_key()) {
+    selected_host_key.emplace(config.selected_host_key());
   }
 
   ASSERT(config.has_fallback_policy());
@@ -110,7 +109,7 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
       return std::unique_ptr<OverrideHostLbConfig>(new OverrideHostLbConfig(
-          std::move(override_host_sources).value(), std::move(selected_endpoint_key), factory,
+          std::move(override_host_sources).value(), std::move(selected_host_key), factory,
           std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
@@ -193,13 +192,13 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHostInternal(LoadBalancerConte
 HostSelectionResponse
 OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   auto response = chooseHostInternal(context);
-  addSelectedEndpointKey(context, response);
+  addSelectedHostKey(context, response);
   return response;
 }
 
-void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
+void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
     LoadBalancerContext* context, HostSelectionResponse& response) {
-  if (!config_.selectedEndpointKey().has_value()) {
+  if (!config_.selectedHostKey().has_value()) {
     return;
   }
 
@@ -208,10 +207,10 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedEndpointKey(
   }
 
   const std::string selected_endpoint = response.host->address()->asString();
-  const Config::MetadataKey& metadata_key = config_.selectedEndpointKey().value();
+  const Config::MetadataKey& metadata_key = config_.selectedHostKey().value();
   if (metadata_key.path_.size() < 1) {
     // Should not be possible based on proto validation, catching anyways.
-    ENVOY_LOG(trace, "Path was not provided in selected_endpoint_key.");
+    ENVOY_LOG(trace, "Path was not provided in selected_host_key.");
     return;
   }
 

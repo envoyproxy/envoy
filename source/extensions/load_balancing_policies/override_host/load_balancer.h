@@ -70,13 +70,11 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
-  const absl::optional<Config::MetadataKey>& selectedEndpointKey() const {
-    return selected_endpoint_key_;
-  }
+  const absl::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
-                       absl::optional<Config::MetadataKey>&& selected_endpoint_key,
+                       absl::optional<Config::MetadataKey>&& selected_host_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -92,7 +90,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
-  const absl::optional<Config::MetadataKey> selected_endpoint_key_;
+  const absl::optional<Config::MetadataKey> selected_host_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -155,7 +153,7 @@ private:
 
     HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
 
-    void addSelectedEndpointKey(LoadBalancerContext* context, HostSelectionResponse& response);
+    void addSelectedHostKey(LoadBalancerContext* context, HostSelectionResponse& response);
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header or in the request metadata.
