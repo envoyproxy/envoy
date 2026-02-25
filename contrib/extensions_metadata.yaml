@@ -191,3 +191,8 @@ envoy.load_balancing_policies.peak_ewma:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma
+envoy.filters.network.ldap_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

@@ -67,6 +67,8 @@ public:
   const std::string NetworkMatchDelegate = "envoy.filters.network.match_delegate";
   // Reverse tunnel filter
   const std::string ReverseTunnel = "envoy.filters.network.reverse_tunnel";
+  // Ldap proxy filter
+  const std::string LdapProxy = "envoy.filters.network.ldap_proxy";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

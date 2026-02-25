@@ -111,4 +111,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # ldap proxy 
+    #
+
+    "envoy.filters.network.ldap_proxy":                         "//contrib/ldap_proxy/filters/network/source:config",
 }
