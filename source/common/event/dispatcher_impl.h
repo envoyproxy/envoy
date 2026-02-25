@@ -135,10 +135,10 @@ private:
   void runThreadLocalDelete();
 
   // Internal implementation of deferred delete processing. When max_to_delete is 0, all pending
-  // items are processed (used by the public clearDeferredDeleteList API for shutdown/cleanup
-  // paths). When max_to_delete > 0, at most that many items are destroyed per call, allowing the
-  // event loop to process timers and connection events between batches. Returns true if no items
-  // remain.
+  // items are processed (used by the public clearDeferredDeleteList API and shutdown/cleanup
+  // paths). When max_to_delete > 0, at most that many items are destroyed per call; the caller
+  // re-schedules for the next event loop iteration, allowing timers and I/O events to fire between
+  // batches. Returns true when no items remain.
   bool clearDeferredDeleteListInternal(size_t max_to_delete);
 
   // Helper used to touch the watchdog after most schedulable, fd, and timer callbacks.
@@ -171,6 +171,10 @@ private:
 
   SchedulableCallbackPtr deferred_delete_cb_;
   uint32_t deferred_deletes_batch_size_{0};
+  // Tracks in-progress batch processing: the vector being drained and offset of the next item.
+  // Non-null only while a bounded batch sequence is active (between the first and last batch).
+  std::vector<DeferredDeletablePtr>* deferred_delete_batch_vector_{nullptr};
+  size_t deferred_delete_batch_offset_{0};
 
   SchedulableCallbackPtr post_cb_;
   Thread::MutexBasicLockable post_lock_;

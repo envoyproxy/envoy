@@ -75,7 +75,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
       deferred_delete_cb_(base_scheduler_.createSchedulableCallback([this]() -> void {
         if (!clearDeferredDeleteListInternal(deferred_deletes_batch_size_)) {
-          deferred_delete_cb_->scheduleCallbackCurrentIteration();
+          deferred_delete_cb_->scheduleCallbackNextIteration();
         }
       })),
       post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
@@ -118,26 +118,39 @@ void DispatcherImpl::clearDeferredDeleteList() { clearDeferredDeleteListInternal
 
 bool DispatcherImpl::clearDeferredDeleteListInternal(size_t max_to_delete) {
   ASSERT(isThreadSafe());
-  std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;
 
-  size_t num_to_delete = to_delete->size();
-  if (deferred_deleting_ || !num_to_delete) {
-    return true;
-  }
+  std::vector<DeferredDeletablePtr>* to_delete;
+  size_t start;
 
-  const size_t batch_size =
-      (max_to_delete > 0) ? std::min(num_to_delete, max_to_delete) : num_to_delete;
-
-  ENVOY_LOG(trace, "clearing deferred deletion list (size={}, batch={})", num_to_delete,
-            batch_size);
-
-  // Swap the current deletion vector so that if we do deferred delete while we are deleting, we
-  // use the other vector. We will get another callback to delete that vector.
-  if (current_to_delete_ == &to_delete_1_) {
-    current_to_delete_ = &to_delete_2_;
+  if (deferred_delete_batch_vector_ != nullptr) {
+    // Continuing a previous batch — resume from the stored offset.
+    to_delete = deferred_delete_batch_vector_;
+    start = deferred_delete_batch_offset_;
   } else {
-    current_to_delete_ = &to_delete_1_;
+    // Starting fresh from current_to_delete_.
+    to_delete = current_to_delete_;
+    if (deferred_deleting_ || to_delete->empty()) {
+      return true;
+    }
+
+    // Swap the current deletion vector so that if we do deferred delete while we are deleting,
+    // we use the other vector. We will get another callback to delete that vector.
+    if (current_to_delete_ == &to_delete_1_) {
+      current_to_delete_ = &to_delete_2_;
+    } else {
+      current_to_delete_ = &to_delete_1_;
+    }
+
+    start = 0;
+    deferred_delete_batch_vector_ = to_delete;
   }
+
+  const size_t num_to_delete = to_delete->size();
+  const size_t end =
+      (max_to_delete > 0) ? std::min(start + max_to_delete, num_to_delete) : num_to_delete;
+
+  ENVOY_LOG(trace, "clearing deferred deletion list (size={}, range=[{}, {}))", num_to_delete,
+            start, end);
 
   touchWatchdog();
   deferred_deleting_ = true;
@@ -145,22 +158,21 @@ bool DispatcherImpl::clearDeferredDeleteListInternal(size_t max_to_delete) {
   // Calling clear() on the vector does not specify which order destructors run in. We want to
   // destroy in FIFO order so just do it manually. This required 2 passes over the vector which is
   // not optimal but can be cleaned up later if needed.
-  for (size_t i = 0; i < batch_size; i++) {
+  for (size_t i = start; i < end; i++) {
     (*to_delete)[i].reset();
   }
 
-  if (batch_size < num_to_delete) {
-    // Bounded path: move unprocessed items to the active deletion vector so they will be picked
-    // up in subsequent event loop iterations. Items added during destruction (via deferredDelete)
-    // are already in current_to_delete_; appending remaining items after them preserves
-    // approximate FIFO ordering.
-    for (size_t i = batch_size; i < num_to_delete; i++) {
-      current_to_delete_->emplace_back(std::move((*to_delete)[i]));
-    }
+  deferred_deleting_ = false;
+
+  if (end < num_to_delete) {
+    deferred_delete_batch_offset_ = end;
+    return false;
   }
 
+  // Batch fully drained. Clear the vector and reset batch state.
   to_delete->clear();
-  deferred_deleting_ = false;
+  deferred_delete_batch_vector_ = nullptr;
+  deferred_delete_batch_offset_ = 0;
 
   return current_to_delete_->empty();
 }
