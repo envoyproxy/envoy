@@ -283,10 +283,6 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
 
 void StatsAccessLog::emitLogConst(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
-  if (!scope()) {
-    return;
-  }
-
   for (const auto& histogram : histograms_) {
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
