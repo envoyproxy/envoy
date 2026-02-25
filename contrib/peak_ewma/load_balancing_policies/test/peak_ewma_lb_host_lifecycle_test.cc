@@ -199,6 +199,160 @@ TEST_F(PeakEwmaHostLifecycleTest, ChooseHostAfterHostRemoval) {
   }
 }
 
+// ============================================================================
+// Ring buffer overflow and alpha calculation regression tests.
+// ============================================================================
+
+// Regression: When more than max_samples are written between aggregations,
+// processHostSamples must skip overwritten slots instead of re-reading them.
+TEST_F(PeakEwmaHostLifecycleTest, RingBufferOverflowSkipsOverwrittenSamples) {
+  // Use a small ring buffer to make overflow easy to trigger.
+  config_.mutable_max_samples_per_host()->set_value(10);
+  config_.mutable_decay_time()->set_seconds(1);
+  createLoadBalancer();
+
+  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  ASSERT_NE(data, nullptr);
+
+  // Write 15 samples (overflow by 5). First 5 slots get overwritten.
+  // Write old samples (RTT=1000ms) first, then newer samples (RTT=10ms).
+  uint64_t base_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              MonotonicTime(std::chrono::milliseconds(1000000)).time_since_epoch())
+                              .count();
+
+  for (int i = 0; i < 15; ++i) {
+    double rtt = (i < 5) ? 1000.0 : 10.0;
+    data->recordRttSample(rtt, base_time_ns + i * 1000000); // 1ms apart
+  }
+
+  // Advance time past aggregation interval.
+  ON_CALL(time_source_, monotonicTime())
+      .WillByDefault(Return(MonotonicTime(std::chrono::milliseconds(1000200))));
+  lb_->chooseHost(nullptr);
+
+  // Only the 10 most recent samples should be processed. Those are all RTT=10ms
+  // (samples 5-14). If the bug is present, some slots would be read twice,
+  // pulling in stale RTT=1000ms values and inflating the EWMA.
+  double ewma = data->getEwmaRtt();
+  EXPECT_GT(ewma, 0.0);
+  EXPECT_LE(ewma, 15.0) << "EWMA should reflect only the valid 10ms samples, not stale 1000ms "
+                           "data from overwritten slots. Got: "
+                        << ewma;
+}
+
+// Regression: Overflow by exactly one past max_samples still produces sane EWMA.
+TEST_F(PeakEwmaHostLifecycleTest, RingBufferOverflowExactlyOnePastMax) {
+  config_.mutable_max_samples_per_host()->set_value(10);
+  config_.mutable_decay_time()->set_seconds(1);
+  createLoadBalancer();
+
+  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  ASSERT_NE(data, nullptr);
+
+  uint64_t base_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              MonotonicTime(std::chrono::milliseconds(1000000)).time_since_epoch())
+                              .count();
+
+  // Write 11 samples (one past max). Slot 0 gets overwritten.
+  // First sample: RTT=1000ms (will be overwritten). Rest: RTT=20ms.
+  data->recordRttSample(1000.0, base_time_ns);
+  for (int i = 1; i <= 10; ++i) {
+    data->recordRttSample(20.0, base_time_ns + i * 1000000);
+  }
+
+  ON_CALL(time_source_, monotonicTime())
+      .WillByDefault(Return(MonotonicTime(std::chrono::milliseconds(1000200))));
+  lb_->chooseHost(nullptr);
+
+  double ewma = data->getEwmaRtt();
+  EXPECT_GT(ewma, 0.0);
+  EXPECT_LE(ewma, 25.0) << "EWMA should reflect the 10 valid 20ms samples. Got: " << ewma;
+}
+
+// Regression: Newer samples must have more influence on EWMA than older ones.
+// With the bug, alpha was computed as time_from_aggregation - sample_time, making
+// older samples get MORE weight. The fix computes alpha as sample_time - previous_update_time.
+TEST_F(PeakEwmaHostLifecycleTest, NewerSamplesHaveMoreInfluenceOnEwma) {
+  config_.mutable_decay_time()->set_seconds(1); // tau = 1s
+  createLoadBalancer();
+
+  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  ASSERT_NE(data, nullptr);
+
+  // Record old sample: RTT=500ms at T=2s.
+  uint64_t t_2s = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      MonotonicTime(std::chrono::seconds(2)).time_since_epoch())
+                      .count();
+  data->recordRttSample(500.0, t_2s);
+
+  // Record newer sample: RTT=10ms at T=4s.
+  uint64_t t_4s = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      MonotonicTime(std::chrono::seconds(4)).time_since_epoch())
+                      .count();
+  data->recordRttSample(10.0, t_4s);
+
+  // Aggregate at T=5s.
+  ON_CALL(time_source_, monotonicTime())
+      .WillByDefault(Return(MonotonicTime(std::chrono::seconds(5))));
+  lb_->chooseHost(nullptr);
+
+  // With correct alpha ordering (newer samples weighted more):
+  // First sample initializes EWMA=500. Second sample (2s gap, tau=1s) has
+  // alpha = 1 - e^(-2) ≈ 0.86, so EWMA ≈ 0.86*10 + 0.14*500 ≈ 78.6.
+  // With the bug (older samples weighted more): alpha for the newer sample
+  // would be based on (5s - 4s) = 1s gap giving alpha ≈ 0.63, while the older
+  // sample gets alpha based on (5s - 2s) = 3s giving alpha ≈ 0.95.
+  // The EWMA would be much closer to 500.
+  double ewma = data->getEwmaRtt();
+  EXPECT_LT(ewma, 100.0) << "EWMA should be much closer to the newer 10ms sample than the older "
+                            "500ms sample. Got: "
+                         << ewma;
+}
+
+// Regression: Alpha must be based on time since last EWMA update, not aggregation time.
+// With the bug, delaying aggregation inflates alpha, making a single new sample
+// dominate the EWMA even if it arrived shortly after the previous update.
+TEST_F(PeakEwmaHostLifecycleTest, AlphaUsesLastUpdateTimestampNotAggregationTime) {
+  config_.mutable_decay_time()->set_seconds(1); // tau = 1s
+  createLoadBalancer();
+
+  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  ASSERT_NE(data, nullptr);
+
+  // LB was created at T=1000s (SetUp default). Use times after that.
+  // Record sample A: RTT=100ms at T=1001s.
+  uint64_t t_1001s = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                         MonotonicTime(std::chrono::seconds(1001)).time_since_epoch())
+                         .count();
+  data->recordRttSample(100.0, t_1001s);
+
+  // Aggregate at T=1001.1s (past the 100ms aggregation interval) — establishes EWMA=100.
+  ON_CALL(time_source_, monotonicTime())
+      .WillByDefault(Return(MonotonicTime(std::chrono::milliseconds(1001100))));
+  lb_->chooseHost(nullptr);
+  EXPECT_NEAR(data->getEwmaRtt(), 100.0, 1.0);
+
+  // Record sample B: RTT=50ms at T=1001.2s (200ms after sample A).
+  uint64_t t_1001_2s = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           MonotonicTime(std::chrono::milliseconds(1001200)).time_since_epoch())
+                           .count();
+  data->recordRttSample(50.0, t_1001_2s);
+
+  // Delay aggregation until T=1010s (9 seconds after first aggregation).
+  ON_CALL(time_source_, monotonicTime())
+      .WillByDefault(Return(MonotonicTime(std::chrono::seconds(1010))));
+  lb_->chooseHost(nullptr);
+
+  // With the fix: alpha is based on (1001.2s - 1001s) = 200ms gap → alpha ≈ 0.18
+  // EWMA ≈ 0.18*50 + 0.82*100 ≈ 91.
+  // With the bug: alpha is based on (1010s - 1001.2s) = 8.8s gap → alpha ≈ 1.0
+  // EWMA ≈ 1.0*50 + 0.0*100 ≈ 50.
+  double ewma = data->getEwmaRtt();
+  EXPECT_GT(ewma, 90.0) << "EWMA should barely change because sample B arrived only 200ms after "
+                           "sample A, regardless of aggregation delay. Got: "
+                        << ewma;
+}
+
 // Coverage: inline aggregation triggers in chooseHost when interval elapses.
 TEST_F(PeakEwmaHostLifecycleTest, AggregationHappensInlineOnChooseHost) {
   createLoadBalancer();

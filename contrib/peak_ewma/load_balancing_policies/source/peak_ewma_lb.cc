@@ -245,23 +245,9 @@ void PeakEwmaLoadBalancer::aggregateWorkerData() {
   // Aggregation cycle complete.
 }
 
-size_t PeakEwmaLoadBalancer::calculateNewSampleCount(size_t last_processed, size_t current_write,
-                                                     size_t max_samples) {
-  if (last_processed == current_write) {
-    return 0;
-  }
-
-  if (current_write >= last_processed) {
-    return current_write - last_processed;
-  } else {
-    // Write index wrapped around.
-    return (max_samples - last_processed) + current_write;
-  }
-}
-
-double PeakEwmaLoadBalancer::calculateTimeBasedAlpha(uint64_t current_time_ns,
-                                                     uint64_t sample_time_ns) {
-  int64_t time_delta_ns = static_cast<int64_t>(current_time_ns - sample_time_ns);
+double PeakEwmaLoadBalancer::calculateTimeBasedAlpha(uint64_t later_time_ns,
+                                                     uint64_t earlier_time_ns) {
+  int64_t time_delta_ns = static_cast<int64_t>(later_time_ns - earlier_time_ns);
   if (time_delta_ns <= 0) {
     return 1.0; // Use full weight for future/concurrent samples.
   }
@@ -293,17 +279,20 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
 
   // Get the range of new samples to process (atomic ring buffer).
   auto [last_processed, current_write] = data->getNewSampleRange();
-
-  size_t num_new_samples =
-      calculateNewSampleCount(last_processed, current_write, data->max_samples_);
-  if (num_new_samples == 0)
+  if (last_processed == current_write)
     return;
+
+  // If ring buffer was fully overwritten, skip to oldest valid slot.
+  // Uses unsigned arithmetic (always correct since write_index_ only increments).
+  if (current_write - last_processed > data->max_samples_) {
+    last_processed = current_write - data->max_samples_;
+  }
+
+  size_t num_new_samples = current_write - last_processed;
 
   // Get current EWMA state.
   double current_ewma = data->getEwmaRtt();
-  uint64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 time_source_.monotonicTime().time_since_epoch())
-                                 .count();
+  uint64_t reference_time = data->last_update_timestamp_.load();
 
   // Process all new samples in chronological order.
   size_t processed_index = last_processed;
@@ -319,13 +308,14 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
       continue;
     }
 
-    double alpha = calculateTimeBasedAlpha(current_time_ns, timestamp_ns);
+    double alpha = calculateTimeBasedAlpha(timestamp_ns, reference_time);
     current_ewma = updateEwmaWithSample(current_ewma, rtt_ms, alpha);
+    reference_time = timestamp_ns;
     processed_index++;
   }
 
   // Update atomic EWMA in host data.
-  data->updateEwma(current_ewma, current_time_ns);
+  data->updateEwma(current_ewma, reference_time);
   data->markSamplesProcessed(current_write);
 }
 

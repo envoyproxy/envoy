@@ -100,8 +100,7 @@ private:
   double calculateHostCost(Upstream::HostConstSharedPtr host);
 
   // EWMA calculation helpers.
-  size_t calculateNewSampleCount(size_t last_processed, size_t current_write, size_t max_samples);
-  double calculateTimeBasedAlpha(uint64_t current_time_ns, uint64_t sample_time_ns);
+  double calculateTimeBasedAlpha(uint64_t later_time_ns, uint64_t earlier_time_ns);
   double updateEwmaWithSample(double current_ewma, double new_rtt_ms, double alpha);
 
   // Core infrastructure.
