@@ -943,12 +943,13 @@ TEST_F(DynamicModulesLoadBalancerTest, PerHostDataSetAndGet) {
 // Host Metadata Tests
 // =============================================================================
 
-TEST_F(DynamicModulesLoadBalancerTest, HostMetadataAccessSuccess) {
-  // Set up metadata on host1.
+TEST_F(DynamicModulesLoadBalancerTest, HostMetadataTypedAccessSuccess) {
+  // Set up metadata on host1 with string, number, and bool values.
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   auto& filter_metadata = (*metadata->mutable_filter_metadata())["envoy.lb"];
   (*filter_metadata.mutable_fields())["version"].set_string_value("v1.0");
   (*filter_metadata.mutable_fields())["weight_factor"].set_number_value(1.5);
+  (*filter_metadata.mutable_fields())["enabled"].set_bool_value(true);
   ON_CALL(*host1_, metadata()).WillByDefault(Return(metadata));
 
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
@@ -972,22 +973,37 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataAccessSuccess) {
 
   auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
 
-  // Test string value lookup.
   envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+
+  // Test string value lookup.
   envoy_dynamic_module_type_module_buffer key = {"version", 7};
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 0, filter_name, key, &result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                        key, &result));
   EXPECT_NE(result.ptr, nullptr);
-  EXPECT_EQ(absl::string_view(result.ptr, result.length), "\"v1.0\"");
+  EXPECT_EQ(absl::string_view(result.ptr, result.length), "v1.0");
 
   // Test number value lookup.
   envoy_dynamic_module_type_module_buffer num_key = {"weight_factor", 13};
-  envoy_dynamic_module_type_envoy_buffer num_result = {nullptr, 0};
-  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 0, filter_name, num_key,
-                                                                 &num_result));
-  EXPECT_NE(num_result.ptr, nullptr);
-  EXPECT_GT(num_result.length, 0);
+  double num_result = 0.0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_number(lb_ptr, 0, 0, filter_name,
+                                                                        num_key, &num_result));
+  EXPECT_DOUBLE_EQ(num_result, 1.5);
+
+  // Test bool value lookup.
+  envoy_dynamic_module_type_module_buffer bool_key = {"enabled", 7};
+  bool bool_result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_bool(lb_ptr, 0, 0, filter_name,
+                                                                      bool_key, &bool_result));
+  EXPECT_TRUE(bool_result);
+
+  // Test type mismatch: string key with number accessor returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_number(lb_ptr, 0, 0, filter_name,
+                                                                         key, &num_result));
+
+  // Test type mismatch: number key with string accessor returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         num_key, &result));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, HostMetadataNotFound) {
@@ -1018,33 +1034,40 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataNotFound) {
 
   auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
 
-  // Non-existent filter name.
-  envoy_dynamic_module_type_module_buffer bad_filter = {"nonexistent", 11};
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
   envoy_dynamic_module_type_module_buffer key = {"version", 7};
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 0, bad_filter, key, &result));
+
+  // Non-existent filter name.
+  envoy_dynamic_module_type_module_buffer bad_filter = {"nonexistent", 11};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, bad_filter,
+                                                                         key, &result));
 
   // Non-existent key.
-  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
   envoy_dynamic_module_type_module_buffer bad_key = {"nonexistent", 11};
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 0, filter_name,
-                                                                  bad_key, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         bad_key, &result));
 
   // Null metadata on host.
   ON_CALL(*host1_, metadata()).WillByDefault(Return(nullptr));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 0, filter_name, key, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         key, &result));
 
   // Null pointer handling.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(nullptr, 0, 0, filter_name,
+                                                                         key, &result));
+  double num = 0.0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_number(nullptr, 0, 0, filter_name,
+                                                                         key, &num));
+  bool b = false;
   EXPECT_FALSE(
-      envoy_dynamic_module_callback_lb_get_host_metadata(nullptr, 0, 0, filter_name, key, &result));
+      envoy_dynamic_module_callback_lb_get_host_metadata_bool(nullptr, 0, 0, filter_name, key, &b));
 
   // Invalid priority/index.
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 999, 0, filter_name, key,
-                                                                  &result));
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata(lb_ptr, 0, 999, filter_name, key,
-                                                                  &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(
+      lb_ptr, 999, 0, filter_name, key, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(
+      lb_ptr, 0, 999, filter_name, key, &result));
 }
 
 // =============================================================================
@@ -1157,41 +1180,6 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksEdgeCases) {
   auto* mock_host_set = priority_set_.getMockHostSet(0);
   ON_CALL(*mock_host_set, localityWeights()).WillByDefault(Return(nullptr));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 0), 0);
-}
-
-// =============================================================================
-// Random Number Generator Tests
-// =============================================================================
-
-TEST_F(DynamicModulesLoadBalancerTest, RandomNumberGenerator) {
-  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
-      config;
-  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_policy_name("test_lb");
-
-  // Set up the mock random generator to return a specific value.
-  ON_CALL(random_, random()).WillByDefault(Return(12345));
-
-  Factory factory;
-  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
-
-  auto thread_aware_lb =
-      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
-                     cluster_info_, priority_set_, runtime_, random_, time_source_);
-  ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
-
-  Upstream::LoadBalancerParams params{priority_set_, nullptr};
-  auto lb = thread_aware_lb->factory()->create(params);
-  ASSERT_NE(lb, nullptr);
-
-  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
-
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_random(lb_ptr), 12345);
-
-  // Null pointer handling.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_random(nullptr), 0);
 }
 
 // =============================================================================

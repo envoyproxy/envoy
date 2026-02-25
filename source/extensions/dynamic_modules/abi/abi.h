@@ -7943,25 +7943,59 @@ bool envoy_dynamic_module_callback_lb_get_host_data(
     uintptr_t* data);
 
 /**
- * envoy_dynamic_module_callback_lb_get_host_metadata returns a metadata value for a host
- * by looking up the given filter name and key in the host's endpoint metadata. The metadata value
- * is serialized as a JSON string. This is useful for implementing metadata-aware load balancing
- * algorithms (e.g., subset load balancing).
+ * envoy_dynamic_module_callback_lb_get_host_metadata_string is called by the module to get
+ * the string value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a string, this returns false.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param priority is the priority level.
  * @param index is the index of the host within all hosts.
  * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
  * @param key is the key within the filter namespace.
- * @param result is the output for the metadata value serialized as a JSON string. The caller must
- * not assume the buffer is valid beyond the current callback. If the key is not found, result
- * will be set to a null buffer.
- * @return true if the metadata key was found, false otherwise.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
  */
-bool envoy_dynamic_module_callback_lb_get_host_metadata(
+bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_metadata_number is called by the module to get
+ * the number value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a number, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_metadata_bool is called by the module to get
+ * the bool value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
 
 /**
  * envoy_dynamic_module_callback_lb_get_locality_count returns the number of locality buckets
@@ -8012,17 +8046,6 @@ bool envoy_dynamic_module_callback_lb_get_locality_host_address(
  */
 uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index);
-
-/**
- * envoy_dynamic_module_callback_lb_get_random returns a random 64-bit unsigned integer from
- * Envoy's random number generator. This is useful for implementing randomized load balancing
- * algorithms (e.g., weighted random, power of two choices).
- *
- * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
- * @return a random 64-bit unsigned integer.
- */
-uint64_t
-envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from

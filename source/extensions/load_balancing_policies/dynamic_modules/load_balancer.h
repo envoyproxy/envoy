@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/random_generator.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
@@ -19,7 +18,7 @@ class DynamicModuleLoadBalancer : public Upstream::LoadBalancer,
 public:
   DynamicModuleLoadBalancer(DynamicModuleLbConfigSharedPtr config,
                             const Upstream::PrioritySet& priority_set,
-                            const std::string& cluster_name, Random::RandomGenerator& random);
+                            const std::string& cluster_name);
   ~DynamicModuleLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -33,7 +32,6 @@ public:
   // Accessors for callbacks.
   const std::string& clusterName() const { return cluster_name_; }
   const Upstream::PrioritySet& prioritySet() const { return priority_set_; }
-  Random::RandomGenerator& random() { return random_; }
 
   // Per-host custom data storage.
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
@@ -43,7 +41,6 @@ private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
   std::string cluster_name_;
-  Random::RandomGenerator& random_;
   envoy_dynamic_module_type_lb_module_ptr in_module_lb_;
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).

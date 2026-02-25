@@ -1,4 +1,3 @@
-#include "source/common/json/json_utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -14,6 +13,37 @@ DynamicModuleLoadBalancer* getLb(envoy_dynamic_module_type_lb_envoy_ptr ptr) {
 
 Upstream::LoadBalancerContext* getContext(envoy_dynamic_module_type_lb_context_envoy_ptr ptr) {
   return static_cast<Upstream::LoadBalancerContext*>(ptr);
+}
+
+// Helper to look up a metadata value by filter name and key for a host.
+const Protobuf::Value* getHostMetadataValue(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+                                            uint32_t priority, size_t index,
+                                            envoy_dynamic_module_type_module_buffer filter_name,
+                                            envoy_dynamic_module_type_module_buffer key) {
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return nullptr;
+  }
+  const auto& metadata = hosts[index]->metadata();
+  if (metadata == nullptr) {
+    return nullptr;
+  }
+  const auto& filter_metadata = metadata->filter_metadata();
+  absl::string_view filter_name_view(filter_name.ptr, filter_name.length);
+  auto filter_it = filter_metadata.find(filter_name_view);
+  if (filter_it == filter_metadata.end()) {
+    return nullptr;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto field_it = filter_it->second.fields().find(key_view);
+  if (field_it == filter_it->second.fields().end()) {
+    return nullptr;
+  }
+  return &field_it->second;
 }
 
 } // namespace
@@ -366,11 +396,7 @@ bool envoy_dynamic_module_callback_lb_get_host_data(
   return getLb(lb_envoy_ptr)->getHostData(priority, index, data);
 }
 
-// Thread-local storage for the serialized metadata value returned to the module.
-// NOLINTNEXTLINE(cpp-core-guidelines-avoid-non-const-global-variables)
-thread_local std::string metadata_scratch_buffer;
-
-bool envoy_dynamic_module_callback_lb_get_host_metadata(
+bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
@@ -381,45 +407,45 @@ bool envoy_dynamic_module_callback_lb_get_host_metadata(
     }
     return false;
   }
-  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
-  if (priority >= host_sets.size()) {
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_string_value()) {
     result->ptr = nullptr;
     result->length = 0;
     return false;
   }
-  const auto& hosts = host_sets[priority]->hosts();
-  if (index >= hosts.size()) {
-    result->ptr = nullptr;
-    result->length = 0;
+  const auto& str = value->string_value();
+  result->ptr = str.data();
+  result->length = str.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
     return false;
   }
-  const auto& metadata = hosts[index]->metadata();
-  if (metadata == nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_number_value()) {
     return false;
   }
-  const auto& filter_metadata = metadata->filter_metadata();
-  absl::string_view filter_name_view(filter_name.ptr, filter_name.length);
-  auto filter_it = filter_metadata.find(std::string(filter_name_view));
-  if (filter_it == filter_metadata.end()) {
-    result->ptr = nullptr;
-    result->length = 0;
+  *result = value->number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
     return false;
   }
-  const auto& fields = filter_it->second.fields();
-  absl::string_view key_view(key.ptr, key.length);
-  auto field_it = fields.find(std::string(key_view));
-  if (field_it == fields.end()) {
-    result->ptr = nullptr;
-    result->length = 0;
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_bool_value()) {
     return false;
   }
-  // Serialize the value as JSON into the thread-local scratch buffer.
-  metadata_scratch_buffer.clear();
-  Envoy::Json::Utility::appendValueToString(field_it->second, metadata_scratch_buffer);
-  result->ptr = metadata_scratch_buffer.data();
-  result->length = metadata_scratch_buffer.size();
+  *result = value->bool_value();
   return true;
 }
 
@@ -499,14 +525,6 @@ uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
     return 0;
   }
   return (*weights)[locality_index];
-}
-
-uint64_t
-envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr) {
-  if (lb_envoy_ptr == nullptr) {
-    return 0;
-  }
-  return getLb(lb_envoy_ptr)->random().random();
 }
 
 } // extern "C"

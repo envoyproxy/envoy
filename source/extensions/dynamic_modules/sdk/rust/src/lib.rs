@@ -9931,16 +9931,38 @@ pub trait EnvoyLoadBalancer {
   /// found. Returns `Some(0)` if the host exists but no data was stored.
   fn get_host_data(&self, priority: u32, index: usize) -> Option<usize>;
 
-  /// Returns a metadata value for a host by looking up the given filter name and key in the host's
-  /// endpoint metadata. The value is returned as a JSON string. Returns `None` if the metadata
-  /// key was not found.
-  fn get_host_metadata(
+  /// Returns the string metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// string.
+  fn get_host_metadata_string(
     &self,
     priority: u32,
     index: usize,
     filter_name: &str,
     key: &str,
   ) -> Option<String>;
+
+  /// Returns the number metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// number.
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64>;
+
+  /// Returns the bool metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// bool.
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool>;
 
   /// Returns the number of locality buckets for the healthy hosts at a given priority.
   fn get_locality_count(&self, priority: u32) -> usize;
@@ -9958,9 +9980,6 @@ pub trait EnvoyLoadBalancer {
 
   /// Returns the weight of a locality bucket at a given priority.
   fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32;
-
-  /// Returns a random 64-bit unsigned integer from Envoy's random number generator.
-  fn get_random(&self) -> u64;
 
   // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
@@ -10210,7 +10229,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_metadata(
+  fn get_host_metadata_string(
     &self,
     priority: u32,
     index: usize,
@@ -10230,7 +10249,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       length: 0,
     };
     let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_metadata(
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_string(
         self.lb_ptr,
         priority,
         index,
@@ -10249,6 +10268,72 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
           .to_string(),
         )
       }
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_number(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: bool = false;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
     } else {
       None
     }
@@ -10310,10 +10395,6 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         locality_index,
       )
     }
-  }
-
-  fn get_random(&self) -> u64 {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_random(self.lb_ptr) }
   }
 
   fn has_context(&self) -> bool {

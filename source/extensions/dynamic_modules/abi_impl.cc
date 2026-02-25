@@ -549,17 +549,32 @@ envoy_dynamic_module_callback_lb_get_host_data(envoy_dynamic_module_type_lb_envo
   return false;
 }
 
-__attribute__((weak)) bool
-envoy_dynamic_module_callback_lb_get_host_metadata(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
-                                                   size_t, envoy_dynamic_module_type_module_buffer,
-                                                   envoy_dynamic_module_type_module_buffer,
-                                                   envoy_dynamic_module_type_envoy_buffer* result) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata: "
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata_string: "
                "not implemented in this context");
   if (result != nullptr) {
     result->ptr = nullptr;
     result->length = 0;
   }
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata_number: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata_bool: "
+               "not implemented in this context");
   return false;
 }
 
@@ -592,13 +607,6 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_locality_host_ad
 __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_locality_weight: "
-               "not implemented in this context");
-  return 0;
-}
-
-__attribute__((weak)) uint64_t
-envoy_dynamic_module_callback_lb_get_random(envoy_dynamic_module_type_lb_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_random: "
                "not implemented in this context");
   return 0;
 }

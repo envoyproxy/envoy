@@ -24,8 +24,6 @@ envoy_cc_library(
     hdrs = ["load_balancer.h"],
     deps = [
         ":lb_config_lib",
-        "//envoy/common:random_generator_interface",
-        "//envoy/common:time_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -37,7 +35,6 @@ envoy_cc_library(
     deps = [
         ":load_balancer_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/json:json_utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

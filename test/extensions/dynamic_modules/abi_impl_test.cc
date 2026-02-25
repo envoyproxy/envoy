@@ -676,15 +676,43 @@ TEST(CommonAbiImplTest, LbGetHostDataEnvoyBug) {
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_get_host_metadata triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostMetadataEnvoyBug) {
+// Test that the weak symbol stub for lb_get_host_metadata_string triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataStringEnvoyBug) {
   envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
   envoy_dynamic_module_type_module_buffer key = {"version", 7};
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
   EXPECT_ENVOY_BUG(
       {
-        auto found = envoy_dynamic_module_callback_lb_get_host_metadata(nullptr, 0, 0, filter_name,
-                                                                        key, &result);
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_string(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_number triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataNumberEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  double result = 0.0;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_number(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_bool triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataBoolEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  bool result = false;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+            nullptr, 0, 0, filter_name, key, &result);
         EXPECT_FALSE(found);
       },
       "not implemented in this context");
@@ -729,16 +757,6 @@ TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
       {
         auto weight = envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0);
         EXPECT_EQ(weight, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_random triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetRandomEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto random = envoy_dynamic_module_callback_lb_get_random(nullptr);
-        EXPECT_EQ(random, 0);
       },
       "not implemented in this context");
 }
