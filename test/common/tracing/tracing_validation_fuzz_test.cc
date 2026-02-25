@@ -1,7 +1,8 @@
 #include "source/common/tracing/tracing_validation.h"
 
-#include "absl/strings/string_view.h"
 #include "test/fuzz/fuzz_runner.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Fuzz {
