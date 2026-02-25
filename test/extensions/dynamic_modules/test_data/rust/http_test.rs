@@ -103,6 +103,12 @@ fn test_header_callbacks_filter_on_request_headers() {
     .return_const(0u32)
     .once();
 
+  envoy_filter
+    .expect_get_attribute_bool()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls)
+    .returning(|_| None)
+    .once();
+
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -259,4 +265,220 @@ fn test_buffer_limit_callbacks() {
     .once();
 
   envoy_filter.set_buffer_limit(2048);
+}
+
+#[test]
+fn test_dynamic_metadata_callbacks_on_response_body() {
+  let mut f = DynamicMetadataCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  // on_request_headers expectations (number metadata).
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "no_namespace" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_number()
+    .withf(|ns, key, val| ns == "ns_req_header" && key == "key" && *val == 123f64)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "ns_req_header" && key == "key")
+    .returning(|_, _, _| Some(123f64))
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_req_header" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  // Route/Cluster/Host metadata.
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|source, ns, key| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Route
+        && ns == "metadata"
+        && key == "route_key"
+    })
+    .returning(|_, _, _| Some(EnvoyBuffer::new("route")))
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|source, ns, key| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Cluster
+        && ns == "metadata"
+        && key == "cluster_key"
+    })
+    .returning(|_, _, _| Some(EnvoyBuffer::new("cluster")))
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|source, ns, key| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Host
+        && ns == "metadata"
+        && key == "host_key"
+    })
+    .returning(|_, _, _| Some(EnvoyBuffer::new("host")))
+    .once();
+  assert_eq!(
+    f.on_request_headers(&mut envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
+
+  // on_request_body expectations (string metadata).
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_req_body" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_string()
+    .withf(|ns, key, val| ns == "ns_req_body" && key == "key" && val == "value")
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_req_body" && key == "key")
+    .returning(|_, _, _| Some(EnvoyBuffer::new("value")))
+    .once();
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "ns_req_body" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  assert_eq!(
+    f.on_request_body(&mut envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  );
+
+  // on_response_headers expectations (number metadata).
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_res_header" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_number()
+    .withf(|ns, key, val| ns == "ns_res_header" && key == "key" && *val == 123f64)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "ns_res_header" && key == "key")
+    .returning(|_, _, _| Some(123f64))
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_res_header" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  assert_eq!(
+    f.on_response_headers(&mut envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  );
+
+  // on_response_body expectations (string + bool + keys + namespaces).
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_res_body" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_string()
+    .withf(|ns, key, val| ns == "ns_res_body" && key == "key" && val == "value")
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_res_body" && key == "key")
+    .returning(|_, _, _| Some(EnvoyBuffer::new("value")))
+    .once();
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "ns_res_body" && key == "key")
+    .returning(|_, _, _| None)
+    .once();
+
+  // Bool metadata expectations.
+  envoy_filter
+    .expect_set_dynamic_metadata_bool()
+    .withf(|ns, key, val| ns == "ns_res_body_bool" && key == "bool_key" && *val == true)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_bool()
+    .withf(|_, ns, key| ns == "ns_res_body_bool" && key == "bool_key")
+    .returning(|_, _, _| Some(true))
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_bool()
+    .withf(|ns, key, val| ns == "ns_res_body_bool" && key == "bool_key" && *val == false)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_bool()
+    .withf(|_, ns, key| ns == "ns_res_body_bool" && key == "bool_key")
+    .returning(|_, _, _| Some(false))
+    .once();
+  envoy_filter
+    .expect_get_metadata_string()
+    .withf(|_, ns, key| ns == "ns_res_body_bool" && key == "bool_key")
+    .returning(|_, _, _| None)
+    .once();
+  envoy_filter
+    .expect_get_metadata_number()
+    .withf(|_, ns, key| ns == "ns_res_body_bool" && key == "bool_key")
+    .returning(|_, _, _| None)
+    .once();
+
+  // Keys expectations.
+  envoy_filter
+    .expect_set_dynamic_metadata_string()
+    .withf(|ns, key, val| ns == "ns_keys_test" && key == "k1" && val == "v1")
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_number()
+    .withf(|ns, key, val| ns == "ns_keys_test" && key == "k2" && *val == 2.0)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_set_dynamic_metadata_bool()
+    .withf(|ns, key, val| ns == "ns_keys_test" && key == "k3" && *val == true)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_metadata_keys()
+    .withf(|_, ns| ns == "ns_keys_test")
+    .returning(|_, _| {
+      Some(vec![
+        EnvoyBuffer::new("k1"),
+        EnvoyBuffer::new("k2"),
+        EnvoyBuffer::new("k3"),
+      ])
+    })
+    .once();
+  envoy_filter
+    .expect_get_metadata_keys()
+    .withf(|_, ns| ns == "non_existing_ns")
+    .returning(|_, _| None)
+    .once();
+
+  // Namespaces expectations.
+  envoy_filter
+    .expect_get_metadata_namespaces()
+    .returning(|_| {
+      Some(vec![
+        EnvoyBuffer::new("ns_keys_test"),
+        EnvoyBuffer::new("ns_res_body_bool"),
+        EnvoyBuffer::new("ns_res_body"),
+      ])
+    })
+    .once();
+
+  assert_eq!(
+    f.on_response_body(&mut envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  );
 }

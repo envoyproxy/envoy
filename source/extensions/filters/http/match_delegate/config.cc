@@ -85,7 +85,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
   ASSERT(matching_data_ != nullptr);
   data_update_func(*matching_data_);
 
-  const Matcher::MatchResult match_result =
+  const Matcher::ActionMatchResult match_result =
       Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, *matching_data_);
 
   match_tree_evaluated_ = match_result.isComplete();

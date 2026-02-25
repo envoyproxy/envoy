@@ -80,7 +80,7 @@ Upstream::ThreadAwareLoadBalancerPtr
 Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::ClusterInfo& cluster_info,
                 const Upstream::PrioritySet& /*priority_set*/, Runtime::Loader&,
-                Random::RandomGenerator&, TimeSource&) {
+                Random::RandomGenerator& /*random*/, TimeSource& /*time_source*/) {
   const auto* typed_config = dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config.ptr());
   ASSERT(typed_config != nullptr, "Invalid dynamic module load balancer config");
 

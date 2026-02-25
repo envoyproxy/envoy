@@ -56,7 +56,7 @@ protected:
   // Helper function to set up thread local slot for tests.
   void setupThreadLocalSlot() {
     // First, call onServerInitialized to set up the extension reference properly.
-    extension_->onServerInitialized();
+    extension_->onServerInitialized(server_);
 
     // Create a thread local registry with the properly initialized extension.
     thread_local_registry_ =
@@ -92,6 +92,7 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Server::MockInstance> server_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};

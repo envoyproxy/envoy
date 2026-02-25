@@ -7,9 +7,12 @@
 pub mod access_log;
 pub mod buffer;
 pub mod cert_validator;
+pub mod matcher;
+pub mod utility;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
+pub use utility::{read_whole_request_body, read_whole_response_body};
 
 #[cfg(test)]
 #[path = "./lib_test.rs"]
@@ -979,6 +982,39 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Get the bool-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool>;
+
+  /// Set the bool-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool);
+
+  /// Get all keys in the given metadata namespace.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the key names,
+  /// or `None` if the namespace is not found.
+  fn get_metadata_keys<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Get all namespace names in the metadata.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the namespace names,
+  /// or `None` if no namespaces exist.
+  fn get_metadata_namespaces<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -988,6 +1024,22 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Set a typed filter state value with the given key. The value is deserialized by a
+  /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
+  /// setting filter state objects that other Envoy filters expect to read as specific C++ types
+  /// (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key, if deserialization fails, or if the key already exists and is read-only.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the received request body (the request body pieces received in the latest event).
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
@@ -1216,6 +1268,14 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -2291,6 +2351,118 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_keys(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys_count(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+      )
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        buffers.as_mut_ptr() as *mut _,
+      )
+    };
+    if success {
+      Some(
+        buffers
+          .into_iter()
+          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
+          .collect(),
+      )
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_namespaces(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces_count(self.raw_ptr, source)
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      count
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
+        self.raw_ptr,
+        source,
+        buffers.as_mut_ptr() as *mut _,
+      )
+    };
+    if success {
+      Some(
+        buffers
+          .into_iter()
+          .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
+          .collect(),
+      )
+    } else {
+      None
+    }
+  }
+
   fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
@@ -2317,6 +2489,35 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         bytes_to_module_buffer(key),
         bytes_to_module_buffer(value),
       )
+    }
+  }
+
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
     }
   }
 
@@ -2629,6 +2830,25 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let mut result: i64 = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_get_attribute_int(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_bool(
         self.raw_ptr,
         attribute_id,
         &mut result as *mut _ as *mut _,
@@ -4280,6 +4500,22 @@ pub trait EnvoyNetworkFilter {
   /// Returns None if the filter state is not found.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
+  /// Set a typed filter state value with the given key. The value is deserialized by a
+  /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
+  /// setting filter state objects that other Envoy filters expect to read as specific C++ types
+  /// (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key, if deserialization fails, or if the key already exists and is read-only.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
@@ -5096,6 +5332,35 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_network_get_filter_state_bytes(
+        self.raw,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_filter_state_typed(
+        self.raw,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_filter_state_typed(
         self.raw,
         bytes_to_module_buffer(key),
         &mut result as *mut _ as *mut _,
@@ -5950,6 +6215,23 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
   /// This is called when the listener filter is destroyed for each accepted connection.
   fn on_close(&mut self, _envoy_filter: &mut ELF) {}
 
+  /// This is called when the HTTP callout response is received initiated by a listener filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `callout_id` is the ID of the callout. This is used to differentiate between multiple calls.
+  /// * `result` is the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &mut self,
+    _envoy_filter: &mut ELF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _response_body: Vec<EnvoyBuffer>,
+  ) {
+  }
+
   /// This is called when the new event is scheduled via the
   /// [`EnvoyListenerFilterScheduler::commit`] for this [`ListenerFilter`].
   ///
@@ -6019,6 +6301,41 @@ pub trait EnvoyListenerFilter {
   /// This is used to determine the buffer size for reading data.
   fn max_read_bytes(&self) -> usize;
 
+  /// Get the requested server name (SNI) from the connection socket.
+  /// Returns None if SNI is not available.
+  fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection socket.
+  /// Returns None if the transport protocol is not available.
+  fn get_detected_transport_protocol<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the requested application protocols (ALPN) from the connection socket.
+  /// Returns an empty vector if no application protocols are available.
+  fn get_requested_application_protocols<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the JA3 fingerprint hash from the connection socket.
+  /// Returns None if the JA3 hash is not available.
+  fn get_ja3_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the JA4 fingerprint hash from the connection socket.
+  /// Returns None if the JA4 hash is not available.
+  fn get_ja4_hash<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Check if SSL/TLS connection information is available on the socket.
+  fn is_ssl(&self) -> bool;
+
+  /// Get the SSL URI SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no URI SANs are present.
+  fn get_ssl_uri_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the SSL DNS SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no DNS SANs are present.
+  fn get_ssl_dns_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the SSL subject from the peer certificate.
+  /// Returns None if the connection is not SSL or subject is not available.
+  fn get_ssl_subject<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
   /// Get the raw socket file descriptor.
   /// Returns -1 if the socket is not available.
   fn get_socket_fd(&self) -> i64;
@@ -6076,6 +6393,33 @@ pub trait EnvoyListenerFilter {
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Send an HTTP callout to the given cluster with the given headers and optional body.
+  ///
+  /// Headers must contain the `:method`, `:path`, and `host` headers.
+  ///
+  /// This returns the status and callout id of the callout. The id is used to
+  /// distinguish different callouts made from the same filter and is generated by Envoy.
+  /// The meaning of the status is:
+  ///
+  ///   * Success: The callout was sent successfully.
+  ///   * MissingRequiredHeaders: One of the required headers is missing: `:method`, `:path`, or
+  ///     `host`.
+  ///   * ClusterNotFound: The cluster with the given name was not found.
+  ///   * CannotCreateRequest: The request could not be created. This happens when, for example,
+  ///     there's no healthy upstream host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`ListenerFilter::on_http_callout_done`] method.
+  fn send_http_callout<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: Vec<(&'a str, &'a [u8])>,
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // callout handle
+  );
+
   /// Create a new implementation of the [`EnvoyListenerFilterScheduler`] trait.
   ///
   /// ## Example Usage
@@ -6110,6 +6454,16 @@ pub trait EnvoyListenerFilter {
 
   /// Get the index of the current worker thread.
   fn get_worker_index(&self) -> u32;
+
+  /// Close the socket immediately. If details is provided, the termination reason is set on the
+  /// connection's stream info before closing.
+  fn close_socket<'a>(&mut self, details: Option<&'a str>);
+
+  /// Write data directly to the raw socket.
+  /// This is useful for protocol negotiation at the listener filter level,
+  /// such as writing SSL support responses in Postgres or MySQL handshake packets.
+  /// Returns the number of bytes written, or -1 if the write failed.
+  fn write_to_socket(&mut self, data: &[u8]) -> i64;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -6516,6 +6870,214 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_max_read_bytes(self.raw) }
   }
 
+  fn get_requested_server_name(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_detected_transport_protocol(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_requested_application_protocols(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+        self.raw,
+      )
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut protocol_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+        self.raw,
+        protocol_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    protocol_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ja3_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_ja4_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn is_ssl(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_is_ssl(self.raw) }
+  }
+
+  fn get_ssl_uri_sans(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(self.raw) };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(self.raw) };
+    if size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(size)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
+        } else {
+          EnvoyBuffer::default()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
   fn get_socket_fd(&self) -> i64 {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_socket_fd(self.raw) }
   }
@@ -6656,6 +7218,52 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let mut callout_id: u64 = 0;
+
+    // Convert headers to module HTTP headers.
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let body_buffer = match body {
+      Some(b) => abi::envoy_dynamic_module_type_module_buffer {
+        ptr: b.as_ptr() as *const _,
+        length: b.len(),
+      },
+      None => abi::envoy_dynamic_module_type_module_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      },
+    };
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_http_callout(
+        self.raw,
+        &mut callout_id,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        body_buffer,
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
+
   fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static {
     unsafe {
       let scheduler_ptr =
@@ -6668,6 +7276,30 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
   fn get_worker_index(&self) -> u32 {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
+  }
+
+  fn close_socket(&mut self, details: Option<&str>) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_close_socket(
+        self.raw,
+        details
+          .map(str_to_module_buffer)
+          .unwrap_or(abi::envoy_dynamic_module_type_module_buffer {
+            ptr: std::ptr::null_mut(),
+            length: 0,
+          }),
+      );
+    }
+  }
+
+  fn write_to_socket(&mut self, data: &[u8]) -> i64 {
+    unsafe {
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_listener_filter_write_to_socket(self.raw, buffer)
+    }
   }
 }
 
@@ -6800,6 +7432,60 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
     filter_config_module_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
   let filter_config = unsafe { &**filter_config };
   filter_config.on_config_scheduled(event_id);
+}
+
+/// # Safety
+///
+/// Caller must ensure `filter_ptr`, `headers`, and `body_chunks` point to valid memory for the
+/// provided sizes, and that the pointed-to data lives for the duration of this call.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+
+  // Convert headers to Vec<(EnvoyBuffer, EnvoyBuffer)>.
+  let header_vec = if headers.is_null() || headers_size == 0 {
+    Vec::new()
+  } else {
+    let headers_slice = unsafe { std::slice::from_raw_parts(headers, headers_size) };
+    headers_slice
+      .iter()
+      .map(|h| {
+        (
+          unsafe { EnvoyBuffer::new_from_raw(h.key_ptr as *const _, h.key_length) },
+          unsafe { EnvoyBuffer::new_from_raw(h.value_ptr as *const _, h.value_length) },
+        )
+      })
+      .collect()
+  };
+
+  // Convert body chunks to Vec<EnvoyBuffer>.
+  let body_vec = if body_chunks.is_null() || body_chunks_size == 0 {
+    Vec::new()
+  } else {
+    let chunks_slice = unsafe { std::slice::from_raw_parts(body_chunks, body_chunks_size) };
+    chunks_slice
+      .iter()
+      .map(|c| unsafe { EnvoyBuffer::new_from_raw(c.ptr as *const _, c.length) })
+      .collect()
+  };
+
+  filter.on_http_callout_done(
+    &mut EnvoyListenerFilterImpl::new(envoy_ptr),
+    callout_id,
+    result,
+    header_vec,
+    body_vec,
+  );
 }
 
 // =============================================================================
@@ -7793,8 +8479,18 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 ///
 /// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
 /// timer when dropped.
+///
+/// Each timer has a unique [`id`](EnvoyBootstrapExtensionTimer::id) that is stable for its
+/// lifetime. This allows modules with multiple timers to identify which timer fired in the
+/// [`BootstrapExtensionConfig::on_timer_fired`] callback by comparing the id of the fired timer
+/// reference against the ids of their stored timer handles.
 #[automock]
 pub trait EnvoyBootstrapExtensionTimer: Send + Sync {
+  /// Returns a unique opaque identifier for this timer. The identifier is stable for the
+  /// lifetime of the timer and can be used to distinguish between multiple timers in the
+  /// [`BootstrapExtensionConfig::on_timer_fired`] callback.
+  fn id(&self) -> usize;
+
   /// Enable the timer with the given delay. If the timer is already enabled, it is reset.
   fn enable(&self, delay: std::time::Duration);
 
@@ -7822,6 +8518,10 @@ impl Drop for EnvoyBootstrapExtensionTimerImpl {
 }
 
 impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerImpl {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
@@ -7853,6 +8553,10 @@ unsafe impl Send for EnvoyBootstrapExtensionTimerRef {}
 unsafe impl Sync for EnvoyBootstrapExtensionTimerRef {}
 
 impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerRef {
+  fn id(&self) -> usize {
+    self.raw_ptr as usize
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
@@ -7874,6 +8578,10 @@ impl EnvoyBootstrapExtensionTimer for EnvoyBootstrapExtensionTimerRef {
 }
 
 impl EnvoyBootstrapExtensionTimer for Box<dyn EnvoyBootstrapExtensionTimer> {
+  fn id(&self) -> usize {
+    (**self).id()
+  }
+
   fn enable(&self, delay: std::time::Duration) {
     (**self).enable(delay);
   }
@@ -8783,6 +9491,381 @@ macro_rules! declare_bootstrap_init_functions {
 }
 
 // =================================================================================================
+// Cluster Dynamic Module
+// =================================================================================================
+
+/// The type of the factory function that creates a new cluster configuration.
+pub type NewClusterConfigFunction = fn(name: &str, config: &[u8]) -> Option<Box<dyn ClusterConfig>>;
+
+/// Global storage for the cluster config factory function.
+pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = OnceLock::new();
+
+/// The module-side cluster configuration.
+///
+/// This trait must be implemented by the module to handle cluster configuration.
+/// The object is created when the corresponding Envoy cluster configuration is loaded, and
+/// it is dropped when the corresponding Envoy cluster configuration is destroyed.
+///
+/// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
+pub trait ClusterConfig: Send + Sync {
+  /// Create a new cluster instance.
+  ///
+  /// This is called when a new cluster is created from this configuration.
+  /// The `envoy_cluster` provides access to Envoy's cluster operations such as
+  /// adding/removing hosts.
+  fn new_cluster(&self, envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster>;
+}
+
+/// The module-side cluster instance.
+///
+/// This trait must be implemented by the module to handle cluster lifecycle events.
+/// The object is created per cluster and is responsible for host discovery.
+///
+/// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
+pub trait Cluster: Send + Sync {
+  /// Called when cluster initialization begins.
+  ///
+  /// The module should perform initial host discovery (e.g., add hosts via
+  /// [`EnvoyCluster::add_hosts`]) and then call [`EnvoyCluster::pre_init_complete`]
+  /// to signal that the initial set of hosts is ready.
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster);
+
+  /// Create a new load balancer instance for a worker thread.
+  ///
+  /// Each worker thread gets its own load balancer instance. The `envoy_lb`
+  /// provides thread-local access to the cluster's host set.
+  fn new_load_balancer(&self, envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb>;
+}
+
+/// The module-side load balancer instance.
+///
+/// This trait must be implemented by the module to select hosts for requests.
+/// One instance is created per worker thread.
+pub trait ClusterLb: Send {
+  /// Select a host for a request.
+  ///
+  /// Returns the raw host pointer obtained from [`EnvoyClusterLoadBalancer::get_healthy_host`],
+  /// or `None` if no host is available.
+  fn choose_host(
+    &mut self,
+    context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+}
+
+/// Envoy-side cluster operations available to the module.
+#[automock]
+pub trait EnvoyCluster: Send + Sync {
+  /// Add multiple hosts to the cluster in a single batch operation.
+  ///
+  /// Each address must be in `ip:port` format (e.g., `127.0.0.1:8080`).
+  /// Each weight must be between 1 and 128. The `addresses` and `weights` slices must have the
+  /// same length.
+  ///
+  /// This triggers only one priority set update regardless of how many hosts are added, avoiding
+  /// the overhead of updating the priority set per host.
+  ///
+  /// Returns the host pointers if all hosts were added successfully, or `None` if any host failed
+  /// (e.g., invalid address or weight). On failure, no hosts are added.
+  fn add_hosts(
+    &self,
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>>;
+
+  /// Remove multiple hosts from the cluster in a single batch operation.
+  ///
+  /// The host pointers must have been returned by a previous [`EnvoyCluster::add_hosts`] call.
+  ///
+  /// This triggers only one priority set update regardless of how many hosts are removed.
+  ///
+  /// Returns the number of hosts that were successfully removed. Hosts not found in the cluster
+  /// are skipped.
+  fn remove_hosts(&self, hosts: &[abi::envoy_dynamic_module_type_cluster_host_envoy_ptr]) -> usize;
+
+  /// Signal that the cluster's initial host discovery is complete.
+  ///
+  /// This must be called during or after [`Cluster::on_init`] to allow Envoy to start
+  /// routing traffic to this cluster.
+  fn pre_init_complete(&self);
+}
+
+/// Envoy-side load balancer operations available to the module.
+#[automock]
+pub trait EnvoyClusterLoadBalancer: Send {
+  /// Get the number of healthy hosts at the given priority level.
+  fn get_healthy_host_count(&self, priority: u32) -> usize;
+
+  /// Get a healthy host by index at the given priority level.
+  ///
+  /// Returns the host pointer, or `None` if the index is out of bounds.
+  fn get_healthy_host(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+}
+
+// Implementations
+
+struct EnvoyClusterImpl {
+  raw: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+}
+
+unsafe impl Send for EnvoyClusterImpl {}
+unsafe impl Sync for EnvoyClusterImpl {}
+
+impl EnvoyClusterImpl {
+  fn new(raw: abi::envoy_dynamic_module_type_cluster_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyCluster for EnvoyClusterImpl {
+  fn add_hosts(
+    &self,
+    addresses: &[String],
+    weights: &[u32],
+  ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
+    let count = addresses.len();
+    let address_buffers: Vec<abi::envoy_dynamic_module_type_module_buffer> =
+      addresses.iter().map(|a| str_to_module_buffer(a)).collect();
+    let mut result_ptrs: Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> =
+      vec![std::ptr::null_mut(); count];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_add_hosts(
+        self.raw,
+        address_buffers.as_ptr(),
+        weights.as_ptr(),
+        count,
+        result_ptrs.as_mut_ptr(),
+      )
+    };
+    if success {
+      Some(result_ptrs)
+    } else {
+      None
+    }
+  }
+
+  fn remove_hosts(&self, hosts: &[abi::envoy_dynamic_module_type_cluster_host_envoy_ptr]) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_remove_hosts(self.raw, hosts.as_ptr(), hosts.len())
+    }
+  }
+
+  fn pre_init_complete(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+}
+
+struct EnvoyClusterLoadBalancerImpl {
+  raw: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+}
+
+unsafe impl Send for EnvoyClusterLoadBalancerImpl {}
+
+impl EnvoyClusterLoadBalancerImpl {
+  fn new(raw: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
+  fn get_healthy_host_count(&self, priority: u32) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(self.raw, priority)
+    }
+  }
+
+  fn get_healthy_host(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_healthy_host(self.raw, priority, index)
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some(host)
+    }
+  }
+}
+
+// Cluster Event Hook Implementations
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_config_new(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
+  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
+  let new_config_fn = NEW_CLUSTER_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_CLUSTER_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
+  config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_module_ptr, ClusterConfig);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
+  config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_module_ptr {
+  let config = config_module_ptr as *const *const dyn ClusterConfig;
+  let config = &**config;
+  let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
+  let cluster = config.new_cluster(&envoy_cluster);
+  wrap_into_c_void_ptr!(cluster)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_init(
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+  let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
+  let cluster = unsafe { &mut *cluster };
+  let envoy_cluster = EnvoyClusterImpl::new(cluster_envoy_ptr);
+  cluster.on_init(&envoy_cluster);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(cluster_module_ptr, Cluster);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_lb_module_ptr {
+  let cluster = cluster_module_ptr as *const *const dyn Cluster;
+  let cluster = &**cluster;
+  let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
+  let lb = cluster.new_load_balancer(&envoy_lb);
+  wrap_into_c_void_ptr!(lb)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
+  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(lb_module_ptr, ClusterLb);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
+  lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  let lb = lb_module_ptr as *mut Box<dyn ClusterLb>;
+  let lb = unsafe { &mut *lb };
+  match lb.choose_host(context_envoy_ptr) {
+    Some(host) => host,
+    None => std::ptr::null_mut(),
+  }
+}
+
+/// Declare the init functions for the cluster dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewClusterConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_cluster_init_functions!(my_program_init, my_new_cluster_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_cluster_config_fn(
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn ClusterConfig>> {
+///   Some(Box::new(MyClusterConfig {}))
+/// }
+///
+/// struct MyClusterConfig {}
+///
+/// impl ClusterConfig for MyClusterConfig {
+///   fn new_cluster(
+///     &self,
+///     _envoy_cluster: &dyn EnvoyCluster,
+///   ) -> Box<dyn Cluster> {
+///     Box::new(MyCluster {})
+///   }
+/// }
+///
+/// struct MyCluster {}
+///
+/// impl Cluster for MyCluster {
+///   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+///     envoy_cluster.pre_init_complete();
+///   }
+///
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Box<dyn ClusterLb> {
+///     Box::new(MyClusterLb {})
+///   }
+/// }
+///
+/// struct MyClusterLb {}
+///
+/// impl ClusterLb for MyClusterLb {
+///   fn choose_host(
+///     &mut self,
+///     _context: envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+///   ) -> Option<envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+///     None
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_cluster_init_functions {
+  ($f:ident, $new_cluster_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_cluster_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =================================================================================================
 // Load Balancer Dynamic Module Support
 // =================================================================================================
 
@@ -8820,6 +9903,83 @@ pub trait EnvoyLoadBalancer {
     priority: u32,
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health;
+
+  /// Returns the address of a host by index within all hosts at a given priority.
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
+
+  /// Returns the weight of a host by index within all hosts at a given priority.
+  fn get_host_weight(&self, priority: u32, index: usize) -> u32;
+
+  /// Returns the number of active requests for a host by index within all hosts at a given
+  /// priority. This is essential for implementing least-request, peak EWMA, and similar algorithms.
+  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64;
+
+  /// Returns the number of active connections for a host by index within all hosts at a given
+  /// priority. This is useful for connection-aware load balancing decisions.
+  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64;
+
+  /// Returns the locality information (region, zone, sub_zone) for a host by index within all
+  /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
+  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
+
+  /// Stores an opaque value on a host identified by priority and index. This data is stored per
+  /// load balancer instance (per worker thread) and can be used for per-host state such as moving
+  /// averages or request tracking. Use 0 to clear the data.
+  fn set_host_data(&self, priority: u32, index: usize, data: usize) -> bool;
+
+  /// Retrieves a previously stored opaque value for a host. Returns `None` if the host was not
+  /// found. Returns `Some(0)` if the host exists but no data was stored.
+  fn get_host_data(&self, priority: u32, index: usize) -> Option<usize>;
+
+  /// Returns the string metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// string.
+  fn get_host_metadata_string(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<String>;
+
+  /// Returns the number metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// number.
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64>;
+
+  /// Returns the bool metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// bool.
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool>;
+
+  /// Returns the number of locality buckets for the healthy hosts at a given priority.
+  fn get_locality_count(&self, priority: u32) -> usize;
+
+  /// Returns the number of healthy hosts in a specific locality bucket at a given priority.
+  fn get_locality_host_count(&self, priority: u32, locality_index: usize) -> usize;
+
+  /// Returns the address of a host within a specific locality bucket at a given priority.
+  fn get_locality_host_address(
+    &self,
+    priority: u32,
+    locality_index: usize,
+    host_index: usize,
+  ) -> Option<String>;
+
+  /// Returns the weight of a locality bucket at a given priority.
+  fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32;
 
   // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
@@ -8943,6 +10103,298 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_host_health(self.lb_ptr, priority, index) }
+  }
+
+  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_address(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_host_weight(&self, priority: u32, index: usize) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.lb_ptr, priority, index) }
+  }
+
+  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_active_requests(self.lb_ptr, priority, index)
+    }
+  }
+
+  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_active_connections(
+        self.lb_ptr,
+        priority,
+        index,
+      )
+    }
+  }
+
+  fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)> {
+    let mut region = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut zone = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut sub_zone = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_locality(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut region,
+        &mut zone,
+        &mut sub_zone,
+      )
+    };
+    if !found {
+      return None;
+    }
+    unsafe {
+      let region_str = if !region.ptr.is_null() && region.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          region.ptr as *const _,
+          region.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      let zone_str = if !zone.ptr.is_null() && zone.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          zone.ptr as *const _,
+          zone.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      let sub_zone_str = if !sub_zone.ptr.is_null() && sub_zone.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          sub_zone.ptr as *const _,
+          sub_zone.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      };
+      Some((region_str, zone_str, sub_zone_str))
+    }
+  }
+
+  fn set_host_data(&self, priority: u32, index: usize, data: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_set_host_data(self.lb_ptr, priority, index, data)
+    }
+  }
+
+  fn get_host_data(&self, priority: u32, index: usize) -> Option<usize> {
+    let mut data: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_data(self.lb_ptr, priority, index, &mut data)
+    };
+    if found {
+      Some(data)
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_string(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<String> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_string(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_number(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: bool = false;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_locality_count(&self, priority: u32) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_locality_count(self.lb_ptr, priority) }
+  }
+
+  fn get_locality_host_count(&self, priority: u32, locality_index: usize) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_host_count(
+        self.lb_ptr,
+        priority,
+        locality_index,
+      )
+    }
+  }
+
+  fn get_locality_host_address(
+    &self,
+    priority: u32,
+    locality_index: usize,
+    host_index: usize,
+  ) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_host_address(
+        self.lb_ptr,
+        priority,
+        locality_index,
+        host_index,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_weight(
+        self.lb_ptr,
+        priority,
+        locality_index,
+      )
+    }
   }
 
   fn has_context(&self) -> bool {
@@ -9071,6 +10523,29 @@ pub trait LoadBalancerConfig: Sync {
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
 }
 
+/// Represents the result of a host selection decision, containing the priority level
+/// and the host index within the healthy hosts at that priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostSelection {
+  /// The priority level of the selected host.
+  pub priority: u32,
+  /// The index of the selected host within the healthy hosts at the given priority.
+  pub index: u32,
+}
+
+impl HostSelection {
+  /// Creates a new host selection at the given priority and index.
+  pub fn new(priority: u32, index: u32) -> Self {
+    Self { priority, index }
+  }
+
+  /// Creates a new host selection at priority 0 with the given index.
+  /// This is a convenience for the common case of single-priority clusters.
+  pub fn at_default_priority(index: u32) -> Self {
+    Self { priority: 0, index }
+  }
+}
+
 /// Trait for a load balancer instance.
 ///
 /// All the event hooks are called on the same thread as the one that the [`LoadBalancer`] is
@@ -9082,9 +10557,10 @@ pub trait LoadBalancer {
   /// The `envoy_lb` provides access to both cluster/host information and request context.
   /// Context methods (those starting with `context_`) are only valid during this callback.
   ///
-  /// Returns the index of the selected host in the healthy hosts list at priority 0,
-  /// or `None` if no host should be selected (which will result in no upstream connection).
-  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize>;
+  /// Returns a [`HostSelection`] containing the priority and index of the selected host
+  /// in the healthy hosts list at that priority, or `None` if no host should be selected
+  /// (which will result in no upstream connection).
+  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection>;
 }
 
 /// The function signature for creating a new load balancer configuration.
@@ -9142,15 +10618,21 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
-) -> i64 {
+  result_priority: *mut u32,
+  result_index: *mut u32,
+) -> bool {
   let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
   let lb = {
     let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
     &mut **raw
   };
   match lb.choose_host(&envoy_lb) {
-    Some(index) => index as i64,
-    None => -1,
+    Some(selection) => {
+      *result_priority = selection.priority;
+      *result_index = selection.index;
+      true
+    },
+    None => false,
   }
 }
 
@@ -9193,14 +10675,14 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
-///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize> {
+///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection> {
 ///     let count = envoy_lb.get_healthy_hosts_count(0);
 ///     if count == 0 {
 ///       return None;
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
-///     Some(index)
+///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }
 /// ```
@@ -9212,7 +10694,7 @@ macro_rules! declare_load_balancer_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION
         .get_or_init(|| $new_lb_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()

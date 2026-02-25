@@ -234,7 +234,7 @@ public:
       : factory_context_(factory_context), config_(config) {}
 
   // Server::Configuration::BootstrapExtension
-  void onServerInitialized() override {
+  void onServerInitialized(Server::Instance&) override {
     provider_ = factory_context_.singletonManager().getTyped<WorkloadMetadataProvider>(
         SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider), [&] {
           return std::make_shared<WorkloadMetadataProviderImpl>(config_.config_source(),
