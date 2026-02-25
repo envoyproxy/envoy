@@ -103,6 +103,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::Continue;
   }
 
+  // TODO(guoyilin42): Add hard limit for the buffer size and flow control if possible.
   request_body_.move(data);
 
   if (!end_stream) {
