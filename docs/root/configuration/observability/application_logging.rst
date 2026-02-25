@@ -53,7 +53,7 @@ Event logging
 
 Envoy can also emit events with *stable event names*. Unlike the regular application or access logs, these event logs
 are not buffered and should be consumed immediately, and they can be used as a form of inter-process communication with
-a managing agent or an xDS server. To enable this feature, please set the field :ref:`json_format
+a managing agent or an xDS server. To enable this feature, please set the field :ref:`event_log
 <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.ApplicationLogConfig.event_log>`. Consult the following table for the
 well-known structured event types:
 

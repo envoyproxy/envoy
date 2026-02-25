@@ -14,6 +14,10 @@
 
 using ::Envoy::StatusHelpers::StatusIs;
 using testing::_;
+using testing::ByMove;
+using testing::Invoke;
+using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -92,6 +96,27 @@ TEST_F(EventPipeDelegateTest, LogEventReaderClosed) {
   EXPECT_OK(log_or_error);
   auto event_log = *std::move(log_or_error);
   ::close(read_file);
+  ENVOY_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "test_event", "{}", 13);
+  EXPECT_EQ(1U, store_.findCounterByString("event_log.write_failed").value().get().value());
+}
+
+TEST_F(EventPipeDelegateTest, PartialWrite) {
+  const std::string fifo_path = "fake_file";
+  NiceMock<Filesystem::MockInstance> file_system;
+  NiceMock<Filesystem::MockFile>* file = new NiceMock<Filesystem::MockFile>;
+  EXPECT_CALL(file_system,
+              createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
+                  Filesystem::FilePathAndType{Filesystem::DestinationType::File, fifo_path})))
+      .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file))));
+  EXPECT_CALL(api_, fileSystem()).WillRepeatedly(ReturnRef(file_system));
+  EXPECT_CALL(*file, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file, write_(_))
+      .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_GT(data.size(), 4);
+        return Filesystem::resultFailure<ssize_t>(4, EAGAIN);
+      }));
+  auto log_or_error = EventPipeDelegate::create(api_, fifo_path, store_, Registry::getSink());
+  EXPECT_OK(log_or_error);
   ENVOY_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "test_event", "{}", 13);
   EXPECT_EQ(1U, store_.findCounterByString("event_log.write_failed").value().get().value());
 }
