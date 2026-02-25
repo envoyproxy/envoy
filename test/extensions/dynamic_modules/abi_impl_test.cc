@@ -655,6 +655,112 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_set_host_data triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbSetHostDataEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_lb_set_host_data(nullptr, 0, 0, 42);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_data triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostDataEnvoyBug) {
+  uintptr_t data = 0;
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_lb_get_host_data(nullptr, 0, 0, &data);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_string triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataStringEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_string(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_number triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataNumberEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  double result = 0.0;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_number(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_bool triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataBoolEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  bool result = false;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_count triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_locality_count(nullptr, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_host_count triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityHostCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_locality_host_count(nullptr, 0, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_host_address triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbGetLocalityHostAddressEnvoyBug) {
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_get_locality_host_address(nullptr, 0, 0, 0, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_weight triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto weight = envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0);
+        EXPECT_EQ(weight, 0);
+      },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Matcher weak symbol stub tests
 // =====================================================================

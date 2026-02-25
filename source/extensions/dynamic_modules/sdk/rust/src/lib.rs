@@ -9922,6 +9922,65 @@ pub trait EnvoyLoadBalancer {
   /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
   fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
 
+  /// Stores an opaque value on a host identified by priority and index. This data is stored per
+  /// load balancer instance (per worker thread) and can be used for per-host state such as moving
+  /// averages or request tracking. Use 0 to clear the data.
+  fn set_host_data(&self, priority: u32, index: usize, data: usize) -> bool;
+
+  /// Retrieves a previously stored opaque value for a host. Returns `None` if the host was not
+  /// found. Returns `Some(0)` if the host exists but no data was stored.
+  fn get_host_data(&self, priority: u32, index: usize) -> Option<usize>;
+
+  /// Returns the string metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// string.
+  fn get_host_metadata_string(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<String>;
+
+  /// Returns the number metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// number.
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64>;
+
+  /// Returns the bool metadata value for a host by looking up the given filter name and key in
+  /// the host's endpoint metadata. Returns `None` if the key was not found or the value is not a
+  /// bool.
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool>;
+
+  /// Returns the number of locality buckets for the healthy hosts at a given priority.
+  fn get_locality_count(&self, priority: u32) -> usize;
+
+  /// Returns the number of healthy hosts in a specific locality bucket at a given priority.
+  fn get_locality_host_count(&self, priority: u32, locality_index: usize) -> usize;
+
+  /// Returns the address of a host within a specific locality bucket at a given priority.
+  fn get_locality_host_address(
+    &self,
+    priority: u32,
+    locality_index: usize,
+    host_index: usize,
+  ) -> Option<String>;
+
+  /// Returns the weight of a locality bucket at a given priority.
+  fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32;
+
   // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
   // -------------------------------------------------------------------------
@@ -10149,6 +10208,192 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         String::new()
       };
       Some((region_str, zone_str, sub_zone_str))
+    }
+  }
+
+  fn set_host_data(&self, priority: u32, index: usize, data: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_set_host_data(self.lb_ptr, priority, index, data)
+    }
+  }
+
+  fn get_host_data(&self, priority: u32, index: usize) -> Option<usize> {
+    let mut data: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_data(self.lb_ptr, priority, index, &mut data)
+    };
+    if found {
+      Some(data)
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_string(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<String> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_string(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_number(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<f64> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_number(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_host_metadata_bool(
+    &self,
+    priority: u32,
+    index: usize,
+    filter_name: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result: bool = false;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+        self.lb_ptr,
+        priority,
+        index,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    };
+    if found {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_locality_count(&self, priority: u32) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_locality_count(self.lb_ptr, priority) }
+  }
+
+  fn get_locality_host_count(&self, priority: u32, locality_index: usize) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_host_count(
+        self.lb_ptr,
+        priority,
+        locality_index,
+      )
+    }
+  }
+
+  fn get_locality_host_address(
+    &self,
+    priority: u32,
+    locality_index: usize,
+    host_index: usize,
+  ) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_host_address(
+        self.lb_ptr,
+        priority,
+        locality_index,
+        host_index,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      unsafe {
+        Some(
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            result.ptr as *const _,
+            result.length,
+          ))
+          .to_string(),
+        )
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_locality_weight(
+        self.lb_ptr,
+        priority,
+        locality_index,
+      )
     }
   }
 

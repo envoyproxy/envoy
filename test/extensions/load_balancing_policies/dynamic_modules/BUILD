@@ -22,6 +22,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/dynamic_modules:config",
         "//source/extensions/load_balancing_policies/dynamic_modules:load_balancer_lib",
         "//test/extensions/dynamic_modules:util",
