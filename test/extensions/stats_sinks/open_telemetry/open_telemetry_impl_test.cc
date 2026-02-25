@@ -359,7 +359,7 @@ public:
 };
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(), server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions());
 
   addCounterToSnapshot("test_counter", 1, 1);
   addHostCounterToSnapshot("test_host_counter", 2, 3);
@@ -412,8 +412,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix"),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix"));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addHostCounterToSnapshot("test_host_counter", 1, 1);
@@ -453,8 +452,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, false),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, false));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
@@ -482,8 +480,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, false, true),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, false, true));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
@@ -514,7 +511,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(), server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions());
 
   addGaugeToSnapshot("test_gauge1", 1);
   addGaugeToSnapshot("test_gauge2", 2);
@@ -535,7 +532,7 @@ TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(), server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions());
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
@@ -556,8 +553,7 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(true, false, true, true),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions(true, false, true, true));
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
@@ -580,7 +576,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(), server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions());
 
   addHistogramToSnapshot("test_histogram1");
   addHistogramToSnapshot("test_histogram2");
@@ -595,8 +591,7 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, true, true, true),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, true, true, true));
 
   addHistogramToSnapshot("test_histogram1", true);
   addHistogramToSnapshot("test_histogram2", true);
@@ -666,8 +661,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
                  }
                }
              }
-           })pb"),
-                                 server_factory_context_.scope().symbolTable());
+           })pb"));
   // Add counters with same name, different tags
   addCounterToSnapshot("test_counter-1", 0, 1, true, {{"key", "val1"}});
   addCounterToSnapshot("test_counter-2", 0, 99, true, {{"key", "val1"}});
@@ -764,8 +758,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
                  }
                }
              }
-           })pb"),
-                                 server_factory_context_.scope().symbolTable());
+           })pb"));
   // Add gauges with same name, different tags
   addGaugeToSnapshot("test_gauge-1", 1, true, {{"key", "valA"}});
   addGaugeToSnapshot("test_gauge-2", 2, true, {{"key", "valA"}});
@@ -861,8 +854,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
                  }
                }
              }
-           })pb"),
-                                 server_factory_context_.scope().symbolTable());
+           })pb"));
   // Add histograms with same name, different tags
   addHistogramToSnapshot("test_histogram-1", false, true, {{"key", "hist1"}});
   addHistogramToSnapshot("test_histogram-2", false, true, {{"key", "hist1"}});
@@ -1019,8 +1011,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
             }
           }
         }
-      )pb"),
-                                 server_factory_context_.scope().symbolTable());
+      )pb"));
 
   addCounterToSnapshot("test_counter", 1, 1, true, {{"key", "val1"}});
   addGaugeToSnapshot("test_gauge", 1, true, {{"key", "valA"}});
@@ -1117,8 +1108,7 @@ TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
             }
           }
         }
-      )pb"),
-                                 server_factory_context_.scope().symbolTable());
+      )pb"));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addCounterToSnapshot("drop_counter", 1, 1);
@@ -1190,8 +1180,7 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
             }
           }
         }
-      )pb"),
-                                 server_factory_context_.scope().symbolTable());
+      )pb"));
 
   addCounterToSnapshot("keep_counter", 1, 1);
   addCounterToSnapshot("drop_via_on_no_match_counter", 1, 1);
@@ -1205,8 +1194,8 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}),
-                                 server_factory_context_.scope().symbolTable());
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
   addCounterToSnapshot("test_counter1", 1, 1);
   MetricsExportRequestSharedPtr metrics =
       flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);

@@ -18,6 +18,15 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
+template <class StatType> Stats::NameAndTags createNameAndTags(const StatType& stat) {
+  absl::flat_hash_map<std::string, uint32_t> tag_map;
+  const auto& tags = stat.tags();
+  for (uint32_t i = 0; i < tags.size(); ++i) {
+    tag_map[tags[i].name_] = i;
+  }
+  return Stats::NameAndTags(stat.name(), std::move(tag_map));
+}
+
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
@@ -138,22 +147,15 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
 }
 
 struct StatsAccessLogMetric {
-  StatsAccessLogMetric(const Stats::StatNameTagVector& tags, Stats::SymbolTable& symbol_table)
-      : tags_(tags), symbol_table_(symbol_table) {}
+  StatsAccessLogMetric(const Stats::StatNameTagVector& tags,
+                       std::vector<Stats::Tag> tags_for_metric)
+      : tags_(tags), tags_for_metric_(std::move(tags_for_metric)) {}
 
   std::string name() const { return ""; }
-  const Stats::SymbolTable& constSymbolTable() const { return symbol_table_; }
-
-  void iterateTagStatNames(const Stats::Metric::TagStatNameIterFn& fn) const {
-    for (const auto& tag : tags_) {
-      if (!fn(tag.first, tag.second)) {
-        return;
-      }
-    }
-  }
+  const std::vector<Stats::Tag>& tags() const { return tags_for_metric_; }
 
   const Stats::StatNameTagVector& tags_;
-  const Stats::SymbolTable& symbol_table_;
+  std::vector<Stats::Tag> tags_for_metric_;
 };
 
 class ActionValidationVisitor
@@ -301,15 +303,24 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
   std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
   dynamic_storage.reserve(dynamic_tags_.size());
 
+  std::vector<Stats::Tag> string_tags;
+  if (rules_) {
+    string_tags.reserve(dynamic_tags_.size());
+  }
+
   for (const auto& dynamic_tag : dynamic_tags_) {
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
+    if (rules_) {
+      string_tags.push_back({dynamic_tag.str_name_, tag_value});
+    }
     auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
     tags.emplace_back(dynamic_tag.name_, storage_value.statName());
   }
 
   if (rules_) {
-    StatsAccessLogMetric metric(tags, scope.symbolTable());
-    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric, scope.symbolTable());
+    StatsAccessLogMetric metric(tags, std::move(string_tags));
+    Stats::NameAndTags name_and_tags = createNameAndTags(metric);
+    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric, name_and_tags);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
       if (const auto* action = dynamic_cast<

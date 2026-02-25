@@ -13,23 +13,14 @@ namespace OpenTelemetry {
 
 namespace {
 
-// StatMatchingDataImpl expects the underlying stat type to implement iterateTagStatNames.
-// Primitive stats do not implement this method. This wrapper is used to adapt primitive
-// stats to StatMatchingDataImpl, providing a dummy implementation of iterateTagStatNames
-// that triggers an ENVOY_BUG if called.
-template <class T> class PrimitiveStatSnapshotWrapper {
-public:
-  PrimitiveStatSnapshotWrapper(const T& stat) : stat_(stat) {}
-
-  const std::string& name() const { return stat_.name(); }
-
-  void iterateTagStatNames(const Stats::Metric::TagStatNameIterFn&) const {
-    ENVOY_BUG(false, "unexpected iterateTagStatNames call for primitive stats");
+template <class StatType> Stats::NameAndTags createNameAndTags(const StatType& stat) {
+  absl::flat_hash_map<std::string, uint32_t> tag_map;
+  const auto& tags = stat.tags();
+  for (uint32_t i = 0; i < tags.size(); ++i) {
+    tag_map[tags[i].name_] = i;
   }
-
-private:
-  const T& stat_;
-};
+  return Stats::NameAndTags(stat.name(), std::move(tag_map));
+}
 
 } // namespace
 
@@ -321,16 +312,9 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
     return {false, {}};
   };
 
-  if constexpr (std::is_same_v<StatType, Stats::PrimitiveCounterSnapshot> ||
-                std::is_same_v<StatType, Stats::PrimitiveGaugeSnapshot>) {
-    PrimitiveStatSnapshotWrapper<StatType> wrapped(stat);
-    Stats::StatMatchingDataImpl<PrimitiveStatSnapshotWrapper<StatType>> data(wrapped,
-                                                                             symbol_table_);
-    return evaluate(data);
-  } else {
-    Stats::StatMatchingDataImpl<StatType> data(stat, symbol_table_);
-    return evaluate(data);
-  }
+  Stats::NameAndTags name_and_tags = createNameAndTags(stat);
+  Stats::StatMatchingDataImpl<StatType> data(stat, name_and_tags);
+  return evaluate(data);
 }
 
 template <class StatType>
