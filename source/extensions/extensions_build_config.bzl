@@ -221,6 +221,7 @@ EXTENSIONS = {
     "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
+    "envoy.filters.http.peak_ewma":                      "//source/extensions/filters/http/peak_ewma:config",
 
     #
     # Listener filters
@@ -575,6 +576,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
     "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
+    "envoy.load_balancing_policies.peak_ewma":          "//source/extensions/load_balancing_policies/peak_ewma:config",
 
     #
     # HTTP Early Header Mutation

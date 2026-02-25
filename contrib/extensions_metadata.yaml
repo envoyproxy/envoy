@@ -149,13 +149,7 @@ envoy.upstreams.http.tcp.golang:
   - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
-envoy.filters.http.peak_ewma:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.http.peak_ewma.v3alpha.PeakEwmaConfig
+
 envoy.filters.http.peer_metadata:
   categories:
   - envoy.filters.http
@@ -184,10 +178,3 @@ envoy.filters.http.alpn:
   status: alpha
   type_urls:
   - istio.envoy.config.filter.http.alpn.v2alpha1.FilterConfig
-envoy.load_balancing_policies.peak_ewma:
-  categories:
-  - envoy.load_balancing_policies
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
-  type_urls:
-  - envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma

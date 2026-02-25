@@ -2051,6 +2051,20 @@ envoy.load_balancing_policies.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig
+envoy.filters.http.peak_ewma:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.peak_ewma.v3.PeakEwmaConfig
+envoy.load_balancing_policies.peak_ewma:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.peak_ewma.v3.PeakEwma
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
