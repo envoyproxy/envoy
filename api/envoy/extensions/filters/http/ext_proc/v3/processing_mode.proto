@@ -47,7 +47,7 @@ message ProcessingMode {
   //
   // When body mutation by the external processor is enabled, the ext_proc filter will always remove the
   // content length header in the following four cases, unless
-  // :ref:`keep_content_length <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.keep_content_length>`
+  // :ref:`allow_content_length_header <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>`
   // is enabled. This is because the content length cannot be guaranteed to be set correctly:
   //
   // 1) ``STREAMED`` BodySendMode: header processing completes before body mutation comes back.

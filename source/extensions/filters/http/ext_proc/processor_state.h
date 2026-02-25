@@ -91,7 +91,7 @@ public:
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
-      bool keep_content_length)
+      bool allow_content_length_header)
       : filter_(filter), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
@@ -100,7 +100,7 @@ public:
             &untyped_cluster_metadata_forwarding_namespaces),
         typed_cluster_metadata_forwarding_namespaces_(
             &typed_cluster_metadata_forwarding_namespaces),
-        keep_content_length_(keep_content_length) {}
+        allow_content_length_header_(allow_content_length_header) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -227,16 +227,13 @@ public:
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
   bool shouldRemoveContentLength() const {
-    // Always remove the content length in 4 cases below, unless keep_content_length is set to true
-    // in the config:
-    // 1) STREAMED BodySendMode
-    // 2) BUFFERED_PARTIAL BodySendMode
-    // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
-    // 4) FULL_DUPLEX_STREAMED BodySendMode
-    // In these modes, ext_proc filter can not guarantee to set the content length correctly if body
-    // is mutated by external processor later. In http1 codec, removing content length will enable
-    // chunked encoding whenever feasible.
-    if (keep_content_length_) {
+    // Always remove the content length in 4 cases below, unless allow_content_length_header is set
+    // to true in the config: 1) STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode 3) BUFFERED
+    // BodySendMode + SKIP HeaderSendMode 4) FULL_DUPLEX_STREAMED BodySendMode In these modes,
+    // ext_proc filter can not guarantee to set the content length correctly if body is mutated by
+    // external processor later. In http1 codec, removing content length will enable chunked
+    // encoding whenever feasible.
+    if (allow_content_length_header_) {
       return false;
     }
     return (
@@ -387,7 +384,7 @@ protected:
   const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_{};
-  const bool keep_content_length_;
+  const bool allow_content_length_header_;
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
@@ -517,11 +514,11 @@ public:
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
-      bool keep_content_length)
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces, keep_content_length) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -663,11 +660,11 @@ public:
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
-      bool keep_content_length)
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces, keep_content_length) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;

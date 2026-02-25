@@ -665,7 +665,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
 
 TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
   const std::string body_sent(10, 'a');
-  proto_config_.set_keep_content_length(true);
+  proto_config_.set_allow_content_length_header(true);
   initializeConfigDuplexStreamed(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

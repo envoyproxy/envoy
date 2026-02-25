@@ -347,4 +347,10 @@ new_features:
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
 
+- area: ext_proc
+  change: |
+    Added :ref:`allow_content_length_header
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
+    the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+
 deprecated:

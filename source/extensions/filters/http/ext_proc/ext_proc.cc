@@ -304,7 +304,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
       status_on_error_(toErrorCode(config.status_on_error().code())),
-      keep_content_length_(config.keep_content_length()) {
+      allow_content_length_header_(config.allow_content_length_header()) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }

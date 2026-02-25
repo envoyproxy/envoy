@@ -5963,7 +5963,7 @@ TEST_F(HttpFilterTest, KeepContentLength) {
       cluster_name: "ext_proc_server"
   processing_mode:
     request_body_mode: "STREAMED"
-  keep_content_length: true
+  allow_content_length_header: true
   )EOF");
 
   // Create synthetic HTTP request
@@ -5988,7 +5988,7 @@ TEST_F(HttpFilterTest, KeepContentLengthFullDuplex) {
       cluster_name: "ext_proc_server"
   processing_mode:
     request_body_mode: "FULL_DUPLEX_STREAMED"
-  keep_content_length: true
+  allow_content_length_header: true
   )EOF");
 
   // Create synthetic HTTP request

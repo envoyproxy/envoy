@@ -382,7 +382,7 @@ message ExternalProcessor {
   //    the body length after external processing. Otherwise, it may cause vulnerability issues such as
   //    request smuggling. Thus, please use your own discretion when enabling this feature.
   //
-  bool keep_content_length = 26;
+  bool allow_content_length_header = 26;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

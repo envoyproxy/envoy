@@ -327,7 +327,7 @@ public:
 
   std::unique_ptr<ProcessingRequestModifier> createProcessingRequestModifier() const;
 
-  bool keepContentLength() const { return keep_content_length_; }
+  bool keepContentLength() const { return allow_content_length_header_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -392,7 +392,7 @@ private:
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
   const std::chrono::milliseconds remote_close_timeout_;
   const Http::Code status_on_error_;
-  const bool keep_content_length_;
+  const bool allow_content_length_header_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
