@@ -1366,6 +1366,7 @@ TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1378,14 +1379,17 @@ TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
             headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  // SPELLCHECKER(off)
   EXPECT_EQ("rojo=00f067aa0ba902b7",
             headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
+  // SPELLCHECKER(on)
 }
 
 TEST_F(McpFilterTest, TraceContextEnabledInvalidParent) {
@@ -1403,6 +1407,7 @@ TEST_F(McpFilterTest, TraceContextEnabledInvalidParent) {
   filter_->decodeHeaders(headers, false);
 
   // Invalid parent (wrong size), valid state. Neither should be injected.
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1415,6 +1420,7 @@ TEST_F(McpFilterTest, TraceContextEnabledInvalidParent) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1474,6 +1480,7 @@ TEST_F(McpFilterTest, TraceContextEnabledMissingParent) {
   filter_->decodeHeaders(headers, false);
 
   // Missing parent, valid state. Neither should be injected.
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1485,6 +1492,7 @@ TEST_F(McpFilterTest, TraceContextEnabledMissingParent) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1507,7 +1515,8 @@ TEST_F(McpFilterTest, TraceContextEnabledNonstringParent) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
-  // Nonstring parent, valid state. Neither should be injected.
+  // traceparent is not a string, valid state. Neither should be injected.
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1520,6 +1529,7 @@ TEST_F(McpFilterTest, TraceContextEnabledNonstringParent) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1542,7 +1552,7 @@ TEST_F(McpFilterTest, TraceContextEnabledNonstringState) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
-  // Nonstring state, valid parent. Parent should be injected, state should not.
+  // tracestate is not a string, valid parent. Parent should be injected, state should not.
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1577,6 +1587,7 @@ TEST_F(McpFilterTest, TraceContextDisabled) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1589,6 +1600,7 @@ TEST_F(McpFilterTest, TraceContextDisabled) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1748,6 +1760,7 @@ TEST_F(McpFilterTest, TracingHeadersClearedWhenTraceParentValid) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
+  // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -1761,6 +1774,7 @@ TEST_F(McpFilterTest, TracingHeadersClearedWhenTraceParentValid) {
       }
     }
   })";
+  // SPELLCHECKER(on)
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1769,7 +1783,9 @@ TEST_F(McpFilterTest, TracingHeadersClearedWhenTraceParentValid) {
   EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
             headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
   ASSERT_FALSE(headers.get(Http::LowerCaseString("tracestate")).empty());
+  // SPELLCHECKER(off)
   EXPECT_EQ("rojo=1", headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
+  // SPELLCHECKER(on)
   ASSERT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
   EXPECT_EQ("userId=alice",
             headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
