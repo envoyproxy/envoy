@@ -301,7 +301,13 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
         "//envoy/filesystem:filesystem_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/matching/common_actions/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/log_entry/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

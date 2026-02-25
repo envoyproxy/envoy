@@ -18,5 +18,6 @@ api_proto_package(
         "//envoy/type/matcher/v3:pkg",
         "//envoy/type/v3:pkg",
         "@xds//udpa/annotations:pkg",
+        "@xds//xds/type/matcher/v3:pkg",
     ],
 )

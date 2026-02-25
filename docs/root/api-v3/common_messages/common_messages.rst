@@ -11,17 +11,9 @@ Common messages
   ../extensions/filters/common/fault/v3/fault.proto
   ../config/core/v3/base.proto
   ../config/core/v3/cel.proto
-  ../extensions/filters/common/matcher/action/v3/skip_action.proto
-  ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
-  ../extensions/matching/common_inputs/stats/v3/stats.proto
-  ../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto
   ../config/core/v3/config_source.proto
-  ../extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto
-  ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
-  ../extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
-  ../extensions/matching/common_inputs/environment_variable/v3/input.proto
   ../config/core/v3/extension.proto
   ../extensions/common/aws/v3/credential_provider.proto
   ../extensions/common/matching/v3/extension_matcher.proto
@@ -35,9 +27,6 @@ Common messages
   ../config/common/mutation_rules/v3/mutation_rules.proto
   ../extensions/early_data/v3/default_early_data_policy.proto
   ../config/core/v3/http_uri.proto
-  ../extensions/matching/input_matchers/ip/v3/ip.proto
-  ../extensions/matching/input_matchers/metadata/v3/metadata.proto
-  ../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto
   ../config/core/v3/address.proto
   ../config/core/v3/protocol.proto
   ../config/core/v3/proxy_protocol.proto

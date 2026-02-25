@@ -255,8 +255,9 @@ envoy_cc_test(
     srcs = ["logger_delegates_test.cc"],
     deps = [
         "//source/common/common:logger_lib",
+        "//source/common/protobuf:utility_lib",
         "//test/mocks:common_lib",
-        "//test/mocks/api:api_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:file_system_for_test_lib",
         "//test/test_common:status_utility_lib",

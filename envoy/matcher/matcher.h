@@ -33,6 +33,7 @@ public:
   virtual ~CustomMatchData() = default;
 };
 
+// TODO(kyessenov): Consider using string_view in some contexts (e.g. logging).
 using MatchingDataType =
     absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
 

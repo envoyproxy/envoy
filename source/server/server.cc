@@ -487,13 +487,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
     RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
-    if (const auto event_log_path = bootstrap_.application_log_config().event_log().pipe_path();
-        !event_log_path.empty()) {
-      auto logger_or_error = Logger::EventPipeDelegate::create(*api_, event_log_path, stats_store_,
-                                                               Logger::Registry::getSink());
-      RETURN_IF_NOT_OK_REF(logger_or_error.status());
-      event_logger_ = *std::move(logger_or_error);
-    }
   }
 
 #ifdef ENVOY_PERFETTO
@@ -645,6 +638,15 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
+  // Initial event log. Must happen prior to starting other threads but may also use the server
+  // context.
+  if (bootstrap_.application_log_config().has_event_log()) {
+    auto logger_or_error = Logger::EventPipeDelegate::create(
+        serverFactoryContext(), bootstrap_.application_log_config().event_log().pipe_path(),
+        bootstrap_.application_log_config().event_log().filter(), Logger::Registry::getSink());
+    RETURN_IF_NOT_OK_REF(logger_or_error.status());
+    event_logger_ = *std::move(logger_or_error);
+  }
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {

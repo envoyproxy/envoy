@@ -23,6 +23,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
@@ -117,11 +119,25 @@ message Bootstrap {
       }
     }
 
+    // Matching action to filter out a log entry.
+    message DropAction {
+    }
+
     message EventLog {
       // Path to a FIFO or a pipe file to receive the stable events. The file is
       // opened as a non-blocking, non-buffered stream. By default, events are written as
       // individual lines in the following format: ``[LEVEL] COMPONENT EVENT BODY\n``.
       string pipe_path = 1;
+
+      // If specified, applies an event filter. Supported inputs are:
+      //
+      // - :ref:`Event name <envoy_v3_api_msg_extensions.matching.common_inputs.log_entry.v3.EventNameInput>` referring
+      //   to the stable event name.
+      //
+      // Suported actions are:
+      //
+      // - :ref:`Drop action <envoy_v3_api_msg_extensions.matching.common_actions.v3.DropAction>`.
+      xds.type.matcher.v3.Matcher filter = 2;
     }
 
     // Optional field to set the application logs format. If this field is set, it will override

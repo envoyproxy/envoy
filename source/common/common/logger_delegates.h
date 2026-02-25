@@ -5,14 +5,18 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/api.h"
+#include "envoy/extensions/matching/common_actions/v3/actions.pb.h"
+#include "envoy/extensions/matching/common_inputs/log_entry/v3/inputs.pb.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
+#include "source/common/matcher/matcher.h"
 
 #include "absl/strings/string_view.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 namespace Logger {
@@ -45,6 +49,34 @@ struct EventPipeStats {
   EVENT_PIPE_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/** Match data for application logging. */
+struct LogEntryData {
+  static absl::string_view name() { return "log_entry_data"; }
+  absl::string_view event_name_;
+};
+struct LogEntryActionContext {};
+
+class EventNameInputFactory : public Matcher::DataInputFactory<LogEntryData> {
+public:
+  std::string name() const override { return "event_name_input"; }
+  Matcher::DataInputFactoryCb<LogEntryData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::matching::common_inputs::log_entry::v3::EventNameInput>();
+  }
+};
+
+class DropActionFactory : public Matcher::ActionFactory<LogEntryActionContext> {
+public:
+  std::string name() const override { return "otlp_metric_drop_action_factory"; }
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&, LogEntryActionContext&,
+                                             ProtobufMessage::ValidationVisitor&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::matching::common_actions::v3::DropAction>();
+  }
+};
+
 /**
  * Event sink delegate using a pipe. Note that writes to pipes are atomic as
  * long as each write size is below PIPE_BUF (which is 64kB on Linux). As long as
@@ -54,7 +86,8 @@ struct EventPipeStats {
 class EventPipeDelegate : public SinkDelegate {
 public:
   static absl::StatusOr<std::unique_ptr<EventPipeDelegate>>
-  create(Api::Api& api, const std::string& log_path, Stats::Store& stats_store,
+  create(Server::Configuration::ServerFactoryContext& server_factory_context,
+         const std::string& log_path, const xds::type::matcher::v3::Matcher& filter_matcher,
          DelegatingLogSinkSharedPtr log_sink);
   ~EventPipeDelegate() override;
 
@@ -65,11 +98,12 @@ public:
   void flush() override;
 
 protected:
-  EventPipeDelegate(Filesystem::FilePtr file, Stats::Store& stats_store,
-                    DelegatingLogSinkSharedPtr log_sink);
+  EventPipeDelegate(Filesystem::FilePtr file, Matcher::MatchTreePtr<LogEntryData> filter,
+                    Stats::Scope& scope, DelegatingLogSinkSharedPtr log_sink);
 
 private:
   Filesystem::FilePtr file_;
+  Matcher::MatchTreePtr<LogEntryData> filter_;
   EventPipeStats stats_;
 };
 

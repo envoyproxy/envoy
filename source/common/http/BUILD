@@ -610,7 +610,7 @@ envoy_cc_library(
     hdrs = ["path_utility.h"],
     deps = [
         "//envoy/http:header_map_interface",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/types:optional",
         "@googleurl//url",

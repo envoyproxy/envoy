@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -39,10 +41,11 @@ void FileSinkDelegate::flush() {
   log_file_->flush();
 }
 
-EventPipeDelegate::EventPipeDelegate(Filesystem::FilePtr file, Stats::Store& stats_store,
-                                     DelegatingLogSinkSharedPtr log_sink)
-    : SinkDelegate(std::move(log_sink)), file_(std::move(file)),
-      stats_{EVENT_PIPE_STATS(POOL_COUNTER_PREFIX(stats_store, "event_log."))} {
+EventPipeDelegate::EventPipeDelegate(Filesystem::FilePtr file,
+                                     Matcher::MatchTreePtr<LogEntryData> filter,
+                                     Stats::Scope& scope, DelegatingLogSinkSharedPtr log_sink)
+    : SinkDelegate(std::move(log_sink)), file_(std::move(file)), filter_(std::move(filter)),
+      stats_{EVENT_PIPE_STATS(POOL_COUNTER_PREFIX(scope, "event_log."))} {
   setDelegate();
 }
 
@@ -54,6 +57,17 @@ void EventPipeDelegate::log(absl::string_view msg, const spdlog::details::log_ms
 
 void EventPipeDelegate::logWithStableName(absl::string_view stable_name, absl::string_view level,
                                           absl::string_view component, absl::string_view msg) {
+  previousDelegate()->logWithStableName(stable_name, level, component, msg);
+  if (const auto result =
+          Matcher::evaluateMatch(*filter_, LogEntryData{.event_name_ = stable_name});
+      result.isMatch()) {
+    if (result.action()->typeUrl() ==
+        "type.googleapis.com/envoy.extensions.matching.common_actions.v3.DropAction") {
+      return;
+    }
+    ENVOY_LOG_EVERY_POW_2_MISC(warn, "Unknown log entry action: {}", result.action()->typeUrl());
+    return;
+  }
   const std::string data =
       absl::StrCat("[", level, "] ", component, " ", stable_name, " ", msg, "\n");
   const Api::IoCallSizeResult result = file_->write(data);
@@ -65,7 +79,6 @@ void EventPipeDelegate::logWithStableName(absl::string_view stable_name, absl::s
                                        "size to be larger than the log entry size.");
     }
   }
-  previousDelegate()->logWithStableName(stable_name, level, component, msg);
 }
 
 void EventPipeDelegate::flush() { previousDelegate()->flush(); }
@@ -74,21 +87,61 @@ namespace {
 constexpr Filesystem::FlagSet DefaultFlags =
     1 << Filesystem::File::Operation::Write | 1 << Filesystem::File::Operation::Create |
     1 << Filesystem::File::Operation::Append | 1 << Filesystem::File::Operation::NonBlock;
-}
+
+class LogEntryActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<LogEntryData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<LogEntryData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+} // namespace
 
 absl::StatusOr<std::unique_ptr<EventPipeDelegate>>
-EventPipeDelegate::create(Api::Api& api, const std::string& log_path, Stats::Store& stats_store,
+EventPipeDelegate::create(Server::Configuration::ServerFactoryContext& server_factory_context,
+                          const std::string& log_path,
+                          const xds::type::matcher::v3::Matcher& filter_matcher,
                           DelegatingLogSinkSharedPtr log_sink) {
-  Filesystem::FilePtr file = api.fileSystem().createFile(
+  Filesystem::FilePtr file = server_factory_context.api().fileSystem().createFile(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, log_path});
   const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
   if (!open_result.ok()) {
     return absl::InvalidArgumentError(
         fmt::format("unable to open file '{}': {}", log_path, open_result.err_->getErrorDetails()));
   }
+  LogEntryActionContext action_context;
+  LogEntryActionValidationVisitor validation_visitor;
+  Matcher::MatchTreeFactory<LogEntryData, LogEntryActionContext> factory{
+      action_context, server_factory_context, validation_visitor};
+  Matcher::MatchTreePtr<LogEntryData> filter = factory.create(filter_matcher)();
   return std::unique_ptr<EventPipeDelegate>(
-      new EventPipeDelegate(std::move(file), stats_store, std::move(log_sink)));
+      new EventPipeDelegate(std::move(file), std::move(filter),
+                            server_factory_context.serverScope(), std::move(log_sink)));
 }
+
+Matcher::DataInputFactoryCb<LogEntryData>
+EventNameInputFactory::createDataInputFactoryCb(const Protobuf::Message&,
+                                                ProtobufMessage::ValidationVisitor&) {
+  class EventNameInput : public Matcher::DataInput<LogEntryData> {
+  public:
+    Matcher::DataInputGetResult get(const LogEntryData& data) const override {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              std::string(data.event_name_)};
+    }
+  };
+  return [] { return std::make_unique<EventNameInput>(); };
+}
+
+Matcher::ActionConstSharedPtr DropActionFactory::createAction(const Protobuf::Message&,
+                                                              LogEntryActionContext&,
+                                                              ProtobufMessage::ValidationVisitor&) {
+  class DropAction
+      : public Matcher::ActionBase<envoy::extensions::matching::common_actions::v3::DropAction> {};
+  return std::make_shared<DropAction>();
+}
+
+REGISTER_FACTORY(EventNameInputFactory, Matcher::DataInputFactory<LogEntryData>);
+REGISTER_FACTORY(DropActionFactory, Matcher::ActionFactory<LogEntryActionContext>);
 
 } // namespace Logger
 } // namespace Envoy

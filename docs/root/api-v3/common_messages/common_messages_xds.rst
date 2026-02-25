@@ -6,15 +6,7 @@ Common messages (XDS)
   :maxdepth: 2
 
   ../../xds/type/v3/cel.proto
-  ../../xds/type/matcher/v3/cel.proto
-  ../../xds/type/matcher/v3/http_inputs.proto
-  ../../xds/type/matcher/v3/ip.proto
   ../../xds/type/v3/range.proto
-  ../../xds/type/matcher/v3/range.proto
-  ../../xds/type/matcher/v3/regex.proto
-  ../../xds/type/matcher/v3/domain.proto
-  ../../xds/type/matcher/v3/string.proto
-  ../../xds/type/matcher/v3/matcher.proto
   ../../xds/core/v3/authority.proto
   ../../xds/core/v3/cidr.proto
   ../../xds/core/v3/collection_entry.proto
