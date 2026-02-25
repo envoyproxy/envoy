@@ -638,8 +638,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
-  // Initial event log. Must happen prior to starting other threads but may also use the server
-  // context.
+  // Initialize event log. Must happen prior to starting other threads but may also use the
+  // server context.
   if (bootstrap_.application_log_config().has_event_log()) {
     auto logger_or_error = Logger::EventPipeDelegate::create(
         serverFactoryContext(), bootstrap_.application_log_config().event_log().pipe_path(),

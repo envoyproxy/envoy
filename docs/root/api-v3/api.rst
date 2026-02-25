@@ -15,6 +15,7 @@ v3 API reference
   admin/admin
   data/data
   service/service
+  matching/matching
   common_messages/common_messages
   common_messages/common_messages_xds
   types/types

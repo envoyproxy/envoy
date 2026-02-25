@@ -41,6 +41,11 @@ void FileSinkDelegate::flush() {
   log_file_->flush();
 }
 
+namespace {
+class DropAction
+    : public Matcher::ActionBase<envoy::extensions::matching::common_actions::v3::DropAction> {};
+} // namespace
+
 EventPipeDelegate::EventPipeDelegate(Filesystem::FilePtr file,
                                      Matcher::MatchTreePtr<LogEntryData> filter,
                                      Stats::Scope& scope, DelegatingLogSinkSharedPtr log_sink)
@@ -61,8 +66,7 @@ void EventPipeDelegate::logWithStableName(absl::string_view stable_name, absl::s
   if (const auto result =
           Matcher::evaluateMatch(*filter_, LogEntryData{.event_name_ = stable_name});
       result.isMatch()) {
-    if (result.action()->typeUrl() ==
-        "type.googleapis.com/envoy.extensions.matching.common_actions.v3.DropAction") {
+    if (dynamic_cast<const DropAction*>(result.action().get())) {
       return;
     }
     ENVOY_LOG_EVERY_POW_2_MISC(warn, "Unknown log entry action: {}", result.action()->typeUrl());
@@ -135,8 +139,6 @@ EventNameInputFactory::createDataInputFactoryCb(const Protobuf::Message&,
 Matcher::ActionConstSharedPtr DropActionFactory::createAction(const Protobuf::Message&,
                                                               LogEntryActionContext&,
                                                               ProtobufMessage::ValidationVisitor&) {
-  class DropAction
-      : public Matcher::ActionBase<envoy::extensions::matching::common_actions::v3::DropAction> {};
   return std::make_shared<DropAction>();
 }
 
