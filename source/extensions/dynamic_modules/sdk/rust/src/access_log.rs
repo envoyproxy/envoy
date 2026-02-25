@@ -262,17 +262,110 @@ pub struct BytesInfo {
   pub wire_bytes_sent: u64,
 }
 
+/// Access log type indicating when the log was recorded.
+///
+/// This corresponds to `envoy::data::accesslog::v3::AccessLogType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum AccessLogType {
+  NotSet               = 0,
+  TcpUpstreamConnected = 1,
+  TcpPeriodic          = 2,
+  TcpConnectionEnd     = 3,
+  DownstreamStart      = 4,
+  DownstreamPeriodic   = 5,
+  DownstreamEnd        = 6,
+  UpstreamPoolReady    = 7,
+  UpstreamPeriodic     = 8,
+  UpstreamEnd          = 9,
+  DownstreamTunnelSuccessfullyEstablished = 10,
+  UdpTunnelUpstreamConnected = 11,
+  UdpPeriodic          = 12,
+  UdpSessionEnd        = 13,
+}
+
+impl AccessLogType {
+  /// Convert from the ABI enum value. Used internally by the macro.
+  #[doc(hidden)]
+  pub fn from_abi(value: abi::envoy_dynamic_module_type_access_log_type) -> Self {
+    match value {
+      abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected => {
+        AccessLogType::TcpUpstreamConnected
+      },
+      abi::envoy_dynamic_module_type_access_log_type::TcpPeriodic => AccessLogType::TcpPeriodic,
+      abi::envoy_dynamic_module_type_access_log_type::TcpConnectionEnd => {
+        AccessLogType::TcpConnectionEnd
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamStart => {
+        AccessLogType::DownstreamStart
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamPeriodic => {
+        AccessLogType::DownstreamPeriodic
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamEnd => AccessLogType::DownstreamEnd,
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamPoolReady => {
+        AccessLogType::UpstreamPoolReady
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamPeriodic => {
+        AccessLogType::UpstreamPeriodic
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamEnd => AccessLogType::UpstreamEnd,
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamTunnelSuccessfullyEstablished => {
+        AccessLogType::DownstreamTunnelSuccessfullyEstablished
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UdpTunnelUpstreamConnected => {
+        AccessLogType::UdpTunnelUpstreamConnected
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UdpPeriodic => AccessLogType::UdpPeriodic,
+      abi::envoy_dynamic_module_type_access_log_type::UdpSessionEnd => AccessLogType::UdpSessionEnd,
+      _ => AccessLogType::NotSet,
+    }
+  }
+
+  /// Get the string representation matching Envoy's `AccessLogType_Name`.
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      AccessLogType::NotSet => "NotSet",
+      AccessLogType::TcpUpstreamConnected => "TcpUpstreamConnected",
+      AccessLogType::TcpPeriodic => "TcpPeriodic",
+      AccessLogType::TcpConnectionEnd => "TcpConnectionEnd",
+      AccessLogType::DownstreamStart => "DownstreamStart",
+      AccessLogType::DownstreamPeriodic => "DownstreamPeriodic",
+      AccessLogType::DownstreamEnd => "DownstreamEnd",
+      AccessLogType::UpstreamPoolReady => "UpstreamPoolReady",
+      AccessLogType::UpstreamPeriodic => "UpstreamPeriodic",
+      AccessLogType::UpstreamEnd => "UpstreamEnd",
+      AccessLogType::DownstreamTunnelSuccessfullyEstablished => {
+        "DownstreamTunnelSuccessfullyEstablished"
+      },
+      AccessLogType::UdpTunnelUpstreamConnected => "UdpTunnelUpstreamConnected",
+      AccessLogType::UdpPeriodic => "UdpPeriodic",
+      AccessLogType::UdpSessionEnd => "UdpSessionEnd",
+    }
+  }
+}
+
 /// Read-only context for accessing log event data.
 pub struct LogContext {
   // Private field - only accessible within this crate.
   pub(crate) envoy_ptr: *mut c_void,
+  /// The type of access log event.
+  pub(crate) log_type: AccessLogType,
 }
 
 impl LogContext {
   /// Create a new LogContext. Used internally by the macro.
   #[doc(hidden)]
-  pub fn new(envoy_ptr: *mut c_void) -> Self {
-    Self { envoy_ptr }
+  pub fn new(envoy_ptr: *mut c_void, log_type: AccessLogType) -> Self {
+    Self {
+      envoy_ptr,
+      log_type,
+    }
+  }
+
+  /// Get the access log type indicating when this log event was recorded.
+  pub fn log_type(&self) -> AccessLogType {
+    self.log_type
   }
 
   /// Get the HTTP response code.
@@ -724,6 +817,60 @@ impl LogContext {
     self.get_envoy_buffer_string(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason,
     )
+  }
+
+  /// Get the JA3 fingerprint hash from the downstream connection.
+  pub fn ja3_hash(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_ja3_hash)
+  }
+
+  /// Get the JA4 fingerprint hash from the downstream connection.
+  pub fn ja4_hash(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_ja4_hash)
+  }
+
+  /// Get the downstream transport failure reason.
+  pub fn downstream_transport_failure_reason(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason,
+    )
+  }
+
+  /// Get the byte size of request headers (uncompressed).
+  pub fn request_headers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the byte size of response headers (uncompressed).
+  pub fn response_headers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the byte size of response trailers (uncompressed).
+  pub fn response_trailers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the upstream protocol (e.g., "HTTP/1.1", "HTTP/2").
+  pub fn upstream_protocol(&self) -> Option<&str> {
+    self.get_envoy_buffer_string(
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_protocol,
+    )
+  }
+
+  /// Get the upstream connection pool ready duration in nanoseconds, or -1 if not available.
+  pub fn upstream_connection_pool_ready_duration_ns(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(
+        self.envoy_ptr,
+      )
+    }
   }
 
   /// Get the downstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
@@ -1282,10 +1429,11 @@ macro_rules! declare_access_logger {
     pub extern "C" fn envoy_dynamic_module_on_access_logger_log(
       envoy_ptr: *mut ::std::ffi::c_void,
       logger_ptr: *mut ::std::ffi::c_void,
-      _log_type: $crate::abi::envoy_dynamic_module_type_access_log_type,
+      log_type: $crate::abi::envoy_dynamic_module_type_access_log_type,
     ) {
       let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn $crate::access_log::AccessLogger>) };
-      let ctx = $crate::access_log::LogContext::new(envoy_ptr);
+      let access_log_type = $crate::access_log::AccessLogType::from_abi(log_type);
+      let ctx = $crate::access_log::LogContext::new(envoy_ptr, access_log_type);
       logger.log(&ctx);
     }
 

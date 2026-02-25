@@ -1712,6 +1712,216 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetLocalReplyBodyEmpty) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_local_reply_body(env_ptr, &result));
 }
+
+// =============================================================================
+// `JA3`/`JA4` Hash Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetJa3Hash) {
+  stream_info_.downstream_connection_info_provider_->setJA3Hash("abc123fingerprint");
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_ja3_hash(env_ptr, &result));
+  EXPECT_EQ("abc123fingerprint", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetJa3HashEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_ja3_hash(env_ptr, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetJa4Hash) {
+  stream_info_.downstream_connection_info_provider_->setJA4Hash("ja4hashvalue");
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_ja4_hash(env_ptr, &result));
+  EXPECT_EQ("ja4hashvalue", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetJa4HashEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_ja4_hash(env_ptr, &result));
+}
+
+// =============================================================================
+// Downstream Transport Failure Reason Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamTransportFailureReason) {
+  stream_info_.downstream_transport_failure_reason_ = "tls_handshake_failed";
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
+      env_ptr, &result));
+  EXPECT_EQ("tls_handshake_failed", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamTransportFailureReasonEmpty) {
+  stream_info_.downstream_transport_failure_reason_ = "";
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
+      env_ptr, &result));
+}
+
+// =============================================================================
+// Header Bytes Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetRequestHeadersBytes) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  // The test fixture has 2 request headers: {x-request-id: req-123} and {host: example.com}.
+  // byteSize() returns the sum of key + value sizes for all headers.
+  uint64_t bytes = envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(env_ptr);
+  EXPECT_GT(bytes, 0);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetRequestHeadersBytesNull) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(env_ptr));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetResponseHeadersBytes) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t bytes = envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(env_ptr);
+  EXPECT_GT(bytes, 0);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetResponseHeadersBytesNull) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(env_ptr));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetResponseTrailersBytes) {
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t bytes = envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(env_ptr);
+  EXPECT_GT(bytes, 0);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetResponseTrailersBytesNull) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(env_ptr));
+}
+
+// =============================================================================
+// Upstream Protocol Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocol) {
+  stream_info_.upstream_info_->setUpstreamProtocol(Http::Protocol::Http2);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_EQ("HTTP/2", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolHttp11) {
+  stream_info_.upstream_info_->setUpstreamProtocol(Http::Protocol::Http11);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_EQ("HTTP/1.1", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissing) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissingUpstreamInfo) {
+  stream_info_.setUpstreamInfo(std::shared_ptr<StreamInfo::UpstreamInfo>());
+  ON_CALL(stream_info_, upstreamInfo())
+      .WillByDefault(testing::Return(std::shared_ptr<StreamInfo::UpstreamInfo>()));
+  ON_CALL(Const(stream_info_), upstreamInfo())
+      .WillByDefault(testing::Return(OptRef<const StreamInfo::UpstreamInfo>()));
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+}
+
+// =============================================================================
+// Upstream Connection Pool Ready Duration Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamConnectionPoolReadyDuration) {
+  auto* upstream =
+      dynamic_cast<NiceMock<StreamInfo::MockUpstreamInfo>*>(stream_info_.upstream_info_.get());
+  ASSERT_NE(upstream, nullptr);
+  upstream->upstream_timing_.connection_pool_callback_latency_ = std::chrono::milliseconds(42);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  // 42 ms = 42,000,000 ns.
+  EXPECT_EQ(
+      42'000'000,
+      envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(env_ptr));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamConnectionPoolReadyDurationNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(
+      -1, envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(env_ptr));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamConnectionPoolReadyDurationNoUpstream) {
+  stream_info_.setUpstreamInfo(std::shared_ptr<StreamInfo::UpstreamInfo>());
+  ON_CALL(stream_info_, upstreamInfo())
+      .WillByDefault(testing::Return(std::shared_ptr<StreamInfo::UpstreamInfo>()));
+  ON_CALL(Const(stream_info_), upstreamInfo())
+      .WillByDefault(testing::Return(OptRef<const StreamInfo::UpstreamInfo>()));
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(
+      -1, envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(env_ptr));
+}
+
 // =============================================================================
 // Tracing Tests (Unsupported functionality check)
 // =============================================================================
