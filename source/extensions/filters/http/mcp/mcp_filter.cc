@@ -58,9 +58,8 @@ const Http::LowerCaseString& baggageHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
 }
 
-void injectTraceContext(
-    const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-    Http::RequestHeaderMap& headers) {
+void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                        Http::RequestHeaderMap& headers) {
   const auto& tp_it = meta_fields.find("traceparent");
   if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
     return;
