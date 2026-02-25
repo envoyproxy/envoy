@@ -23,6 +23,7 @@ envoy_cmake(
     }),
     build_data = ["@boost//:header"],
     cache_entries = {
+        "Boost_NO_BOOST_CMAKE": "on",
         "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/boost",
         "BUILD_AVX512": "on",
         "BUILD_AVX512VBMI": "on",
@@ -75,6 +76,7 @@ envoy_cmake(
     }),
     build_data = ["@boost//:header"],
     cache_entries = {
+        "Boost_NO_BOOST_CMAKE": "on",
         "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/boost",
         #        "BUILD_SVE2_BITPERM": "on",
         #        "BUILD_SVE2": "on",
