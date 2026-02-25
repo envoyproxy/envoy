@@ -18,13 +18,14 @@ absl::StatusOr<int> getSessionId(const json& json_rpc) {
     }
     if (it->is_string()) {
       int int_id;
+      // TODO(guoyilin42): Support non-numeric string IDs as MCP is JSON-RPC compliant.
       if (absl::SimpleAtoi(it->get<std::string>(), &int_id)) {
         return int_id;
       }
     }
     return absl::InvalidArgumentError("JSON-RPC request ID is not an integer or a numeric string.");
   }
-  return absl::InvalidArgumentError("JSON-RPC request does not have an ID.");
+  return absl::InvalidArgumentError("JSON-RPC request (except notification) does not have an ID.");
 }
 
 json generateInitializeResponse(int session_id, absl::string_view server_name) {
