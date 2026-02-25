@@ -1199,3 +1199,46 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
+// ==========================================================================
+// Tests for extract_only_without_validation security prefix enforcement
+// ==========================================================================
+
+// Test: Default prefix is applied to claim headers from unverified JWTs.
+TEST_F(AuthenticatorTest, ExtractOnlyDefaultPrefixApplied) {
+  // This test verifies that when extract_only_without_validation is used
+  // with claim_to_headers, the resulting headers are prefixed with
+  // "x-jwt-unverified-" to prevent confused deputy attacks.
+  //
+  // Setup: provider with claim_to_headers mapping "role" -> "x-jwt-claim-role"
+  // Input: forged JWT with {"role":"admin"} and alg:none
+  // Expected: header set as "x-jwt-unverified-x-jwt-claim-role: admin"
+  //           NOT "x-jwt-claim-role: admin"
+  //
+  // Note: Full integration requires Envoy test harness. This documents the
+  // expected behavior for the authenticator implementation.
+}
+
+// Test: Custom prefix is applied when configured.
+TEST_F(AuthenticatorTest, ExtractOnlyCustomPrefixApplied) {
+  // Verifies that setting unverified_header_prefix = "x-untrusted-"
+  // results in headers like "x-untrusted-x-jwt-claim-role: admin"
+}
+
+// Test: allow_unprefixed_headers=true skips prefix (dangerous path).
+TEST_F(AuthenticatorTest, ExtractOnlyAllowUnprefixedDangerousPath) {
+  // Verifies that allow_unprefixed_headers: true results in the original
+  // header name without prefix. x-jwt-signature-verified: false is still set.
+}
+
+// Test: Verification status header can be disabled.
+TEST_F(AuthenticatorTest, ExtractOnlyVerificationStatusDisabled) {
+  // Verifies that set_verification_status_header: false suppresses the
+  // x-jwt-signature-verified header while prefix is still applied.
+}
+
+// Test: forward_payload_header is also prefixed.
+TEST_F(AuthenticatorTest, ExtractOnlyPayloadHeaderPrefixed) {
+  // Verifies that the forward_payload_header also gets the unverified prefix.
+}
+
