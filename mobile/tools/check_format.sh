@@ -76,12 +76,6 @@ else
   fi
 fi
 
-# Install Black if not present
-if ! command -v black &> /dev/null
-then
-    echo "black not found."
-    exit 1
-fi
 
 PYTHON_DIRS=(
   "library/python"
@@ -89,9 +83,9 @@ PYTHON_DIRS=(
   "examples/python"
 )
 if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
-  black "${PYTHON_DIRS[@]}"
+  python3 -m black "${PYTHON_DIRS[@]}"
 else
-  NEEDS_FORMAT=$(black --check "${PYTHON_DIRS[@]}" 2>&1)
+  NEEDS_FORMAT=$(python3 -m black --check "${PYTHON_DIRS[@]}" 2>&1)
   if [[ -n "${NEEDS_FORMAT}" ]]; then
     echo "ERROR: Run 'tools/check_format.sh fix' to fix"
     echo "${NEEDS_FORMAT}"
