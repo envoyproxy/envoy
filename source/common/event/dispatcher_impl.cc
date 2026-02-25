@@ -119,6 +119,10 @@ void DispatcherImpl::clearDeferredDeleteList() { clearDeferredDeleteListInternal
 bool DispatcherImpl::clearDeferredDeleteListInternal(size_t max_to_delete) {
   ASSERT(isThreadSafe());
 
+  if (deferred_deleting_) {
+    return true;
+  }
+
   std::vector<DeferredDeletablePtr>* to_delete;
   size_t start;
 
@@ -129,7 +133,7 @@ bool DispatcherImpl::clearDeferredDeleteListInternal(size_t max_to_delete) {
   } else {
     // Starting fresh from current_to_delete_.
     to_delete = current_to_delete_;
-    if (deferred_deleting_ || to_delete->empty()) {
+    if (to_delete->empty()) {
       return true;
     }
 
