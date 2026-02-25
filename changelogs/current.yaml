@@ -82,6 +82,11 @@ minor_behavior_changes:
     Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
     containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
     guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
+- area: ext_authz
+  change: |
+    Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
+    headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
+    collected and can be accesses via method requestProcessingEffect() and failedOpen().
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
