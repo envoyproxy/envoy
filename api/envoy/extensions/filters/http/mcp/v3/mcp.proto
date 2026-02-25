@@ -53,6 +53,14 @@ message Mcp {
     DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
+  message TraceContextPropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
+  message BaggagePropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
   // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -78,18 +86,12 @@ message Mcp {
   // Default is DYNAMIC_METADATA when unspecified.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  message TraceContextPropagationConfig {
-    option (xds.annotations.v3.message_status).work_in_progress = true;
-  }
   // If set, extract and validate W3C trace context from the MCP request body and propagate it in
   // HTTP headers `traceparent` and `tracestate`. The fields are validated and propagated according
   // to the spec which can be found at `https://www.w3.org/TR/trace-context/`.
   // If unset (default), do not extract or inject trace context.
   TraceContextPropagationConfig propagate_trace_context = 6;
 
-  message BaggagePropagationConfig {
-    option (xds.annotations.v3.message_status).work_in_progress = true;
-  }
   // If set, extract and validate W3C baggage from the MCP request body and copy it to the
   // HTTP header `baggage`. Validated according to the spec at `https://www.w3.org/TR/baggage/`.
   // Note that this is independent of trace context extraction. Also note that if this is set, the
