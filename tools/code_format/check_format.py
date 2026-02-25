@@ -915,7 +915,6 @@ class FormatChecker:
     def clang_format(self, file_path, check=False):
         result = []
         quoted_path = shlex.quote(file_path)
-        
         if check:
             command = f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
             result = self.execute_command(command, "clang-format check failed", file_path)
