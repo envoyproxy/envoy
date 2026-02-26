@@ -5,43 +5,36 @@
 #include "envoy/stats/stats.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
 
-// A struct containing the pre-computed string values of a stat's name and tags.
-// This allows tag matching to avoid looking up StatName in SymbolTable
-// (which requires a lock).
-struct NameAndTags {
-  NameAndTags(std::string name, absl::flat_hash_map<std::string, uint32_t> tag_map)
-      : name_(std::move(name)), tag_map_(std::move(tag_map)) {}
-
-  std::string name_;
-  // Map from tag name (string) to the index of tag in a TagVector.
-  absl::flat_hash_map<std::string, uint32_t> tag_map_;
-};
-
 template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
 public:
-  StatMatchingDataImpl(const StatType& metric, const NameAndTags& name_and_tags)
-      : metric_(metric), name_and_tags_(name_and_tags) {}
+  explicit StatMatchingDataImpl(const StatType& metric) : metric_(metric), name_(metric.name()) {
+    for (const auto& tag : metric.tags()) {
+      tag_map_[tag.name_] = tag.value_;
+    }
+  }
 
   static std::string name() { return "stat_matching_data_impl"; }
 
-  std::string fullName() const override { return name_and_tags_.name_; }
+  std::string fullName() const override { return name_; }
 
   std::string tagValue(absl::string_view name) const override {
-    auto it = name_and_tags_.tag_map_.find(name);
-    if (it != name_and_tags_.tag_map_.end()) {
-      // Tags vector order should map to indices in NameAndTags map.
-      return metric_.tags()[it->second].value_;
+    auto it = tag_map_.find(name);
+    if (it != tag_map_.end()) {
+      return std::string(it->second);
     }
     return {};
   }
 
 private:
   const StatType& metric_;
-  const NameAndTags& name_and_tags_;
+  std::string name_;
+  // Map from tag name to tag value.
+  absl::flat_hash_map<absl::string_view, absl::string_view> tag_map_;
 };
 
 } // namespace Stats

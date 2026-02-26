@@ -18,15 +18,6 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
-template <class StatType> Stats::NameAndTags createNameAndTags(const StatType& stat) {
-  absl::flat_hash_map<std::string, uint32_t> tag_map;
-  const auto& tags = stat.tags();
-  for (uint32_t i = 0; i < tags.size(); ++i) {
-    tag_map[tags[i].name_] = i;
-  }
-  return Stats::NameAndTags(stat.name(), std::move(tag_map));
-}
-
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
@@ -319,8 +310,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 
   if (rules_) {
     StatsAccessLogMetric metric(tags, std::move(string_tags));
-    Stats::NameAndTags name_and_tags = createNameAndTags(metric);
-    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric, name_and_tags);
+    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
       if (const auto* action = dynamic_cast<

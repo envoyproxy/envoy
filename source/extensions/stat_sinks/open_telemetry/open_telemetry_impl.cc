@@ -11,19 +11,6 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
-namespace {
-
-template <class StatType> Stats::NameAndTags createNameAndTags(const StatType& stat) {
-  absl::flat_hash_map<std::string, uint32_t> tag_map;
-  const auto& tags = stat.tags();
-  for (uint32_t i = 0; i < tags.size(); ++i) {
-    tag_map[tags[i].name_] = i;
-  }
-  return Stats::NameAndTags(stat.name(), std::move(tag_map));
-}
-
-} // namespace
-
 using ::opentelemetry::proto::metrics::v1::AggregationTemporality;
 using ::opentelemetry::proto::metrics::v1::HistogramDataPoint;
 using ::opentelemetry::proto::metrics::v1::Metric;
@@ -290,31 +277,27 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
 template <class StatType>
 OtlpMetricsFlusherImpl::MetricConfig
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
-  auto evaluate = [&](auto& data) -> MetricConfig {
-    const ::Envoy::Matcher::ActionMatchResult result =
-        Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
-    ASSERT(result.isComplete());
-    if (result.isMatch()) {
-      if (dynamic_cast<const DropAction*>(result.action().get())) {
-        return {true, {}};
-      }
+  Stats::StatMatchingDataImpl<StatType> data(stat);
 
-      if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
-        return {false, *match_action->config()};
-      }
-
-      ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
-                result.action()->typeUrl());
+  const ::Envoy::Matcher::ActionMatchResult result =
+      Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
+  ASSERT(result.isComplete());
+  if (result.isMatch()) {
+    if (dynamic_cast<const DropAction*>(result.action().get())) {
+      return {true, {}};
     }
 
-    // By default, this stat will be converted to the metric without any
-    // customization.
-    return {false, {}};
-  };
+    if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
+      return {false, *match_action->config()};
+    }
 
-  Stats::NameAndTags name_and_tags = createNameAndTags(stat);
-  Stats::StatMatchingDataImpl<StatType> data(stat, name_and_tags);
-  return evaluate(data);
+    ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
+              result.action()->typeUrl());
+  }
+
+  // By default, this stat will be converted to the metric without any
+  // customization.
+  return {false, {}};
 }
 
 template <class StatType>
