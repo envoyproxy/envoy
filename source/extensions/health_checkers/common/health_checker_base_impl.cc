@@ -161,7 +161,12 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
-    if (host->disableActiveHealthCheck() || active_sessions_.contains(host)) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.health_check_after_cluster_warming") &&
+        active_sessions_.contains(host)) {
       continue;
     }
     active_sessions_[host] = makeSession(host);
