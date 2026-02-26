@@ -129,12 +129,13 @@ Tcp::ConnectionPool::ConnectionData* TcpUpstream::onDownstreamEvent(Network::Con
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    std::string reason =
+    local_close_reason_ =
         !details.empty()
-            ? std::string(details)
+            ? details
             : StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose;
 
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush, reason);
+    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                            local_close_reason_);
   }
   return nullptr;
 }

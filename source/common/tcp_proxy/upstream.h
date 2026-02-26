@@ -180,9 +180,11 @@ public:
   bool startUpstreamSecureTransport() override;
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
   StreamInfo::DetectedCloseType detectedCloseType() const override;
+  absl::string_view localCloseReason() const override { return local_close_reason_; }
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  std::string local_close_reason_;
 };
 
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
