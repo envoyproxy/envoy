@@ -412,6 +412,14 @@ type sslConnection struct {
 	request *httpRequest
 }
 
+func (s *sslConnection) getStringSliceValue(id int) []string {
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), id)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
+}
+
 func (s *sslConnection) PeerCertificatePresented() bool {
 	presented, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslPeerCertificatePresented)
 	return ok && presented != 0
@@ -448,35 +456,19 @@ func (s *sslConnection) SubjectLocalCertificate() string {
 }
 
 func (s *sslConnection) UriSanPeerCertificate() []string {
-	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUriSanPeerCertificate)
-	if !ok || val == "" {
-		return nil
-	}
-	return strings.Split(val, "\x00")
+	return s.getStringSliceValue(ValueSslUriSanPeerCertificate)
 }
 
 func (s *sslConnection) UriSanLocalCertificate() []string {
-	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUriSanLocalCertificate)
-	if !ok || val == "" {
-		return nil
-	}
-	return strings.Split(val, "\x00")
+	return s.getStringSliceValue(ValueSslUriSanLocalCertificate)
 }
 
 func (s *sslConnection) DnsSansPeerCertificate() []string {
-	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslDnsSansPeerCertificate)
-	if !ok || val == "" {
-		return nil
-	}
-	return strings.Split(val, "\x00")
+	return s.getStringSliceValue(ValueSslDnsSansPeerCertificate)
 }
 
 func (s *sslConnection) DnsSansLocalCertificate() []string {
-	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslDnsSansLocalCertificate)
-	if !ok || val == "" {
-		return nil
-	}
-	return strings.Split(val, "\x00")
+	return s.getStringSliceValue(ValueSslDnsSansLocalCertificate)
 }
 
 func (s *sslConnection) ValidFromPeerCertificate() (uint64, bool) {

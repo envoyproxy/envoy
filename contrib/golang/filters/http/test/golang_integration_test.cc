@@ -1058,9 +1058,9 @@ TEST_P(GolangIntegrationTest, SslConnectionNonSsl) {
   waitForNextUpstreamRequest();
 
   // Verify the filter detected no SSL and set the appropriate header
-  auto ssl_tested_header = upstream_request_->headers().get(Http::LowerCaseString("x-ssl-tested"));
-  ASSERT_FALSE(ssl_tested_header.empty());
-  EXPECT_EQ("no-ssl", ssl_tested_header[0]->value().getStringView());
+  auto ssl_tested = getHeader(upstream_request_->headers(), "x-ssl-tested");
+  ASSERT_FALSE(ssl_tested.empty());
+  EXPECT_EQ("no-ssl", ssl_tested);
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);

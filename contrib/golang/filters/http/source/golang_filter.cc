@@ -1105,7 +1105,7 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
       return CAPIStatus::CAPIValueNotFound;
     }
     auto cipher_id = ssl->ciphersuiteId();
-    if (cipher_id == 0xffff) {
+    if (cipher_id == SSL_INVALID_CIPHERSUITE_ID) {
       return CAPIStatus::CAPIValueNotFound;
     }
     *value = cipher_id;

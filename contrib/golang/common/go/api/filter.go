@@ -343,8 +343,13 @@ type FilterState interface {
 	GetString(key string) string
 }
 
-// SslConnection provides SSL/TLS connection information
-// refer https://github.com/envoyproxy/envoy/blob/main/envoy/ssl/connection.h
+// SslConnection provides SSL/TLS connection information for the downstream connection.
+// This interface mirrors envoy/ssl/connection.h and provides access to peer certificate
+// details, TLS version, cipher suite, and other SSL/TLS connection properties.
+//
+// Note: Most methods that return certificate information will return empty values
+// (empty string, nil slice, or false for the bool return) when the information is not available.
+// Refer to https://github.com/envoyproxy/envoy/blob/main/envoy/ssl/connection.h
 type SslConnection interface {
 	// PeerCertificatePresented returns whether the peer certificate was presented
 	PeerCertificatePresented() bool
