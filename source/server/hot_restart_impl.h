@@ -116,6 +116,7 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  bool isInitializing() const override;
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string

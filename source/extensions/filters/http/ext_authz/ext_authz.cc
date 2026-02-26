@@ -13,6 +13,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,6 +28,7 @@ constexpr uint32_t kDefaultPerRouteTimeoutMs = 200;
 using MetadataProto = ::envoy::config::core::v3::Metadata;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
+using Filters::Common::ProcessingEffect::Effect;
 
 void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
@@ -567,6 +569,13 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
 }
 
+void Filter::updateEffect(const Effect effect) {
+  if (!config_->emitFilterStateStats() || logging_info_ == nullptr) {
+    return;
+  }
+  logging_info_->setReqProcessingEffect(effect);
+}
+
 void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   if (!config_->emitFilterStateStats()) {
     return;
@@ -640,6 +649,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "Rejecting response with invalid header append action.",
                        *decoder_callbacks_);
       rejectResponse();
+      updateEffect(Effect::InvalidMutationRejected);
       return;
     }
     ENVOY_STREAM_LOG(trace, "Ignoring response headers with invalid header append action.",
@@ -668,7 +678,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                           response->dynamic_metadata);
     }
   }
-
   switch (response->status) {
   case CheckStatus::OK: {
     // Any changes to request headers or query parameters can affect how the request is going to be
@@ -681,7 +690,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
-
+    // Use this to track if there are any modifications to the request headers.
+    bool req_header_mutations = false;
     ENVOY_STREAM_LOG(trace,
                      "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
     for (const auto& [key, value] : response->headers_to_set) {
@@ -691,9 +701,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->setCopy(Http::LowerCaseString(key), value);
+        req_header_mutations = true;
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -705,6 +717,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
                          key, value);
         rejectResponse();
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -715,9 +728,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
         request_headers_->addCopy(Http::LowerCaseString(key), value);
+        req_header_mutations = true;
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -729,6 +744,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
                          key, value);
         rejectResponse();
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -755,9 +771,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // into one entry. The value of that combined entry is separated by ",".
           // TODO(dio): Consider to use addCopy instead.
           request_headers_->appendCopy(lowercase_key, value);
+          req_header_mutations = true;
           if (!headersWithinLimits(*request_headers_)) {
             stats_.request_header_limits_reached_.inc();
             rejectResponse();
+            updateEffect(Effect::MutationRejectedSizeLimitExceeded);
             return;
           }
         }
@@ -771,6 +789,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.",
                          *decoder_callbacks_, key, value);
         rejectResponse();
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
     }
@@ -799,9 +818,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
         request_headers_->remove(lowercase_key);
+        req_header_mutations = true;
         if (!headersWithinLimits(*request_headers_)) {
           stats_.request_header_limits_reached_.inc();
           rejectResponse();
+          updateEffect(Effect::MutationRejectedSizeLimitExceeded);
           return;
         }
         break;
@@ -813,8 +834,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         ENVOY_STREAM_LOG(trace, "Rejecting disallowed header removal '{}'.", *decoder_callbacks_,
                          key);
         rejectResponse();
+        updateEffect(Effect::InvalidMutationRejected);
         return;
       }
+    }
+    if (req_header_mutations) {
+      updateEffect(Effect::MutationApplied);
     }
 
     if (!response->response_headers_to_add.empty()) {
@@ -897,6 +922,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid query parameter {}={}.", *decoder_callbacks_,
                            key, value);
           rejectResponse();
+          updateEffect(Effect::InvalidMutationRejected);
           return;
         }
         ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
@@ -928,6 +954,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->setPath(new_path);
       if (!headersWithinLimits(*request_headers_)) {
         stats_.request_header_limits_reached_.inc();
+        updateEffect(Effect::MutationRejectedSizeLimitExceeded);
         rejectResponse();
         return;
       }
@@ -1040,6 +1067,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error",
                        *decoder_callbacks_);
       stats_.failure_mode_allowed_.inc();
+      if (config_->emitFilterStateStats() && logging_info_ != nullptr) {
+        logging_info_->setFailedOpen();
+      }
       if (cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }

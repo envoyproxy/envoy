@@ -1325,12 +1325,13 @@ TEST_P(McpRouterIntegrationTest, ResourcesTemplatesListFanoutAggregation) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Verify the aggregated response contains resource templates from both backends with
-  // backend-prefixed names (__ delimiter) and URI templates (+ delimiter).
-  EXPECT_THAT(response->body(), testing::HasSubstr("time__config"));
+  // backend-prefixed URI templates (+ delimiter) and unprefixed names (names are display-only;
+  // routing uses the URI which is already prefixed).
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"name\":\"config\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("time+file:///{path}"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("tools__data"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"name\":\"data\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("tools+db:///{table}"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("tools__files"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"name\":\"files\""));
   EXPECT_THAT(response->body(), testing::HasSubstr("tools+file:///{filename}"));
   // Verify descriptions are preserved.
   EXPECT_THAT(response->body(), testing::HasSubstr("Config template"));
