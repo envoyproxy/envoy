@@ -193,9 +193,9 @@ func assertEq(a, b interface{}, msg string) {
 func (p *HeaderCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.reqHeadersCalled = true
-	assertEq(headers.GetOne(":path"), "/test/long/url", ":path header")
-	assertEq(headers.GetOne(":method"), "POST", ":method header")
-	assertEq(headers.GetOne("foo"), "bar", "foo header")
+	assertEq(headers.GetOne(":path").ToUnsafeString(), "/test/long/url", ":path header")
+	assertEq(headers.GetOne(":method").ToUnsafeString(), "POST", ":method header")
+	assertEq(headers.GetOne("foo").ToUnsafeString(), "bar", "foo header")
 
 	for k, v := range p.headersToAdd {
 		headers.Set(k, v)
@@ -203,33 +203,33 @@ func (p *HeaderCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 
 	// Test setter/getter
 	headers.Set("new", "value1")
-	assertEq(headers.GetOne("new"), "value1", "new header set")
+	assertEq(headers.GetOne("new").ToUnsafeString(), "value1", "new header set")
 
 	vals := headers.Get("new")
 	assertEq(len(vals), 1, "new header count")
-	assertEq(vals[0], "value1", "new header val")
+	assertEq(vals[0].ToUnsafeString(), "value1", "new header val")
 
 	// Test add
 	headers.Add("new", "value2")
 	vals = headers.Get("new")
 	assertEq(len(vals), 2, "new header count after add")
-	assertEq(vals[1], "value2", "new header val 2")
+	assertEq(vals[1].ToUnsafeString(), "value2", "new header val 2")
 
 	// Test remove
 	headers.Remove("new")
-	assertEq(headers.GetOne("new"), "", "new header removed")
+	assertEq(headers.GetOne("new").ToUnsafeString(), "", "new header removed")
 	return shared.HeadersStatusContinue
 }
 
 func (p *HeaderCallbacksFilter) OnRequestTrailers(trailers shared.HeaderMap) shared.TrailersStatus {
 	p.reqTrailersCalled = true
-	assertEq(trailers.GetOne("foo"), "bar", "foo trailer")
+	assertEq(trailers.GetOne("foo").ToUnsafeString(), "bar", "foo trailer")
 	for k, v := range p.headersToAdd {
 		trailers.Set(k, v)
 	}
 	// Test setter/getter
 	trailers.Set("new", "value1")
-	assertEq(trailers.GetOne("new"), "value1", "new trailer set")
+	assertEq(trailers.GetOne("new").ToUnsafeString(), "value1", "new trailer set")
 
 	// Test add
 	trailers.Add("new", "value2")
@@ -238,39 +238,39 @@ func (p *HeaderCallbacksFilter) OnRequestTrailers(trailers shared.HeaderMap) sha
 
 	// Test remove
 	trailers.Remove("new")
-	assertEq(trailers.GetOne("new"), "", "new trailer removed")
+	assertEq(trailers.GetOne("new").ToUnsafeString(), "", "new trailer removed")
 	return shared.TrailersStatusContinue
 }
 
 func (p *HeaderCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
 	p.resHeadersCalled = true
-	assertEq(headers.GetOne("foo"), "bar", "foo response header")
+	assertEq(headers.GetOne("foo").ToUnsafeString(), "bar", "foo response header")
 	for k, v := range p.headersToAdd {
 		headers.Set(k, v)
 	}
 
 	headers.Set("new", "value1")
-	assertEq(headers.GetOne("new"), "value1", "new resp header")
+	assertEq(headers.GetOne("new").ToUnsafeString(), "value1", "new resp header")
 	headers.Add("new", "value2")
 	assertEq(len(headers.Get("new")), 2, "new resp header count")
 	headers.Remove("new")
-	assertEq(headers.GetOne("new"), "", "new resp header removed")
+	assertEq(headers.GetOne("new").ToUnsafeString(), "", "new resp header removed")
 	return shared.HeadersStatusContinue
 }
 
 func (p *HeaderCallbacksFilter) OnResponseTrailers(trailers shared.HeaderMap) shared.TrailersStatus {
 	p.resTrailersCalled = true
-	assertEq(trailers.GetOne("foo"), "bar", "foo response trailer")
+	assertEq(trailers.GetOne("foo").ToUnsafeString(), "bar", "foo response trailer")
 	for k, v := range p.headersToAdd {
 		trailers.Set(k, v)
 	}
 
 	trailers.Set("new", "value1")
-	assertEq(trailers.GetOne("new"), "value1", "new resp trailer")
+	assertEq(trailers.GetOne("new").ToUnsafeString(), "value1", "new resp trailer")
 	trailers.Add("new", "value2")
 	assertEq(len(trailers.Get("new")), 2, "new resp trailer count")
 	trailers.Remove("new")
-	assertEq(trailers.GetOne("new"), "", "new resp trailer removed")
+	assertEq(trailers.GetOne("new").ToUnsafeString(), "", "new resp trailer removed")
 	return shared.TrailersStatusContinue
 }
 
@@ -383,10 +383,10 @@ func (p *BodyCallbacksFilter) OnRequestBody(body shared.BodyBuffer,
 	var body_content string
 
 	for _, c := range p.handle.BufferedRequestBody().GetChunks() {
-		body_content += string(c)
+		body_content += c.ToUnsafeString()
 	}
 	for _, c := range body.GetChunks() {
-		body_content += string(c)
+		body_content += c.ToUnsafeString()
 	}
 
 	assertEq(body_content, "request_body", "request body content")
@@ -417,10 +417,10 @@ func (p *BodyCallbacksFilter) OnResponseBody(body shared.BodyBuffer,
 	var body_content string
 
 	for _, c := range p.handle.BufferedResponseBody().GetChunks() {
-		body_content += string(c)
+		body_content += c.ToUnsafeString()
 	}
 	for _, c := range body.GetChunks() {
-		body_content += string(c)
+		body_content += c.ToUnsafeString()
 	}
 
 	assertEq(body_content, "response_body", "response body content")
@@ -546,7 +546,7 @@ func (p *HttpCalloutsFilter) OnRequestHeaders(headers shared.HeaderMap,
 }
 
 func (p *HttpCalloutsFilter) OnHttpCalloutDone(calloutID uint64, result shared.HttpCalloutResult,
-	headers [][2]string, body [][]byte) {
+	headers [][2]shared.UnsafeEnvoyBuffer, body []shared.UnsafeEnvoyBuffer) {
 	if p.clusterName == "resetting_cluster" {
 		assert(result == shared.HttpCalloutReset, "expected reset")
 		return
@@ -556,7 +556,7 @@ func (p *HttpCalloutsFilter) OnHttpCalloutDone(calloutID uint64, result shared.H
 
 	found := false
 	for _, h := range headers {
-		if h[0] == "some_header" && h[1] == "some_value" {
+		if h[0].ToUnsafeString() == "some_header" && h[1].ToUnsafeString() == "some_value" {
 			found = true
 			break
 		}
@@ -565,7 +565,7 @@ func (p *HttpCalloutsFilter) OnHttpCalloutDone(calloutID uint64, result shared.H
 
 	fullBody := ""
 	for _, b := range body {
-		fullBody += string(b)
+		fullBody += b.ToUnsafeString()
 	}
 	assertEq(fullBody, "response_body_from_callout", "resp body")
 
@@ -683,7 +683,7 @@ func (p *FakeExternalCacheFilter) OnRequestHeaders(headers shared.HeaderMap, end
 	sched := p.handle.GetScheduler()
 
 	go func() {
-		if key == "existing" {
+		if key.ToUnsafeString() == "existing" {
 			// Simulate hit
 			sched.Schedule(func() {
 				p.handle.SendLocalResponse(200, [][2]string{{"cached", "yes"}}, []byte("cached_response_body"), "")
@@ -785,18 +785,18 @@ type StatsCallbacksFilter struct {
 func (p *StatsCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
 	p.handle.IncrementCounterValue(p.ids.reqTotal, 1)
 	p.handle.IncrementGaugeValue(p.ids.reqPending, 1)
-	p.method = headers.GetOne(":method")
+	p.method = headers.GetOne(":method").ToUnsafeString()
 
 	p.handle.IncrementCounterValue(p.ids.epTotal, 1, "on_request_headers", p.method)
 	p.handle.IncrementGaugeValue(p.ids.epPending, 1, "on_request_headers", p.method)
 
-	if valStr := headers.GetOne(p.ids.headerToCount); valStr != "" {
+	if valStr := headers.GetOne(p.ids.headerToCount).ToUnsafeString(); valStr != "" {
 		if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 			p.handle.RecordHistogramValue(p.ids.reqVals, val)
 			p.handle.RecordHistogramValue(p.ids.epVals, val, "on_request_headers", p.method)
 		}
 	}
-	if valStr := headers.GetOne(p.ids.headerToSet); valStr != "" {
+	if valStr := headers.GetOne(p.ids.headerToSet).ToUnsafeString(); valStr != "" {
 		if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 			p.handle.SetGaugeValue(p.ids.reqSet, val)
 			p.handle.SetGaugeValue(p.ids.epSet, val, "on_request_headers", p.method)
@@ -811,12 +811,12 @@ func (p *StatsCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, endOf
 	p.handle.DecrementGaugeValue(p.ids.epPending, 1, "on_request_headers", p.method)
 	p.handle.IncrementGaugeValue(p.ids.epPending, 1, "on_response_headers", p.method)
 
-	if valStr := headers.GetOne(p.ids.headerToCount); valStr != "" {
+	if valStr := headers.GetOne(p.ids.headerToCount).ToUnsafeString(); valStr != "" {
 		if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 			p.handle.RecordHistogramValue(p.ids.epVals, val, "on_response_headers", p.method)
 		}
 	}
-	if valStr := headers.GetOne(p.ids.headerToSet); valStr != "" {
+	if valStr := headers.GetOne(p.ids.headerToSet).ToUnsafeString(); valStr != "" {
 		if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 			p.handle.SetGaugeValue(p.ids.epSet, val, "on_response_headers", p.method)
 		}
@@ -970,22 +970,23 @@ func (p *HttpStreamBasicFilter) OnRequestHeaders(h shared.HeaderMap, end bool) s
 	return shared.HeadersStatusStop
 }
 
-func (p *HttpStreamBasicFilter) OnHttpStreamHeaders(id uint64, headers [][2]string, end bool) {
+func (p *HttpStreamBasicFilter) OnHttpStreamHeaders(id uint64, headers [][2]shared.UnsafeEnvoyBuffer, end bool) {
 	assertEq(id, p.streamID, "stream id")
 	p.headers = true
 	found := false
 	for _, h := range headers {
-		if h[0] == ":status" && h[1] == "200" {
+		if h[0].ToUnsafeString() == ":status" && h[1].ToUnsafeString() == "200" {
 			found = true
 		}
 	}
 	assert(found, "status 200")
 }
-func (p *HttpStreamBasicFilter) OnHttpStreamData(id uint64, body [][]byte, end bool) {
+func (p *HttpStreamBasicFilter) OnHttpStreamData(id uint64, body []shared.UnsafeEnvoyBuffer, end bool) {
 	assertEq(id, p.streamID, "stream id")
 	p.data = true
 }
-func (p *HttpStreamBasicFilter) OnHttpStreamTrailers(id uint64, trailers [][2]string) {}
+func (p *HttpStreamBasicFilter) OnHttpStreamTrailers(id uint64, trailers [][2]shared.UnsafeEnvoyBuffer) {
+}
 func (p *HttpStreamBasicFilter) OnHttpStreamComplete(id uint64) {
 	assertEq(id, p.streamID, "stream id")
 	p.complete = true
@@ -1050,15 +1051,15 @@ func (p *HttpStreamBidiFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sh
 	p.sentTrailers = true
 	return shared.HeadersStatusStop
 }
-func (p *HttpStreamBidiFilter) OnHttpStreamHeaders(id uint64, headers [][2]string, end bool) {
+func (p *HttpStreamBidiFilter) OnHttpStreamHeaders(id uint64, headers [][2]shared.UnsafeEnvoyBuffer, end bool) {
 	assertEq(id, p.streamID, "id")
 	p.recvHeaders = true
 }
-func (p *HttpStreamBidiFilter) OnHttpStreamData(id uint64, body [][]byte, end bool) {
+func (p *HttpStreamBidiFilter) OnHttpStreamData(id uint64, body []shared.UnsafeEnvoyBuffer, end bool) {
 	assertEq(id, p.streamID, "id")
 	p.recvChunks++
 }
-func (p *HttpStreamBidiFilter) OnHttpStreamTrailers(id uint64, trailers [][2]string) {
+func (p *HttpStreamBidiFilter) OnHttpStreamTrailers(id uint64, trailers [][2]shared.UnsafeEnvoyBuffer) {
 	assertEq(id, p.streamID, "id")
 	p.recvTrailers = true
 }
@@ -1118,10 +1119,13 @@ func (p *UpstreamResetFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sha
 	p.streamID = id
 	return shared.HeadersStatusStop
 }
-func (p *UpstreamResetFilter) OnHttpStreamHeaders(id uint64, headers [][2]string, end bool) {}
-func (p *UpstreamResetFilter) OnHttpStreamData(id uint64, body [][]byte, end bool)          {}
-func (p *UpstreamResetFilter) OnHttpStreamTrailers(id uint64, trailers [][2]string)         {}
-func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64)                               {}
+func (p *UpstreamResetFilter) OnHttpStreamHeaders(id uint64, headers [][2]shared.UnsafeEnvoyBuffer, end bool) {
+}
+func (p *UpstreamResetFilter) OnHttpStreamData(id uint64, body []shared.UnsafeEnvoyBuffer, end bool) {
+}
+func (p *UpstreamResetFilter) OnHttpStreamTrailers(id uint64, trailers [][2]shared.UnsafeEnvoyBuffer) {
+}
+func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64) {}
 func (p *UpstreamResetFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {
 	assertEq(id, p.streamID, "id")
 	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), "")

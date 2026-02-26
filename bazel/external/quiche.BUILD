@@ -2985,7 +2985,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
-    hdrs = ["quiche/common/quiche_stream.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [

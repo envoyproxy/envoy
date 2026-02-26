@@ -180,6 +180,26 @@ impl AccessLogger for TestAccessLogger {
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader);
     let _response_trailers =
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
+
+    // Test access log type.
+    let log_type = ctx.log_type();
+    assert_eq!(log_type.as_str(), "DownstreamEnd");
+
+    // Test JA3/JA4 fingerprint accessors.
+    let _ja3 = ctx.ja3_hash();
+    let _ja4 = ctx.ja4_hash();
+
+    // Test downstream transport failure reason.
+    let _ds_transport_failure = ctx.downstream_transport_failure_reason();
+
+    // Test header byte size accessors.
+    let _req_header_bytes = ctx.request_headers_bytes();
+    let _resp_header_bytes = ctx.response_headers_bytes();
+    let _resp_trailer_bytes = ctx.response_trailers_bytes();
+
+    // Test upstream protocol and connection pool ready duration.
+    let _upstream_protocol = ctx.upstream_protocol();
+    let _pool_ready_duration = ctx.upstream_connection_pool_ready_duration_ns();
   }
 
   fn flush(&mut self) {
