@@ -1048,9 +1048,9 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
-   * @param failure_reason the downstream local close reason.
+   * @param reason the downstream local close reason.
    */
-  virtual void setDownstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
 
   /**
    * @return absl::string_view the downstream local close reason, if local close did not occur an

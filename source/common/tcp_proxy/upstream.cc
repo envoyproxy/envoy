@@ -117,8 +117,8 @@ StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
   return StreamInfo::DetectedCloseType::Normal;
 }
 
-Tcp::ConnectionPool::ConnectionData*
-TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view close_details) {
+Tcp::ConnectionPool::ConnectionData* TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
+                                                                    absl::string_view details) {
   // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
@@ -129,16 +129,12 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    local_close_reason_ =
-        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose;
-    // Because the tcp client idle_timeout is fired by TcpProxy starting on downstream connection
-    // so we will set the local_close_reason to the upstream here.
-    if (!close_details.empty()) {
-      local_close_reason_ = std::string(close_details);
-    }
+    std::string reason =
+        !details.empty()
+            ? std::string(details)
+            : StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose;
 
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                            local_close_reason_);
+    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush, reason);
   }
   return nullptr;
 }
@@ -232,8 +228,8 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
   // between it being sent to the HTTP/2 stack and out to the kernel.
 }
 
-Tcp::ConnectionPool::ConnectionData* HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
-                                                                     absl::string_view) {
+Tcp::ConnectionPool::ConnectionData*
+HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view /*details*/) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
@@ -534,7 +530,7 @@ bool CombinedUpstream::readDisable(bool disable) {
 }
 
 Tcp::ConnectionPool::ConnectionData*
-CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view) {
+CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view /*details*/) {
   if (!upstream_request_) {
     return nullptr;
   }
