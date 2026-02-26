@@ -648,9 +648,9 @@ public:
   virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
 
   /**
-   * @param failure_reason the upstream local close reason.
+   * @param reason the upstream local close reason.
    */
-  virtual void setUpstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
 
   /**
    * @return absl::string_view the upstream local close reason, if local close did not occur an

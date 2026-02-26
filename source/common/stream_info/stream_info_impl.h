@@ -77,8 +77,8 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   DetectedCloseType upstreamDetectedCloseType() const override {
     return upstream_detected_close_type_;
   }
-  void setUpstreamLocalCloseReason(absl::string_view failure_reason) override {
-    upstream_local_close_reason_ = std::string(failure_reason);
+  void setUpstreamLocalCloseReason(absl::string_view reason) override {
+    upstream_local_close_reason_ = std::string(reason);
   }
   absl::string_view upstreamLocalCloseReason() const override {
     return upstream_local_close_reason_;
