@@ -60,7 +60,7 @@ message FileServerConfig {
   // The longest matching path_mapping takes precedence.
   repeated PathMapping path_mappings = 2;
 
-  // A map from filename suffix to content type header.
+  // A map from filename suffix (in lowercase) to content type header.
   // e.g. {"txt": "text/plain"}
   //
   // File suffixes may not contain ``.`` as the filename suffix after
@@ -69,7 +69,8 @@ message FileServerConfig {
   // An empty string suffix will only match files ending with a ``.``.
   //
   // Files with no suffix (e.g. ``README``) can be matched as the full string.
-  map<string, string> content_types = 3;
+  map<string, string> content_types = 3
+      [(validate.rules).map = {keys {string {pattern: "^[a-z0-9_\\-]*$"}}}];
 
   // If ``content_types`` does not contain a match for a file suffix,
   // ``default_content_type`` is used.
