@@ -89,6 +89,9 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # cpe = "cpe:2.3:a:grpc:grpc:*",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
+            "gazelle:resolve go golang.org/x/net/http2 @org_golang_x_net//http2",
+            "gazelle:resolve go golang.org/x/net/http2/hpack @org_golang_x_net//http2/hpack",
+            "gazelle:resolve go golang.org/x/net/trace @org_golang_x_net//trace",
         ],
     )
     go_repository(
