@@ -162,6 +162,10 @@ void HotRestartImpl::shutdown() {
 uint32_t HotRestartImpl::baseId() { return base_id_; }
 std::string HotRestartImpl::version() { return hotRestartVersion(); }
 
+bool HotRestartImpl::isInitializing() const {
+  return (shmem_->flags_.load() & SHMEM_FLAGS_INITIALIZING) != 0;
+}
+
 std::string HotRestartImpl::hotRestartVersion() {
   return fmt::format("{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory));
 }
