@@ -5,6 +5,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp" // IWYU pragma: keep
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +35,7 @@ public:
 
 TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalResponse) {
   Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/mcp"}, {"host", "test-host"}};
+      {":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
 
   // It should return StopIteration because body is needed for POST requests.
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
@@ -55,6 +56,21 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
   // Decoding data triggers parse and handles 'initialize' method, sending local reply.
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, NonMcpPathReturnsContinue) {
+  // Request URL not started with /mcp (or query params) should pass through.
+  Http::TestRequestHeaderMapImpl headers{{":path", "/mcp/foo"}};
+
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":12,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(headers.getPathValue(), testing::StrEq("/mcp/foo"));
+  EXPECT_EQ(nlohmann::json::parse(body.toString()),
+            nlohmann::json::parse(R"json({"jsonrpc":"2.0","id":12,"method":"tools/list"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAcceptedHttpCode) {

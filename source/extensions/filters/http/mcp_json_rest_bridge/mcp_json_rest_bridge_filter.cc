@@ -35,6 +35,7 @@ json generateInitializeResponse(int session_id, absl::string_view server_name) {
 
   json result;
   result[McpConstants::PROTOCOL_VERSION_FIELD] = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
+  // TODO(guoyilin42): Support list_changed from ServerToolConfig and description from ServerInfo.
   result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
         [McpConstants::LIST_CHANGED_FIELD] = false;
   result[McpConstants::SERVER_INFO_FIELD][McpConstants::NAME_FIELD] = server_name;
@@ -76,13 +77,14 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
 
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  mcp_operation_ = McpOperation::Undecided;
-  server_name_ = std::string(request_headers.getHostValue());
-
   if (request_headers.getPathValue() != "/mcp") {
-    // Only intercept /mcp requests
-    return Http::FilterHeadersStatus::StopIteration;
+    // Only intercept /mcp requests and pass through other requests.
+    return Http::FilterHeadersStatus::Continue;
   }
+
+  mcp_operation_ = McpOperation::Undecided;
+  // TODO(guoyilin42): Strip port number from server_name_.
+  server_name_ = std::string(request_headers.getHostValue());
 
   if (request_headers.getMethodValue() != "POST") {
     ENVOY_LOG(warn, "Only POST method is supported for MCP. Received: {}",
