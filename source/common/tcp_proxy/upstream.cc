@@ -106,6 +106,13 @@ Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
   return nullptr;
 }
 
+absl::string_view TcpUpstream::localCloseReason() const {
+  if (upstream_conn_data_ != nullptr) {
+    return upstream_conn_data_->connection().localCloseReason();
+  }
+  return "";
+}
+
 StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
   if (upstream_conn_data_ != nullptr &&
       upstream_conn_data_->connection().streamInfo().upstreamInfo()) {
@@ -129,13 +136,11 @@ Tcp::ConnectionPool::ConnectionData* TcpUpstream::onDownstreamEvent(Network::Con
         StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    local_close_reason_ =
+    upstream_conn_data_->connection().close(
+        Network::ConnectionCloseType::NoFlush,
         !details.empty()
             ? details
-            : StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose;
-
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                            local_close_reason_);
+            : StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
   }
   return nullptr;
 }
