@@ -1,17 +1,15 @@
 package utility
 
 import (
-	"unsafe"
-
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
-func isSameChunks(bufferedChunk [][]byte, receivedChunk [][]byte) bool {
+func isSameChunks(bufferedChunk []shared.UnsafeEnvoyBuffer, receivedChunk []shared.UnsafeEnvoyBuffer) bool {
 	if len(bufferedChunk) != len(receivedChunk) {
 		return false
 	}
 	for i := range bufferedChunk {
-		if unsafe.SliceData(bufferedChunk[i]) != unsafe.SliceData(receivedChunk[i]) {
+		if bufferedChunk[i].Ptr != receivedChunk[i].Ptr {
 			return false
 		}
 	}
@@ -28,12 +26,12 @@ func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
 	}
 	body := make([]byte, 0, bodySize)
 
-	var bufferedChunks [][]byte
+	var bufferedChunks []shared.UnsafeEnvoyBuffer
 
 	if bufferedBody != nil {
 		bufferedChunks = bufferedBody.GetChunks()
 		for _, chunk := range bufferedChunks {
-			body = append(body, chunk...)
+			body = append(body, chunk.ToUnsafeBytes()...)
 		}
 	}
 	if receivedBody != nil {
@@ -46,7 +44,7 @@ func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
 		if !isSameChunks(bufferedChunks, receivedChunks) {
 			// Avoid duplicate appending the same chunks
 			for _, chunk := range receivedChunks {
-				body = append(body, chunk...)
+				body = append(body, chunk.ToUnsafeBytes()...)
 			}
 		}
 	}
