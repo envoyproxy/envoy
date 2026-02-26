@@ -392,30 +392,6 @@ func (c *httpCApiImpl) HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bo
 	return uint64(value), true
 }
 
-func (c *httpCApiImpl) HttpGetStringsValue(r unsafe.Pointer, id int) ([]string, bool) {
-	req := (*httpRequest)(r)
-	req.mutex.Lock()
-	defer req.mutex.Unlock()
-
-	var valueData C.uint64_t
-	var valueLen C.int
-	var count C.int
-	res := C.envoyGoFilterHttpGetStringsValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen, &count)
-	if res == C.CAPIValueNotFound {
-		return nil, false
-	}
-	handleCApiStatus(res)
-
-	if count == 0 {
-		return []string{}, true
-	}
-
-	// Clone the memory from C++ to Go, then split on null separator
-	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
-	data := strings.Clone(value)
-	return strings.Split(data, "\x00"), true
-}
-
 func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{} {
 	req := (*httpRequest)(r)
 	req.mutex.Lock()

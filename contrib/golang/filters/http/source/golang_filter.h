@@ -327,7 +327,6 @@ public:
 
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
-  CAPIStatus getStringsValue(int id, uint64_t* value_data, int* value_len, int* count);
 
   CAPIStatus getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);

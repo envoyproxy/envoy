@@ -34,6 +34,7 @@ import "C"
 import (
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -447,23 +448,35 @@ func (s *sslConnection) SubjectLocalCertificate() string {
 }
 
 func (s *sslConnection) UriSanPeerCertificate() []string {
-	val, _ := cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslUriSanPeerCertificate)
-	return val
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUriSanPeerCertificate)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
 }
 
 func (s *sslConnection) UriSanLocalCertificate() []string {
-	val, _ := cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslUriSanLocalCertificate)
-	return val
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUriSanLocalCertificate)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
 }
 
 func (s *sslConnection) DnsSansPeerCertificate() []string {
-	val, _ := cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslDnsSansPeerCertificate)
-	return val
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslDnsSansPeerCertificate)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
 }
 
 func (s *sslConnection) DnsSansLocalCertificate() []string {
-	val, _ := cAPI.HttpGetStringsValue(unsafe.Pointer(s.request), ValueSslDnsSansLocalCertificate)
-	return val
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslDnsSansLocalCertificate)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
 }
 
 func (s *sslConnection) ValidFromPeerCertificate() (uint64, bool) {

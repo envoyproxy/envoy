@@ -1288,58 +1288,48 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     req_->strValue = ssl->urlEncodedPemEncodedPeerCertificateChain();
     break;
   }
+  // SSL String array values (serialized as null-separated strings)
+  case EnvoyValue::SslUriSanPeerCertificate:
+  case EnvoyValue::SslUriSanLocalCertificate:
+  case EnvoyValue::SslDnsSansPeerCertificate:
+  case EnvoyValue::SslDnsSansLocalCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    absl::Span<const std::string> strings;
+    switch (static_cast<EnvoyValue>(id)) {
+    case EnvoyValue::SslUriSanPeerCertificate:
+      strings = ssl->uriSanPeerCertificate();
+      break;
+    case EnvoyValue::SslUriSanLocalCertificate:
+      strings = ssl->uriSanLocalCertificate();
+      break;
+    case EnvoyValue::SslDnsSansPeerCertificate:
+      strings = ssl->dnsSansPeerCertificate();
+      break;
+    case EnvoyValue::SslDnsSansLocalCertificate:
+      strings = ssl->dnsSansLocalCertificate();
+      break;
+    default:
+      PANIC("unreachable");
+    }
+    // Serialize to null-separated string
+    req_->strValue.clear();
+    for (size_t i = 0; i < strings.size(); ++i) {
+      if (i > 0) {
+        req_->strValue.push_back('\0');
+      }
+      req_->strValue.append(strings[i]);
+    }
+    break;
+  }
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
 
   *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
   *value_len = req_->strValue.length();
-  return CAPIStatus::CAPIOK;
-}
-
-CAPIStatus Filter::getStringsValue(int id, uint64_t* value_data, int* value_len, int* count) {
-  // lock until this function return since it may running in a Go thread.
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-
-  const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
-  if (ssl == nullptr) {
-    return CAPIStatus::CAPIValueNotFound;
-  }
-
-  absl::Span<const std::string> strings;
-  switch (static_cast<EnvoyValue>(id)) {
-  case EnvoyValue::SslUriSanPeerCertificate:
-    strings = ssl->uriSanPeerCertificate();
-    break;
-  case EnvoyValue::SslUriSanLocalCertificate:
-    strings = ssl->uriSanLocalCertificate();
-    break;
-  case EnvoyValue::SslDnsSansPeerCertificate:
-    strings = ssl->dnsSansPeerCertificate();
-    break;
-  case EnvoyValue::SslDnsSansLocalCertificate:
-    strings = ssl->dnsSansLocalCertificate();
-    break;
-  default:
-    RELEASE_ASSERT(false, absl::StrCat("invalid strings value id: ", id));
-  }
-
-  // Serialize to null-separated string (null between strings, not after last)
-  req_->strValue.clear();
-  for (size_t i = 0; i < strings.size(); ++i) {
-    if (i > 0) {
-      req_->strValue.push_back('\0');
-    }
-    req_->strValue.append(strings[i]);
-  }
-
-  *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
-  *value_len = req_->strValue.length();
-  *count = strings.size();
   return CAPIStatus::CAPIOK;
 }
 
