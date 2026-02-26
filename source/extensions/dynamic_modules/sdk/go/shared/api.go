@@ -103,9 +103,16 @@ type HttpFilter interface {
 	// @Return TrailersStatus the status to control the plugin chain processing.
 	OnResponseTrailers(trailers HeaderMap) TrailersStatus
 
-	// OnStreamComplete is called when the stream is closed. This is a good place to clean up any
-	// resources.
+	// OnStreamComplete is called when the stream processing is complete and before access logs
+	// are flushed.
+	// This is a good place to do any final processing or cleanup before the request is fully
+	// completed.
 	OnStreamComplete()
+
+	// OnDestroy is called when the HTTP filter instance is being destroyed. This is called
+	// after OnStreamComplete and access logs are flushed. This is a good place to release
+	// any per-stream resources.
+	OnDestroy()
 }
 
 type EmptyHttpFilter struct {
@@ -136,6 +143,9 @@ func (p *EmptyHttpFilter) OnResponseTrailers(trailers HeaderMap) TrailersStatus 
 }
 
 func (p *EmptyHttpFilter) OnStreamComplete() {
+}
+
+func (p *EmptyHttpFilter) OnDestroy() {
 }
 
 // HttpFilterFactory is the factory interface for creating stream plugins.

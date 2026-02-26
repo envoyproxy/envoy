@@ -65,6 +65,7 @@ public:
   }
 
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   std::shared_ptr<std::atomic<bool>> shared_status_;
@@ -140,6 +141,7 @@ public:
   }
 
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -274,6 +276,7 @@ public:
     assertTrue(res_headers_called_, "resHeadersCalled");
     assertTrue(res_trailers_called_, "resTrailersCalled");
   }
+  void onDestroy() override {}
 
 private:
   std::map<std::string, std::string> headers_to_add_;
@@ -373,6 +376,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -489,6 +493,7 @@ public:
     assertTrue(seen_request_body_, "seenRequestBody");
     assertTrue(seen_response_body_, "seenResponseBody");
   }
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -566,6 +571,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -661,6 +667,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -729,6 +736,7 @@ public:
       assertEq(event_ids_[i], i, "event id order");
     }
   }
+  void onDestroy() override {}
 
   TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
     return TrailersStatus::Continue;
@@ -813,6 +821,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -920,6 +929,7 @@ public:
     std::vector<BufferView> res_tags = {{"on_response_headers"}, {method_}};
     handle_.decrementGaugeValue(ids_.epPending, 1, res_tags);
   }
+  void onDestroy() override {}
 
   TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
     return TrailersStatus::Continue;
@@ -1080,6 +1090,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -1164,6 +1175,7 @@ public:
     assertTrue(data_received_, "data received");
     assertTrue(complete_, "stream complete");
   }
+  void onDestroy() override {}
 
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
     return HeadersStatus::Continue;
@@ -1275,6 +1287,7 @@ public:
     assertTrue(recv_trailers_, "recvTrailers");
     assertTrue(complete_, "complete");
   }
+  void onDestroy() override {}
 
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
     return HeadersStatus::Continue;
@@ -1375,6 +1388,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
