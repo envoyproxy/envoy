@@ -75,7 +75,7 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
     return false;
   }
   std::string key_str(key.ptr, key.length);
-  absl::WriterMutexLock lock(&function_registry_mutex);
+  absl::WriterMutexLock lock(function_registry_mutex);
   auto [it, inserted] = function_registry.try_emplace(key_str, function_ptr);
   return inserted;
 }
@@ -83,7 +83,7 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
 bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
                                                 void** function_ptr_out) {
   std::string key_str(key.ptr, key.length);
-  absl::ReaderMutexLock lock(&function_registry_mutex);
+  absl::ReaderMutexLock lock(function_registry_mutex);
   auto it = function_registry.find(key_str);
   if (it != function_registry.end()) {
     *function_ptr_out = it->second;

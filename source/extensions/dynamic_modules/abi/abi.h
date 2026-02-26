@@ -6407,6 +6407,92 @@ bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
 
 // -----------------------------------------------------------------------------
+// Access Logger Callbacks - Additional Stream Info
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the `JA3` fingerprint hash from the downstream connection.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_ja3_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the `JA4` fingerprint hash from the downstream connection.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_ja4_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the failure reason string will be stored.
+ * @return true if the failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the byte size of request headers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of request headers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the byte size of response headers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of response headers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the byte size of response trailers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of response trailers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream protocol (e.g., "HTTP/1.1", "HTTP/2").
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the protocol string will be stored.
+ * @return true if the upstream protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream connection pool ready duration in nanoseconds.
+ * This is the time from when the upstream request was created to when the connection pool
+ * became ready.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the duration in nanoseconds, or -1 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+// -----------------------------------------------------------------------------
 // Access Logger Callbacks - Metrics
 // -----------------------------------------------------------------------------
 
