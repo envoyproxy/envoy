@@ -21,7 +21,6 @@ envoy_cc_library(
     hdrs = ["stats.h"],
     tcmalloc_dep = 1,
     deps = [
-        "//envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

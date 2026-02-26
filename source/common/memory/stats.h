@@ -3,19 +3,11 @@
 #include <cstdint>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/stats/store.h"
 
 #include "source/common/common/thread.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
-
-#define MEMORY_ALLOCATOR_MANAGER_STATS(COUNTER) COUNTER(released_by_timer)
-
-struct MemoryAllocatorManagerStats {
-  MEMORY_ALLOCATOR_MANAGER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 namespace Memory {
 
 constexpr absl::string_view TCMALLOC_ROUTINE_THREAD_ID = "TcmallocProcessBackgroundActions";
@@ -71,9 +63,16 @@ public:
   static absl::optional<std::string> dumpStats();
 };
 
+/**
+ * Manages tcmalloc background memory release using the native ProcessBackgroundActions API.
+ * When configured with a non-zero release rate, a dedicated thread is started that runs
+ * tcmalloc's ProcessBackgroundActions, which handles per-CPU cache reclamation, cache shuffling,
+ * size class resizing, transfer cache plundering, and memory release to the OS at the configured
+ * rate.
+ */
 class AllocatorManager {
 public:
-  AllocatorManager(Api::Api& api, Envoy::Stats::Scope& scope,
+  AllocatorManager(Api::Api& api,
                    const envoy::config::bootstrap::v3::MemoryAllocatorManager& config);
 
   ~AllocatorManager();
@@ -81,13 +80,10 @@ public:
 private:
   const uint64_t bytes_to_release_;
   const std::chrono::milliseconds memory_release_interval_msec_;
-  MemoryAllocatorManagerStats allocator_manager_stats_;
+  const size_t background_release_rate_bytes_per_second_;
   Api::Api& api_;
   Thread::ThreadPtr tcmalloc_thread_;
-  Event::DispatcherPtr tcmalloc_routine_dispatcher_;
-  Event::TimerPtr memory_release_timer_;
   void configureBackgroundMemoryRelease();
-  void tcmallocRelease();
   // Used for testing.
   friend class AllocatorManagerPeer;
 };

@@ -121,39 +121,54 @@ absl::optional<std::string> Stats::dumpStats() {
 #endif
 }
 
+namespace {
+
+/**
+ * Computes the background release rate in bytes per second from the configured bytes_to_release
+ * and memory_release_interval.
+ */
+size_t computeBackgroundReleaseRate(uint64_t bytes_to_release,
+                                    std::chrono::milliseconds memory_release_interval_msec) {
+  if (bytes_to_release == 0 || memory_release_interval_msec.count() == 0) {
+    return 0;
+  }
+  return static_cast<size_t>(bytes_to_release * 1000 / memory_release_interval_msec.count());
+}
+
+} // namespace
+
 AllocatorManager::AllocatorManager(
-    Api::Api& api, Envoy::Stats::Scope& scope,
-    const envoy::config::bootstrap::v3::MemoryAllocatorManager& config)
+    Api::Api& api, const envoy::config::bootstrap::v3::MemoryAllocatorManager& config)
     : bytes_to_release_(config.bytes_to_release()),
       memory_release_interval_msec_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, memory_release_interval, 1000))),
-      allocator_manager_stats_(MemoryAllocatorManagerStats{
-          MEMORY_ALLOCATOR_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "tcmalloc."))}),
+      background_release_rate_bytes_per_second_(
+          computeBackgroundReleaseRate(bytes_to_release_, memory_release_interval_msec_)),
       api_(api) {
   configureBackgroundMemoryRelease();
 };
 
 AllocatorManager::~AllocatorManager() {
 #if defined(TCMALLOC)
-  if (tcmalloc_routine_dispatcher_) {
-    tcmalloc_routine_dispatcher_->exit();
-  }
   if (tcmalloc_thread_) {
+    // Signal the ProcessBackgroundActions loop to exit and wait for the thread to finish.
+    tcmalloc::MallocExtension::SetBackgroundProcessActionsEnabled(false);
     tcmalloc_thread_->join();
     tcmalloc_thread_.reset();
+    // Reset the release rate and re-enable background actions so that a subsequent
+    // AllocatorManager instance can start fresh.
+    tcmalloc::MallocExtension::SetBackgroundReleaseRate(
+        tcmalloc::MallocExtension::BytesPerSecond{0});
+    tcmalloc::MallocExtension::SetBackgroundProcessActionsEnabled(true);
   }
-#endif
-}
-
-void AllocatorManager::tcmallocRelease() {
-#if defined(TCMALLOC)
-  tcmalloc::MallocExtension::ReleaseMemoryToSystem(bytes_to_release_);
 #endif
 }
 
 /**
- * Configures tcmalloc release rate from the page heap. If `bytes_to_release_`
- * has been initialized to `0`, no heap memory will be released in background.
+ * Configures tcmalloc to use its native ProcessBackgroundActions for background memory
+ * maintenance. This enables comprehensive memory management including per-CPU cache reclamation,
+ * cache shuffling, size class resizing, transfer cache plundering, and memory release at the
+ * configured rate. If `bytes_to_release_` is `0`, no background processing will be started.
  */
 void AllocatorManager::configureBackgroundMemoryRelease() {
 #if defined(GPERFTOOLS_TCMALLOC)
@@ -163,33 +178,28 @@ void AllocatorManager::configureBackgroundMemoryRelease() {
                    "will be configured.");
   }
 #elif defined(TCMALLOC)
-  ENVOY_BUG(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised");
+  ENVOY_BUG(!tcmalloc_thread_, "Invalid state, tcmalloc has already been initialised.");
   if (bytes_to_release_ > 0) {
-    tcmalloc_routine_dispatcher_ = api_.allocateDispatcher(std::string(TCMALLOC_ROUTINE_THREAD_ID));
-    memory_release_timer_ = tcmalloc_routine_dispatcher_->createTimer([this]() -> void {
-      const uint64_t unmapped_bytes_before_release = Stats::totalPageHeapUnmapped();
-      tcmallocRelease();
-      const uint64_t unmapped_bytes_after_release = Stats::totalPageHeapUnmapped();
-      if (unmapped_bytes_after_release > unmapped_bytes_before_release) {
-        // Only increment stats if memory was actually released. As tcmalloc releases memory on a
-        // span granularity, during some release rounds there may be no memory released, if during
-        // past round too much memory was released.
-        // https://github.com/google/tcmalloc/blob/master/tcmalloc/tcmalloc.cc#L298
-        allocator_manager_stats_.released_by_timer_.inc();
-      }
-      memory_release_timer_->enableTimer(memory_release_interval_msec_);
-    });
+    if (!tcmalloc::MallocExtension::NeedsProcessBackgroundActions()) {
+      ENVOY_LOG_MISC(warn, "This platform does not support tcmalloc background actions.");
+      return;
+    }
+
+    tcmalloc::MallocExtension::SetBackgroundReleaseRate(
+        tcmalloc::MallocExtension::BytesPerSecond{background_release_rate_bytes_per_second_});
+
     tcmalloc_thread_ = api_.threadFactory().createThread(
-        [this]() -> void {
-          ENVOY_LOG_MISC(debug, "Started {}", TCMALLOC_ROUTINE_THREAD_ID);
-          memory_release_timer_->enableTimer(memory_release_interval_msec_);
-          tcmalloc_routine_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+        []() -> void {
+          ENVOY_LOG_MISC(debug, "Started {}.", TCMALLOC_ROUTINE_THREAD_ID);
+          // ProcessBackgroundActions runs an infinite loop that handles all tcmalloc background
+          // maintenance including cache reclamation and memory release. It returns only when
+          // SetBackgroundProcessActionsEnabled(false) is called.
+          tcmalloc::MallocExtension::ProcessBackgroundActions();
         },
         Thread::Options{std::string(TCMALLOC_ROUTINE_THREAD_ID)});
-    ENVOY_LOG_MISC(
-        info, fmt::format(
-                  "Configured tcmalloc with background release rate: {} bytes per {} milliseconds",
-                  bytes_to_release_, memory_release_interval_msec_.count()));
+
+    ENVOY_LOG_MISC(info, "Configured tcmalloc with background release rate: {} bytes per second.",
+                   background_release_rate_bytes_per_second_);
   }
 #endif
 }

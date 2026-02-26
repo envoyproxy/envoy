@@ -41,6 +41,7 @@
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 
 #include "absl/hash/hash.h"
@@ -527,7 +528,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
       client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
     }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
-    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+    load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
   }
   return absl::OkStatus();

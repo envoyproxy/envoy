@@ -4,7 +4,7 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
@@ -26,20 +26,21 @@ using testing::NiceMock;
 using testing::Return;
 
 // The tests in this file provide just coverage over some corner cases in error handling. The test
-// for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.
+// for the happy path for LoadStatsReporterImpl is provided in
+// //test/integration:load_stats_reporter.
 namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LoadStatsReporterTest : public testing::Test {
+class LoadStatsReporterImplTest : public testing::Test {
 public:
-  LoadStatsReporterTest()
+  LoadStatsReporterImplTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {}
 
   void TearDown() override {
     if (load_stats_reporter_ != nullptr) {
-      // Validate that LoadStatsReporter correctly shuts down by disabling
+      // Validate that LoadStatsReporterImpl correctly shuts down by disabling
       // timers and resetting the stream.
       EXPECT_CALL(*retry_timer_, disableTimer());
       EXPECT_CALL(*response_timer_, disableTimer());
@@ -58,9 +59,9 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_ =
-        std::make_unique<LoadStatsReporter>(local_info_, cm_, *stats_store_.rootScope(),
-                                            Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
+    load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
+        local_info_, cm_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
+        dispatcher_);
   }
 
   void expectSendMessage(
@@ -115,11 +116,11 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  std::unique_ptr<LoadStatsReporter> load_stats_reporter_;
+  std::unique_ptr<LoadStatsReporterImpl> load_stats_reporter_;
 };
 
 // Validate that stream creation results in a timer based retry.
-TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
+TEST_F(LoadStatsReporterImplTest, StreamCreationFailure) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   createLoadStatsReporter();
@@ -128,7 +129,7 @@ TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
   retry_timer_cb_();
 }
 
-TEST_F(LoadStatsReporterTest, TestPubSub) {
+TEST_F(LoadStatsReporterImplTest, TestPubSub) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
@@ -146,7 +147,7 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
 }
 
 // Validate treatment of existing clusters across updates.
-TEST_F(LoadStatsReporterTest, ExistingClusters) {
+TEST_F(LoadStatsReporterImplTest, ExistingClusters) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
@@ -305,11 +306,11 @@ void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stat
   metric->set_total_metric_value(total_metric_value);
 }
 
-// This test validates that the LoadStatsReporter correctly handles and reports
+// This test validates that the LoadStatsReporterImpl correctly handles and reports
 // endpoint-level granularity load metrics when the feature is enabled. It sets
 // up a cluster with a host, simulates load metrics, and ensures that the
 // generated load report includes the expected endpoint-level statistics.
-TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReporting) {
+TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReporting) {
   // Enable endpoint granularity
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -377,7 +378,7 @@ TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReporting) {
 
 // This test validates that endpoint stats are not reported if the endpoint has no load stat
 // updates.
-TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReportingNoUpdate) {
+TEST_F(LoadStatsReporterImplTest, EndpointLevelLoadStatsReportingNoUpdate) {
   // Enable endpoint granularity
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -436,7 +437,7 @@ TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReportingNoUpdate) {
 }
 
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
-TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
+TEST_F(LoadStatsReporterImplTest, UpstreamLocalityStats) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -525,7 +526,7 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
-TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
+TEST_F(LoadStatsReporterImplTest, RemoteStreamClose) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -540,7 +541,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
 }
 
 // Validate that errors stat is not incremented for a graceful stream termination.
-TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
+TEST_F(LoadStatsReporterImplTest, RemoteStreamGracefulClose) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -555,7 +556,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
 }
 
 // Validate that when rq_active is non-zero, a load report is sent even if rq_issued is 0.
-TEST_F(LoadStatsReporterTest, ReportLoadWhenRqActiveIsNonZero) {
+TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   // Keep this test when deprecating the runtime flag.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

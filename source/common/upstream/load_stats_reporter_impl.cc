@@ -1,4 +1,4 @@
-#include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/load_stats_reporter_impl.h"
 
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -21,10 +21,10 @@ MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
 
 } // namespace
 
-LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
-                                     ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::RawAsyncClientSharedPtr&& async_client,
-                                     Event::Dispatcher& dispatcher)
+LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info,
+                                             ClusterManager& cluster_manager, Stats::Scope& scope,
+                                             Grpc::RawAsyncClientSharedPtr&& async_client,
+                                             Event::Dispatcher& dispatcher)
     : cm_(cluster_manager),
       stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
@@ -39,9 +39,9 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
   establishNewStream();
 }
 
-LoadStatsReporter::~LoadStatsReporter() {
+LoadStatsReporterImpl::~LoadStatsReporterImpl() {
   // Disable the timer.
-  ENVOY_LOG_MISC(info, "Destroying LoadStatsReporter");
+  ENVOY_LOG_MISC(info, "Destroying LoadStatsReporterImpl");
   retry_timer_->disableTimer();
   response_timer_->disableTimer();
   if (stream_ != nullptr) {
@@ -50,12 +50,12 @@ LoadStatsReporter::~LoadStatsReporter() {
   }
 }
 
-void LoadStatsReporter::setRetryTimer() {
+void LoadStatsReporterImpl::setRetryTimer() {
   ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
-void LoadStatsReporter::establishNewStream() {
+void LoadStatsReporterImpl::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
   stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
@@ -67,7 +67,7 @@ void LoadStatsReporter::establishNewStream() {
   sendLoadStatsRequest();
 }
 
-void LoadStatsReporter::sendLoadStatsRequest() {
+void LoadStatsReporterImpl::sendLoadStatsRequest() {
   // TODO(htuch): This sends load reports for only the set of clusters in clusters_, which
   // was initialized in startLoadReportPeriod() the last time we either sent a load report
   // or received a new LRS response (whichever happened more recently). The code in
@@ -222,20 +222,20 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   }
 }
 
-void LoadStatsReporter::handleFailure() {
+void LoadStatsReporterImpl::handleFailure() {
   stats_.errors_.inc();
   setRetryTimer();
 }
 
-void LoadStatsReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
+void LoadStatsReporterImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
+void LoadStatsReporterImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void LoadStatsReporter::onReceiveMessage(
+void LoadStatsReporterImpl::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   message_ = std::move(message);
@@ -243,7 +243,7 @@ void LoadStatsReporter::onReceiveMessage(
   stats_.requests_.inc();
 }
 
-void LoadStatsReporter::startLoadReportPeriod() {
+void LoadStatsReporterImpl::startLoadReportPeriod() {
   // Once a cluster is tracked, we don't want to reset its stats between reports
   // to avoid racing between request/response.
   // TODO(htuch): They key here could be absl::string_view, but this causes
@@ -309,11 +309,12 @@ void LoadStatsReporter::startLoadReportPeriod() {
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
 }
 
-void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
+void LoadStatsReporterImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+void LoadStatsReporterImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
+                                          const std::string& message) {
   response_timer_->disableTimer();
   stream_ = nullptr;
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {

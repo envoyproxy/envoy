@@ -71,6 +71,16 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "load_stats_reporter_mocks",
+    srcs = ["load_stats_reporter.cc"],
+    hdrs = ["load_stats_reporter.h"],
+    deps = [
+        "//envoy/upstream:load_stats_reporter_interface",
+        "//source/common/stats:isolated_store_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "upstream_mocks",
     hdrs = ["mocks.h"],
     deps = [
@@ -90,6 +100,7 @@ envoy_cc_mock(
         ":host_set_mocks",
         ":load_balancer_context_mock",
         ":load_balancer_mocks",
+        ":load_stats_reporter_mocks",
         ":missing_cluster_notifier_mocks",
         ":od_cds_api_handle_mocks",
         ":od_cds_api_mocks",

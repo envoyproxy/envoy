@@ -37,6 +37,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: memory
+  change: |
+    Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
+    ``ProcessBackgroundActions`` and ``SetBackgroundReleaseRate`` APIs. This provides more comprehensive
+    background memory management including per-CPU cache reclamation, cache shuffling, and size class
+    resizing, in addition to memory release. The ``tcmalloc.released_by_timer`` stat has been removed.
 - area: mcp
   change: |
     Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
