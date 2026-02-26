@@ -16,20 +16,21 @@ import (
 
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
-		"passthrough":               &PassthroughConfigFactory{},
-		"header_callbacks":          &HeaderCallbacksConfigFactory{},
-		"per_route_config":          &PerRouteConfigFactory{},
-		"body_callbacks":            &BodyCallbacksConfigFactory{},
-		"http_callouts":             &HttpCalloutsConfigFactory{},
-		"send_response":             &SendResponseConfigFactory{},
-		"http_filter_scheduler":     &HttpFilterSchedulerConfigFactory{},
-		"fake_external_cache":       &FakeExternalCacheConfigFactory{},
-		"stats_callbacks":           &StatsCallbacksConfigFactory{},
-		"streaming_terminal_filter": &StreamingTerminalConfigFactory{},
-		"http_stream_basic":         &HttpStreamBasicConfigFactory{},
-		"http_stream_bidirectional": &HttpStreamBidirectionalConfigFactory{},
-		"upstream_reset":            &UpstreamResetConfigFactory{},
-		"http_config_scheduler":     &ConfigSchedulerConfigFactory{},
+		"passthrough":                  &PassthroughConfigFactory{},
+		"header_callbacks":             &HeaderCallbacksConfigFactory{},
+		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
+		"per_route_config":             &PerRouteConfigFactory{},
+		"body_callbacks":               &BodyCallbacksConfigFactory{},
+		"http_callouts":                &HttpCalloutsConfigFactory{},
+		"send_response":                &SendResponseConfigFactory{},
+		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
+		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
+		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
+		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
+		"http_stream_bidirectional":    &HttpStreamBidirectionalConfigFactory{},
+		"upstream_reset":               &UpstreamResetConfigFactory{},
+		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
 	})
 }
 
@@ -176,6 +177,40 @@ type HeaderCallbacksFilter struct {
 	reqTrailersCalled bool
 	resHeadersCalled  bool
 	resTrailersCalled bool
+}
+
+type HeaderCallbacksOnCreationConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HeaderCallbacksOnCreationConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	headersToAdd := make(map[string]string)
+	str := string(config)
+	parts := strings.Split(str, ",")
+	for _, part := range parts {
+		kv := strings.Split(part, ":")
+		if len(kv) == 2 {
+			headersToAdd[kv[0]] = kv[1]
+		}
+	}
+	return &HeaderCallbacksOnCreationFilterFactory{headersToAdd: headersToAdd}, nil
+}
+
+type HeaderCallbacksOnCreationFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	headersToAdd map[string]string
+}
+
+func (f *HeaderCallbacksOnCreationFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.headersToAdd {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &HeaderCallbacksOnCreationFilter{}
+}
+
+type HeaderCallbacksOnCreationFilter struct {
+	shared.EmptyHttpFilter
 }
 
 func assert(cond bool, msg string) {
