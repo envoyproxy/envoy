@@ -33,11 +33,18 @@ public:
   const std::string& clusterName() const { return cluster_name_; }
   const Upstream::PrioritySet& prioritySet() const { return priority_set_; }
 
+  // Per-host custom data storage.
+  bool setHostData(uint32_t priority, size_t index, uintptr_t data);
+  bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
+
 private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
   std::string cluster_name_;
   envoy_dynamic_module_type_lb_module_ptr in_module_lb_;
+
+  // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
+  absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
 };
 
 } // namespace DynamicModules

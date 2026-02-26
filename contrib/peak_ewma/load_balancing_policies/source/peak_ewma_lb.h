@@ -8,10 +8,6 @@
 #include <new>
 #include <vector>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/callback_impl.h"
@@ -70,7 +66,7 @@ private:
  *
  * Architecture:
  * - HTTP filter records RTT samples in host-attached ring buffers (lock-free)
- * - Timer aggregates samples every 100ms and updates EWMA values
+ * - Aggregation happens lazily inline in chooseHost() when the interval elapses
  * - P2C selection uses current EWMA + active requests for cost calculation
  */
 class PeakEwmaLoadBalancer : public Upstream::LoadBalancerBase {
@@ -80,10 +76,7 @@ public:
       Upstream::ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       uint32_t healthy_panic_threshold, const Upstream::ClusterInfo& cluster_info,
       TimeSource& time_source,
-      const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config,
-      Event::Dispatcher& main_dispatcher);
-
-  ~PeakEwmaLoadBalancer();
+      const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config);
 
   // LoadBalancer interface
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -96,10 +89,10 @@ private:
   void addPeakEwmaLbPolicyDataToHosts(const Upstream::HostVector& hosts);
   PeakEwmaHostLbPolicyData* getPeakEwmaData(Upstream::HostConstSharedPtr host);
 
-  // Timer-based aggregation - processes host-attached sample data.
+  // Inline aggregation - processes host-attached sample data.
   void aggregateWorkerData();
   void processHostSamples(Upstream::HostConstSharedPtr host, PeakEwmaHostLbPolicyData* data);
-  void onAggregationTimer();
+  void maybeAggregate();
 
   // Power of Two Choices selection.
   Upstream::HostConstSharedPtr selectFromTwoCandidates(const Upstream::HostVector& hosts,
@@ -107,8 +100,7 @@ private:
   double calculateHostCost(Upstream::HostConstSharedPtr host);
 
   // EWMA calculation helpers.
-  size_t calculateNewSampleCount(size_t last_processed, size_t current_write, size_t max_samples);
-  double calculateTimeBasedAlpha(uint64_t current_time_ns, uint64_t sample_time_ns);
+  double calculateTimeBasedAlpha(uint64_t later_time_ns, uint64_t earlier_time_ns);
   double updateEwmaWithSample(double current_ewma, double new_rtt_ms, double alpha);
 
   // Core infrastructure.
@@ -121,10 +113,9 @@ private:
   // Business logic components.
   Cost cost_;
 
-  // Timer infrastructure for periodic EWMA calculation.
-  Event::Dispatcher& main_dispatcher_;
-  Event::TimerPtr aggregation_timer_;
+  // Inline aggregation state.
   const std::chrono::milliseconds aggregation_interval_;
+  MonotonicTime last_aggregation_time_;
 
   // Host stats for admin interface visibility.
   absl::flat_hash_map<Upstream::HostConstSharedPtr, std::unique_ptr<GlobalHostStats>>
