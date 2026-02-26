@@ -426,7 +426,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message HttpService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.HttpService";
@@ -437,7 +437,12 @@ message HttpService {
   config.core.v3.HttpUri server_uri = 1;
 
   // Sets a prefix to the value of authorization request header ``Path``.
+  // Only one of ``path_prefix`` or ``path_override`` may be set.
   string path_prefix = 2;
+
+  // Replaces the value of authorization request header ``Path`` with this value.
+  // Only one of ``path_prefix`` or ``path_override`` may be set.
+  string path_override = 10;
 
   // Settings used for controlling authorization request metadata.
   AuthorizationRequest authorization_request = 7;

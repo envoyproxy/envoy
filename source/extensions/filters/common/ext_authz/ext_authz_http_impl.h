@@ -45,6 +45,11 @@ public:
   const std::string& pathPrefix() { return path_prefix_; }
 
   /**
+   * Returns the authorization request path override (replaces path entirely when set).
+   */
+  const std::string& pathOverride() { return path_override_; }
+
+  /**
    * Returns authorization request timeout.
    */
   const std::chrono::milliseconds& timeout() const { return timeout_; }
@@ -125,6 +130,7 @@ private:
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
+  const std::string path_override_;
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
