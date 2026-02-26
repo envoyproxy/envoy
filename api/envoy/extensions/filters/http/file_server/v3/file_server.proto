@@ -61,14 +61,15 @@ message FileServerConfig {
   repeated PathMapping path_mappings = 2;
 
   // A map from filename suffix (in lowercase) to content type header.
-  // e.g. {"txt": "text/plain"}
+  // e.g. ``{"txt": "text/plain"}``
   //
   // File suffixes may not contain ``.`` as the filename suffix after
   // the last ``.`` is used to perform an O(1) lookup against the keys.
   //
   // An empty string suffix will only match files ending with a ``.``.
   //
-  // Files with no suffix (e.g. ``README``) can be matched as the full string.
+  // Files with no suffix (e.g. ``README``) can be matched as the full string
+  // in lowercase. e.g. ``{"readme": "text/plain"}``
   map<string, string> content_types = 3
       [(validate.rules).map = {keys {string {pattern: "^[a-z0-9_\\-]*$"}}}];
 
