@@ -90,6 +90,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: hot_restart
+  change: |
+    Fixed hot restart for listeners with a network namespace in the address. Previously, socket
+    hand-off didn't work cleanly because the namespace was not included in the ``PassListenSocket``
+    request, causing the parent to always fall back to binding a new socket.
 - area: dynamic_modules
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This

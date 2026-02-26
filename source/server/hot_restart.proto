@@ -8,6 +8,7 @@ message HotRestartMessage {
     message PassListenSocket {
       string address = 1;
       uint32 worker_index = 2;
+      string network_namespace = 3;
     }
     message ShutdownAdmin {
     }

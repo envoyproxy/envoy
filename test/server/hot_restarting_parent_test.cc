@@ -81,6 +81,103 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
 }
 
+// Verifies that hot restart socket hand-off succeeds when the network namespace is included
+// in the PassListenSocket request, matching the listener's namespaced address.
+TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMatch) {
+  MockListenerManager listener_manager;
+  Network::MockListenerConfig listener_config;
+  MockOptions options;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  InSequence s;
+  listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
+  EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
+  EXPECT_CALL(listener_config, listenSocketFactories());
+  // Create an address with a network namespace set.
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance(Network::Address::Ipv4Instance("0.0.0.0", 80),
+                                         absl::optional<std::string>("/var/run/netns/ns1")));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      localAddress())
+      .WillOnce(ReturnRef(address));
+  EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(true));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      socketType())
+      .WillOnce(Return(Network::Socket::Type::Stream));
+  EXPECT_CALL(server_, options()).WillOnce(ReturnRef(options));
+  EXPECT_CALL(options, concurrency()).WillOnce(Return(1));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      getListenSocket(_));
+
+  // The request carries the network namespace, so the resolved address will match.
+  HotRestartMessage::Request request;
+  request.mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
+  request.mutable_pass_listen_socket()->set_network_namespace("/var/run/netns/ns1");
+  HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
+  EXPECT_EQ(0, message.reply().pass_listen_socket().fd());
+}
+
+// Verifies that hot restart socket hand-off fails when a different network namespace is
+// specified in the request compared to what the listener has configured.
+TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMismatch) {
+  MockListenerManager listener_manager;
+  Network::MockListenerConfig listener_config;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  InSequence s;
+  listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
+  EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
+  EXPECT_CALL(listener_config, listenSocketFactories());
+  // Create an address with a network namespace set.
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance(Network::Address::Ipv4Instance("0.0.0.0", 80),
+                                         absl::optional<std::string>("/var/run/netns/ns1")));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      localAddress())
+      .WillOnce(ReturnRef(address));
+
+  // The request carries a different namespace, so the address won't match.
+  HotRestartMessage::Request request;
+  request.mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
+  request.mutable_pass_listen_socket()->set_network_namespace("/var/run/netns/ns2");
+  HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
+  EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
+}
+
+// Verifies that hot restart socket hand-off fails when the request carries a namespace
+// but the listener has no namespace configured (nullopt != optional("ns1")).
+TEST_F(HotRestartingParentTest, GetListenSocketsForChildNamespaceRequestNoNamespaceListener) {
+  MockListenerManager listener_manager;
+  Network::MockListenerConfig listener_config;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  InSequence s;
+  listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
+  EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
+  EXPECT_CALL(listener_config, listenSocketFactories());
+  // Create an address without a network namespace.
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      localAddress())
+      .WillOnce(ReturnRef(address));
+
+  // The request carries a namespace but the listener doesn't have one, so they won't match.
+  HotRestartMessage::Request request;
+  request.mutable_pass_listen_socket()->set_address("tcp://0.0.0.0:80");
+  request.mutable_pass_listen_socket()->set_network_namespace("/var/run/netns/ns1");
+  HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
+  EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
+}
+
 TEST_F(HotRestartingParentTest, GetListenSocketsForChildSocketType) {
   MockListenerManager listener_manager;
   Network::MockListenerConfig tcp_listener_config;

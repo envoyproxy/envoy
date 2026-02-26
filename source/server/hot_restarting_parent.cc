@@ -142,6 +142,10 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   Network::Address::InstanceConstSharedPtr addr =
       THROW_OR_RETURN_VALUE(Network::Utility::resolveUrl(request.pass_listen_socket().address()),
                             Network::Address::InstanceConstSharedPtr);
+  const std::string& ns = request.pass_listen_socket().network_namespace();
+  if (!ns.empty() && addr->ip() != nullptr) {
+    addr = addr->withNetworkNamespace(ns);
+  }
 
   for (const auto& listener : server_->listenerManager().listeners()) {
     for (auto& socket_factory : listener.get().listenSocketFactories()) {
