@@ -481,6 +481,10 @@ new_features:
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
     standard JSON-REST HTTP requests.
+- area: http
+  change: |
+    Added :ref:`file_server http filter <_config_http_filters_file_server>` to allow responding with
+    file contents from the filesystem.
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
