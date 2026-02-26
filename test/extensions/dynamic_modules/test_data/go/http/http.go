@@ -82,7 +82,7 @@ func (f *statsCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.Ht
 
 func (p *statsCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
 	p.handle.RecordHistogramValue(p.factory.ones, 1)
-	header := headers.GetOne("header")
+	header := headers.GetOne("header").ToUnsafeString()
 	p.handle.IncrementCounterValue(p.factory.testCounterVec, 1, header)
 	p.handle.IncrementGaugeValue(p.factory.testGaugeVec, 1, header)
 	p.handle.RecordHistogramValue(p.factory.testHistogramVec, 1, header)
@@ -154,16 +154,16 @@ func (p *headerCallbacksFilter) OnResponseTrailers(trailers shared.HeaderMap) sh
 
 func testHeaders(headers shared.HeaderMap) {
 	// Test single getter API
-	if val := headers.GetOne("single"); val != "value" {
+	if val := headers.GetOne("single").ToUnsafeString(); val != "value" {
 		panic(fmt.Sprintf("header single mismatch: %s", val))
 	}
-	if val := headers.GetOne("non-exist"); val != "" {
+	if val := headers.GetOne("non-exist").ToUnsafeString(); val != "" {
 		panic(fmt.Sprintf("header non-exist found: %s", val))
 	}
 
 	// Test multi getter API
 	vals := headers.Get("multi")
-	if len(vals) != 2 || vals[0] != "value1" || vals[1] != "value2" {
+	if len(vals) != 2 || vals[0].ToUnsafeString() != "value1" || vals[1].ToUnsafeString() != "value2" {
 		panic(fmt.Sprintf("header multi mismatch: %v", vals))
 	}
 	if len(headers.Get("non-exist")) != 0 {
@@ -172,7 +172,7 @@ func testHeaders(headers shared.HeaderMap) {
 
 	// Test setter API
 	headers.Set("new", "value")
-	if headers.GetOne("new") != "value" {
+	if headers.GetOne("new").ToUnsafeString() != "value" {
 		panic("header new mismatch")
 	}
 	headers.Remove("to-be-deleted")
@@ -180,7 +180,7 @@ func testHeaders(headers shared.HeaderMap) {
 	// Test adder API
 	headers.Add("multi", "value3")
 	newVals := headers.Get("multi")
-	if len(newVals) != 3 || newVals[0] != "value1" || newVals[1] != "value2" || newVals[2] != "value3" {
+	if len(newVals) != 3 || newVals[0].ToUnsafeString() != "value1" || newVals[1].ToUnsafeString() != "value2" || newVals[2].ToUnsafeString() != "value3" {
 		panic(fmt.Sprintf("header multi values mismatch: %v", newVals))
 	}
 
@@ -189,11 +189,11 @@ func testHeaders(headers shared.HeaderMap) {
 	if len(all) != 5 {
 		panic(fmt.Sprintf("header all length mismatch: %d", len(all)))
 	}
-	if all[0][0] != "single" || all[0][1] != "value" ||
-		all[1][0] != "multi" || all[1][1] != "value1" ||
-		all[2][0] != "multi" || all[2][1] != "value2" ||
-		all[3][0] != "new" || all[3][1] != "value" ||
-		all[4][0] != "multi" || all[4][1] != "value3" {
+	if all[0][0].ToUnsafeString() != "single" || all[0][1].ToUnsafeString() != "value" ||
+		all[1][0].ToUnsafeString() != "multi" || all[1][1].ToUnsafeString() != "value1" ||
+		all[2][0].ToUnsafeString() != "multi" || all[2][1].ToUnsafeString() != "value2" ||
+		all[3][0].ToUnsafeString() != "new" || all[3][1].ToUnsafeString() != "value" ||
+		all[4][0].ToUnsafeString() != "multi" || all[4][1].ToUnsafeString() != "value3" {
 		panic(fmt.Sprintf("header all mismatch: %v", all))
 	}
 }
@@ -271,15 +271,15 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,
-		"metadata", "route_key"); !ok || val != "route" {
+		"metadata", "route_key"); !ok || val.ToUnsafeString() != "route" {
 		panic(fmt.Sprintf("route metadata mismatch: %v", val))
 	}
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeCluster,
-		"metadata", "cluster_key"); !ok || val != "cluster" {
+		"metadata", "cluster_key"); !ok || val.ToUnsafeString() != "cluster" {
 		panic(fmt.Sprintf("cluster metadata mismatch: %v", val))
 	}
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeHost,
-		"metadata", "host_key"); !ok || val != "host" {
+		"metadata", "host_key"); !ok || val.ToUnsafeString() != "host" {
 		panic(fmt.Sprintf("host metadata mismatch: %v", val))
 	}
 
@@ -293,7 +293,7 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestBody(body shared.BodyBuffer, e
 	}
 	// Set a string.
 	p.handle.SetMetadata("ns_req_body", "key", "value")
-	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_req_body", "key"); !ok || val != "value" {
+	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_req_body", "key"); !ok || val.ToUnsafeString() != "value" {
 		panic("metadata key mismatch")
 	}
 	// Try getting a string as number.
@@ -327,13 +327,71 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 	}
 	// Set a string.
 	p.handle.SetMetadata("ns_res_body", "key", "value")
-	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_res_body", "key"); !ok || val != "value" {
+	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_res_body", "key"); !ok || val.ToUnsafeString() != "value" {
 		panic("metadata key mismatch")
 	}
 	// Try getting a string as number.
 	if _, ok := p.handle.GetMetadataNumber(shared.MetadataSourceTypeDynamic, "ns_res_body", "key"); ok {
 		panic("metadata type mismatch")
 	}
+
+	// Test bool metadata.
+	p.handle.SetMetadata("ns_res_body_bool", "bool_key", true)
+	if val, ok := p.handle.GetMetadataBool(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); !ok || val != true {
+		panic("bool metadata mismatch")
+	}
+	// Set false.
+	p.handle.SetMetadata("ns_res_body_bool", "bool_key", false)
+	if val, ok := p.handle.GetMetadataBool(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); !ok || val != false {
+		panic("bool metadata mismatch for false")
+	}
+	// Try getting bool as string (should fail).
+	if _, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); ok {
+		panic("bool/string type mismatch not detected")
+	}
+	// Try getting bool as number (should fail).
+	if _, ok := p.handle.GetMetadataNumber(shared.MetadataSourceTypeDynamic, "ns_res_body_bool", "bool_key"); ok {
+		panic("bool/number type mismatch not detected")
+	}
+
+	// Test GetMetadataKeys.
+	p.handle.SetMetadata("ns_keys_test", "k1", "v1")
+	p.handle.SetMetadata("ns_keys_test", "k2", 2.0)
+	p.handle.SetMetadata("ns_keys_test", "k3", true)
+	keys := p.handle.GetMetadataKeys(shared.MetadataSourceTypeDynamic, "ns_keys_test")
+	if len(keys) != 3 {
+		panic(fmt.Sprintf("expected 3 keys, got %d", len(keys)))
+	}
+	keySet := make(map[string]bool)
+	for _, k := range keys {
+		keySet[k.ToUnsafeString()] = true
+	}
+	if !keySet["k1"] || !keySet["k2"] || !keySet["k3"] {
+		panic(fmt.Sprintf("missing expected keys: %v", keys))
+	}
+
+	// Non-existing namespace returns nil.
+	if keys := p.handle.GetMetadataKeys(shared.MetadataSourceTypeDynamic, "non_existing_ns"); keys != nil {
+		panic("expected nil keys for non-existing namespace")
+	}
+
+	// Test GetMetadataNamespaces - we've set metadata in multiple namespaces across phases.
+	namespaces := p.handle.GetMetadataNamespaces(shared.MetadataSourceTypeDynamic)
+	if len(namespaces) == 0 {
+		panic("expected at least one namespace")
+	}
+	nsSet := make(map[string]bool)
+	for _, ns := range namespaces {
+		nsSet[ns.ToUnsafeString()] = true
+	}
+	// We set "ns_keys_test" and "ns_res_body_bool" above in this phase.
+	if !nsSet["ns_keys_test"] {
+		panic(fmt.Sprintf("missing ns_keys_test in namespaces: %v", namespaces))
+	}
+	if !nsSet["ns_res_body_bool"] {
+		panic(fmt.Sprintf("missing ns_res_body_bool in namespaces: %v", namespaces))
+	}
+
 	return shared.BodyStatusContinue
 }
 
@@ -396,7 +454,7 @@ func (p *filterStateCallbacksFilter) OnStreamComplete() {
 
 func (p *filterStateCallbacksFilter) testFilterState(key, value string) {
 	p.handle.SetFilterState(key, []byte(value))
-	if val, ok := p.handle.GetFilterState(key); !ok || string(val) != value {
+	if val, ok := p.handle.GetFilterState(key); !ok || val.ToUnsafeString() != value {
 		panic(fmt.Sprintf("filter state %s mismatch", key))
 	}
 	if _, ok := p.handle.GetFilterState("key"); ok {
