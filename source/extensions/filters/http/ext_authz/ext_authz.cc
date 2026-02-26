@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/header_value.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"

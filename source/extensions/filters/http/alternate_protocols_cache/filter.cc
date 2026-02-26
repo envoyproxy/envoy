@@ -3,6 +3,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 
 #include "source/common/http/headers.h"

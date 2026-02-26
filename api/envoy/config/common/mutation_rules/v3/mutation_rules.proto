@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.common.mutation_rules.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/header_value.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 

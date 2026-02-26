@@ -10,6 +10,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/config_provider.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"

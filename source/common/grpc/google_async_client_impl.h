@@ -7,6 +7,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
