@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -53,6 +53,14 @@ message Mcp {
     DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
+  message TraceContextPropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
+  message BaggagePropagationConfig {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+  }
+
   // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -77,6 +85,28 @@ message Mcp {
   // Controls whether attributes are written to dynamic metadata, filter state, or both.
   // Default is DYNAMIC_METADATA when unspecified.
   RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // If set, extract and validate W3C trace context from the MCP request body
+  // (params._meta.traceparent & params._meta.tracestate) and propagate it in HTTP headers
+  // ``traceparent`` and ``tracestate`` (respectively).
+  //
+  // The traceparent and tracestate fields are validated and propagated according to the spec at
+  // ``https://www.w3.org/TR/trace-context/``.
+  //
+  // If unset (default), do not extract or inject trace context.
+  TraceContextPropagationConfig propagate_trace_context = 6;
+
+  // If set, extract and validate W3C baggage from the MCP request body (params._meta.baggage) and
+  // copy it to the HTTP header ``baggage``.
+  //
+  // The baggage field is validated according to the spec at ``https://www.w3.org/TR/baggage/``.
+
+  // Note that this is independent of ``propagate_trace_context``.
+  // Also note that if this is set, the downstream request's baggage header will be overwritten if
+  // the MCP request body contains a valid baggage field.
+  //
+  // If unset (default), do not extract or inject baggage.
+  BaggagePropagationConfig propagate_baggage = 7;
 }
 
 // Parser configuration with method-specific rules.

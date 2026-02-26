@@ -145,25 +145,35 @@ func envoyBufferToBytesUnsafe(buf C.envoy_dynamic_module_type_envoy_buffer) []by
 	return unsafe.Slice((*byte)(unsafe.Pointer(buf.ptr)), buf.length)
 }
 
-func envoyHttpHeaderSliceToHeadersUnsafe(
+func envoyBufferToUnsafeEnvoyBuffer(buf C.envoy_dynamic_module_type_envoy_buffer) shared.UnsafeEnvoyBuffer {
+	return shared.UnsafeEnvoyBuffer{
+		Ptr: (*byte)(unsafe.Pointer(buf.ptr)),
+		Len: uint64(buf.length),
+	}
+}
+
+func envoyHttpHeaderSliceToUnsafeHeaderSlice(
 	buf []C.envoy_dynamic_module_type_envoy_http_header,
-) [][2]string {
-	headers := make([][2]string, len(buf))
+) [][2]shared.UnsafeEnvoyBuffer {
+	headers := make([][2]shared.UnsafeEnvoyBuffer, len(buf))
 	for i, header := range buf {
-		key := unsafe.String((*byte)(unsafe.Pointer(header.key_ptr)), header.key_length)
-		value := unsafe.String((*byte)(unsafe.Pointer(header.value_ptr)), header.value_length)
-		headers[i] = [2]string{key, value}
+		headers[i] = [2]shared.UnsafeEnvoyBuffer{
+			{Ptr: (*byte)(unsafe.Pointer(header.key_ptr)), Len: uint64(header.key_length)},
+			{Ptr: (*byte)(unsafe.Pointer(header.value_ptr)), Len: uint64(header.value_length)},
+		}
 	}
 	return headers
 }
 
-func envoyBufferSliceToBytesSliceUnsafe(
+func envoyBufferSliceToUnsafeEnvoyBufferSlice(
 	buf []C.envoy_dynamic_module_type_envoy_buffer,
-) [][]byte {
-	chunks := make([][]byte, 0, len(buf))
+) []shared.UnsafeEnvoyBuffer {
+	chunks := make([]shared.UnsafeEnvoyBuffer, 0, len(buf))
 	for _, chunk := range buf {
-		data := unsafe.Slice((*byte)(unsafe.Pointer(chunk.ptr)), chunk.length)
-		chunks = append(chunks, data)
+		chunks = append(chunks, shared.UnsafeEnvoyBuffer{
+			Ptr: (*byte)(unsafe.Pointer(chunk.ptr)),
+			Len: uint64(chunk.length),
+		})
 	}
 	return chunks
 }
@@ -189,7 +199,7 @@ type dymHeaderMap struct {
 	headerType    C.envoy_dynamic_module_type_http_header_type
 }
 
-func (h *dymHeaderMap) getSingleHeader(key string, index uint64, valueCount *uint64) string {
+func (h *dymHeaderMap) getSingleHeader(key string, index uint64, valueCount *uint64) shared.UnsafeEnvoyBuffer {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_http_get_header(
 		h.hostPluginPtr,
@@ -201,22 +211,22 @@ func (h *dymHeaderMap) getSingleHeader(key string, index uint64, valueCount *uin
 	)
 
 	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return ""
+		return shared.UnsafeEnvoyBuffer{}
 	}
 
 	runtime.KeepAlive(key)
-	return envoyBufferToStringUnsafe(valueView)
+	return envoyBufferToUnsafeEnvoyBuffer(valueView)
 }
 
-func (h *dymHeaderMap) Get(key string) []string {
+func (h *dymHeaderMap) Get(key string) []shared.UnsafeEnvoyBuffer {
 	valueCount := uint64(0)
 
 	firstValue := h.getSingleHeader(key, 0, &valueCount)
 	if valueCount == 0 {
-		return []string{}
+		return []shared.UnsafeEnvoyBuffer{}
 	}
 
-	values := make([]string, 0, valueCount)
+	values := make([]shared.UnsafeEnvoyBuffer, 0, valueCount)
 	values = append(values, firstValue)
 
 	for i := uint64(1); i < valueCount; i++ {
@@ -227,11 +237,11 @@ func (h *dymHeaderMap) Get(key string) []string {
 	return values
 }
 
-func (h *dymHeaderMap) GetOne(key string) string {
+func (h *dymHeaderMap) GetOne(key string) shared.UnsafeEnvoyBuffer {
 	return h.getSingleHeader(key, 0, nil)
 }
 
-func (h *dymHeaderMap) GetAll() [][2]string {
+func (h *dymHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	headerCount := C.envoy_dynamic_module_callback_http_get_headers_size(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
@@ -246,7 +256,7 @@ func (h *dymHeaderMap) GetAll() [][2]string {
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		unsafe.SliceData(resultHeaders),
 	)
-	finalResult := envoyHttpHeaderSliceToHeadersUnsafe(resultHeaders)
+	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult
 }
@@ -289,7 +299,7 @@ type dymBodyBuffer struct {
 	bufferType    C.envoy_dynamic_module_type_http_body_type
 }
 
-func (b *dymBodyBuffer) GetChunks() [][]byte {
+func (b *dymBodyBuffer) GetChunks() []shared.UnsafeEnvoyBuffer {
 	var chunksSize C.size_t = 0
 	size := C.envoy_dynamic_module_callback_http_get_body_chunks_size(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(b.hostPluginPtr),
@@ -307,7 +317,7 @@ func (b *dymBodyBuffer) GetChunks() [][]byte {
 		unsafe.SliceData(resultChunks),
 	)
 	runtime.KeepAlive(resultChunks)
-	return envoyBufferSliceToBytesSliceUnsafe(resultChunks)
+	return envoyBufferSliceToUnsafeEnvoyBufferSlice(resultChunks)
 }
 
 func (b *dymBodyBuffer) GetSize() uint64 {
@@ -405,7 +415,7 @@ type dymHttpFilterHandle struct {
 	downstreamWatermarkCallbacks shared.DownstreamWatermarkCallbacks
 }
 
-func (h *dymHttpFilterHandle) GetMetadataString(source shared.MetadataSourceType, metadataNamespace, key string) (string, bool) {
+func (h *dymHttpFilterHandle) GetMetadataString(source shared.MetadataSourceType, metadataNamespace, key string) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 
 	ret := C.envoy_dynamic_module_callback_http_get_metadata_string(
@@ -416,12 +426,12 @@ func (h *dymHttpFilterHandle) GetMetadataString(source shared.MetadataSourceType
 		&valueView,
 	)
 	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return "", false
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
 
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
-	return envoyBufferToStringUnsafe(valueView), true
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymHttpFilterHandle) GetMetadataNumber(source shared.MetadataSourceType, metadataNamespace, key string) (float64, bool) {
@@ -462,7 +472,7 @@ func (h *dymHttpFilterHandle) GetMetadataBool(source shared.MetadataSourceType, 
 	return bool(value), true
 }
 
-func (h *dymHttpFilterHandle) GetMetadataKeys(source shared.MetadataSourceType, metadataNamespace string) []string {
+func (h *dymHttpFilterHandle) GetMetadataKeys(source shared.MetadataSourceType, metadataNamespace string) []shared.UnsafeEnvoyBuffer {
 	count := C.envoy_dynamic_module_callback_http_get_metadata_keys_count(
 		h.hostPluginPtr,
 		(C.envoy_dynamic_module_type_metadata_source)(source),
@@ -485,14 +495,11 @@ func (h *dymHttpFilterHandle) GetMetadataKeys(source shared.MetadataSourceType, 
 		return nil
 	}
 
-	keys := make([]string, int(count))
-	for i := 0; i < int(count); i++ {
-		keys[i] = envoyBufferToStringUnsafe(buffers[i])
-	}
-	return keys
+	runtime.KeepAlive(buffers)
+	return envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
 }
 
-func (h *dymHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSourceType) []string {
+func (h *dymHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSourceType) []shared.UnsafeEnvoyBuffer {
 	count := C.envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
 		h.hostPluginPtr,
 		(C.envoy_dynamic_module_type_metadata_source)(source),
@@ -511,11 +518,8 @@ func (h *dymHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSource
 		return nil
 	}
 
-	namespaces := make([]string, int(count))
-	for i := 0; i < int(count); i++ {
-		namespaces[i] = envoyBufferToStringUnsafe(buffers[i])
-	}
-	return namespaces
+	runtime.KeepAlive(buffers)
+	return envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
 }
 
 func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value any) {
@@ -615,7 +619,7 @@ func (h *dymHttpFilterHandle) GetAttributeNumber(
 
 func (h *dymHttpFilterHandle) GetAttributeString(
 	attributeID shared.AttributeID,
-) (string, bool) {
+) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 
 	ret := C.envoy_dynamic_module_callback_http_filter_get_attribute_string(
@@ -624,10 +628,10 @@ func (h *dymHttpFilterHandle) GetAttributeString(
 		&valueView,
 	)
 	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return "", false
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
 
-	return envoyBufferToStringUnsafe(valueView), true
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymHttpFilterHandle) GetAttributeBool(
@@ -647,7 +651,7 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 	return bool(value), true
 }
 
-func (h *dymHttpFilterHandle) GetFilterState(key string) ([]byte, bool) {
+func (h *dymHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 
 	ret := C.envoy_dynamic_module_callback_http_get_filter_state_bytes(
@@ -656,11 +660,11 @@ func (h *dymHttpFilterHandle) GetFilterState(key string) ([]byte, bool) {
 		&valueView,
 	)
 	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
-		return nil, false
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
 
 	runtime.KeepAlive(key)
-	return envoyBufferToBytesUnsafe(valueView), true
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
@@ -674,13 +678,13 @@ func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
 }
 
 func (h *dymHttpFilterHandle) GetData(key string) any {
-	stringValue, found := h.GetMetadataString(shared.MetadataSourceTypeDynamic,
+	buf, found := h.GetMetadataString(shared.MetadataSourceTypeDynamic,
 		"composer.shared_data", key)
 	if !found {
 		return nil
 	}
 	// Convert string back to uintptr safely.
-	uintValue, err := strconv.ParseUint(stringValue, 10, 64)
+	uintValue, err := strconv.ParseUint(buf.ToUnsafeString(), 10, 64)
 	if err != nil {
 		return nil
 	}
@@ -1442,8 +1446,8 @@ func envoy_dynamic_module_on_http_filter_http_callout_done(
 	}
 
 	// Prepare headers and body chunks.
-	resultHeaders := envoyHttpHeaderSliceToHeadersUnsafe(unsafe.Slice(headers, int(headersSize)))
-	resultChunks := envoyBufferSliceToBytesSliceUnsafe(unsafe.Slice(chunks, int(chunksSize)))
+	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
+	resultChunks := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
 	cb := pluginWrapper.calloutCallbacks[uint64(calloutID)]
 	if cb != nil {
@@ -1471,7 +1475,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_headers(
 	}
 
 	// Prepare headers.
-	resultHeaders := envoyHttpHeaderSliceToHeadersUnsafe(unsafe.Slice(headers, int(headersSize)))
+	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 
 	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
 	if cb != nil {
@@ -1494,7 +1498,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_data(
 	}
 
 	// Prepare data.
-	resultData := envoyBufferSliceToBytesSliceUnsafe(unsafe.Slice(chunks, int(chunksSize)))
+	resultData := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
 	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
 	if cb != nil {
@@ -1516,7 +1520,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_trailers(
 	}
 
 	// Prepare trailers.
-	resultTrailers := envoyHttpHeaderSliceToHeadersUnsafe(unsafe.Slice(trailers, int(trailersSize)))
+	resultTrailers := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(trailers, int(trailersSize)))
 
 	cb := pluginWrapper.streamCallbacks[uint64(streamID)]
 	if cb != nil {
