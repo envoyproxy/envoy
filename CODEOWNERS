@@ -268,6 +268,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/config/validators/minimum_clusters @adisuissa @yanavlasov
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
+/*/extensions/filters/http/file_server @ravenblackx @wbpcode @phlax
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @ggreenway @UNOWNED
 /*/extensions/http/cache_v2/file_system_http_cache @ggreenway @ravenblackx

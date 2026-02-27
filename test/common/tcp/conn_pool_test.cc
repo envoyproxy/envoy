@@ -154,7 +154,7 @@ public:
     EXPECT_CALL(*test_conn.connection_, connect());
     EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_, _));
 
-    ON_CALL(*test_conn.connection_, close(Network::ConnectionCloseType::NoFlush))
+    ON_CALL(*test_conn.connection_, close(Network::ConnectionCloseType::NoFlush, _))
         .WillByDefault(InvokeWithoutArgs([test_conn]() -> void {
           test_conn.connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
         }));
@@ -447,8 +447,8 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
     EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
 
     auto connection = conn_pool_->test_conns_[0].connection_;
-    EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush))
-        .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+    EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush, _))
+        .WillOnce(Invoke([&](Network::ConnectionCloseType, absl::string_view) -> void {
           connection->raiseEvent(Network::ConnectionEvent::LocalClose);
           // idle timer is disabled.
           EXPECT_FALSE(idle_timer->enabled());
@@ -1214,7 +1214,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
   EXPECT_NE(nullptr, handle);
 
   EXPECT_CALL(callbacks_->mock_pool_failure_cb_, Call);
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
 }
@@ -1226,7 +1226,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
   prepareConn();
 
   EXPECT_CALL(callbacks_->callbacks_, onEvent(_));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
 }
@@ -1240,7 +1240,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   // Transition connection to ready list
   callbacks_->conn_data_.reset();
 
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   conn_pool_.reset();
 }
