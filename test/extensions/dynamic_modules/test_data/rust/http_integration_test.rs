@@ -27,6 +27,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
+    "header_callbacks_on_creation" => Some(Box::new(HeaderCallbacksOnCreationConfig {
+      headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
+    })),
     "per_route_config" => Some(Box::new(PerRouteFilterConfig {
       value: String::from_utf8(config.to_owned()).unwrap(),
     })),
@@ -405,6 +408,26 @@ impl Drop for HeadersHttpFilter {
     assert!(self.response_trailers_called);
   }
 }
+
+struct HeaderCallbacksOnCreationConfig {
+  headers_to_add: String,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksOnCreationConfig {
+  fn new_http_filter(&self, envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    for header in self.headers_to_add.split(',') {
+      let parts: Vec<&str> = header.split(':').collect();
+      if parts.len() == 2 {
+        envoy.set_request_header(parts[0], parts[1].as_bytes());
+      }
+    }
+    Box::new(HeaderCallbacksOnCreationFilter {})
+  }
+}
+
+struct HeaderCallbacksOnCreationFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksOnCreationFilter {}
 
 struct PerRouteFilterConfig {
   value: String,
