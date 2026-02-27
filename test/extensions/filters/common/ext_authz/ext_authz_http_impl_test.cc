@@ -358,12 +358,8 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixAndPathOverrideMutuallyExclusive) {
     path_prefix: "/prefix"
     path_override: "/override"
   )EOF";
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<ClientConfig>(proto_config, 250, proto_config.http_service().path_prefix(),
-                                     factory_context_),
-      EnvoyException, "Only one of path_prefix or path_override may be set, not both.");
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "Only one of path_prefix or path_override may be set, not both.");
 }
 
 // Verify path_override must start with /.
@@ -376,12 +372,8 @@ TEST_F(ExtAuthzHttpClientTest, PathOverrideMustStartWithSlash) {
       timeout: 0.25s
     path_override: "no-leading-slash"
   )EOF";
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<ClientConfig>(proto_config, 250, proto_config.http_service().path_prefix(),
-                                     factory_context_),
-      EnvoyException, "path_override should start with \"/\".");
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "path_override should start with \"/\".");
 }
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
