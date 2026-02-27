@@ -28,6 +28,7 @@ envoy_cc_library(
         ":dynamic_modules_lib",
         "//source/common/common:logger_lib",
     ],
+    alwayslink = True,
 )
 
 go_library(
