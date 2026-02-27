@@ -10,8 +10,3 @@ py_test(
     ],
     main = "fetch_test.py",
 )
-
-py_test(
-    name = "placeholder_test",
-    srcs = ["placeholder_test.py"],
-)
