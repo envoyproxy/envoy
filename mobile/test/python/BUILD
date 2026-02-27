@@ -10,3 +10,12 @@ py_test(
     ],
     main = "fetch_test.py",
 )
+
+py_test(
+    name = "lifecycle_test",
+    srcs = ["lifecycle_test.py"],
+    data = [
+        "//library/python:envoy_engine.so",
+    ],
+    main = "lifecycle_test.py",
+)
