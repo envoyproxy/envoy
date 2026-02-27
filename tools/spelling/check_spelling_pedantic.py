@@ -761,7 +761,7 @@ if __name__ == "__main__":
     # language to handle hosts where en_US is not recognized (e.g. CI).
     try:
         locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-    except:
+    except Exception:
         locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
     default_dictionary = os.environ["ASPELL_DICT"]

@@ -70,7 +70,7 @@ def verify_server(port, max_retries=3):
 def kill_server(pid):
     try:
         os.kill(pid, 9)
-    except:
+    except Exception:
         pass
     sys.exit(1)
 

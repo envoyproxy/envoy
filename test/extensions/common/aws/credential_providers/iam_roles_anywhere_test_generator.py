@@ -35,7 +35,7 @@ def no_chain():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 
@@ -58,7 +58,7 @@ def chain():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 
@@ -81,7 +81,7 @@ def fast_forward():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 
@@ -103,7 +103,7 @@ def custom_session():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 
@@ -125,7 +125,7 @@ def blank_session():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 
@@ -147,7 +147,7 @@ def custom_duration():
     s3 = roles_anywhere_session.client("s3")
     try:
         print(s3.list_buckets())
-    except:
+    except Exception:
         pass
 
 

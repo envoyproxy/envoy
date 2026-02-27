@@ -296,7 +296,7 @@ if __name__ == "__main__":
 
         try:
             staging_id = _create_staging_repository(args.profile_id)
-        except:
+        except Exception:
             sys.exit("Unable to create staging id")
 
         # Upload files using the staging_id, close the staging repository, and release

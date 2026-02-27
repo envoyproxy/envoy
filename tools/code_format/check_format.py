@@ -963,7 +963,7 @@ class FormatChecker:
         """Run check_format and return the traceback of any exception."""
         try:
             return self.check_format(file_path, fail_on_diff=fail_on_diff)
-        except:
+        except Exception:
             return traceback.format_exc().split("\n")
 
     def normalize_path(self, path):

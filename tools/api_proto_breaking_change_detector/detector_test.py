@@ -121,7 +121,7 @@ class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
                 cls._run_command_print_error("git config user.name 'Bazel Test'")
                 cls._run_command_print_error("git config user.email '<>'")
                 cls._run_command_print_error('git commit -m "Initial commit"')
-        except:
+        except Exception:
             cls.tearDownClass()
             raise
 

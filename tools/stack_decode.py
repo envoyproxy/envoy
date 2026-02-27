@@ -120,7 +120,7 @@ def ignore_decoding_errors(io_wrapper):
     if hasattr(io_wrapper, 'reconfigure'):
         try:
             io_wrapper.reconfigure(errors='ignore')
-        except:
+        except Exception:
             pass
 
     return io_wrapper

@@ -28,7 +28,7 @@ def get_execution_root(workspace):
     try:
         compdb = pathlib.Path(workspace, "compile_commands.json").read_text()
         return json.loads(compdb)[0]['directory']
-    except:
+    except Exception:
         return bazel_info("execution_root")
 
 
@@ -58,7 +58,7 @@ def build_binary_with_debug_info(target, config=None):
 def get_launch_json(workspace):
     try:
         return json.loads(pathlib.Path(workspace, ".vscode", "launch.json").read_text())
-    except:
+    except Exception:
         return {"version": "0.2.0"}
 
 
@@ -150,7 +150,7 @@ def auto_detect_config():
         # On other architectures, try to detect available compilers
         # This is a simple heuristic - could be made more sophisticated
         return None  # Let Bazel use its default
-    except:
+    except Exception:
         return None
 
 
