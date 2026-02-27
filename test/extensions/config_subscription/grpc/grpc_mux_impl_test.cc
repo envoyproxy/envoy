@@ -1546,8 +1546,7 @@ TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
       /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
       /*backoff_strategy_=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
-          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
-          random_),
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
       /*skip_subsequent_node_=*/true,
@@ -1596,8 +1595,7 @@ TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
       /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
       /*backoff_strategy_=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
-          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
-          random_),
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
       /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
       /*skip_subsequent_node_=*/true,
