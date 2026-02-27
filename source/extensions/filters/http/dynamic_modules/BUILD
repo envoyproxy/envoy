@@ -61,4 +61,5 @@ envoy_cc_library(
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
+    alwayslink = True,
 )

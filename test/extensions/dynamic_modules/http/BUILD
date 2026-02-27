@@ -61,6 +61,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -78,6 +79,7 @@ envoy_cc_test(
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
@@ -107,6 +109,8 @@ envoy_cc_test(
     },
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
