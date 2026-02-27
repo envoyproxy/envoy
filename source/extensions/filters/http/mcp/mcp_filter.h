@@ -14,6 +14,8 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -52,6 +54,16 @@ public:
 
   bool clearRouteCache() const { return clear_route_cache_; }
 
+  const absl::optional<
+      envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>&
+  propagateTraceContext() const {
+    return propagate_trace_context_;
+  }
+  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>&
+  propagateBaggage() const {
+    return propagate_baggage_;
+  }
+
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
@@ -74,6 +86,11 @@ public:
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
+  const absl::optional<
+      envoy::extensions::filters::http::mcp::v3::Mcp::TraceContextPropagationConfig>
+      propagate_trace_context_;
+  const absl::optional<envoy::extensions::filters::http::mcp::v3::Mcp::BaggagePropagationConfig>
+      propagate_baggage_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   const std::string metadata_namespace_;

@@ -37,6 +37,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: memory
+  change: |
+    Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
+    ``ProcessBackgroundActions`` and ``SetBackgroundReleaseRate`` APIs. This provides more comprehensive
+    background memory management including per-CPU cache reclamation, cache shuffling, and size class
+    resizing, in addition to memory release. The ``tcmalloc.released_by_timer`` stat has been removed.
 - area: mcp
   change: |
     Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
@@ -143,6 +149,9 @@ bug_fixes:
     to the client.
 - area: formatter
   change: |
+    Supported the log formatter ``UPSTREAM_LOCAL_CLOSE_REASON``.
+- area: formatter
+  change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
 - area: spiffe
@@ -180,6 +189,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: outlier_detection
+  change: |
+    Added :ref:`detect_degraded_hosts <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
+    to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
+    the ``x-envoy-degraded`` header. Degraded hosts are deprioritized in load balancing but remain in rotation (not
+    ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to false.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
@@ -467,6 +482,10 @@ new_features:
 - area: a2a
   change: |
     Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+- area: mcp
+  change: |
+    Added options ``propagate_trace_context`` and ``propagate_baggage`` for extracting traceparent & tracestate
+    and baggage from mcp params, respectively.
 - area: mcp_json_rest_bridge
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
