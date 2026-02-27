@@ -54,6 +54,11 @@ MockUpstreamInfo::MockUpstreamInfo()
         failure_reason_ = std::string(failure_reason);
       }));
   ON_CALL(*this, upstreamTransportFailureReason()).WillByDefault(ReturnRef(failure_reason_));
+  ON_CALL(*this, setUpstreamLocalCloseReason(_))
+      .WillByDefault(Invoke([this](absl::string_view failure_reason) {
+        local_close_reason_ = std::string(failure_reason);
+      }));
+  ON_CALL(*this, upstreamLocalCloseReason()).WillByDefault(ReturnPointee(&local_close_reason_));
   ON_CALL(*this, setUpstreamHost(_))
       .WillByDefault(Invoke([this](Upstream::HostDescriptionConstSharedPtr upstream_host) {
         upstream_host_ = upstream_host;
