@@ -484,7 +484,11 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
-
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP session negotiation, including ``initialize`` and
+    ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
+    recommended for production use.
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header
