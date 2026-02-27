@@ -628,6 +628,15 @@ Current supported substitution commands include:
     The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
     Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
+.. _config_access_log_format_upstream_local_close_reason:
+
+``%UPSTREAM_LOCAL_CLOSE_REASON%``
+  HTTP/TCP
+    If upstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
 .. _config_access_log_format_downstream_transport_failure_reason:
 
 ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%``

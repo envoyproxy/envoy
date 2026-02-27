@@ -14,7 +14,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
 #include "matching_utils.h"
@@ -90,7 +90,8 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : filter_(filter), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
@@ -98,7 +99,8 @@ public:
         untyped_cluster_metadata_forwarding_namespaces_(
             &untyped_cluster_metadata_forwarding_namespaces),
         typed_cluster_metadata_forwarding_namespaces_(
-            &typed_cluster_metadata_forwarding_namespaces) {}
+            &typed_cluster_metadata_forwarding_namespaces),
+        allow_content_length_header_(allow_content_length_header) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -186,7 +188,8 @@ public:
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
-  void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
+  void logMutation(CallbackState callback_state,
+                   Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
@@ -225,14 +228,15 @@ public:
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
   bool shouldRemoveContentLength() const {
-    // Always remove the content length in 3 cases below:
-    // 1) STREAMED BodySendMode
-    // 2) BUFFERED_PARTIAL BodySendMode
-    // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
-    // 4) FULL_DUPLEX_STREAMED BodySendMode
-    // In these modes, ext_proc filter can not guarantee to set the content length correctly if
-    // body is mutated by external processor later.
-    // In http1 codec, removing content length will enable chunked encoding whenever feasible.
+    // Always remove the content length in 4 cases below, unless allow_content_length_header is set
+    // to true in the config: 1) STREAMED BodySendMode 2) BUFFERED_PARTIAL BodySendMode 3) BUFFERED
+    // BodySendMode + SKIP HeaderSendMode 4) FULL_DUPLEX_STREAMED BodySendMode In these modes,
+    // ext_proc filter can not guarantee to set the content length correctly if body is mutated by
+    // external processor later. In http1 codec, removing content length will enable chunked
+    // encoding whenever feasible.
+    if (allow_content_length_header_) {
+      return false;
+    }
     return (
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
         body_mode_ ==
@@ -381,6 +385,7 @@ protected:
   const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
   // If true, the attributes for this processing state have already been sent.
   bool attributes_sent_{};
+  const bool allow_content_length_header_;
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
@@ -391,7 +396,7 @@ private:
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                        ProcessingEffect::Effect& processing_effect);
+                        Extensions::Filters::Common::ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
 
   /**
@@ -470,7 +475,7 @@ private:
    */
   absl::Status processHeaderMutationIfAvailable(
       const envoy::service::ext_proc::v3::CommonResponse& common_response,
-      ProcessingEffect::Effect& effect);
+      Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only
@@ -491,7 +496,7 @@ private:
    */
   void
   applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
-                            ProcessingEffect::Effect& effect);
+                            Extensions::Filters::Common::ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.
@@ -509,11 +514,12 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   DecodingProcessorState(const DecodingProcessorState&) = delete;
@@ -654,11 +660,12 @@ public:
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
-      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces)
+      const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
+      bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
                        untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
-                       typed_cluster_metadata_forwarding_namespaces) {
+                       typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;

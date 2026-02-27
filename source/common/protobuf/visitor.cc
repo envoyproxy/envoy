@@ -26,8 +26,10 @@ absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::M
       auto* any_message = Protobuf::DynamicCastMessage<Protobuf::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
-      // inner_message must be valid as parsing would have already failed to load if there was an
-      // invalid type_url.
+      if (inner_message == nullptr) {
+        return absl::InvalidArgumentError(
+            fmt::format("Invalid type_url '{}' during traversal", target_type_url));
+      }
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
     } else if (message.GetTypeName() == "xds.type.v3.TypedStruct") {
       auto output_or_error = Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);

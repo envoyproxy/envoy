@@ -102,7 +102,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {
 }
 
 // This test verifies that the Rust bootstrap extension timer API works correctly.
-// A timer is created during config_new, armed with a short delay, and on_timer_fired logs success.
+// Two timers are created during config_new, armed with short delays, and on_timer_fired uses the
+// timer identity API to distinguish which timer fired. Init completes after both timers fire.
 TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
   EXPECT_LOG_CONTAINS(
       "info", "Bootstrap timer test completed successfully!",

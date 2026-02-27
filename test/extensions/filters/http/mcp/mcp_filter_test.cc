@@ -1352,6 +1352,538 @@ TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
+TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  // SPELLCHECKER(off)
+  EXPECT_EQ("rojo=00f067aa0ba902b7",
+            headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
+  // SPELLCHECKER(on)
+}
+
+TEST_F(McpFilterTest, TraceContextEnabledInvalidParent) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // Invalid parent (wrong size), valid state. Neither should be injected.
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "invalid",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, TraceContextEnabledValidParentInvalidState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // Valid parent, invalid state (contains comma). Only parent should be injected.
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "invalid,comma"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, TraceContextEnabledMissingParent) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // Missing parent, valid state. Neither should be injected.
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, TraceContextEnabledNonstringParent) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // traceparent is not a string, valid state. Neither should be injected.
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": 123,
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, TraceContextEnabledNonstringState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // tracestate is not a string, valid parent. Parent should be injected, state should not.
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": 123
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, TraceContextDisabled) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+}
+
+TEST_F(McpFilterTest, BaggageEnabledValid) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "baggage": "userId=alice,serverNode=re-Ink"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ("userId=alice,serverNode=re-Ink",
+            headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
+}
+
+TEST_F(McpFilterTest, BaggageEnabledInvalid) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // Invalid baggage (missing =).
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "baggage": "invalid"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("baggage")).empty());
+}
+
+TEST_F(McpFilterTest, BaggageEnabledMissing) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "other": "field"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("baggage")).empty());
+}
+
+TEST_F(McpFilterTest, IndependentBaggageAndTrace) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_EQ("userId=alice",
+            headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
+}
+
+TEST_F(McpFilterTest, TracingHeadersClearedWhenTraceParentValid) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"traceparent", "original-traceparent"},
+                                         {"tracestate", "original-tracestate"},
+                                         {"baggage", "original-baggage"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=1",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("tracestate")).empty());
+  // SPELLCHECKER(off)
+  EXPECT_EQ("rojo=1", headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
+  // SPELLCHECKER(on)
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
+  EXPECT_EQ("userId=alice",
+            headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
+
+  // Verify only one instance of each header exists (original ones removed)
+  EXPECT_EQ(1, headers.get(Http::LowerCaseString("traceparent")).size());
+  EXPECT_EQ(1, headers.get(Http::LowerCaseString("tracestate")).size());
+  EXPECT_EQ(1, headers.get(Http::LowerCaseString("baggage")).size());
+}
+
+TEST_F(McpFilterTest, TraceStateHeadersClearedEvenIfMissingInMeta) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"traceparent", "original-traceparent"},
+                                         {"tracestate", "original-tracestate"},
+                                         {"baggage", "original-baggage"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  // Even though tracestate was not present it is semantically tied to traceparent.
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("tracestate")).empty());
+  // Baggage should still be present because it's handled independently.
+  EXPECT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
+}
+
+TEST_F(McpFilterTest, TracingHeadersNotClearedWhenTraceParentInvalid) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context();
+  proto_config.mutable_propagate_baggage();
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json, text/event-stream"},
+                                         {"traceparent", "original-traceparent"},
+                                         {"tracestate", "original-tracestate"},
+                                         {"baggage", "original-baggage"}};
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // Invalid traceparent in meta
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "invalid-traceparent"
+      }
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Original headers should still be present
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_EQ("original-traceparent",
+            headers.get(Http::LowerCaseString("traceparent"))[0]->value().getStringView());
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("tracestate")).empty());
+  EXPECT_EQ("original-tracestate",
+            headers.get(Http::LowerCaseString("tracestate"))[0]->value().getStringView());
+  ASSERT_FALSE(headers.get(Http::LowerCaseString("baggage")).empty());
+  EXPECT_EQ("original-baggage",
+            headers.get(Http::LowerCaseString("baggage"))[0]->value().getStringView());
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

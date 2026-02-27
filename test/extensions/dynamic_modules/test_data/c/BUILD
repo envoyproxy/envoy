@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
@@ -128,6 +129,12 @@ test_program(name = "access_log_missing_logger_log")
 test_program(name = "access_log_missing_logger_destroy")
 
 test_program(name = "access_log_config_new_fail")
+
+test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_config_new_fail")
+
+test_program(name = "cluster_new_fail")
 
 test_program(name = "lb_round_robin")
 

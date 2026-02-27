@@ -408,6 +408,62 @@ TEST(CommonAbiImplTest, CertValidatorGetFilterStateEnvoyBug) {
 }
 
 // =====================================================================
+// Cluster extension weak symbol stub tests
+// =====================================================================
+
+// Test that the weak symbol stub for cluster_add_hosts triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterAddHostsEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:80", 12};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  EXPECT_ENVOY_BUG(
+      {
+        auto result =
+            envoy_dynamic_module_callback_cluster_add_hosts(nullptr, &addr, &weight, 1, &host_ptr);
+        EXPECT_FALSE(result);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_remove_hosts triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterRemoveHostsEnvoyBug) {
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, &host_ptr, 1);
+        EXPECT_EQ(result, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_pre_init_complete triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, ClusterPreInitCompleteEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_lb_get_healthy_host_count triggers an ENVOY_BUG.
+TEST(CommonAbiImplTest, ClusterLbGetHealthyHostCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0);
+        EXPECT_EQ(result, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for cluster_lb_get_healthy_host triggers an ENVOY_BUG.
+TEST(CommonAbiImplTest, ClusterLbGetHealthyHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0);
+        EXPECT_EQ(result, nullptr);
+      },
+      "not implemented in this context");
+}
+
+// =====================================================================
 // Load Balancer weak symbol stub tests
 // =====================================================================
 
@@ -595,6 +651,112 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
         auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header(
             nullptr, key, &result, 0, nullptr);
         EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_set_host_data triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbSetHostDataEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_lb_set_host_data(nullptr, 0, 0, 42);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_data triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostDataEnvoyBug) {
+  uintptr_t data = 0;
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_lb_get_host_data(nullptr, 0, 0, &data);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_string triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataStringEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_string(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_number triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataNumberEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  double result = 0.0;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_number(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_host_metadata_bool triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostMetadataBoolEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  bool result = false;
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+            nullptr, 0, 0, filter_name, key, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_count triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_locality_count(nullptr, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_host_count triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityHostCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count = envoy_dynamic_module_callback_lb_get_locality_host_count(nullptr, 0, 0);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_host_address triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbGetLocalityHostAddressEnvoyBug) {
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_get_locality_host_address(nullptr, 0, 0, 0, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_locality_weight triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto weight = envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0);
+        EXPECT_EQ(weight, 0);
       },
       "not implemented in this context");
 }
