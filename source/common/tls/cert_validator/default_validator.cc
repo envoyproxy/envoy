@@ -552,7 +552,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (cert == nullptr) {
       break;
     }
-    X509_NAME* name = X509_get_subject_name(cert.get());
+    const X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));

@@ -357,6 +357,8 @@ public:
   }
 
   void onStreamComplete() override {}
+
+  void onDestroy() override {}
 };
 
 class HeaderCallbacksOnCreationFilterFactory : public HttpFilterFactory {

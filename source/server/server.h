@@ -259,7 +259,8 @@ public:
   virtual void maybeCreateHeapShrinker() PURE;
   virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
-  virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<Server::GuardDog>
+  maybeCreateGuardDog(absl::string_view name, const Server::Configuration::Watchdog& config) PURE;
   virtual std::unique_ptr<HdsDelegateApi>
   maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
                          Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
@@ -342,9 +343,6 @@ public:
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
-
-protected:
-  const Configuration::MainImpl& config() { return config_; }
 
 private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();
