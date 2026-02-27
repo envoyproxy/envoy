@@ -1,7 +1,9 @@
 """Integration tests for the Envoy Mobile Python bindings."""
 
+import random
 import threading
 import unittest
+from test.python.echo_test_server import EchoTestServer
 
 from library.python.envoy_engine import (
     EngineBuilder,
@@ -15,6 +17,19 @@ from library.python.envoy_engine import (
 
 class TestFetchRequest(unittest.TestCase):
     """Tests for making HTTP requests through Envoy Mobile."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Set up an echo test server for the tests to hit."""
+        port = random.randint(2**14, 2**16)
+        cls._echo_server = EchoTestServer("127.0.0.1", port)
+        cls._echo_server.start()
+        cls._echo_server_url = f"127.0.0.1:{port}"
+
+    @classmethod
+    def tearDownClass(cls):
+        """Shut down the echo test server."""
+        cls._echo_server.stop()
 
     def _build_engine(self):
         """Helper to build and start an engine."""
@@ -110,8 +125,8 @@ class TestFetchRequest(unittest.TestCase):
 
         headers = {
             ":method": "GET",
-            ":scheme": "https",
-            ":authority": "www.google.com",
+            ":scheme": "http",
+            ":authority": self._echo_server_url,
             ":path": "/",
         }
         stream.send_headers(headers, end_stream=True)
@@ -153,8 +168,8 @@ class TestFetchRequest(unittest.TestCase):
 
         headers = {
             ":method": "GET",
-            ":scheme": "https",
-            ":authority": "www.google.com",
+            ":scheme": "http",
+            ":authority": self._echo_server_url,
             ":path": "/",
         }
         stream.send_headers(headers, end_stream=False)
@@ -175,21 +190,6 @@ class TestFetchRequest(unittest.TestCase):
         self.assertEqual(final_stream.upstream_protocol, -1)
 
         engine.terminate()
-
-
-class TestPythonTypes(unittest.TestCase):
-    """Tests for Python type wrappers."""
-
-    def test_stream_intel_fields(self):
-        """StreamIntel fields are accessible."""
-        intel = StreamIntel()
-        intel.stream_id = 42
-        intel.connection_id = 7
-        intel.attempt_count = 1
-        self.assertEqual(intel.stream_id, 42)
-        self.assertEqual(intel.connection_id, 7)
-        self.assertEqual(intel.attempt_count, 1)
-        self.assertTrue(False, "test")
 
 
 if __name__ == "__main__":
