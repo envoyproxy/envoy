@@ -67,7 +67,9 @@ void ActiveTcpClient::readEnableIfNew() {
   }
 }
 
-void ActiveTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void ActiveTcpClient::close(Network::ConnectionCloseType type, absl::string_view details) {
+  connection_->close(type, details);
+}
 
 void ActiveTcpClient::clearCallbacks() {
   if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {

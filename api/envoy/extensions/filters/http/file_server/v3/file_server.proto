@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.file_server.v3;
+
+import "envoy/extensions/common/async_files/v3/async_file_manager.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.file_server.v3";
+option java_outer_classname = "FileServerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/file_server/v3;file_serverv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: FileServerConfig]
+// [#extension: envoy.filters.http.file_server]
+
+// A :ref:`file server <config_http_filters_file_server>` filter configuration.
+// [#next-free-field: 6]
+message FileServerConfig {
+  message PathMapping {
+    // If no ``request_path_prefix`` is matched, the filter does not intercept a request.
+    //
+    // If a ``request_path_prefix`` is matched, that prefix is removed from the request
+    // and replaced with ``file_path_prefix`` to form a filesystem path for
+    // the request.
+    //
+    // Prefix ``/`` will match all GET requests.
+    string request_path_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Replaces a matched ``request_path_prefix`` to form a filesystem path for a
+    // request. May be relative to the working directory of the envoy execution,
+    // or an absolute path.
+    string file_path_prefix = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  message DirectoryBehavior {
+    // [#not-implemented-hide:] Directory operations currently have no async implementation.
+    message List {
+    }
+
+    // Attempts to serve the given file within the directory, e.g. ``index.html``.
+    // Precisely one of ``default_file`` and ``list`` must be set per ``DirectoryBehavior``.
+    string default_file = 1 [(validate.rules).string = {pattern: "^[^/]*$"}];
+
+    // Responds with an html formatted list of the files and subdirectories in the directory.
+    // Precisely one of ``default_file`` and ``list`` must be set per ``DirectoryBehavior``.
+    // [#not-implemented-hide:] Directory operations currently have no async implementation.
+    List list = 2;
+  }
+
+  // A configuration for the AsyncFileManager to be used to read from the filesystem.
+  common.async_files.v3.AsyncFileManagerConfig manager_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The longest matching path_mapping takes precedence.
+  repeated PathMapping path_mappings = 2;
+
+  // A map from filename suffix to content type header.
+  // e.g. {"txt": "text/plain"}
+  //
+  // File suffixes may not contain ``.`` as the filename suffix after
+  // the last ``.`` is used to perform an O(1) lookup against the keys.
+  //
+  // An empty string suffix will only match files ending with a ``.``.
+  //
+  // Files with no suffix (e.g. ``README``) can be matched as the full string.
+  map<string, string> content_types = 3;
+
+  // If ``content_types`` does not contain a match for a file suffix,
+  // ``default_content_type`` is used.
+  //
+  // If there is no match and ``default_content_type`` is empty, the
+  // ``content-type`` header will be omitted from the response.
+  string default_content_type = 4;
+
+  // If the requested path refers to a directory, the given behaviors are
+  // tried in order until one succeeds. If the end of the list is reached
+  // with no success, the result is a 403 Forbidden.
+  repeated DirectoryBehavior directory_behaviors = 5;
+}
