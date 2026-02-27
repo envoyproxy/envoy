@@ -1,7 +1,5 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
-#include "envoy/stats/primitive_stats.h"
-
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 

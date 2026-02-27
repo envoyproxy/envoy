@@ -136,18 +136,6 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
   return value;
 }
 
-struct StatsAccessLogMetric {
-  StatsAccessLogMetric(const Stats::StatNameTagVector& tags,
-                       std::vector<Stats::Tag> tags_for_metric)
-      : tags_(tags), tags_for_metric_(std::move(tags_for_metric)) {}
-
-  std::string name() const { return ""; }
-  const std::vector<Stats::Tag>& tags() const { return tags_for_metric_; }
-
-  const Stats::StatNameTagVector& tags_;
-  std::vector<Stats::Tag> tags_for_metric_;
-};
-
 struct StatTagMetric : public Stats::StatTagMatchingData {
   StatTagMetric(absl::string_view value) : value_(value) {}
   absl::string_view value() const override { return value_; }

@@ -58,13 +58,6 @@ message Config {
 
     // The tags for the stat.
     repeated Tag tags = 2;
-
-    // The custom rules to generate the stats. Currently, the only
-    // supported input is
-    // ``envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput``.
-    // The supported actions are
-    // - ``envoy.extensions.matching.actions.transform_stat.v3.TransformStat``.
-    xds.type.matcher.v3.Matcher rules = 3;
   }
 
   // Configuration for a histogram stat.

@@ -286,12 +286,3 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
     ],
 )
-
-envoy_cc_library(
-    name = "stat_matching_data_impl_lib",
-    hdrs = ["stat_matching_data_impl.h"],
-    deps = [
-        "//envoy/stats:stats_interface",
-        "@abseil-cpp//absl/container:flat_hash_map",
-    ],
-)
