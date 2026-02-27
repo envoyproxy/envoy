@@ -121,6 +121,17 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
+config_setting(
+    name = "use_hermetic_llvm",
+    flag_values = {
+        ":use_local_llvm_flag": "False",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "envoy_repo",
     srcs = ["envoy_repo.py"],

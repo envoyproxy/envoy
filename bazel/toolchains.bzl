@@ -15,7 +15,7 @@ def envoy_toolchains():
         name = "llvm_toolchain",
         llvm_version = "18.1.8",
         cxx_standard = {"": "c++20"},
-        sysroot = {
+        sysroot = {} if LLVM_PATH else {
             "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
             "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
         },
