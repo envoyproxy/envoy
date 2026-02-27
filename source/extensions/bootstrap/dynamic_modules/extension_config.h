@@ -239,83 +239,89 @@ public:
     Stats::Histogram::Unit unit_;
   };
 
+#define INDEX_TO_ID(index) ((index) + 1)
+#define ID_TO_INDEX(id) ((id) - 1)
+
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
+    size_t id = INDEX_TO_ID(counters_.size());
     counters_.push_back(std::move(counter));
     return id;
   }
 
   size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    size_t id = counter_vecs_.size();
+    size_t id = INDEX_TO_ID(counter_vecs_.size());
     counter_vecs_.push_back(std::move(counter_vec));
     return id;
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
+    size_t id = INDEX_TO_ID(gauges_.size());
     gauges_.push_back(std::move(gauge));
     return id;
   }
 
   size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    size_t id = gauge_vecs_.size();
+    size_t id = INDEX_TO_ID(gauge_vecs_.size());
     gauge_vecs_.push_back(std::move(gauge_vec));
     return id;
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
+    size_t id = INDEX_TO_ID(histograms_.size());
     histograms_.push_back(std::move(histogram));
     return id;
   }
 
   size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
-    size_t id = histogram_vecs_.size();
+    size_t id = INDEX_TO_ID(histogram_vecs_.size());
     histogram_vecs_.push_back(std::move(histogram_vec));
     return id;
   }
 
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id >= counter_vecs_.size()) {
+    if (id == 0 || id > counter_vecs_.size()) {
       return {};
     }
-    return counter_vecs_[id];
+    return counter_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id >= gauge_vecs_.size()) {
+    if (id == 0 || id > gauge_vecs_.size()) {
       return {};
     }
-    return gauge_vecs_[id];
+    return gauge_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id >= histogram_vecs_.size()) {
+    if (id == 0 || id > histogram_vecs_.size()) {
       return {};
     }
-    return histogram_vecs_[id];
+    return histogram_vecs_[ID_TO_INDEX(id)];
   }
+
+#undef INDEX_TO_ID
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
