@@ -327,7 +327,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
       static_cast<void*>(filter_config_.get()),
       {const_cast<char*>("test_counter"), strlen("test_counter")}, &counter_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
-  EXPECT_EQ(0, counter_id);
+  EXPECT_EQ(1, counter_id);
 
   // Increment the counter via the filter.
   result = envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
