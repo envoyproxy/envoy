@@ -217,21 +217,18 @@ public:
     Stats::Histogram::Unit unit_;
   };
 
-// To ensure our IDs are never 0 (as 0 is used to indicate invalid ID), we store the stats in
-// vectors and use the index + 1 as the ID.
-#define INDEX_TO_ID(index) ((index) + 1)
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
 #define ID_TO_INDEX(id) ((id) - 1)
 
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = INDEX_TO_ID(counters_.size());
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    size_t id = INDEX_TO_ID(counter_vecs_.size());
     counter_vecs_.push_back(std::move(counter_vec));
-    return id;
+    return counter_vecs_.size();
   }
 
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
@@ -249,15 +246,13 @@ public:
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = INDEX_TO_ID(gauges_.size());
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    size_t id = INDEX_TO_ID(gauge_vecs_.size());
     gauge_vecs_.push_back(std::move(gauge_vec));
-    return id;
+    return gauge_vecs_.size();
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
@@ -275,15 +270,13 @@ public:
   }
 
   size_t addHistogram(ModuleHistogramHandle&& hist) {
-    size_t id = INDEX_TO_ID(hists_.size());
     hists_.push_back(std::move(hist));
-    return id;
+    return hists_.size();
   }
 
   size_t addHistogramVec(ModuleHistogramVecHandle&& hist_vec) {
-    size_t id = INDEX_TO_ID(hist_vecs_.size());
     hist_vecs_.push_back(std::move(hist_vec));
-    return id;
+    return hist_vecs_.size();
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
@@ -300,7 +293,6 @@ public:
     return hist_vecs_[ID_TO_INDEX(id)];
   }
 
-#undef INDEX_TO_ID
 #undef ID_TO_INDEX
 
 private:

@@ -95,26 +95,24 @@ public:
     Stats::Histogram& histogram_;
   };
 
-#define INDEX_TO_ID(index) ((index) + 1)
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
 #define ID_TO_INDEX(id) ((id) - 1)
 
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = INDEX_TO_ID(counters_.size());
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = INDEX_TO_ID(gauges_.size());
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = INDEX_TO_ID(histograms_.size());
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
