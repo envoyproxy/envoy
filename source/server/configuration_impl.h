@@ -176,7 +176,6 @@ public:
   actions() const override {
     return actions_;
   }
-  uint32_t deferredDeletesBatchSize() const override { return deferred_deletes_batch_size_; }
 
 private:
   std::chrono::milliseconds miss_timeout_;
@@ -185,7 +184,6 @@ private:
   std::chrono::milliseconds multikill_timeout_;
   double multikill_threshold_;
   Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction> actions_;
-  uint32_t deferred_deletes_batch_size_;
 };
 
 /**

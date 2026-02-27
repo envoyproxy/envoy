@@ -866,6 +866,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
   worker_guard_dog_ = maybeCreateGuardDog("workers");
+
+  const uint32_t batch_size =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(bootstrap_, deferred_deletes_batch_size, 0);
+  dispatcher_->setDeferredDeletesBatchSize(batch_size);
+
   return absl::OkStatus();
 }
 

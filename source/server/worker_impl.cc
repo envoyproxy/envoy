@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/exception.h"
@@ -10,6 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
@@ -37,6 +39,9 @@ WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overl
                                           const std::string& worker_name) {
   Event::DispatcherPtr dispatcher(
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
+  const uint32_t batch_size =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_.bootstrap(), deferred_deletes_batch_size, 0);
+  dispatcher->setDeferredDeletesBatchSize(batch_size);
   auto conn_handler = getHandler(*dispatcher, index, overload_manager, null_overload_manager);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
                                       overload_manager, api_, stat_names_);
