@@ -483,7 +483,7 @@ new_features:
     standard JSON-REST HTTP requests.
 - area: http
   change: |
-    Added :ref:`file_server http filter <_config_http_filters_file_server>` to allow responding with
+    Added :ref:`file_server http filter <config_http_filters_file_server>` to allow responding with
     file contents from the filesystem.
 - area: mcp_router
   change: |
