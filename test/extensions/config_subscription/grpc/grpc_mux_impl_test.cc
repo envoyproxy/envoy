@@ -1522,7 +1522,7 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
 // Ensures that the load-stats-reporter is created if enabled.
 TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
 
   bool factory_called = false;
   auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
@@ -1571,11 +1571,11 @@ TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
 }
 
 // Ensures that the load-stats-reporter is not created if disabled.
-// One envoy.reloadable_features.enable_lrs_server_self is deprecated, this test
+// One envoy.reloadable_features.enable_lrs_server_self_ads is deprecated, this test
 // can be removed.
 TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self", "false"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "false"}});
 
   auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
     return nullptr; // Should not be called

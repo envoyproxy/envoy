@@ -656,7 +656,7 @@ void GrpcMuxImpl::drainRequests() {
 
 Upstream::LoadStatsReporter* GrpcMuxImpl::maybeCreateLoadStatsReporter() {
   if (!lrs_server_ && load_stats_reporter_factory_ &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self")) {
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
     ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
               target_xds_authority_);
     lrs_server_ = load_stats_reporter_factory_();
