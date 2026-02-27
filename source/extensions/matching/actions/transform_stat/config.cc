@@ -20,11 +20,10 @@ public:
     if (action_config.has_drop_stat()) {
       return std::make_shared<DropStat>(action_config.drop_stat());
     } else if (action_config.has_drop_tag()) {
-      const auto& drop_tag = action_config.drop_tag();
-      return std::make_shared<DropTag>(drop_tag.target_tag_name());
-    } else if (action_config.has_upsert_tag()) {
-      const auto& upsert_tag = action_config.upsert_tag();
-      return std::make_shared<UpsertTag>(upsert_tag.tag_name(), upsert_tag.tag_value());
+      return std::make_shared<DropTag>();
+    } else if (action_config.has_update_tag()) {
+      const auto& update_tag = action_config.update_tag();
+      return std::make_shared<UpdateTag>(update_tag.new_tag_value());
     }
 
     return std::make_shared<NoOpAction>();

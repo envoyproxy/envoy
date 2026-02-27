@@ -51,25 +51,21 @@ public:
   Result apply(std::string&) const override;
 };
 
-class UpsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
+class UpdateTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  UpsertTag(std::string tag_name, std::string tag_value);
+  explicit UpdateTag(std::string tag_value);
 
   Result apply(std::string& tag_value) const override;
 
 private:
-  const std::string tag_name_;
   const std::string tag_value_;
 };
 
 class DropTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropTag(std::string target_tag_name);
+  explicit DropTag() = default;
 
   Result apply(std::string& tag_value) const override;
-
-private:
-  const std::string target_tag_name_;
 };
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {

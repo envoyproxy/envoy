@@ -47,11 +47,10 @@ TEST_F(TransformStatTest, DropStat) {
   EXPECT_EQ(TransformStatAction::Result::DropStat, stat_action->apply(tag_value));
 }
 
-TEST_F(TransformStatTest, UpsertTag) {
+TEST_F(TransformStatTest, UpdateTag) {
   TransformStat config;
-  auto* upsert_tag = config.mutable_upsert_tag();
-  upsert_tag->set_tag_name("foo");
-  upsert_tag->set_tag_value("bar");
+  auto* update_tag = config.mutable_update_tag();
+  update_tag->set_new_tag_value("bar");
   createAction(config);
 
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
@@ -64,8 +63,7 @@ TEST_F(TransformStatTest, UpsertTag) {
 
 TEST_F(TransformStatTest, DropTag) {
   TransformStat config;
-  auto* drop_tag = config.mutable_drop_tag();
-  drop_tag->set_target_tag_name("foo");
+  config.mutable_drop_tag();
   createAction(config);
 
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
