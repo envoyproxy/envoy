@@ -746,6 +746,7 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
     DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create plugin instance");
     return nullptr;
   }
+  // So the plugin_ field will never be null as long as the plugin handle is alive.
   plugin_handle->plugin_ = std::move(plugin);
 
   return wrapPointer(plugin_handle.release());
@@ -754,6 +755,10 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
   auto* plugin_handle = unwrapPointer<HttpFilterHandleImpl>(filter_module_ptr);
+  if (plugin_handle == nullptr) {
+    return;
+  }
+  plugin_handle->plugin_->onDestroy();
   delete plugin_handle;
 }
 

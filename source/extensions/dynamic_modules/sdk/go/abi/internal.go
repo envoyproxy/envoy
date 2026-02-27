@@ -1314,6 +1314,9 @@ func envoy_dynamic_module_on_http_filter_destroy(
 		return
 	}
 	pluginWrapper.streamDestoried = true
+	if pluginWrapper.plugin != nil {
+		pluginWrapper.plugin.OnDestroy()
+	}
 	pluginManager.remove(unsafe.Pointer(pluginPtr))
 }
 
