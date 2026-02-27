@@ -347,8 +347,7 @@ public:
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_protovalidate")) {
 #ifdef ENVOY_ENABLE_PROTOVALIDATE
       validateWithProtovalidate(message, recurse_into_any);
-      // TODO(phlax): return here once all protos are protovalidate annotated
-      // return;
+      return;
 #endif
     }
     // Throw an exception if the config has an invalid Duration field. This is needed
