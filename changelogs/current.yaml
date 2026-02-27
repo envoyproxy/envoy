@@ -197,6 +197,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: outlier_detection
+  change: |
+    Added :ref:`detect_degraded_hosts <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
+    to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
+    the ``x-envoy-degraded`` header. Degraded hosts are deprioritized in load balancing but remain in rotation (not
+    ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to false.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic

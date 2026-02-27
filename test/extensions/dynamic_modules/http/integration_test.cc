@@ -204,6 +204,41 @@ TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
       upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksOnCreation) {
+  initializeFilter("header_callbacks_on_creation", "dog:cat", "",
+                   "type.googleapis.com/google.protobuf.StringValue");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers are added as expected in the filter.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+}
+
 TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
   initializeFilter("per_route_config", "a", "b");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
