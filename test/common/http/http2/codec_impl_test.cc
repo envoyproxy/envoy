@@ -3147,8 +3147,8 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAcceptedWithIncreasedPerHeaderLimi
     return;
   }
 
-  // Use the same 80KB 'q' header that exceeds the default 64KB wire limit in
-  // LargeRequestHeadersExceedPerHeaderLimit, but configure max_header_field_size_kb to 128 KiB
+  // Use the same 80 KB 'q' header that exceeds the default 64 KB wire limit in
+  // LargeRequestHeadersExceedPerHeaderLimit, but configure max_header_field_size_kb to 128 KB
   // so that the inflater accepts it.
   max_request_headers_kb_ = 128;
   server_http2_options_.mutable_max_header_field_size_kb()->set_value(128);

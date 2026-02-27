@@ -2624,7 +2624,7 @@ uint32_t adjustMaxSingleHeaderSizeForCodecLimits(uint32_t size,
     return 100;
   } else if (params.downstream_protocol == Http::CodecType::HTTP3 ||
              params.upstream_protocol == Http::CodecType::HTTP3) {
-    // QUICHE has a hard-coded limit of 1024KiB in it's QPACK decoder.
+    // QUICHE has a hard-coded limit of 1024 KB in its QPACK decoder.
     // Reduce the size so that it can pass and receive some test coverage.
     return 1023;
   }
@@ -2650,9 +2650,9 @@ TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAcceptedWithIncreasedPerH
     return;
   }
 
-  // Use a 200 KiB header of 'a' characters. With Huffman encoding, 'a' is 5 bits, so the
-  // wire-encoded size is 200*1024*5/8 = 128000 bytes, which exceeds the default 64 KiB
-  // wire limit but fits within a max_header_field_size_kb of 128 KiB.
+  // Use a 200 KB header of 'a' characters. With Huffman encoding, 'a' is 5 bits, so the
+  // wire-encoded size is 200*1024*5/8 = 128000 bytes, which exceeds the default 64 KB
+  // wire limit but fits within a max_header_field_size_kb of 128 KB.
   const uint32_t header_size_kb = 200;
   const uint32_t max_header_field_size_kb = 128;
   const uint32_t max_headers_kb = header_size_kb + 1;
