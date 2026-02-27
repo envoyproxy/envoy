@@ -2,7 +2,6 @@
 
 #include "envoy/stats/primitive_stats.h"
 
-#include "source/common/stats/stat_matching_data_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
@@ -278,7 +277,6 @@ template <class StatType>
 OtlpMetricsFlusherImpl::MetricConfig
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   Stats::StatMatchingDataImpl<StatType> data(stat);
-
   const ::Envoy::Matcher::ActionMatchResult result =
       Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
   ASSERT(result.isComplete());

@@ -757,21 +757,20 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
 )EOF";
 
@@ -789,21 +788,20 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
           tags:
             - name: foo
               value_format: baz
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
 )EOF";
   initialize(yaml2);
@@ -823,21 +821,20 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
 )EOF";
@@ -856,21 +853,20 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
           tags:
             - name: foo
               value_format: baz
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
 )EOF";
@@ -893,21 +889,20 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "-"
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: error.type
-              exact_match_map:
-                map:
-                  "-":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "-":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
 )EOF";
 
@@ -925,21 +920,20 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "UH"
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: error.type
-              exact_match_map:
-                map:
-                  "-":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "-":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
 )EOF";
   initialize(yaml2);
@@ -959,23 +953,22 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTag) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        upsert_tag:
-                          tag_name: foo
-                          tag_value: baz
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            upsert_tag:
+                              tag_name: foo
+                              tag_value: baz
         value_fixed: 1
 )EOF";
 
@@ -1004,22 +997,21 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_tag:
-                          target_tag_name: foo
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_tag:
+                              target_tag_name: foo
         value_fixed: 1
 )EOF";
 
@@ -1032,7 +1024,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
                                  Stats::StatNameTagVectorOptConstRef tags) -> Stats::Counter& {
             EXPECT_EQ("counter", scope_->symbolTable().toString(name));
             EXPECT_EQ(0, tags->get().size());
-
             return scope_->counterFromStatNameWithTags_(name, tags);
           }));
   logger_->log(formatter_context_, stream_info_);
@@ -1047,21 +1038,20 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
         set:
           log_type: DownstreamEnd
@@ -1082,21 +1072,20 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
           tags:
             - name: foo
               value_format: baz
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        drop_stat: {}
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            drop_stat: {}
         value_fixed: 1
         set:
           log_type: DownstreamEnd
@@ -1119,23 +1108,22 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTagOnGauge) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        upsert_tag:
-                          tag_name: foo
-                          tag_value: baz
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            upsert_tag:
+                              tag_name: foo
+                              tag_value: baz
         value_fixed: 1
         set:
           log_type: DownstreamEnd
@@ -1169,23 +1157,22 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpsertTagOnHistogram) {
           tags:
             - name: foo
               value_format: bar
-          rules:
-            matcher_tree:
-              input:
-                name: stat_tag_value_input
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
-                  tag_name: foo
-              exact_match_map:
-                map:
-                  "bar":
-                    action:
-                      name: generic_stat_action
-                      typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
-                        upsert_tag:
-                          tag_name: foo
-                          tag_value: baz
+              rules:
+                matcher_tree:
+                  input:
+                    name: stat_tag_value_input
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  exact_match_map:
+                    map:
+                      "bar":
+                        action:
+                          name: generic_stat_action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.matching.actions.transform_stat.v3.TransformStat
+                            upsert_tag:
+                              tag_name: foo
+                              tag_value: baz
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
 )EOF";

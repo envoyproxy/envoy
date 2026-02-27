@@ -38,14 +38,13 @@ public:
 TEST_F(TransformStatTest, DropStat) {
   TransformStat config;
   config.mutable_drop_stat();
-
   createAction(config);
 
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
   ASSERT_NE(stat_action, nullptr);
 
-  Envoy::Stats::StatNameTagVector tags;
-  EXPECT_EQ(TransformStatAction::Result::Drop, stat_action->apply(tags));
+  std::string tag_value;
+  EXPECT_EQ(TransformStatAction::Result::DropStat, stat_action->apply(tag_value));
 }
 
 TEST_F(TransformStatTest, UpsertTag) {
@@ -53,67 +52,27 @@ TEST_F(TransformStatTest, UpsertTag) {
   auto* upsert_tag = config.mutable_upsert_tag();
   upsert_tag->set_tag_name("foo");
   upsert_tag->set_tag_value("bar");
-
   createAction(config);
 
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
   ASSERT_NE(stat_action, nullptr);
 
-  // Case 1: Tag does not exist
-  Envoy::Stats::StatNameTagVector tags;
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ("foo", symbol_table_.toString(tags[0].first));
-  EXPECT_EQ("bar", symbol_table_.toString(tags[0].second));
-
-  // Case 2: Tag exists and should be updated
-  tags.clear();
-  tags.emplace_back(pool_.add("foo"), pool_.add("baz"));
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ("foo", symbol_table_.toString(tags[0].first));
-  EXPECT_EQ("bar", symbol_table_.toString(tags[0].second));
-
-  // Case 3: Other tags exist
-  tags.clear();
-  tags.emplace_back(pool_.add("other"), pool_.add("value"));
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(2, tags.size());
-  EXPECT_EQ("other", symbol_table_.toString(tags[0].first));
-  EXPECT_EQ("foo", symbol_table_.toString(tags[1].first));
-  EXPECT_EQ("bar", symbol_table_.toString(tags[1].second));
+  std::string tag_value = "baz";
+  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tag_value));
+  EXPECT_EQ("bar", tag_value);
 }
 
 TEST_F(TransformStatTest, DropTag) {
   TransformStat config;
   auto* drop_tag = config.mutable_drop_tag();
   drop_tag->set_target_tag_name("foo");
-
   createAction(config);
 
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
   ASSERT_NE(stat_action, nullptr);
 
-  // Case 1: Tag exists and should be dropped
-  Envoy::Stats::StatNameTagVector tags;
-  tags.emplace_back(pool_.add("foo"), pool_.add("bar"));
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  EXPECT_TRUE(tags.empty());
-
-  // Case 2: Tag does not exist
-  tags.clear();
-  tags.emplace_back(pool_.add("other"), pool_.add("value"));
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ("other", symbol_table_.toString(tags[0].first));
-
-  // Case 3: Multiple tags
-  tags.clear();
-  tags.emplace_back(pool_.add("other"), pool_.add("value"));
-  tags.emplace_back(pool_.add("foo"), pool_.add("bar"));
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(1, tags.size());
-  EXPECT_EQ("other", symbol_table_.toString(tags[0].first));
+  std::string tag_value = "bar";
+  EXPECT_EQ(TransformStatAction::Result::DropTag, stat_action->apply(tag_value));
 }
 
 TEST_F(TransformStatTest, EmptyAction) {
@@ -123,52 +82,8 @@ TEST_F(TransformStatTest, EmptyAction) {
   const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
   ASSERT_NE(stat_action, nullptr);
 
-  Envoy::Stats::StatNameTagVector tags;
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-}
-
-TEST_F(TransformStatTest, CombinedAction) {
-  TransformStat config;
-  auto* drop_tag = config.mutable_drop_tag();
-  drop_tag->set_target_tag_name("foo");
-  auto* upsert_tag = config.mutable_upsert_tag();
-  upsert_tag->set_tag_name("bar");
-  upsert_tag->set_tag_value("baz");
-
-  createAction(config);
-
-  const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
-  ASSERT_NE(stat_action, nullptr);
-
-  // Input: [foo=1, other=2]
-  // Expected Output: [other=2] (upsert_tag is ignored due to precedence)
-  Envoy::Stats::StatNameTagVector tags;
-  tags.emplace_back(pool_.add("foo"), pool_.add("1"));
-  tags.emplace_back(pool_.add("other"), pool_.add("2"));
-
-  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(1, tags.size());
-  // drop_tag removed "foo".
-  // upsert_tag is skipped.
-  // "other" remains.
-
-  EXPECT_EQ("other", symbol_table_.toString(tags[0].first));
-  EXPECT_EQ("2", symbol_table_.toString(tags[0].second));
-}
-
-TEST_F(TransformStatTest, CombinedDropStat) {
-  TransformStat config;
-  config.mutable_drop_stat();
-  auto* upsert_tag = config.mutable_upsert_tag();
-  upsert_tag->set_tag_name("bar");
-  upsert_tag->set_tag_value("baz");
-
-  createAction(config);
-  const auto* stat_action = dynamic_cast<const TransformStatAction*>(action_.get());
-  ASSERT_NE(stat_action, nullptr);
-
-  Envoy::Stats::StatNameTagVector tags;
-  EXPECT_EQ(TransformStatAction::Result::Drop, stat_action->apply(tags));
+  std::string tag_value;
+  EXPECT_EQ(TransformStatAction::Result::Keep, stat_action->apply(tag_value));
 }
 
 } // namespace TransformStat

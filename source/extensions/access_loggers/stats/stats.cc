@@ -6,7 +6,6 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/common/stats/stat_matching_data_impl.h"
 #include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
@@ -149,11 +148,27 @@ struct StatsAccessLogMetric {
   std::vector<Stats::Tag> tags_for_metric_;
 };
 
+struct StatTagMetric : public Stats::StatTagMatchingData {
+  StatTagMetric(absl::string_view value) : value_(value) {}
+  absl::string_view value() const override { return value_; }
+  absl::string_view value_;
+};
+
 class ActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
 public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Stats::StatMatchingData>&,
                                           absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
+class TagActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Stats::StatTagMatchingData> {
+public:
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<Stats::StatTagMatchingData>&,
+                             absl::string_view) override {
     return absl::OkStatus();
   }
 };
@@ -267,24 +282,24 @@ StatsAccessLog::NameAndTags::NameAndTags(
   for (const auto& tag_cfg : cfg.tags()) {
     dynamic_tags_.emplace_back(tag_cfg, pool, commands, context);
   }
-
-  if (cfg.has_rules()) {
-    ActionValidationVisitor validation_visitor;
-    ActionContext action_context(pool);
-    Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory(
-        action_context, context.serverFactoryContext(), validation_visitor);
-    rules_ = factory.create(cfg.rules())();
-  }
 }
 
 StatsAccessLog::DynamicTag::DynamicTag(
     const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
     Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
-    Server::Configuration::GenericFactoryContext&)
+    Server::Configuration::GenericFactoryContext& context)
     : str_name_(tag_cfg.name()), name_(pool.add(str_name_)),
       value_formatter_(THROW_OR_RETURN_VALUE(
           Formatter::FormatterImpl::create(tag_cfg.value_format(), true, commands),
-          Formatter::FormatterPtr)) {}
+          Formatter::FormatterPtr)) {
+  if (tag_cfg.has_rules()) {
+    TagActionValidationVisitor validation_visitor;
+    ActionContext action_context(pool);
+    Matcher::MatchTreeFactory<Stats::StatTagMatchingData, ActionContext> factory(
+        action_context, context.serverFactoryContext(), validation_visitor);
+    rules_ = factory.create(tag_cfg.rules())();
+  }
+}
 
 StatsAccessLog::NameAndTags::TagsResult
 StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
@@ -294,35 +309,31 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
   std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
   dynamic_storage.reserve(dynamic_tags_.size());
 
-  std::vector<Stats::Tag> string_tags;
-  if (rules_) {
-    string_tags.reserve(dynamic_tags_.size());
-  }
-
   for (const auto& dynamic_tag : dynamic_tags_) {
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
-    if (rules_) {
-      string_tags.push_back({dynamic_tag.str_name_, tag_value});
-    }
-    auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
-    tags.emplace_back(dynamic_tag.name_, storage_value.statName());
-  }
 
-  if (rules_) {
-    StatsAccessLogMetric metric(tags, std::move(string_tags));
-    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
-    const auto result = rules_->match(data);
-    if (result.isMatch()) {
-      if (const auto* action = dynamic_cast<
-              const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
-              result.action().get())) {
-        const auto action_result = action->apply(tags);
-        if (action_result ==
-            Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
-          return {std::move(tags), {}, true};
+    if (dynamic_tag.rules_) {
+      StatTagMetric tag_metric(tag_value);
+      const auto result = dynamic_tag.rules_->match(tag_metric);
+      if (result.isMatch()) {
+        if (const auto* action = dynamic_cast<
+                const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
+                result.action().get())) {
+          const auto action_result = action->apply(tag_value);
+          if (action_result ==
+              Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropStat) {
+            return {std::move(tags), {}, true};
+          }
+          if (action_result ==
+              Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropTag) {
+            continue;
+          }
         }
       }
     }
+
+    auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
+    tags.emplace_back(dynamic_tag.name_, storage_value.statName());
   }
 
   return {std::move(tags), std::move(dynamic_storage), false};

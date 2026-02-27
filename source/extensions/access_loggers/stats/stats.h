@@ -45,6 +45,7 @@ private:
     std::string str_name_;
     const Envoy::Stats::StatName name_;
     Formatter::FormatterPtr value_formatter_;
+    Matcher::MatchTreeSharedPtr<Envoy::Stats::StatTagMatchingData> rules_;
   };
 
   // The construction of NameAndTags can only be made at initialization time because it needs to
@@ -67,7 +68,6 @@ private:
     std::string str_name_;
     Envoy::Stats::StatName name_;
     std::vector<DynamicTag> dynamic_tags_;
-    Matcher::MatchTreeSharedPtr<Envoy::Stats::StatMatchingData> rules_;
   };
 
   struct Histogram {

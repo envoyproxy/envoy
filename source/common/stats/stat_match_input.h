@@ -34,30 +34,28 @@ public:
   }
 };
 
-class StatTagValueInput : public Matcher::DataInput<Envoy::Stats::StatMatchingData> {
+class StatTagValueInput : public Matcher::DataInput<Envoy::Stats::StatTagMatchingData> {
 public:
-  StatTagValueInput(const std::string& tag_name) : tag_name_(tag_name) {}
+  StatTagValueInput() = default;
 
-  Matcher::DataInputGetResult get(const Envoy::Stats::StatMatchingData& data) const override {
+  Matcher::DataInputGetResult get(const Envoy::Stats::StatTagMatchingData& data) const override {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            data.tagValue(tag_name_)};
+            std::string(data.value())};
   }
-
-private:
-  const std::string tag_name_;
 };
 
-class StatTagValueInputFactory : public Matcher::DataInputFactory<Envoy::Stats::StatMatchingData> {
+class StatTagValueInputFactory
+    : public Matcher::DataInputFactory<Envoy::Stats::StatTagMatchingData> {
 public:
   std::string name() const override { return "stat_tag_value_input"; }
 
-  Envoy::Matcher::DataInputFactoryCb<Envoy::Stats::StatMatchingData>
+  Envoy::Matcher::DataInputFactoryCb<Envoy::Stats::StatTagMatchingData>
   createDataInputFactoryCb(const Envoy::Protobuf::Message& config,
                            Envoy::ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& input_config = MessageUtil::downcastAndValidate<
+    MessageUtil::downcastAndValidate<
         const envoy::extensions::matching::common_inputs::stats::v3::StatTagValueInput&>(
         config, validation_visitor);
-    return [name = input_config.tag_name()] { return std::make_unique<StatTagValueInput>(name); };
+    return [] { return std::make_unique<StatTagValueInput>(); };
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {

@@ -29,51 +29,53 @@ public:
     // The stat should be kept (emitted).
     Keep,
     // The stat should be dropped (not emitted).
-    Drop,
+    DropStat,
+    // The tag should be dropped.
+    DropTag,
   };
 
   virtual ~TransformStatAction() = default;
 
   /**
-   * Applies the action to the given tags.
+   * Apply the action to the supplied tags.
    * @param tags supplied the tags to be applied.
    * @return Result result of the action.
    */
-  virtual Result apply(Envoy::Stats::StatNameTagVector& tags) const PURE;
+  virtual Result apply(std::string& tag_value) const PURE;
 };
 
 class DropStat : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
   explicit DropStat(const ProtoTransformStat::DropStat&) {}
 
-  Result apply(Envoy::Stats::StatNameTagVector&) const override;
+  Result apply(std::string&) const override;
 };
 
 class UpsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  UpsertTag(Envoy::Stats::StatName tag_name, Envoy::Stats::StatName tag_value);
+  UpsertTag(std::string tag_name, std::string tag_value);
 
-  Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
+  Result apply(std::string& tag_value) const override;
 
 private:
-  const Envoy::Stats::StatName tag_name_;
-  const Envoy::Stats::StatName tag_value_;
+  const std::string tag_name_;
+  const std::string tag_value_;
 };
 
 class DropTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropTag(Envoy::Stats::StatName target_tag_name);
+  explicit DropTag(std::string target_tag_name);
 
-  Result apply(Envoy::Stats::StatNameTagVector& tags) const override;
+  Result apply(std::string& tag_value) const override;
 
 private:
-  const Envoy::Stats::StatName target_tag_name_;
+  const std::string target_tag_name_;
 };
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
   explicit NoOpAction() {}
-  Result apply(Envoy::Stats::StatNameTagVector&) const override;
+  Result apply(std::string&) const override;
 };
 
 } // namespace TransformStat
