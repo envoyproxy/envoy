@@ -84,7 +84,7 @@ class TestFetchRequest(unittest.TestCase):
         engine_running = threading.Event()
         engine = (
             EngineBuilder()
-            .set_log_level(LogLevel.info)
+            .set_log_level(LogLevel.trace)
             .add_runtime_guard("dns_cache_set_ip_version_to_remove", True)
             .set_on_engine_running(lambda: engine_running.set())
             .build()
@@ -185,7 +185,7 @@ class TestFetchRequest(unittest.TestCase):
         self.assertIsNotNone(final_stream)
         # Some timing fields should be > 0 when a request completes
         self.assertGreater(final_stream.stream_start_ms, 0)
-        self.assertGreaterEqual(final_stream.response_start_ms, 0)
+        self.assertGreaterEqual(final_stream.response_start_ms, 0, final_stream.ssl_end_ms)
         self.assertGreater(final_stream.stream_end_ms, 0)
         # Byte counts should be >= 0, and at least one should be > 0 for successful responses
         self.assertGreaterEqual(final_stream.sent_byte_count, 0)
