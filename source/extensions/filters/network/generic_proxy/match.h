@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/matcher/v3/matcher.pb.validate.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/network/generic_proxy/interface/stream.h"

@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/resource_detectors/static/config.h"
 
 #include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/static_config_resource_detector.pb.h"
-#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/static_config_resource_detector.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/static/static_config_resource_detector.h"

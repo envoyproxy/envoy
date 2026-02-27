@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/input_matchers/metadata/v3/metadata.pb.h"
-#include "envoy/extensions/matching/input_matchers/metadata/v3/metadata.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 

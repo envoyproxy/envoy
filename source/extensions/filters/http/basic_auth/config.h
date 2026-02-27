@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
-#include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

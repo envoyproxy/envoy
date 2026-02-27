@@ -6,7 +6,6 @@
 #include <unordered_set>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
@@ -36,6 +35,7 @@
 #include "source/server/listener_hooks.h"
 
 #include "absl/types/optional.h"
+#include "envoy/config/bootstrap/v2//bootstrap.pb.h"
 
 namespace Envoy {
 

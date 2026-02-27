@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/cors/config.h"
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 

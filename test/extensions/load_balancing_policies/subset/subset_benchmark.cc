@@ -5,7 +5,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
 #include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
-#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 
 #include "source/common/common/random_generator.h"
 #include "source/common/memory/stats.h"

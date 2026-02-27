@@ -3,9 +3,7 @@
 #include <string>
 
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
-#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.validate.h"
 #include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.h"
-#include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.validate.h"
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
 

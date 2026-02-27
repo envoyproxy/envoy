@@ -13,7 +13,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/kae/v3alpha/kae.pb.validate.h"
 #include "contrib/kae/private_key_providers/source/kae_private_key_provider.h"
 #include "openssl/rsa.h"
 #include "openssl/ssl.h"

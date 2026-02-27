@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
-#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.validate.h"
 
 #include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 

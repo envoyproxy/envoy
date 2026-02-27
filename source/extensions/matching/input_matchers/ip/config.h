@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/input_matchers/ip/v3/ip.pb.h"
-#include "envoy/extensions/matching/input_matchers/ip/v3/ip.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 

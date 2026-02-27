@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
-#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 

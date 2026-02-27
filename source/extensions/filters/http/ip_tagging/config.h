@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

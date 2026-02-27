@@ -19,7 +19,6 @@
 
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
-#include "xds/type/matcher/v3/matcher.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

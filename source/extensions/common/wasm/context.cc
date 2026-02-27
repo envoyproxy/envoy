@@ -9,7 +9,6 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
@@ -52,6 +51,8 @@
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
+
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 
 #include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"

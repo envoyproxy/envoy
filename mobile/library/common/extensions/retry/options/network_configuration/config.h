@@ -8,7 +8,6 @@
 
 #include "library/common/extensions/retry/options/network_configuration/predicate.h"
 #include "library/common/extensions/retry/options/network_configuration/predicate.pb.h"
-#include "library/common/extensions/retry/options/network_configuration/predicate.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

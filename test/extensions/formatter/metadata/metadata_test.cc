@@ -1,4 +1,5 @@
-#include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
+
+#include "envoy/config/core/v3/substitution_format_string.pb.h"
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"

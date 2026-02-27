@@ -6,7 +6,6 @@
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 

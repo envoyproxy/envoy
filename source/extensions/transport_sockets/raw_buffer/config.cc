@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 
 #include "source/common/network/raw_buffer_socket.h"
 

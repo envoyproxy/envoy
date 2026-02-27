@@ -1,5 +1,4 @@
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
-#include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.validate.h"
 
 #include "source/extensions/geoip_providers/maxmind/config.h"
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"

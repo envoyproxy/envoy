@@ -1,7 +1,6 @@
 #include "source/common/filter/config_discovery_impl.h"
 
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"

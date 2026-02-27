@@ -1,6 +1,5 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/singleton/manager_impl.h"

@@ -3,7 +3,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/http/peak_ewma/v3alpha/peak_ewma.pb.h"
-#include "contrib/envoy/extensions/filters/http/peak_ewma/v3alpha/peak_ewma.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

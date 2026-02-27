@@ -3,7 +3,6 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/status_code_input.pb.h"
-#include "envoy/type/matcher/v3/status_code_input.pb.validate.h"
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"

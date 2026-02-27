@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filters/test_network_filter.pb.h"
-#include "test/integration/filters/test_network_filter.pb.validate.h"
 
 namespace Envoy {
 namespace {

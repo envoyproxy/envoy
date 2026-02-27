@@ -6,7 +6,6 @@
 
 #include "test/common/http/filters/test_kv_store/filter.h"
 #include "test/common/http/filters/test_kv_store/filter.pb.h"
-#include "test/common/http/filters/test_kv_store/filter.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

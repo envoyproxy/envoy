@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.h"
-#include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/network/resolver_impl.h"

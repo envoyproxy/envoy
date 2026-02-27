@@ -1,7 +1,6 @@
 #include <chrono>
 
 #include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 #include "envoy/grpc/status.h"
 
 #include "source/common/common/enum_to_int.h"

@@ -1,6 +1,5 @@
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/trace/v3/skywalking.pb.h"
-#include "envoy/config/trace/v3/skywalking.pb.validate.h"
 
 #include "source/extensions/tracers/skywalking/config.h"
 

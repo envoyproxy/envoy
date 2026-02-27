@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
-#include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

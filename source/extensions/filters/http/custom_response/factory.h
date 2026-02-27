@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"

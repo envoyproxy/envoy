@@ -13,7 +13,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
-#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.validate.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"

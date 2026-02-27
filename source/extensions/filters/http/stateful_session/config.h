@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/stateful_session/v3/stateful_session.pb.h"
-#include "envoy/extensions/filters/http/stateful_session/v3/stateful_session.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"

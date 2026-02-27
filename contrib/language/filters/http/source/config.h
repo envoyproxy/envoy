@@ -3,7 +3,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/http/language/v3alpha/language.pb.h"
-#include "contrib/envoy/extensions/filters/http/language/v3alpha/language.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

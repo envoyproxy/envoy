@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
-#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

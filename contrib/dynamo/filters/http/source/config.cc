@@ -6,7 +6,7 @@
 
 #include "contrib/dynamo/filters/http/source/dynamo_filter.h"
 #include "contrib/dynamo/filters/http/source/dynamo_stats.h"
-#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
+#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
 
 namespace Envoy {
 namespace Extensions {

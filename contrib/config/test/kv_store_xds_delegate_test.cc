@@ -1,10 +1,7 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/service/discovery/v3/discovery.pb.validate.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 
 #include "source/extensions/config_subscription/grpc/xds_source_id.h"
 

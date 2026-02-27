@@ -12,7 +12,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
-#include "test/integration/filters/stop_and_continue_filter_config.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

@@ -1,6 +1,5 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
-#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "source/extensions/filters/network/ratelimit/config.h"
 

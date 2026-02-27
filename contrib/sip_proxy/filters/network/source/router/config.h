@@ -1,7 +1,6 @@
 #pragma once
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
-#include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/filters/factory_base.h"
 #include "contrib/sip_proxy/filters/network/source/filters/well_known_names.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"

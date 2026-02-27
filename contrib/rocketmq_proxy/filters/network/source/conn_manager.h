@@ -17,7 +17,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 #include "contrib/rocketmq_proxy/filters/network/source/active_message.h"
 #include "contrib/rocketmq_proxy/filters/network/source/codec.h"
 #include "contrib/rocketmq_proxy/filters/network/source/stats.h"

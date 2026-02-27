@@ -2,7 +2,6 @@
 
 #include "envoy/compression/decompressor/config.h"
 #include "envoy/extensions/compression/zstd/decompressor/v3/zstd.pb.h"
-#include "envoy/extensions/compression/zstd/decompressor/v3/zstd.pb.validate.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/common/decompressor/factory_base.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
-#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.validate.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/filters/common/expr/evaluator.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
-#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"

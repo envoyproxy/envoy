@@ -1,6 +1,6 @@
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 
-#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"
+#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"

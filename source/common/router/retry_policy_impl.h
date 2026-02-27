@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
 

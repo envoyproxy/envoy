@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "test/common/upstream/health_check_fuzz.pb.validate.h"
+#include "test/common/upstream/health_check_fuzz.pb.h"
 #include "test/common/upstream/health_check_fuzz_test_utils.h"
 #include "test/fuzz/common.pb.h"
 

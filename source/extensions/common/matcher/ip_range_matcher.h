@@ -9,7 +9,6 @@
 #include "source/common/network/utility.h"
 
 #include "xds/type/matcher/v3/ip.pb.h"
-#include "xds/type/matcher/v3/ip.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

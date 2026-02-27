@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
-#include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"

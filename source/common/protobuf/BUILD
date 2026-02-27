@@ -228,6 +228,7 @@ envoy_cc_library(
         "@com_google_protobuf//:protobuf",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@protovalidate-cc//buf/validate:validator",
         "@xds//udpa/annotations:pkg_cc_proto",
     ] + envoy_select_enable_yaml(["yaml_utility_lib"]),
 )

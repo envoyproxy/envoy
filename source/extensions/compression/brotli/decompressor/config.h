@@ -2,7 +2,6 @@
 
 #include "envoy/compression/decompressor/config.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
-#include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.validate.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"

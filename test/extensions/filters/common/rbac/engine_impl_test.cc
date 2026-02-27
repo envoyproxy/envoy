@@ -1,6 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/config/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 
 #include "source/common/network/address_impl.h"

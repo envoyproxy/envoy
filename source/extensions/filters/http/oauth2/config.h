@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

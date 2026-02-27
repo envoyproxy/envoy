@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "test/common/http/filters/assertion/filter.pb.h"
-#include "test/common/http/filters/assertion/filter.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

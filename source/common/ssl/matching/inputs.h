@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.pb.h"
-#include "envoy/extensions/matching/common_inputs/ssl/v3/ssl_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 
 #include "absl/strings/str_join.h"

@@ -2,7 +2,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/router/string_accessor.h"
 
 #include "source/common/config/utility.h"

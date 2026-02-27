@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

@@ -1,13 +1,12 @@
 #include <optional>
 #include <string>
 
-#include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
+#include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/address.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/http/matching/inputs.h"
 #include "source/common/protobuf/protobuf.h"

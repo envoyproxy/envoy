@@ -1,7 +1,6 @@
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.validate.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/network/matching/data_impl.h"

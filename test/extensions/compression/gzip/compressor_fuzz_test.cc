@@ -5,7 +5,6 @@
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/extensions/compression/gzip/compressor_fuzz_input.pb.h"
-#include "test/extensions/compression/gzip/compressor_fuzz_input.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 

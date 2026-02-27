@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package utility_test.protovalidate;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/any.proto";
+
+// Message with a simple string constraint for testing protovalidate validation.
+message MessageWithStringConstraint {
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
+}
+
+// Outer message wrapping a nested MessageWithStringConstraint to test that
+// protovalidate only validates at the top-level/any boundary.
+message OuterMessage {
+  MessageWithStringConstraint inner = 1;
+}
+
+// Message with a required Any field in a oneof that also has a bool field.
+// Used to test the shouldSuppressViolation path (suppresses "value is required"
+// violations for fields in a oneof that contains a bool field).
+message MessageWithRequiredAnyInOneofWithBool {
+  oneof type {
+    bool enabled = 1;
+    google.protobuf.Any config = 2 [(buf.validate.field).required = true];
+  }
+}
+
+// Message with a required Any field NOT in a oneof.
+// Used to test shouldSuppressViolation returning false because oneof == nullptr.
+message MessageWithRequiredAnyField {
+  google.protobuf.Any value = 1 [(buf.validate.field).required = true];
+}
+
+// Message with a required Any field in a oneof that has NO bool field.
+// Used to test shouldSuppressViolation returning false because no bool in oneof.
+message MessageWithRequiredAnyInOneofNoBool {
+  oneof type {
+    string name = 1;
+    google.protobuf.Any config = 2 [(buf.validate.field).required = true];
+  }
+}
+
+// Message with a message-level CEL constraint that always fails.
+// Used to test the violation.has_field() == false path in onMessage, and
+// the !violation.has_field() early return in shouldSuppressViolation.
+message MessageWithCelMessageConstraint {
+  option (buf.validate.message) = {
+    cel: {
+      id: "test.always.fail",
+      message: "message-level constraint always fails",
+      expression: "false"
+    }
+  };
+  string name = 1;
+}

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.h"
-#include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
