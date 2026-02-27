@@ -134,11 +134,11 @@ def boringssl_fips_build_command(arches, libs):
             lib,
             arch,
             arch_alias,
-	    hermetic,
+            hermetic,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
-	for hermetic in [False, True]
+        for hermetic in [False, True]
     }
 
 def _create_ninja_build_command(lib, arch, arch_alias, hermetic):
@@ -156,9 +156,9 @@ def ninja_build_command(arches, libs):
             lib,
             arch,
             arch_alias,
-	    hermetic,
+            hermetic,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
-	for hermetic in [False, True]
+        for hermetic in [False, True]
     }
