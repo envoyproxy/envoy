@@ -482,6 +482,13 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.file_server:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.file_server.v3.FileServerConfig
 envoy.filters.http.file_system_buffer:
   categories:
   - envoy.filters.http
