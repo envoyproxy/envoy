@@ -648,6 +648,17 @@ public:
   virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
 
   /**
+   * @param reason the upstream local close reason.
+   */
+  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the upstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view upstreamLocalCloseReason() const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -1037,9 +1048,9 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
-   * @param failure_reason the downstream local close reason.
+   * @param reason the downstream local close reason.
    */
-  virtual void setDownstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
 
   /**
    * @return absl::string_view the downstream local close reason, if local close did not occur an

@@ -77,6 +77,12 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   DetectedCloseType upstreamDetectedCloseType() const override {
     return upstream_detected_close_type_;
   }
+  void setUpstreamLocalCloseReason(absl::string_view reason) override {
+    upstream_local_close_reason_ = std::string(reason);
+  }
+  absl::string_view upstreamLocalCloseReason() const override {
+    return upstream_local_close_reason_;
+  }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -109,6 +115,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   absl::optional<std::string> upstream_connection_interface_name_;
   std::string upstream_transport_failure_reason_;
   DetectedCloseType upstream_detected_close_type_{DetectedCloseType::Normal};
+  std::string upstream_local_close_reason_;
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};
   absl::optional<Http::Protocol> upstream_protocol_;
