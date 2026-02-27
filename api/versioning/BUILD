@@ -2,7 +2,7 @@
 
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 
-licenses(["notice"])  # Apache 2
+licenses(["notice"])  # Apache 2 
 
 # This tracks active development versions of protos.
 proto_library(
