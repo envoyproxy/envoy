@@ -158,7 +158,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 }
 
 TEST(StaticModule, LoadSuccess) {
-  absl::StatusOr<DynamicModulePtr> result = newStaticModule("no_op_for_static");
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("no_op_static");
   EXPECT_TRUE(result.ok()) << result.status().message();
 }
 
@@ -175,7 +175,7 @@ TEST(StaticModule, SymbolNotFound) {
 TEST(StaticModule, LoadViaNewDynamicModuleByName) {
   // newDynamicModuleByName with "static://" prefix should delegate to newStaticModule.
   absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModuleByName("static://no_op_for_static", /*do_not_close=*/false);
+      newDynamicModuleByName("static://no_op_static", /*do_not_close=*/false);
   EXPECT_TRUE(result.ok()) << result.status().message();
 }
 
@@ -183,11 +183,11 @@ TEST(StaticModule, MultiModuleNoCollision) {
   // Verify that a C static module and a Rust static module can both be loaded without symbol
   // collision, since each uses a distinct name prefix.
   absl::StatusOr<DynamicModulePtr> c_module =
-      newDynamicModuleByName("static://no_op_for_static", /*do_not_close=*/false);
+      newDynamicModuleByName("static://no_op_static", /*do_not_close=*/false);
   EXPECT_TRUE(c_module.ok()) << c_module.status().message();
 
   absl::StatusOr<DynamicModulePtr> rust_module =
-      newDynamicModuleByName("static://no_op_for_static", /*do_not_close=*/false);
+      newDynamicModuleByName("static://no_op_static", /*do_not_close=*/false);
   EXPECT_TRUE(rust_module.ok()) << rust_module.status().message();
 }
 

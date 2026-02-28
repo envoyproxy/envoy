@@ -20,9 +20,10 @@ def test_program(name):
     )
 
     _static_name = name + "_static"
+    _static_lib_name = name + "_static_lib"
 
     rust_static_library(
-        name = _static_name,
+        name = _static_lib_name,
         srcs = srcs,
         edition = "2021",
         crate_root = name + ".rs",
@@ -35,7 +36,7 @@ def test_program(name):
     envoy_dynamic_module_prefix_symbols(
         name = _static_name,
         module_name = name,
-        archive = ":" + _static_name,
+        archive = ":" + _static_lib_name,
     )
 
     # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
