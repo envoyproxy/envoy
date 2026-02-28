@@ -1,4 +1,3 @@
-load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_cc_static")
 load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_program")
 
 licenses(["notice"])  # Apache 2
@@ -176,10 +175,3 @@ test_program(name = "cert_validator_not_validated")
 test_program(name = "cert_validator_empty_digest")
 
 test_program(name = "cert_validator_filter_state")
-
-envoy_dynamic_module_cc_static(
-    name = "no_op_for_static",
-    srcs = ["no_op_for_static.c"],
-    module_name = "no_op_for_static",
-    tags = ["notidy"],
-)

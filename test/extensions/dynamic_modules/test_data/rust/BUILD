@@ -1,4 +1,3 @@
-load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_rust_static")
 load("//test/extensions/dynamic_modules/test_data/rust:test_data.bzl", "test_program")
 
 licenses(["notice"])  # Apache 2
@@ -46,18 +45,3 @@ test_program(name = "network_integration_test")
 test_program(name = "bootstrap_http_combined_test")
 
 test_program(name = "access_log_integration_test")
-
-# Static module for testing "static://" linking. Uses envoy_dynamic_module_rust_static to
-# rename envoy_dynamic_module_on_* symbols with the "static_no_op_rust_" prefix via llvm-objcopy,
-# so the prefixed symbols are available via dlsym(RTLD_DEFAULT, ...) in tests.
-envoy_dynamic_module_rust_static(
-    name = "static_no_op_rust",
-    srcs = ["no_op.rs"],
-    module_name = "static_no_op_rust",
-    tags = [
-        "no_tsan",
-        "nocoverage",
-    ],
-    visibility = ["//test/extensions/dynamic_modules:__pkg__"],
-    deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
-)

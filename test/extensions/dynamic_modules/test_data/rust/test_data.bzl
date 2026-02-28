@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_test", "rustfmt_test")
+load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_static_library", "rust_test", "rustfmt_test")
+load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_prefix_symbols")
 
 def test_program(name):
     srcs = [name + ".rs"]
@@ -16,6 +17,25 @@ def test_program(name):
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
         ],
         rustc_flags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
+    )
+
+    _static_name = name + "_static"
+
+    rust_static_library(
+        name = _static_name,
+        srcs = srcs,
+        edition = "2021",
+        crate_root = name + ".rs",
+        deps = [
+            "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+        ],
+        rustc_flags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
+    )
+
+    envoy_dynamic_module_prefix_symbols(
+        name = _static_name,
+        module_name = name,
+        archive = ":" + _static_name,
     )
 
     # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
