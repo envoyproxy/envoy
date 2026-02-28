@@ -370,9 +370,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (bind_type != BindType::NoBind) {
-    const std::string network_namespace = address->networkNamespace().value_or("");
-    const int fd =
-        server_.hotRestart().duplicateParentListenSocket(addr, worker_index, network_namespace);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(
+        addr, worker_index, address->networkNamespace().value_or(""));
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
