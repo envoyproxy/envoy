@@ -292,9 +292,8 @@ StatsAccessLog::NameAndTags::TagsResult
 StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   Stats::Scope& scope) const {
-  Stats::StatNameTagVector tags;
-  std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
-  dynamic_storage.reserve(dynamic_tags_.size());
+  std::vector<std::pair<Stats::StatName, std::string>> collected_tags;
+  collected_tags.reserve(dynamic_tags_.size());
 
   for (const auto& dynamic_tag : dynamic_tags_) {
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
@@ -318,8 +317,17 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
       }
     }
 
-    auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
-    tags.emplace_back(dynamic_tag.name_, storage_value.statName());
+    collected_tags.emplace_back(dynamic_tag.name_, std::move(tag_value));
+  }
+
+  Stats::StatNameTagVector tags;
+  tags.reserve(collected_tags.size());
+  std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
+  dynamic_storage.reserve(collected_tags.size());
+
+  for (const auto& [name, value] : collected_tags) {
+    auto& storage_value = dynamic_storage.emplace_back(value, scope.symbolTable());
+    tags.emplace_back(name, storage_value.statName());
   }
 
   return {std::move(tags), std::move(dynamic_storage), false};
