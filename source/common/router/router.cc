@@ -509,6 +509,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      {}, &callbacks_->activeSpan());
           direct_response->finalizeResponseHeaders(response_headers, formatter_context,
                                                    callbacks_->streamInfo());
+          // Apply content_type from body_format if configured.
+          const absl::string_view content_type = direct_response->responseContentType();
+          if (!content_type.empty()) {
+            response_headers.setReferenceKey(Http::Headers::get().ContentType, content_type);
+          }
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
