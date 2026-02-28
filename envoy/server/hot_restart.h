@@ -49,7 +49,7 @@ public:
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
   virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
-                                          const std::string& network_namespace) PURE;
+                                          absl::string_view network_namespace) PURE;
 
   /**
    * Registers a UdpListenerConfig as a possible receiver of udp packets forwarded from the

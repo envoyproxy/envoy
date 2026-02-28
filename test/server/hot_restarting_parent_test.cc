@@ -67,8 +67,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactories());
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80);
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())
@@ -95,9 +95,9 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMatch) {
       .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactories());
   // Create an address with a network namespace set.
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance(Network::Address::Ipv4Instance("0.0.0.0", 80),
-                                         absl::optional<std::string>("/var/run/netns/ns1")));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>(
+          "0.0.0.0", 80, nullptr, absl::optional<std::string>("/var/run/netns/ns1"));
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())
@@ -134,9 +134,9 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNetworkNamespaceMismatch
       .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactories());
   // Create an address with a network namespace set.
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance(Network::Address::Ipv4Instance("0.0.0.0", 80),
-                                         absl::optional<std::string>("/var/run/netns/ns1")));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>(
+          "0.0.0.0", 80, nullptr, absl::optional<std::string>("/var/run/netns/ns1"));
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())
@@ -163,8 +163,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNamespaceRequestNoNamesp
       .WillOnce(Return(listeners));
   EXPECT_CALL(listener_config, listenSocketFactories());
   // Create an address without a network namespace.
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80);
   EXPECT_CALL(
       *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
       localAddress())
@@ -192,8 +192,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildSocketType) {
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80);
   EXPECT_CALL(tcp_listener_config, listenSocketFactories());
   EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
                   tcp_listener_config.socket_factories_[0].get()),
@@ -244,8 +244,8 @@ TEST_F(HotRestartingParentTest, GetListenSocketsWithMultipleAddresses) {
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
-  Network::Address::InstanceConstSharedPtr address(
-      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 80);
   Network::Address::InstanceConstSharedPtr alt_address(
       new Network::Address::Ipv4Instance("0.0.0.0", 8080));
 

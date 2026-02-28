@@ -126,7 +126,7 @@ void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::Ud
 
 int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
                                                     uint32_t worker_index,
-                                                    const std::string& network_namespace) {
+                                                    absl::string_view network_namespace) {
   if (parent_terminated_) {
     return -1;
   }
