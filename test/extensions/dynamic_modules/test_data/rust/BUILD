@@ -10,8 +10,6 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/network:__pkg__",
 ])
 
-licenses(["notice"])  # Apache 2
-
 test_program(name = "no_op")
 
 test_program(name = "network_no_op")
