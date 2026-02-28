@@ -126,6 +126,12 @@ bug_fixes:
 - area: drop_overload
   change: |
     Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
+- area: scoped_rds
+  change: |
+    Fixed a bug where SRDS subscriptions would never start when a listener with scoped routes was
+    added after server initialization completed. The ``SrdsFactory`` interface
+    was incorrectly using the server-level init manager instead of the listener-level init manager,
+    causing the SRDS init target to be silently discarded.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -139,6 +145,11 @@ bug_fixes:
 - area: oauth2
   change: |
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: watch-dog
+  change: |
+    Fixed a bug where the worker-threads' watch-dogs were configured using the main-thread's configuration.
+    This change can be reverted by setting the runtime guard ``envoy.restart_features.worker_threads_watchdog_fix``
+    to ``false``.
 - area: ext_proc
   change: |
     Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
@@ -189,6 +200,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: golang
+  change: |
+    Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
+    providing access to SSL/TLS connection information for the downstream connection. This includes
+    peer certificate details (subject, issuer, serial number, SANs, validity), TLS version, cipher
+    suite, and PEM-encoded certificates. This achieves feature parity with the Lua filter's
+    ``downstreamSslConnection()`` functionality.
 - area: outlier_detection
   change: |
     Added :ref:`detect_degraded_hosts <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
@@ -493,6 +511,16 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP session negotiation, including ``initialize`` and
+    ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
+    recommended for production use.
+- area: ext_proc
+  change: |
+    Added :ref:`allow_content_length_header
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
+    the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
 - area: tls
   change: |
     Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
@@ -503,12 +531,6 @@ new_features:
     CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: unable
     to get certificate CRL, certificate CRL distribution points: [http://crl.example.com/ca.crl,
     http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL validation failures and helps
-    operators identify connectivity or CRL server issues without requiring debug-level logging.
-
-- area: ext_proc
-  change: |
-    Added :ref:`allow_content_length_header
-    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
-    the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+    operators identify connectivity or CRL server issues without requiring debug-level logging.    
 
 deprecated:

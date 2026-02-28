@@ -832,9 +832,18 @@ public:
   virtual TrailersStatus onResponseTrailers(HeaderMap& trailers) = 0;
 
   /**
-   * Called when the stream processing is complete.
+   * Called when the stream processing is complete and before access logs are flushed.
+   * This is a good place to do any final processing or cleanup before the request is fully
+   * completed.
    */
   virtual void onStreamComplete() = 0;
+
+  /**
+   * Called when the HTTP filter instance is being destroyed. This is called
+   * after onStreamComplete and access logs are flushed. This is a good place to release
+   * any per-stream resources.
+   */
+  virtual void onDestroy() = 0;
 };
 
 class HttpFilterFactory {
