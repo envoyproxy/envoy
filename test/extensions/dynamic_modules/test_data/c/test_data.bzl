@@ -37,6 +37,8 @@ def test_program(name):
     )
 
     # Build static library with symbol prefixing for static linking into Envoy binary.
+    # We compile the source once and create one renamed archive:
+    #   - module_name=name        → <name>_envoy_dynamic_module_on_* (for "static://<name>")
     _static_lib_name = "_" + name + "_static_lib"
     cc_library(
         name = _static_lib_name,

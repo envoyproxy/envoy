@@ -158,7 +158,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 }
 
 TEST(StaticModule, LoadSuccess) {
-  absl::StatusOr<DynamicModulePtr> result = newStaticModule("no_op_static");
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("matcher_no_op");
   EXPECT_TRUE(result.ok()) << result.status().message();
 }
 
@@ -172,13 +172,13 @@ TEST(StaticModule, SymbolNotFound) {
                                  "envoy_dynamic_module_on_program_init"));
 }
 
-TEST(StaticModule, MultiModuleNoCollision) {
+TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module =
-      newDynamicModuleByName("static://no_op", /*do_not_close=*/false);
+      newDynamicModuleByName("static://matcher_no_op", /*do_not_close=*/false);
   EXPECT_TRUE(c_module.ok()) << c_module.status().message();
 
   absl::StatusOr<DynamicModulePtr> c_module_2 =
-      newDynamicModuleByName("static://no_op", /*do_not_close=*/false);
+      newDynamicModuleByName("static://matcher_no_op", /*do_not_close=*/false);
   EXPECT_TRUE(c_module_2.ok()) << c_module_2.status().message();
 }
 
