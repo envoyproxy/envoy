@@ -127,6 +127,7 @@ build:mobile-rbe --jobs=40
 build:mobile-rbe --verbose_failures
 build:mobile-rbe --spawn_strategy=remote,sandboxed,local
 build:mobile-rbe --experimental_ui_max_stdouterr_bytes=10485760
+build:mobile-rbe --extra_execution_platforms=//bazel/platforms/rbe:linux_x64
 
 
 #############################################################################

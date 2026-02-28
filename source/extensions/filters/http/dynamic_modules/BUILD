@@ -56,6 +56,7 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":filter_lib",
+        "//envoy/registry",
         "//source/common/http:utility_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/router:string_accessor_lib",
@@ -66,4 +67,5 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = True,
 )

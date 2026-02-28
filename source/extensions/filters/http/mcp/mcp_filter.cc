@@ -1,12 +1,33 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/protobuf/utility.h"
+#include "source/common/tracing/tracing_validation.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
+#include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,9 +37,64 @@ namespace Mcp {
 using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
+
+const Http::LowerCaseString kMcpSessionId{
+    std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
+
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "mcp.");
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+
+const Http::LowerCaseString& traceparentHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "traceparent");
+}
+
+const Http::LowerCaseString& tracestateHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "tracestate");
+}
+
+const Http::LowerCaseString& baggageHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
+}
+
+void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                        Http::RequestHeaderMap& headers) {
+  const auto& tp_it = meta_fields.find("traceparent");
+  if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return;
+  }
+
+  const std::string& tp = tp_it->second.string_value();
+  if (!Envoy::Tracing::isValidTraceParent(tp)) {
+    return;
+  }
+
+  headers.remove(traceparentHeader());
+  headers.remove(tracestateHeader());
+
+  headers.setCopy(traceparentHeader(), tp);
+
+  const auto& ts_it = meta_fields.find("tracestate");
+  if (ts_it != meta_fields.end() && ts_it->second.kind_case() == Protobuf::Value::kStringValue) {
+    const std::string& ts = ts_it->second.string_value();
+    if (Envoy::Tracing::isValidTraceState(ts)) {
+      headers.setCopy(tracestateHeader(), ts);
+    }
+  }
+}
+
+void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                   Http::RequestHeaderMap& headers) {
+  const auto& bg_it = meta_fields.find("baggage");
+  if (bg_it == meta_fields.end() || bg_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    return;
+  }
+
+  const std::string& bg = bg_it->second.string_value();
+  if (Envoy::Tracing::isValidBaggage(bg)) {
+    headers.setCopy(baggageHeader(), bg);
+  }
 }
 } // namespace
 
@@ -26,6 +102,12 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  const std::string& stats_prefix, Stats::Scope& scope)
     : traffic_mode_(proto_config.traffic_mode()),
       clear_route_cache_(proto_config.clear_route_cache()),
+      propagate_trace_context_(proto_config.has_propagate_trace_context()
+                                   ? absl::make_optional(proto_config.propagate_trace_context())
+                                   : absl::nullopt),
+      propagate_baggage_(proto_config.has_propagate_baggage()
+                             ? absl::make_optional(proto_config.propagate_baggage())
+                             : absl::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
@@ -35,6 +117,14 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
       stats_(generateStats(stats_prefix, scope)) {}
+
+bool McpFilter::isValidMcpDeleteRequest(const Http::RequestHeaderMap& headers) const {
+  // DELETE is only meaningful for MCP session termination when MCP-Session-Id is present.
+  if (headers.getMethodValue() != Http::Headers::get().MethodValues.Delete) {
+    return false;
+  }
+  return !headers.get(kMcpSessionId).empty();
+}
 
 bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) const {
   // Check if this is a GET request for SSE stream
@@ -59,10 +149,18 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
 }
 
 bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) const {
-  // Check if this is a POST request with JSON content
+  // Check if this is a POST request with JSON content.
+  // Content-Type is JSON if it is exactly "application/json" or starts with
+  // "application/json" followed by ';' or ' ' (for parameters like charset).
+  // This rejects related but distinct types like application/json-patch+json.
+  const absl::string_view content_type = headers.getContentTypeValue();
+  const auto& json_ct = Http::Headers::get().ContentTypeValues.Json;
+  bool is_json_content_type =
+      absl::StartsWith(content_type, json_ct) &&
+      (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
+       content_type[json_ct.size()] == ' ');
   bool is_post_request =
-      headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
-      headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json;
+      headers.getMethodValue() == Http::Headers::get().MethodValues.Post && is_json_content_type;
 
   if (!is_post_request) {
     return false;
@@ -119,6 +217,12 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
+  if (isValidMcpDeleteRequest(headers)) {
+    is_mcp_request_ = true;
+    ENVOY_LOG(debug, "valid MCP DELETE session-termination request, passing through");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (isValidMcpSseRequest(headers)) {
     is_mcp_request_ = true;
     ENVOY_LOG(debug, "valid MCP SSE request, passing through");
@@ -255,6 +359,22 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
   }
 
+  // Handle tracing field extraction and header injection.
+  if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
+    const Protobuf::Value* meta_value = parser_->getNestedValue(
+        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    auto headers = decoder_callbacks_->requestHeaders();
+    if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
+      const auto& meta_fields = meta_value->struct_value().fields();
+      if (config_->propagateTraceContext().has_value()) {
+        injectTraceContext(meta_fields, *headers);
+      }
+      if (config_->propagateBaggage().has_value()) {
+        injectBaggage(meta_fields, *headers);
+      }
+    }
+  }
+
   if (!metadata.fields().empty()) {
     if (config_->shouldStoreToFilterState()) {
       auto filter_state_obj =
@@ -266,6 +386,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
+      (*metadata.mutable_fields())[std::string(Filters::Common::Mcp::McpConstants::IS_MCP_REQUEST)]
+          .set_bool_value(is_mcp_request_);
       decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }

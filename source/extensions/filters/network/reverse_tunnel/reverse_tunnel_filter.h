@@ -14,6 +14,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -36,6 +37,10 @@ public:
   bool autoCloseConnections() const { return auto_close_connections_; }
   const std::string& requestPath() const { return request_path_; }
   const std::string& requestMethod() const { return request_method_string_; }
+  static constexpr absl::string_view tenantDelimiter() {
+    return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+        TENANT_SCOPE_DELIMITER;
+  }
 
   // Returns true if validation is configured.
   bool hasValidation() const {

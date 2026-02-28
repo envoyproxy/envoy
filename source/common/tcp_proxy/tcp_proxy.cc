@@ -104,11 +104,23 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
 OnDemandConfig::OnDemandConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand& on_demand_message,
     Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-    : odcds_(THROW_OR_RETURN_VALUE(
-          context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-              &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
-              OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
-          Upstream::OdCdsApiHandlePtr)),
+    : odcds_([&]() -> Upstream::OdCdsApiHandlePtr {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.tcp_proxy_odcds_over_ads_fix") &&
+            on_demand_message.odcds_config().config_source_specifier_case() ==
+                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+          return THROW_OR_RETURN_VALUE(
+              context.serverFactoryContext().clusterManager().allocateOdCdsApi(
+                  &Upstream::XdstpOdCdsApiImpl::create, on_demand_message.odcds_config(),
+                  OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+              Upstream::OdCdsApiHandlePtr);
+        }
+        return THROW_OR_RETURN_VALUE(
+            context.serverFactoryContext().clusterManager().allocateOdCdsApi(
+                &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
+                OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+            Upstream::OdCdsApiHandlePtr);
+      }()),
       lookup_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
       stats_(generateStats(scope)) {}
@@ -1184,7 +1196,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                  static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
-    Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
+    absl::string_view downstream_close_details = read_callbacks_->connection().localCloseReason();
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data(
+        upstream_->onDownstreamEvent(event, downstream_close_details));
     if (conn_data != nullptr &&
         conn_data->connection().state() != Network::Connection::State::Closed) {
       config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
@@ -1228,6 +1242,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    // Propagate the upstream local close reason to the downstream stream info's upstreamInfo.
+    if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamLocalCloseReason(upstream_->localCloseReason());
+    }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));

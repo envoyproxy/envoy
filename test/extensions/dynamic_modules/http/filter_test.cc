@@ -1,5 +1,7 @@
 #include <cstring>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -18,6 +20,23 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
+
+namespace {
+
+// Test ObjectFactory used by the Rust SDK typed filter state test. Creates a StringAccessorImpl
+// from the provided bytes.
+class HttpTypedObjectForRustFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.http_typed_object_for_rust"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(HttpTypedObjectForRustFactory, StreamInfo::FilterState::ObjectFactory);
+
+} // namespace
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
                          DynamicModuleTestLanguages::languageParamToTestName);
@@ -439,6 +458,51 @@ TEST_P(DynamicModuleHttpLanguageTests, FilterStateCallbacks) {
       stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("stream_complete_key");
   ASSERT_NE(stream_complete_value, nullptr);
   EXPECT_EQ(stream_complete_value->serializeAsString(), "stream_complete_value");
+}
+
+TEST_P(DynamicModuleHttpLanguageTests, TypedFilterStateCallbacks) {
+  const std::string filter_name = "typed_filter_state_callbacks";
+  const std::string filter_config = "";
+
+  const auto language = GetParam();
+  if (language != "rust") {
+    // Only Rust SDK has this test for now.
+    GTEST_SKIP();
+  }
+
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", language), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter->setDecoderFilterCallbacks(callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+
+  // Verify the typed filter state was set correctly by the Rust filter.
+  const auto* typed_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>(
+      "envoy.test.http_typed_object_for_rust");
+  ASSERT_NE(typed_value, nullptr);
+  EXPECT_EQ(typed_value->serializeAsString(), "typed_value");
+
+  filter->onDestroy();
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {

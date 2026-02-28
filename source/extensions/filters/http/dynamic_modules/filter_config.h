@@ -217,83 +217,83 @@ public:
     Stats::Histogram::Unit unit_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    size_t id = counter_vecs_.size();
     counter_vecs_.push_back(std::move(counter_vec));
-    return id;
+    return counter_vecs_.size();
   }
 
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id >= counter_vecs_.size()) {
+    if (id == 0 || id > counter_vecs_.size()) {
       return {};
     }
-    return counter_vecs_[id];
+    return counter_vecs_[ID_TO_INDEX(id)];
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    size_t id = gauge_vecs_.size();
     gauge_vecs_.push_back(std::move(gauge_vec));
-    return id;
+    return gauge_vecs_.size();
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id >= gauge_vecs_.size()) {
+    if (id == 0 || id > gauge_vecs_.size()) {
       return {};
     }
-    return gauge_vecs_[id];
+    return gauge_vecs_[ID_TO_INDEX(id)];
   }
 
   size_t addHistogram(ModuleHistogramHandle&& hist) {
-    size_t id = hists_.size();
     hists_.push_back(std::move(hist));
-    return id;
-  }
-
-  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= hists_.size()) {
-      return {};
-    }
-    return hists_[id];
+    return hists_.size();
   }
 
   size_t addHistogramVec(ModuleHistogramVecHandle&& hist_vec) {
-    size_t id = hist_vecs_.size();
     hist_vecs_.push_back(std::move(hist_vec));
-    return id;
+    return hist_vecs_.size();
+  }
+
+  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
+    if (id == 0 || id > hists_.size()) {
+      return {};
+    }
+    return hists_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id >= hist_vecs_.size()) {
+    if (id == 0 || id > hist_vecs_.size()) {
       return {};
     }
-    return hist_vecs_[id];
+    return hist_vecs_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
 private:
   // The name of the filter passed in the constructor.

@@ -35,15 +35,18 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
   return &lb_marker;
 }
 
-int64_t
-envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
-                                       envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-                                       envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+bool envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index) {
   (void)lb_envoy_ptr;
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
   // Return an invalid index that is larger than any possible host list.
-  return 9999;
+  *result_priority = 0;
+  *result_index = 9999;
+  return true;
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

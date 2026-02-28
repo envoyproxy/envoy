@@ -1,8 +1,5 @@
-#include "source/common/event/dispatcher_impl.h"
 #include "source/common/memory/stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,6 +17,9 @@ public:
   static uint64_t bytesToRelease(const AllocatorManager& allocator_manager) {
     return allocator_manager.bytes_to_release_;
   }
+  static size_t backgroundReleaseRateBytesPerSecond(const AllocatorManager& allocator_manager) {
+    return allocator_manager.background_release_rate_bytes_per_second_;
+  }
 };
 
 namespace {
@@ -28,9 +28,7 @@ static const int MB = 1048576;
 
 class MemoryReleaseTest : public testing::Test {
 protected:
-  MemoryReleaseTest()
-      : api_(Api::createApiForTest(stats_, time_system_)),
-        dispatcher_("test_thread", *api_, time_system_), scope_("memory_release_test.", stats_) {}
+  MemoryReleaseTest() : api_(Api::createApiForTest()) {}
 
   void initialiseAllocatorManager(uint64_t bytes_to_release, float release_interval_s) {
     const std::string yaml_config = (release_interval_s > 0)
@@ -45,16 +43,10 @@ protected:
                                                       bytes_to_release);
     const auto proto_config =
         TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
-    allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, scope_, proto_config);
+    allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, proto_config);
   }
 
-  void step(const std::chrono::milliseconds& step) { time_system_.advanceTimeWait(step); }
-
-  Envoy::Stats::TestUtil::TestStore stats_;
-  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
-  Envoy::Stats::TestUtil::TestScope scope_;
   std::unique_ptr<Memory::AllocatorManager> allocator_manager_;
 };
 
@@ -72,38 +64,27 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroDefaultIntervalMemoryReleased) {
                       initialiseAllocatorManager(MB /*bytes per second*/, 0));
 #elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
-  EXPECT_LOG_CONTAINS(
-      "info",
-      "Configured tcmalloc with background release rate: 1048576 bytes per 1000 milliseconds",
-      initialiseAllocatorManager(MB /*bytes per second*/, 0));
+  EXPECT_LOG_CONTAINS("info",
+                      "Configured tcmalloc with background release rate: 1048576 bytes per second.",
+                      initialiseAllocatorManager(MB /*bytes per second*/, 0));
   EXPECT_EQ(MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
   EXPECT_EQ(std::chrono::milliseconds(1000),
             AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
+  EXPECT_EQ(static_cast<size_t>(MB),
+            AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
   a.reset();
-  // Release interval was configured to default value (1 second).
-  step(std::chrono::milliseconds(1000));
-  EXPECT_TRUE(TestUtility::waitForCounterEq(
-      stats_, "memory_release_test.tcmalloc.released_by_timer", 1UL, time_system_));
-  auto released_bytes_before_next_run = Stats::totalPageHeapUnmapped();
   b.reset();
-  step(std::chrono::milliseconds(1000));
-  EXPECT_TRUE(TestUtility::waitForCounterEq(
-      stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL, time_system_));
+  // Wait for ProcessBackgroundActions to release memory. The default sleep interval is 1 second.
+  absl::SleepFor(absl::Seconds(3));
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
-  EXPECT_LT(released_bytes_before_next_run, final_released_bytes);
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
 #endif
 }
 
-TEST_F(MemoryReleaseTest, ReleaseRateZeroNoRelease) {
-  auto a = std::make_unique<unsigned char[]>(MB);
-  EXPECT_LOG_NOT_CONTAINS(
-      "info", "Configured tcmalloc with background release rate: 0 bytes 1000 milliseconds",
-      initialiseAllocatorManager(0 /*bytes per second*/, 0));
-  a.reset();
-  // Release interval was configured to default value (1 second).
-  step(std::chrono::milliseconds(3000));
-  EXPECT_EQ(0UL, stats_.counter("memory_release_test.tcmalloc.released_by_timer").value());
+TEST_F(MemoryReleaseTest, ReleaseRateZeroNoBackgroundThread) {
+  EXPECT_LOG_NOT_CONTAINS("info",
+                          "Configured tcmalloc with background release rate: 0 bytes per second.",
+                          initialiseAllocatorManager(0 /*bytes per second*/, 0));
 }
 
 TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
@@ -120,21 +101,43 @@ TEST_F(MemoryReleaseTest, ReleaseRateAboveZeroCustomIntervalMemoryReleased) {
                       initialiseAllocatorManager(MB /*bytes per second*/, 0));
 #elif defined(TCMALLOC)
   auto initial_unmapped_bytes = Stats::totalPageHeapUnmapped();
-  EXPECT_LOG_CONTAINS(
-      "info",
-      "Configured tcmalloc with background release rate: 16777216 bytes per 2000 milliseconds",
-      initialiseAllocatorManager(16 * MB /*bytes per second*/, 2));
+  // 16 MB every 2 seconds = 8 MB/s.
+  EXPECT_LOG_CONTAINS("info",
+                      "Configured tcmalloc with background release rate: 8388608 bytes per second.",
+                      initialiseAllocatorManager(16 * MB /*bytes per 2 seconds*/, 2));
   EXPECT_EQ(16 * MB, AllocatorManagerPeer::bytesToRelease(*allocator_manager_));
   EXPECT_EQ(std::chrono::milliseconds(2000),
             AllocatorManagerPeer::memoryReleaseInterval(*allocator_manager_));
+  // Verify the computed release rate: 16 MB * 1000 / 2000 = 8 MB/s.
+  EXPECT_EQ(static_cast<size_t>(8 * MB),
+            AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
   a.reset();
-  step(std::chrono::milliseconds(2000));
   b.reset();
-  step(std::chrono::milliseconds(2000));
-  EXPECT_TRUE(TestUtility::waitForCounterEq(
-      stats_, "memory_release_test.tcmalloc.released_by_timer", 2UL, time_system_));
+  // Wait for ProcessBackgroundActions to release memory.
+  absl::SleepFor(absl::Seconds(3));
   auto final_released_bytes = Stats::totalPageHeapUnmapped();
   EXPECT_LT(initial_unmapped_bytes, final_released_bytes);
+#endif
+}
+
+TEST_F(MemoryReleaseTest, BackgroundReleaseRateComputedCorrectly) {
+#if defined(TCMALLOC)
+  // 4 MB every 500ms = 8 MB/s.
+  initialiseAllocatorManager(4 * MB, 0.5);
+  EXPECT_EQ(static_cast<size_t>(8 * MB),
+            AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
+  allocator_manager_.reset();
+
+  // 1 MB every 1s (default) = 1 MB/s.
+  initialiseAllocatorManager(MB, 0);
+  EXPECT_EQ(static_cast<size_t>(MB),
+            AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
+  allocator_manager_.reset();
+
+  // 10 MB every 5s = 2 MB/s.
+  initialiseAllocatorManager(10 * MB, 5);
+  EXPECT_EQ(static_cast<size_t>(2 * MB),
+            AllocatorManagerPeer::backgroundReleaseRateBytesPerSecond(*allocator_manager_));
 #endif
 }
 

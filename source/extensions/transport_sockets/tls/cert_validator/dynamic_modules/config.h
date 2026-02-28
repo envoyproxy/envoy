@@ -55,6 +55,10 @@ public:
   // do_verify_cert_chain. Reset before each verification call.
   absl::optional<std::string> last_error_details_;
 
+  // Stores the transport socket callbacks pointer during do_verify_cert_chain so that
+  // filter state callbacks can access the connection's stream info. Reset after each call.
+  Network::TransportSocketCallbacks* current_callbacks_ = nullptr;
+
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleCertValidatorConfig>>
   newDynamicModuleCertValidatorConfig(

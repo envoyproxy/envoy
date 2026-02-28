@@ -72,6 +72,10 @@ protected:
   // Path helper
   std::string buildFullPath(absl::string_view name) const;
 
+  // Check if it is a valid JSON-RPC request or response.
+  void checkValidJsonRpc(absl::string_view name,
+                         absl::optional<absl::string_view> value = absl::nullopt);
+
   // Protocol-specific interface
   virtual bool isNotification(const std::string& method) const = 0;
   virtual absl::string_view protocolName() const = 0;
@@ -105,6 +109,8 @@ protected:
   bool is_valid_jsonrpc_{false};
   bool has_jsonrpc_{false};
   bool has_method_{false};
+  bool has_result_{false};
+  bool has_error_{false};
 
   // Optimization flag
   bool can_stop_parsing_{false};

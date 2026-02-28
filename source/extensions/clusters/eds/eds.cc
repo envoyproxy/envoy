@@ -10,6 +10,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -172,10 +173,13 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
           returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
       address_list.emplace_back(address);
     }
-    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-      // All addresses must by IP addresses.
-      if (!address->ip()) {
-        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses")) {
+      for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+        // All addresses must by IP addresses.
+        if (!address->ip()) {
+          throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+        }
       }
     }
   }

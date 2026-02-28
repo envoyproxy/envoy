@@ -199,6 +199,22 @@ Upstream socket interface
 
 This extension enables the responder Envoy to accept and manage incoming reverse tunnel connections from initiator Envoys.
 
+Tenant isolation can be enabled at the bootstrap level by setting ``enable_tenant_isolation: true`` in the
+upstream socket interface configuration:
+
+.. literalinclude:: /_configs/reverse_connection/responder-envoy-tenant-isolation.yaml
+    :language: yaml
+    :lines: 7-13
+    :linenos:
+    :lineno-start: 7
+    :caption: :download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`
+
+When tenant isolation is enabled, Envoy scopes cached reverse tunnel sockets by tenant. The socket interface
+concatenates the tenant identifier with the node and cluster identifiers using the ``:`` delimiter (for example
+``tenant-a:node-1``). Because the delimiter is part of the composite key, handshake requests that include ``:``
+in any of the reverse tunnel headers are rejected with ``400`` to prevent ambiguous lookups. The flag defaults
+to ``false`` to preserve existing behaviour.
+
 .. _config_reverse_tunnel_network_filter:
 
 Reverse tunnel network filter
@@ -227,6 +243,20 @@ for a downstream node, the cluster looks up a cached reverse tunnel connection t
 Each data request must include a ``host_id`` that identifies the target downstream node. This ID can be
 specified directly in request headers or computed from them. The cluster extracts the ``host_id`` using
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
+
+When tenant isolation is enabled (via ``enable_tenant_isolation: true`` in the upstream socket interface
+bootstrap extension), the cluster **must** be configured with the ``tenant_id_format`` field. The cluster
+automatically constructs tenant-scoped identifiers using the formatted tenant ID and the formatted host ID.
+
+.. important::
+
+   When tenant isolation is enabled in the bootstrap configuration, ``tenant_id_format`` is **required**
+   for all reverse connection clusters. Envoy will fail to start if tenant isolation is enabled but
+   ``tenant_id_format`` is not configured in any reverse connection cluster. Additionally, the tenant
+   identifier must be derivable from the request context (i.e., the formatter must evaluate to a non-empty
+   value) at runtime. If the tenant identifier cannot be inferred, host selection will fail and the request
+   will not be routed. This ensures strict tenant isolation and prevents requests from being routed without
+   proper tenant scoping.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
@@ -293,6 +323,11 @@ mapping, or custom filter implementations. The Lua filter checks request headers
 sets the ``x-computed-host-id`` header, which the reverse connection cluster uses to look up the appropriate
 tunnel connection.
 
+For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
+includes a companion configuration
+:download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
+That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``.
+
 The header priority order is:
 
 #. **x-node-id header**: Highest priority—targets a specific downstream node.
@@ -318,6 +353,24 @@ The header priority order is:
       x-cluster-id: example-cluster
 
    The filter sets ``host_id = "example-cluster"`` and routes to any node in that cluster.
+
+#. **Request with tenant + node IDs** (tenant isolation enabled):
+
+   .. code-block:: http
+
+      GET /downstream_service HTTP/1.1
+      x-tenant-id: tenant-a
+      x-node-id: example-node
+
+   The cluster uses ``tenant_id_format: "%REQ(x-tenant-id)%"`` and ``host_id_format: "%REQ(x-node-id)%"``
+   to automatically construct ``host_id = "tenant-a:example-node"`` internally, ensuring the correct
+   tunnel socket is reused while keeping tenants isolated.
+
+   .. note::
+
+      If tenant isolation is enabled and ``tenant_id_format`` is configured, but the tenant ID cannot
+      be inferred from the request (e.g., the ``x-tenant-id`` header is missing or the formatter
+      evaluates to empty), host selection will fail and the request will not be routed.
 
 .. _config_reverse_connection_security:
 

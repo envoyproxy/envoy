@@ -1,3 +1,5 @@
+#include "envoy/router/string_accessor.h"
+
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/dynamic_modules/config.h"
@@ -5,6 +7,7 @@
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -453,6 +456,223 @@ typed_config:
   auto result = factory.createCertValidator(&validation_config, stats_, factory_context_,
                                             *store_.rootScope());
   ASSERT_FALSE(result.ok());
+}
+
+// =============================================================================
+// Filter state callback tests.
+// =============================================================================
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateSetAndGet) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  // Set up mock transport socket callbacks to provide filter state access.
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+
+  config->current_callbacks_ = &transport_callbacks;
+
+  const std::string key = "test.key";
+  const std::string value = "test.value";
+
+  bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(value.size(), result_buf.length);
+  EXPECT_EQ(value, std::string(result_buf.ptr, result_buf.length));
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNonExisting) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  config->current_callbacks_ = &transport_callbacks;
+
+  const std::string key = "nonexistent.key";
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+  EXPECT_FALSE(ok);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+  EXPECT_EQ(0, result_buf.length);
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullCallbacks) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  // current_callbacks_ is nullptr by default.
+  const std::string key = "test.key";
+  const std::string value = "test.value";
+
+  bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullCallbacks) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  // current_callbacks_ is nullptr by default.
+  const std::string key = "test.key";
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+  EXPECT_FALSE(ok);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+  EXPECT_EQ(0, result_buf.length);
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullKey) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  config->current_callbacks_ = &transport_callbacks;
+
+  const std::string value = "test.value";
+  bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
+      static_cast<void*>(config.get()), {nullptr, 0},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_FALSE(ok);
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullValue) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  config->current_callbacks_ = &transport_callbacks;
+
+  const std::string key = "test.key";
+  bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, {nullptr, 0});
+  EXPECT_FALSE(ok);
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullKey) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  config->current_callbacks_ = &transport_callbacks;
+
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  bool ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
+      static_cast<void*>(config.get()), {nullptr, 0}, &result_buf);
+  EXPECT_FALSE(ok);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+  EXPECT_EQ(0, result_buf.length);
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateSetEmptyValue) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  config->current_callbacks_ = &transport_callbacks;
+
+  const std::string key = "test.key";
+  const std::string empty_value = "";
+
+  bool ok = envoy_dynamic_module_callback_cert_validator_set_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(empty_value.data()), empty_value.size()});
+  // Empty value has a non-null pointer but zero length, so ptr check passes.
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  ok = envoy_dynamic_module_callback_cert_validator_get_filter_state(
+      static_cast<void*>(config.get()), {const_cast<char*>(key.data()), key.size()}, &result_buf);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(0, result_buf.length);
+
+  config->current_callbacks_ = nullptr;
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateViaDoVerifyCertChain) {
+  // This test uses the cert_validator_filter_state C module which sets and reads
+  // filter state during do_verify_cert_chain.
+  auto config_or_error = createConfig("cert_validator_filter_state");
+  ASSERT_TRUE(config_or_error.ok());
+
+  DynamicModuleCertValidator validator(config_or_error.value(), stats_);
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  sk_X509_push(cert_chain.get(), cert.release());
+
+  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  CertValidator::ExtraValidationContext validation_context{&transport_callbacks};
+
+  auto results = validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx,
+                                             validation_context, false, "example.com");
+  EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
+  EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::Validated, results.detailed_status);
+
+  // Verify the filter state was set on the connection's stream info.
+  const auto* accessor = transport_callbacks.connection_.streamInfo()
+                             .filterState()
+                             ->getDataReadOnly<Router::StringAccessor>("cert_validator.test_key");
+  ASSERT_NE(nullptr, accessor);
+  EXPECT_EQ("cert_validator.test_value", accessor->asString());
+}
+
+TEST_F(DynamicModuleCertValidatorTest, FilterStateCallbacksResetAfterVerify) {
+  // Verify that current_callbacks_ is reset to nullptr after doVerifyCertChain returns.
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+
+  DynamicModuleCertValidator validator(config_or_error.value(), stats_);
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  sk_X509_push(cert_chain.get(), cert.release());
+
+  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
+
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  CertValidator::ExtraValidationContext validation_context{&transport_callbacks};
+
+  validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx, validation_context, false,
+                              "example.com");
+
+  // After the call, current_callbacks_ should be reset.
+  EXPECT_EQ(nullptr, config_or_error.value()->current_callbacks_);
 }
 
 } // namespace
