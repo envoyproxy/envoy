@@ -39,10 +39,6 @@ private:
                Server::Configuration::GenericFactoryContext& context);
     DynamicTag(DynamicTag&&) = default;
 
-    std::pair<absl::optional<std::string>, bool>
-    value(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) const;
-
-    std::string str_name_;
     const Envoy::Stats::StatName name_;
     Formatter::FormatterPtr value_formatter_;
     Matcher::MatchTreeSharedPtr<Envoy::Stats::StatTagMatchingData> rules_;
@@ -65,7 +61,6 @@ private:
     TagsResult tags(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info,
                     Envoy::Stats::Scope& scope) const;
 
-    std::string str_name_;
     Envoy::Stats::StatName name_;
     std::vector<DynamicTag> dynamic_tags_;
   };

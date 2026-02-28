@@ -50,11 +50,8 @@ public:
   std::string name() const override { return "stat_tag_value_input"; }
 
   Envoy::Matcher::DataInputFactoryCb<Envoy::Stats::StatTagMatchingData>
-  createDataInputFactoryCb(const Envoy::Protobuf::Message& config,
-                           Envoy::ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::common_inputs::stats::v3::StatTagValueInput&>(
-        config, validation_visitor);
+  createDataInputFactoryCb(const Envoy::Protobuf::Message&,
+                           Envoy::ProtobufMessage::ValidationVisitor&) override {
     return [] { return std::make_unique<StatTagValueInput>(); };
   }
 

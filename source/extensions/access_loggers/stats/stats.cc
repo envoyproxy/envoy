@@ -264,9 +264,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 StatsAccessLog::NameAndTags::NameAndTags(
     const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
     Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
-    Server::Configuration::GenericFactoryContext& context)
-    : str_name_(cfg.name()) {
-  name_ = pool.add(str_name_);
+    Server::Configuration::GenericFactoryContext& context) {
+  name_ = pool.add(cfg.name());
   for (const auto& tag_cfg : cfg.tags()) {
     dynamic_tags_.emplace_back(tag_cfg, pool, commands, context);
   }
@@ -276,7 +275,7 @@ StatsAccessLog::DynamicTag::DynamicTag(
     const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
     Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
     Server::Configuration::GenericFactoryContext& context)
-    : str_name_(tag_cfg.name()), name_(pool.add(str_name_)),
+    : name_(pool.add(tag_cfg.name())),
       value_formatter_(THROW_OR_RETURN_VALUE(
           Formatter::FormatterImpl::create(tag_cfg.value_format(), true, commands),
           Formatter::FormatterPtr)) {
@@ -299,10 +298,9 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 
   for (const auto& dynamic_tag : dynamic_tags_) {
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
-
     if (dynamic_tag.rules_) {
-      StatTagMetric tag_metric(tag_value);
-      const auto result = dynamic_tag.rules_->match(tag_metric);
+      StatTagMetric data(tag_value);
+      const auto result = dynamic_tag.rules_->match(data);
       if (result.isMatch()) {
         if (const auto* action = dynamic_cast<
                 const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
@@ -310,7 +308,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
           const auto action_result = action->apply(tag_value);
           if (action_result ==
               Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropStat) {
-            return {std::move(tags), {}, true};
+            return {{}, {}, true};
           }
           if (action_result ==
               Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropTag) {
