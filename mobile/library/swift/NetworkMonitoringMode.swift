@@ -6,8 +6,8 @@ import Foundation
 public enum NetworkMonitoringMode: Int {
   /// Do not monitor changes to the network reachability state.
   case disabled = 0
-  /// Monitor changes to the network reachability state using `SCNetworkReachability`.
+  /// Enable network monitoring (legacy compatibility value).
   case reachability = 1
-  /// Monitor changes to the network reachability state using `NWPathMonitor`.
+  /// Enable network monitoring.
   case pathMonitor = 2
 }

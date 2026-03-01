@@ -30,6 +30,18 @@ envoy_mobile_objc_test(
     ],
 )
 
+envoy_mobile_objc_test(
+    name = "envoy_engine_impl_test",
+    srcs = [
+        "EnvoyEngineImplTest.mm",
+    ],
+    flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
 envoy_objc_library(
     name = "envoy_test_server",
     testonly = True,
