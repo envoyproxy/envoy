@@ -13,7 +13,7 @@ envoy_objc_library(
     ],
     hdrs = [
         "apple_network_change_monitor.h",
-        "apple_network_change_monitor_bridge.h",
+        "apple_network_change_monitor_impl.h",
     ],
     module_name = "AppleNetworkChangeMonitor",
     sdk_frameworks = [

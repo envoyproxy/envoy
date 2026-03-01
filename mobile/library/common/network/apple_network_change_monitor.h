@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "library/cc/network_change_monitor.h"
 
 #ifdef __OBJC__
@@ -30,7 +32,8 @@ public:
   void stop() override;
 
 private:
-  NetworkChangeListener& network_change_listener_;
+  // Owned forwarding listener retained for the lifetime of the Objective-C monitor callbacks.
+  std::shared_ptr<NetworkChangeListener> network_change_listener_impl_;
   EnvoyCxxNetworkMonitor* monitor_impl_; // Objective-C implementation
 };
 
