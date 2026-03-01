@@ -82,7 +82,7 @@ public:
 
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<MockScopeTrackedObject> tracked_object_;
-  std::shared_ptr<TestExecutionContext> context_{};
+  std::shared_ptr<TestExecutionContext> context_;
 };
 
 TEST_F(ExecutionContextTest, NullContext) {

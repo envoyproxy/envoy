@@ -3,9 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/async_client.h"
@@ -54,7 +54,7 @@ public:
     using element_type = AsyncClient::Stream*;
     using pointer = element_type*;
     using reference = element_type&;
-    explicit StreamIterator(std::list<CallbacksFacade>::iterator it) : it(it) {}
+    explicit StreamIterator(std::vector<CallbacksFacade>::iterator it) : it(it) {}
     StreamIterator() = default;
 
     reference operator*() { return it->stream_; }
@@ -72,7 +72,7 @@ public:
     }
     bool operator==(const StreamIterator& other) const { return it == other.it; }
 
-    std::list<CallbacksFacade>::iterator it;
+    std::vector<CallbacksFacade>::iterator it;
   };
 
   // Iterator over underlying Http::AsyncClient::Stream objects
@@ -102,7 +102,7 @@ private:
 
   uint32_t active_streams_{0};
   std::weak_ptr<MuxDemux> muxdemux_;
-  std::list<CallbacksFacade> callbacks_facades_;
+  std::vector<CallbacksFacade> callbacks_facades_;
 };
 
 // MuxDemux allows sending the same or different requests to multiple destinations.

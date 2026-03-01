@@ -22,7 +22,24 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override {
+    return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
+                               context.scope());
+  }
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
+          proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override {
+    return createFilterFactory(proto_config, stats_prefix, context, context.scope());
+  }
+
+private:
+  Http::FilterFactoryCb createFilterFactory(
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
+          proto_config,
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+      Stats::Scope& scope);
 };
 
 } // namespace AdaptiveConcurrency

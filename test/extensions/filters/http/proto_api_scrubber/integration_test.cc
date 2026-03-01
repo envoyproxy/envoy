@@ -1111,10 +1111,10 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
   auto response = sendGrpcRequest(request_proto, kCreateApiKeyMethod);
   ASSERT_TRUE(response->waitForEndStream());
 
-  // Verify 403 / Permission Denied.
+  // Verify 404 / Not Found.
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
-  EXPECT_EQ("7", grpc_status->value().getStringView()); // 7 = Permission Denied
+  EXPECT_EQ("5", grpc_status->value().getStringView()); // 5 = Not Found.
 
   // Verify Stats for blocked method.
   test_server_->waitForCounterGe("proto_api_scrubber.method_blocked", 1);

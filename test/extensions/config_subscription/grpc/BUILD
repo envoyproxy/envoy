@@ -155,7 +155,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )

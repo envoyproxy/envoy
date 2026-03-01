@@ -87,17 +87,10 @@ Config::Config(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
           filter->onALPN(data, len);
         }
-        return ssl_select_cert_success;
-      });
-  SSL_CTX_set_tlsext_servername_callback(
-      ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(
-            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
 
-        // Return an error to stop the handshake; we have what we wanted already.
-        *out_alert = SSL_AD_USER_CANCELLED;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
+        const char* servername = SSL_get_servername(client_hello->ssl, TLSEXT_NAMETYPE_host_name);
+        filter->onServername(absl::NullSafeStringView(servername));
+        return ssl_select_cert_error;
       });
 }
 

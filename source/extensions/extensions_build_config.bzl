@@ -8,6 +8,7 @@ EXTENSIONS = {
     "envoy.access_loggers.extension_filters.cel":       "//source/extensions/access_loggers/filters/cel:config",
     "envoy.access_loggers.extension_filters.process_ratelimit":       "//source/extensions/access_loggers/filters/process_ratelimit:config",
     "envoy.access_loggers.fluentd"  :                   "//source/extensions/access_loggers/fluentd:config",
+    "envoy.access_loggers.dynamic_modules":             "//source/extensions/access_loggers/dynamic_modules:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
@@ -21,7 +22,9 @@ EXTENSIONS = {
     #
 
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
+    "envoy.clusters.composite":                         "//source/extensions/clusters/composite:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
+    "envoy.clusters.dynamic_modules":                   "//source/extensions/clusters/dynamic_modules:cluster",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
@@ -59,6 +62,7 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+    "envoy.bootstrap.dynamic_modules":                  "//source/extensions/bootstrap/dynamic_modules:config",
 
     #
     # Reverse Connection
@@ -91,6 +95,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
     "envoy.matching.matchers.runtime_fraction":         "//source/extensions/matching/input_matchers/runtime_fraction:config",
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
+    "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
 
     #
@@ -120,6 +125,7 @@ EXTENSIONS = {
     # CEL Matching Input
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
+    "envoy.matching.inputs.dynamic_module_data_input":  "//source/extensions/matching/http/dynamic_modules:data_input_lib",
 
     #
     # Dynamic Metadata Matching Input
@@ -173,6 +179,7 @@ EXTENSIONS = {
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
+    "envoy.filters.http.file_server":                   "//source/extensions/filters/http/file_server:config",
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.geoip":                         "//source/extensions/filters/http/geoip:config",
@@ -189,6 +196,7 @@ EXTENSIONS = {
     "envoy.filters.http.json_to_metadata":              "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.mcp":                           "//source/extensions/filters/http/mcp:config",
+    "envoy.filters.http.mcp_json_rest_bridge":          "//source/extensions/filters/http/mcp_json_rest_bridge:config",
     "envoy.filters.http.mcp_router":                    "//source/extensions/filters/http/mcp_router:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default. kill_request is not built into most prebuilt images.
@@ -211,6 +219,7 @@ EXTENSIONS = {
     "envoy.filters.http.thrift_to_metadata":            "//source/extensions/filters/http/thrift_to_metadata:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
+    "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
@@ -229,6 +238,7 @@ EXTENSIONS = {
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
+    "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
 
     #
     # Network filters
@@ -416,6 +426,7 @@ EXTENSIONS = {
     # TLS peer certification validators
     #
 
+    "envoy.tls.cert_validator.dynamic_modules":          "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
@@ -475,6 +486,7 @@ EXTENSIONS = {
     "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
     "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
     "envoy.quic.connection_debug_visitor.quic_stats":   "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
+    "envoy.quic.packet_writer.default":                 "//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
 
     #
     # UDP packet writers
@@ -563,6 +575,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
+    "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
     #
     # HTTP Early Header Mutation
@@ -583,6 +596,11 @@ EXTENSIONS = {
     "envoy.config_subscription.ads_collection": "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
     "envoy.config_mux.delta_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
     "envoy.config_mux.sotw_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
+
+    #
+    # Content Parsers
+    #
+    "envoy.content_parsers.json":                            "//source/extensions/content_parsers/json:config",
 
     #
     # Geolocation Provider
@@ -609,8 +627,9 @@ EXTENSIONS = {
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
-    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
-    "envoy.tls.certificate_mappers.sni":                  "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.sni":                            "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.static_name":                    "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
+    "envoy.tls.upstream_certificate_mappers.filter_state_override": "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",

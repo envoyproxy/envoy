@@ -11,6 +11,13 @@ for routing, load balancing decisions, telemetry, etc. See :ref:`the well-known
 filter state keys <well_known_filter_state>` for the controls used by Envoy
 extensions.
 
+The filter can apply values at different points in the connection lifecycle:
+
+* ``on_new_connection``: applied when a new downstream connection is accepted.
+* ``on_downstream_tls_handshake``: applied when the downstream TLS handshake is complete. For
+  non-TLS downstream connections (where there is no TLS handshake), this list is applied when the
+  new connection is accepted.
+
 .. warning::
     This filter allows overriding the behavior of other extensions and
     significantly and indirectly altering the connection processing logic.
@@ -64,6 +71,20 @@ Use this pattern when you want to store arbitrary connection data under a custom
         inline_string: "%REQUESTED_SERVER_NAME%"
 
 The stored value can then be accessed in access logs using ``%FILTER_STATE(my.custom.client_sni)%``.
+
+When you need to populate filter state using information that is only available after the downstream
+TLS handshake completes (e.g., downstream peer certificate SANs), use
+``on_downstream_tls_handshake``:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.filters.network.set_filter_state.v3.Config
+
+  on_downstream_tls_handshake:
+  - object_key: my.custom.downstream_peer_uri_san
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "%DOWNSTREAM_PEER_URI_SAN%"
 
 
 Statistics

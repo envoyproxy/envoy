@@ -24,13 +24,33 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
     RouteConfigUpdatePtr& config_update_info,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Rds::RouteConfigProvider* route_config_provider) {
-  const auto& config_source = config_update_info->protobufConfigurationCast()
-                                  .vhds()
-                                  .config_source()
-                                  .api_config_source()
-                                  .api_type();
-  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    return absl::InvalidArgumentError("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+  const auto& vhds_config_source =
+      config_update_info->protobufConfigurationCast().vhds().config_source();
+  // VHDS only supports Delta xDS. This can be specified either explicitly via DELTA_GRPC
+  // or implicitly by using ADS when the parent ADS stream is in Delta mode.
+  const bool is_ads = vhds_config_source.config_source_specifier_case() ==
+                      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds;
+  const bool is_delta_grpc = vhds_config_source.has_api_config_source() &&
+                             vhds_config_source.api_config_source().api_type() ==
+                                 envoy::config::core::v3::ApiConfigSource::DELTA_GRPC;
+
+  if (!is_ads && !is_delta_grpc) {
+    return absl::InvalidArgumentError(
+        "vhds: only 'DELTA_GRPC' or 'ADS' (which uses Delta xDS) is supported as a config source.");
+  }
+
+  // If using ADS, verify the parent ADS stream is in Delta mode
+  if (is_ads) {
+    const auto& bootstrap = factory_context.bootstrap();
+    if (!bootstrap.has_dynamic_resources() || !bootstrap.dynamic_resources().has_ads_config()) {
+      return absl::InvalidArgumentError(
+          "vhds: ADS config source specified but no ADS configured in bootstrap.");
+    }
+    const auto& ads_config = bootstrap.dynamic_resources().ads_config();
+    if (ads_config.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+      return absl::InvalidArgumentError(
+          "vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source.");
+    }
   }
 
   auto status = absl::OkStatus();

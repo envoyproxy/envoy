@@ -24,6 +24,19 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
   };
 }
 
+Http::FilterFactoryCb
+RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+
+  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      proto_config, stats_prefix, context.scope(), context, context.messageValidationVisitor());
+
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& proto_config,

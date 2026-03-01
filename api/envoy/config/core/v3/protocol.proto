@@ -57,8 +57,41 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message QuicProtocolOptions {
+  // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
+  // network change events from the platform, i.e. the current network gets
+  // disconnected, or upon the QUIC detecting a bad connection. After migration, the
+  // connection may be on a different network other than the default network
+  // picked by the platform. Both iOS and Android will use a default network to interact with the internet, usually prefer unmetered network (WIFI)
+  // over metered ones (cellular). And users can specify which network to be used as the default. A connection on non-default network is only allowed to
+  // serve new requests for a certain period of time before being drained, and
+  // meanwhile, QUIC will try to migrate to the default network if possible.
+  message ConnectionMigrationSettings {
+    // Config for options to migrate idle connections which aren't serving any requests.
+    message MigrateIdleConnectionSettings {
+      // If idle connections are allowed to be migrated, only migrate the connection
+      // if it hasn't been idle for longer than this idle period. Otherwise, the
+      // connection will be closed instead.
+      // Default to 30s.
+      google.protobuf.Duration max_idle_time_before_migration = 1
+          [(validate.rules).duration = {gte {seconds: 1}}];
+    }
+
+    // Config whether and how to migrate idle connections.
+    // If absent, idle connections will not be migrated but be closed upon
+    // migration signals.
+    MigrateIdleConnectionSettings migrate_idle_connections = 1;
+
+    // After migrating to a non-default network interface, the connection will
+    // only be allowed to stay on that network for up to this period of time before
+    // being drained unless it migrates to the default network or that network
+    // gets picked as the default by the device by then.
+    // Default to 128s.
+    google.protobuf.Duration max_time_on_non_default_network = 2
+        [(validate.rules).duration = {gte {seconds: 1}}];
+  }
+
   // Maximum number of streams that the client can negotiate per connection. ``100``
   // if not specified.
   google.protobuf.UInt32Value max_concurrent_streams = 1 [(validate.rules).uint32 = {gte: 1}];
@@ -121,6 +154,25 @@ message QuicProtocolOptions {
   // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
   google.protobuf.UInt64Value max_packet_length = 9;
+
+  // A customized UDP socket and a QUIC packet writer using the socket for
+  // client connections. i.e. Mobile uses its own implementation to interact
+  // with platform socket APIs.
+  // If not present, the default platform-independent socket and writer will be used.
+  // [#extension-category: envoy.quic.client_packet_writer]
+  TypedExtensionConfig client_packet_writer = 10;
+
+  // Enable QUIC `connection migration
+  // <https://datatracker.ietf.org/doc/html/rfc9000#name-connection-migration>`
+  // to a different network interface when the current network is degrading or
+  // has become bad.
+  // In order to use a different network interface other than the platform's default one,
+  // a customized :ref:`client_packet_writer <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.client_packet_writer>` needs to be configured to
+  // create UDP sockets on non-default networks.
+  // Only takes effect when runtime key ``envoy.reloadable_features.use_migration_in_quiche`` is true.
+  // If absent, the feature will be disabled.
+  // [#not-implemented-hide:]
+  ConnectionMigrationSettings connection_migration = 11;
 }
 
 message UpstreamHttpProtocolOptions {

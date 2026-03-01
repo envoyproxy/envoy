@@ -110,7 +110,7 @@ genrule(
 
 xcodeproj(
     name = "xcodeproj",
-    bazel_path = "./bazelw",
+    bazel_path = "bazel",
     build_mode = "bazel",
     project_name = "Envoy",
     project_options = project_options(

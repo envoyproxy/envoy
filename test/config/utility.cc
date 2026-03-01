@@ -695,6 +695,50 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
 #endif
 }
 
+envoy::config::route::v3::RouteConfiguration
+ConfigHelper::buildRouteConfigWithVhdsOverAds(const std::string& name) {
+  API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: "{}"
+      vhds:
+        config_source:
+          ads: {{}}
+    )EOF",
+                                        name),
+                            route);
+  return route;
+#else
+  UNREFERENCED_PARAMETER(name);
+  PANIC("YAML support compiled out");
+#endif
+}
+
+envoy::config::route::v3::VirtualHost ConfigHelper::buildVirtualHost(const std::string& name,
+                                                                     const std::string& domain,
+                                                                     const std::string& prefix,
+                                                                     const std::string& cluster) {
+  API_NO_BOOST(envoy::config::route::v3::VirtualHost) vhost;
+#ifdef ENVOY_ENABLE_YAML
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: {}
+        domains: [{}]
+        routes:
+        - match: {{ prefix: {} }}
+          route: {{ cluster: {} }}
+      )EOF",
+                                        name, domain, prefix, cluster),
+                            vhost);
+  return vhost;
+#else
+  UNREFERENCED_PARAMETER(name);
+  UNREFERENCED_PARAMETER(domain);
+  UNREFERENCED_PARAMETER(prefix);
+  UNREFERENCED_PARAMETER(cluster);
+  PANIC("YAML support compiled out");
+#endif
+}
+
 envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
   envoy::config::endpoint::v3::Endpoint endpoint;
   endpoint.mutable_address()->mutable_socket_address()->set_address(address);

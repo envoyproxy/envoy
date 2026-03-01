@@ -20,8 +20,8 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

@@ -24,7 +24,7 @@ on:
         default:
       command:
         type: string
-        default: ./bazelw
+        default: bazel
       concurrency-suffix:
         type: string
         default: -mobile

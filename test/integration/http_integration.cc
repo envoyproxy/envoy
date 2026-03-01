@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
-#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
@@ -323,7 +323,7 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
@@ -335,7 +335,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol), quic_stat_names_(stats_store_.symbolTable()) {
   // Legacy integration tests expect the default listener to be named "http" for
@@ -403,7 +403,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster, server_factory_context_);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

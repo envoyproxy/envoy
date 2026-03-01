@@ -13,6 +13,7 @@ envoy_cc_test(
     name = "mcp_filter_test",
     srcs = ["mcp_filter_test.cc"],
     deps = [
+        "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/mcp:mcp_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",

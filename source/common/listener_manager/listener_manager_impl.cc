@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
+#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
@@ -335,7 +335,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     if (!io_handle) {
       return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
-    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
+                                                      absl::nullopt, bind_type != BindType::NoBind);
   }
 
   // Continue with standard socket creation for addresses using the default interface.

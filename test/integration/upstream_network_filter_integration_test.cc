@@ -1,10 +1,13 @@
+#include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/extension/v3/config_discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/filters/test_network_filter.pb.h"
 #include "test/integration/integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -672,6 +675,104 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   const std::string expected_data = data_.substr(bytes_to_drain);
   EXPECT_EQ(expected_data, received_data);
   tcp_client->close();
+}
+
+class TestAccessLogFilterAndLogger : public Network::ReadFilter, public AccessLog::Instance {
+public:
+  TestAccessLogFilterAndLogger(Stats::Scope& scope) : scope_(scope) {}
+
+  // AccessLog::Instance
+  void log(const AccessLog::LogContext&, const StreamInfo::StreamInfo&) override {
+    ENVOY_LOG_MISC(error, "TestAccessLogger::log called");
+    scope_.counterFromString("test_access_log_filter.log_called").inc();
+  }
+
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+  Network::FilterStatus onNewConnection() override {
+    ENVOY_LOG_MISC(error, "TestAccessLogFilter::onNewConnection called");
+    scope_.counterFromString("test_access_log_filter.on_new_connection").inc();
+    return Network::FilterStatus::Continue;
+  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) override {}
+
+  Stats::Scope& scope_;
+};
+
+class TestAccessLogFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    Stats::Scope& scope = context.serverFactoryContext().scope();
+    return [&scope](Network::FilterManager& filter_manager) {
+      auto filter = std::make_shared<TestAccessLogFilterAndLogger>(scope);
+      filter_manager.addReadFilter(filter);
+      filter_manager.addAccessLogHandler(filter);
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::TestNetworkFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.test.access_log_filter_custom"; }
+};
+
+class UpstreamNetworkFilterAccessLogIntegrationTest
+    : public testing::Test,
+      public UpstreamNetworkFiltersIntegrationTestBase {
+public:
+  UpstreamNetworkFilterAccessLogIntegrationTest()
+      : UpstreamNetworkFiltersIntegrationTestBase(Network::Address::IpVersion::v4,
+                                                  ConfigHelper::baseConfig()) {}
+
+  void initialize() override {
+    // Add the access log filter to the cluster
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto* filter = cluster->add_filters();
+      filter->set_name("envoy.test.access_log_filter_custom");
+      // Need valid config type matching the factory
+      test::integration::filters::TestNetworkFilterConfig config;
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
+    // Setup generic tcp proxy downstream
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter_chain = listener->add_filter_chains();
+      auto* filter = filter_chain->add_filters();
+      filter->set_name("envoy.filters.network.tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+      config.set_stat_prefix("tcp_stats");
+      config.set_cluster("cluster_0");
+      filter->mutable_typed_config()->PackFrom(config);
+    });
+
+    BaseIntegrationTest::initialize();
+    registerTestServerPorts({port_name_});
+  }
+
+  void verifyLog() {
+    test_server_->waitForCounterGe("test_access_log_filter.on_new_connection", 1);
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+    test_server_->waitForCounterGe("test_access_log_filter.log_called", 1);
+  }
+};
+
+TEST_F(UpstreamNetworkFilterAccessLogIntegrationTest, LogCalled) {
+  TestAccessLogFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      register_factory(factory);
+
+  initialize();
+  sendDataVerifyResults(0);
+
+  verifyLog();
 }
 
 } // namespace

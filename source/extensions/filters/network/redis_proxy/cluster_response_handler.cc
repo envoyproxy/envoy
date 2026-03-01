@@ -71,6 +71,11 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
     return std::make_unique<ArrayAppendAggregateResponseHandler>(shard_count);
   }
 
+  // HELLO command
+  if (command_name == "hello") {
+    return std::make_unique<HelloResponseHandler>(shard_count);
+  }
+
   // This should never be reached - all commands mapped to aggregate_all_responses
   // should be handled above
   ASSERT(false, fmt::format("Unhandled aggregate command: {}:{}", command_name, subcommand));
@@ -112,6 +117,7 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
           {"select", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
 
           // Aggregate responses
+          {"hello", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"config:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:len", ClusterScopeResponseHandlerType::aggregate_all_responses},
@@ -317,6 +323,7 @@ void ArrayMergeAggregateResponseHandler::processAggregatedResponses(
 // Implementation of ArrayAppendAggregateResponseHandler
 void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
     ClusterScopeCmdRequest& request) {
+
   Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
   response->type(Common::Redis::RespType::Array);
 
@@ -336,6 +343,107 @@ void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
   }
 
   sendSuccessResponse(request, std::move(response));
+}
+
+// Algorithm: Process HELLO responses from multiple shards
+// - On first valid array response: build a reference map and sanitize the 'id' field
+// - On subsequent responses: validate against the reference map immediately
+// Skip 'id' field comparisons since it's shard-specific. For 'proto' field,
+// return error on mismatch as protocol version must be consistent across shards.
+// For other fields, log warnings but don't fail the request.
+void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
+  // Helper to check if two RespValues are equal
+  auto valuesEqual = [](const Common::Redis::RespValue& v1, const Common::Redis::RespValue& v2) {
+    if (v1.type() != v2.type())
+      return false;
+    if (v1.type() == Common::Redis::RespType::BulkString)
+      return v1.asString() == v2.asString();
+    if (v1.type() == Common::Redis::RespType::Integer)
+      return v1.asInteger() == v2.asInteger();
+    return true;
+  };
+
+  size_t first_response_index = 0;
+  absl::flat_hash_map<std::string, const Common::Redis::RespValue*> first_response_map;
+
+  // iterate through all shard responses to validate the responses
+  // Error out if there is any protocol support inconsistency
+  // Sanitize 'id' to be filled later by the client implementation
+  // Log warnings for other inconsistencies
+  for (size_t idx = 0; idx < pending_responses_.size(); ++idx) {
+    auto& resp = pending_responses_[idx];
+    if (!resp) {
+      continue;
+    }
+
+    if (resp->type() != Common::Redis::RespType::Array) {
+      if (!first_response_map.empty()) {
+        ENVOY_LOG(warn, "HELLO: shard returned non-array response, skipping validation");
+      }
+      continue;
+    }
+
+    if (resp->asArray().empty()) {
+      continue;
+    }
+
+    // First valid array response: build reference map and sanitize
+    if (first_response_map.empty()) {
+      first_response_index = idx;
+      auto& arr = resp->asArray();
+      for (size_t i = 0; i + 1 < arr.size(); i += 2) {
+        if (arr[i].type() == Common::Redis::RespType::BulkString) {
+          const std::string& key = arr[i].asString();
+          first_response_map.emplace(key, &arr[i + 1]);
+          // Sanitize id field in first response
+          if (key == "id") {
+            // This will be filled by the client id of envoy filter in client command implementation
+            arr[i + 1].type(Common::Redis::RespType::Null);
+            ENVOY_LOG(debug, "HELLO: sanitized client id field to null");
+          }
+        }
+      }
+      continue;
+    }
+
+    // Subsequent responses: validate against reference map
+    const auto& arr = resp->asArray();
+    for (size_t i = 0; i + 1 < arr.size(); i += 2) {
+      if (arr[i].type() != Common::Redis::RespType::BulkString) {
+        ENVOY_LOG(warn, "HELLO: non-bulkstring key in response, skipping");
+        continue;
+      }
+
+      const std::string& key = arr[i].asString();
+      if (key == "id") {
+        continue; // Skip id field comparison
+      }
+
+      auto it = first_response_map.find(key);
+      if (it == first_response_map.end()) {
+        ENVOY_LOG(warn, "HELLO: key '{}' not found in first response", key);
+        continue;
+      }
+
+      if (!valuesEqual(*it->second, arr[i + 1])) {
+        if (key == "proto") {
+          ENVOY_LOG(error, "HELLO: protocol version mismatch across shards");
+          sendErrorResponse(request, "ERR inconsistent RESP proto across shards");
+          return;
+        }
+        ENVOY_LOG(warn, "HELLO: value mismatch for key '{}'", key);
+      }
+    }
+  }
+
+  // If no valid array response found, return error
+  if (first_response_map.empty()) {
+    sendErrorResponse(request, "ERR no valid HELLO response received from any shard");
+    return;
+  }
+
+  // All validations passed, send the first response (already sanitized)
+  sendSuccessResponse(request, std::move(pending_responses_[first_response_index]));
 }
 
 } // namespace CommandSplitter

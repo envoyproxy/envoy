@@ -33,6 +33,12 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override;
   void addAccessLogHandler(AccessLog::InstanceSharedPtr) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  absl::string_view filterConfigName() const override { return {}; }
+  void setFilterConfigName(absl::string_view) override {}
+  OptRef<const Router::Route> route() const override { return absl::nullopt; }
+  absl::optional<bool> filterDisabled(absl::string_view) const override { return absl::nullopt; }
+  Http::RequestHeaderMapOptRef requestHeaders() const override { return absl::nullopt; }
+  const StreamInfo::StreamInfo& streamInfo() const override;
 
   Filter& filter_;
   Event::Dispatcher& dispatcher_;

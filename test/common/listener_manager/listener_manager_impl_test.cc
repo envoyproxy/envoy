@@ -8546,6 +8546,9 @@ public:
   Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
                               Network::Address::IpVersion version, bool socket_v6only,
                               const Network::SocketCreationOptions& options) const override {
+    if (mock_io_handle_) {
+      return std::move(mock_io_handle_);
+    }
     UNREFERENCED_PARAMETER(socket_v6only);
     UNREFERENCED_PARAMETER(options);
     // Create a regular socket for testing
@@ -8564,6 +8567,9 @@ public:
   Network::IoHandlePtr socket(Network::Socket::Type socket_type,
                               const Network::Address::InstanceConstSharedPtr addr,
                               const Network::SocketCreationOptions& options) const override {
+    if (mock_io_handle_) {
+      return std::move(mock_io_handle_);
+    }
     // Delegate to the other socket method
     return socket(socket_type, addr->type(),
                   addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
@@ -8591,8 +8597,13 @@ public:
   bool wasCalled() const { return was_called_; }
   void resetCalled() { was_called_ = false; }
 
+  void setMockIoHandle(Network::IoHandlePtr&& mock_io_handle) {
+    mock_io_handle_ = std::move(mock_io_handle);
+  }
+
 private:
   mutable bool was_called_{false};
+  mutable Network::IoHandlePtr mock_io_handle_;
 };
 
 // Test address that returns a custom socket interface
@@ -8765,6 +8776,57 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully)
   // The socket creation should fail with the expected error
   EXPECT_FALSE(socket_result.ok());
   EXPECT_EQ(socket_result.status().message(), "failed to create socket using custom interface");
+}
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceTcpListenSocketBindToPort) {
+  auto custom_interface = std::make_unique<TestCustomSocketInterface>();
+  TestCustomSocketInterface* custom_interface_ptr = custom_interface.get();
+  auto custom_address = std::make_shared<TestCustomAddress>(*custom_interface);
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  // Test with BindType::NoBind
+  {
+    Network::Socket::OptionsSharedPtr options = std::make_shared<Network::Socket::Options>();
+    Network::SocketCreationOptions creation_options;
+
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*mock_io_handle, bind(_)).Times(0);
+    EXPECT_CALL(*mock_io_handle, listen(_)).Times(0);
+    EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
+    custom_interface_ptr->setMockIoHandle(std::move(mock_io_handle));
+
+    auto socket_result = real_listener_factory.createListenSocket(
+        custom_address, Network::Socket::Type::Stream, options,
+        ListenerComponentFactory::BindType::NoBind, creation_options, 0);
+    EXPECT_TRUE(socket_result.ok());
+  }
+
+  // Test with BindType::ReusePort
+  {
+    Network::Socket::OptionsSharedPtr options = std::make_shared<Network::Socket::Options>();
+    Network::SocketCreationOptions creation_options;
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+
+    // Set default actions for all potentially called methods on MockIoHandle
+    ON_CALL(*mock_io_handle, isOpen()).WillByDefault(Return(true));
+    ON_CALL(*mock_io_handle, bind(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    ON_CALL(*mock_io_handle, listen(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    ON_CALL(*mock_io_handle, localAddress()).WillByDefault(Return(custom_address));
+
+    // Explicit expectations for the test flow
+    EXPECT_CALL(*mock_io_handle, isOpen()).Times(testing::AtLeast(1));
+    EXPECT_CALL(*mock_io_handle, bind(_));
+
+    // *** Crucially, expect close() to NOT be called ***
+    EXPECT_CALL(*mock_io_handle, close()).Times(0);
+
+    custom_interface_ptr->setMockIoHandle(std::move(mock_io_handle));
+
+    auto socket_result = real_listener_factory.createListenSocket(
+        custom_address, Network::Socket::Type::Stream, options,
+        ListenerComponentFactory::BindType::ReusePort, creation_options, 0);
+    EXPECT_TRUE(socket_result.ok());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));

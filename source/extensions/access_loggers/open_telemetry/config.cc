@@ -12,6 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
+#include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,14 +21,25 @@ namespace OpenTelemetry {
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(open_telemetry_access_logger_cache);
+SINGLETON_MANAGER_REGISTRATION(open_telemetry_http_access_logger_cache);
 
-GrpcAccessLoggerCacheSharedPtr
-getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
+std::shared_ptr<GrpcAccessLoggerCacheImpl>
+getGrpcAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<GrpcAccessLoggerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_access_logger_cache), [&context] {
         return std::make_shared<GrpcAccessLoggerCacheImpl>(
             context.clusterManager().grpcAsyncClientManager(), context.serverScope(),
             context.threadLocal(), context.localInfo());
+      });
+}
+
+HttpAccessLoggerCacheSharedPtr
+getHttpAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
+  return context.singletonManager().getTyped<HttpAccessLoggerCacheImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_http_access_logger_cache), [&context] {
+        return std::make_shared<HttpAccessLoggerCacheImpl>(
+            context.clusterManager(), context.serverScope(), context.threadLocal(),
+            context.localInfo());
       });
 }
 
@@ -41,14 +53,42 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
+  // Validate transport configuration: exactly one transport must be specified.
+  const bool has_grpc_service = proto_config.has_grpc_service();
+  const bool has_http_service = proto_config.has_http_service();
+  const bool has_common_config_grpc =
+      proto_config.has_common_config() && proto_config.common_config().has_grpc_service();
+
+  const int transport_count =
+      (has_grpc_service ? 1 : 0) + (has_http_service ? 1 : 0) + (has_common_config_grpc ? 1 : 0);
+
+  if (transport_count == 0) {
+    throw EnvoyException(
+        "OpenTelemetry access logger requires one of: grpc_service, http_service, or "
+        "common_config.grpc_service to be configured.");
+  }
+
+  if (transport_count > 1) {
+    throw EnvoyException(
+        "OpenTelemetry access logger can only have one transport configured. "
+        "Specify exactly one of: grpc_service, http_service, or common_config.grpc_service.");
+  }
+
   auto commands =
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
                                 proto_config.formatters(), context, std::move(command_parsers)),
                             std::vector<Formatter::CommandParserPtr>);
 
+  // Create appropriate access log based on transport type.
+  if (has_http_service) {
+    return std::make_shared<HttpAccessLog>(
+        std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+        getHttpAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
+  }
+
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
-      getAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
+      getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

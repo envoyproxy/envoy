@@ -141,6 +141,11 @@ Arguments to PING are not allowed. Envoy responds to ECHO immediately with the c
 All other supported commands must contain a key. Supported commands are functionally identical to the
 original Redis command except possibly in failure scenarios.
 
+RESP Protocol
+^^^^^^^^^^^^^
+Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
+hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
+
 INFO command
 ^^^^^^^^^^^^
 INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.

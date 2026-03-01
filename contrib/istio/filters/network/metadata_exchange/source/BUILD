@@ -36,8 +36,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:bool_accessor_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//contrib/envoy/extensions/filters/network/metadata_exchange/v3:pkg_cc_proto",
     ],
 )

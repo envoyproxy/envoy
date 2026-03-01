@@ -24,4 +24,11 @@ message Config {
   // A sequence of the filter state values to apply in the specified order
   // when a new connection is received.
   repeated common.set_filter_state.v3.FilterStateValue on_new_connection = 1;
+
+  // A sequence of the filter state values to apply in the specified order
+  // when the downstream TLS handshake is complete.
+  //
+  // For non-TLS downstream connections (where there is no TLS handshake), this
+  // list is applied when a new connection is received.
+  repeated common.set_filter_state.v3.FilterStateValue on_downstream_tls_handshake = 2;
 }

@@ -3,6 +3,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -122,6 +123,9 @@ public:
   void onConnectionClose(ConnectionCloseAction close_action);
   bool pendingClose() { return state_.local_close_pending_ || state_.remote_close_pending_; }
 
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler);
+  void log(AccessLog::AccessLogType type);
+
 protected:
   struct State {
     // Number of pending filters awaiting closure.
@@ -197,6 +201,7 @@ private:
   std::list<ActiveWriteFilterPtr> downstream_filters_;
   State state_;
   absl::optional<ConnectionCloseAction> latched_close_action_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
 };
 
 } // namespace Network

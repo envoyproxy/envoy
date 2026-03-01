@@ -597,10 +597,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // the buffer limit to a new larger value.
   uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
   if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
-      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+      effective_buffer_limit > callbacks_->bufferLimit()) {
     ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
                      effective_buffer_limit);
-    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+    callbacks_->setBufferLimit(effective_buffer_limit);
   }
 
   // Increment the attempt count from 0 to 1 at the first upstream request.
@@ -866,12 +866,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
             // Calculate effective buffer limit for shadow streams using the same logic as main
             // request. A buffer limit of 1 is set in the case that the effective limit == 0,
             // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-            .setBufferLimit([this]() -> uint32_t {
-              uint64_t effective_limit = calculateEffectiveBufferLimit();
-              // Convert to uint32_t for AsyncClient, clamping to max uint32_t if needed
-              uint32_t shadow_limit = static_cast<uint32_t>(std::min(
-                  effective_limit, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
-              return shadow_limit == 0 ? 1 : shadow_limit;
+            .setBufferLimit([this]() -> uint64_t {
+              const uint64_t effective_limit = calculateEffectiveBufferLimit();
+              return effective_limit == 0 ? 1 : effective_limit;
             }())
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
@@ -966,7 +963,7 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   }
 
   // If no route-level buffer limit is set, use the stream buffer limit.
-  const uint32_t current_stream_limit = callbacks_->decoderBufferLimit();
+  const uint32_t current_stream_limit = callbacks_->bufferLimit();
   if (current_stream_limit != 0) {
     return static_cast<uint64_t>(current_stream_limit);
   }
@@ -1592,6 +1589,11 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
     return;
   }
 
+  // Track the attempted host in upstream info for access logging purposes.
+  if (host && callbacks_->streamInfo().upstreamInfo()) {
+    callbacks_->streamInfo().upstreamInfo()->addUpstreamHostAttempted(host);
+  }
+
   if (request_vcluster_) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
@@ -1743,13 +1745,23 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     }
   }
 
-  upstream_request.upstreamHost()->outlierDetector().putResult(
-      response_code_for_outlier_detection >= 500
-          ? Upstream::Outlier::Result::ExtOriginRequestFailed
-          : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-      response_code_for_outlier_detection);
-
   maybeProcessOrcaLoadReport(*headers, upstream_request);
+
+  // Check for degraded header
+  const bool is_degraded = headers->EnvoyDegraded() != nullptr;
+
+  // Ejection has priority over degradation: 5xx errors always trigger ejection logic.
+  if (response_code_for_outlier_detection >= 500) {
+    upstream_request.upstreamHost()->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestFailed, response_code_for_outlier_detection);
+  } else if (is_degraded) {
+    // Only mark as degraded if response is successful (not 5xx).
+    upstream_request.upstreamHost()->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestDegraded, response_code_for_outlier_detection);
+  } else {
+    upstream_request.upstreamHost()->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestSuccess, response_code_for_outlier_detection);
+  }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(

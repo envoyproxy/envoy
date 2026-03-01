@@ -94,7 +94,7 @@ private:
 public:
   // Stores the first value put inside.
   void registerInvocation(const T& arg) {
-    absl::MutexLock lock{&mutex_};
+    absl::MutexLock lock(mutex_);
     if (0 == invocation_count_) {
       data_ = arg;
     }
@@ -104,14 +104,14 @@ public:
   // Blocks until some value appears, and returns it.
   T awaitFirstInvocation() const {
     const auto cond = std::bind(&Tracker::hasInvocations, this, 1);
-    absl::MutexLock lock{&mutex_, absl::Condition(&cond)};
+    absl::MutexLock lock(mutex_, absl::Condition(&cond));
     return data_;
   }
 
   // Blocks until N invocations have happened.
   void awaitInvocations(const int n) const {
     const auto cond = std::bind(&Tracker::hasInvocations, this, n);
-    absl::MutexLock lock{&mutex_, absl::Condition(&cond)};
+    absl::MutexLock lock(mutex_, absl::Condition(&cond));
   }
 
 private:

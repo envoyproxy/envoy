@@ -19,12 +19,12 @@ envoy_extension_cc_test_library(
     hdrs = ["dns_filter_test_utils.h"],
     extension_names = ["envoy.filters.udp.dns_filter"],
     deps = [
-        "//bazel/foreign_cc:ares",
         "//source/common/common:random_generator_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/test_common:environment_lib",
+        "@c-ares//:ares",
     ],
 )
 
@@ -75,11 +75,29 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":dns_filter_test_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/udp/dns_filter:config",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:integration_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "dns_filter_access_log_integration_test",
+    size = "large",
+    srcs = ["dns_filter_access_log_integration_test.cc"],
+    extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "6gig",
+    deps = [
+        ":dns_filter_test_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/udp/dns_filter:config",
+        "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

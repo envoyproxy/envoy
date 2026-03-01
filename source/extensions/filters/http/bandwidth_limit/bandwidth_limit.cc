@@ -97,7 +97,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
   if (config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
     config.stats().request_enabled_.inc();
     request_limiter_ = std::make_unique<StreamRateLimiter>(
-        config.limit(), decoder_callbacks_->decoderBufferLimit(),
+        config.limit(), decoder_callbacks_->bufferLimit(),
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -164,7 +164,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
     config.stats().response_enabled_.inc();
 
     response_limiter_ = std::make_unique<StreamRateLimiter>(
-        config.limit(), encoder_callbacks_->encoderBufferLimit(),
+        config.limit(), encoder_callbacks_->bufferLimit(),
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
         [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {

@@ -43,9 +43,12 @@ absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params
     } else if (histogram_buckets_query_param.value() == "summary" ||
                histogram_buckets_query_param.value() == "none") {
       histogram_buckets_mode = HistogramBucketsMode::Summary;
+    } else if (histogram_buckets_query_param.value() == "prometheusnative") {
+      histogram_buckets_mode = HistogramBucketsMode::PrometheusNative;
     } else {
       return absl::InvalidArgumentError(
-          "usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)\n");
+          "usage: "
+          "/stats?histogram_buckets=(cumulative|disjoint|detailed|summary|prometheusnative)\n");
     }
   }
   return absl::OkStatus();

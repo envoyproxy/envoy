@@ -1068,6 +1068,33 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  // Handle HELLO command: only support HELLO [protover]
+  // Additional options like AUTH, SETNAME are not supported yet
+  if (command_name == Common::Redis::SupportedCommands::hello()) {
+    if (request->asArray().size() > 2) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          "ERR HELLO options like AUTH and SETNAME are not supported"));
+      return nullptr;
+    }
+
+    if (request->asArray().size() == 2) {
+      const std::string& proto_arg = request->asArray()[1].asString();
+
+      int64_t proto_ver = 0;
+      if (!absl::SimpleAtoi(proto_arg, &proto_ver)) {
+        callbacks.onResponse(
+            Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
+        return nullptr;
+      }
+
+      if (proto_ver != 2) {
+        callbacks.onResponse(
+            Common::Redis::Utility::makeError(Response::get().UnsupportedProtocol));
+        return nullptr;
+      }
+    }
+  }
+
   if (command_name == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
     Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());

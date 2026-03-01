@@ -49,9 +49,9 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/extensions/common/async_files",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/http/cache/file_system_http_cache/v3:pkg_cc_proto",
     ],
 )
@@ -66,8 +66,8 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -77,6 +77,6 @@ envoy_cc_library(
     hdrs = ["cache_file_fixed_block.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )

@@ -14,6 +14,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -36,6 +37,10 @@ public:
   bool autoCloseConnections() const { return auto_close_connections_; }
   const std::string& requestPath() const { return request_path_; }
   const std::string& requestMethod() const { return request_method_string_; }
+  static constexpr absl::string_view tenantDelimiter() {
+    return Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+        TENANT_SCOPE_DELIMITER;
+  }
 
   // Returns true if validation is configured.
   bool hasValidation() const {
@@ -50,6 +55,9 @@ public:
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
                               bool validation_passed, StreamInfo::StreamInfo& stream_info) const;
+
+  // Returns the required cluster name for validation.
+  const std::string& requiredClusterName() const { return required_cluster_name_; }
 
 private:
   ReverseTunnelFilterConfig(
@@ -67,6 +75,9 @@ private:
   Formatter::FormatterConstSharedPtr cluster_id_formatter_;
   const bool emit_dynamic_metadata_{false};
   const std::string dynamic_metadata_namespace_;
+
+  // Required cluster name for validation (empty means no validation).
+  const std::string required_cluster_name_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

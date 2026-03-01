@@ -1317,7 +1317,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
 TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   // The timer is consumed but not used by this test.
   new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
@@ -1361,7 +1361,7 @@ TEST_F(FaultFilterRateLimitTest, DelayWithResponseRateLimitEnabled) {
               setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected));
 
   // Rate limiter related calls.
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   // The timer is consumed but not used by this test.
   new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
 
@@ -1402,7 +1402,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(fault);
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).Times(0);
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));

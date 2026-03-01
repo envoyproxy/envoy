@@ -122,7 +122,8 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
 
   auto match_result = method_matcher->match(matching_data);
 
-  // 'Envoy::Matcher::MatchResult' is the struct type, 'MatchState::UnableToMatch' is the value.
+  // 'Envoy::Matcher::ActionMatchResult' is the struct type, 'MatchState::UnableToMatch' is the
+  // value.
   if (match_result.isInsufficientData()) {
     ENVOY_STREAM_LOG(warn,
                      "Method-level matcher evaluation for {} was not complete. Allowing request.",
@@ -137,9 +138,9 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
     filter_config_.stats().method_blocked_.inc();
     decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.outcome", "blocked");
 
-    rejectRequest(Status::PermissionDenied, "Method not allowed",
+    rejectRequest(Status::NotFound, "Method not allowed",
                   formatError(kRcDetailFilterProtoApiScrubber,
-                              Envoy::Http::CodeUtility::toString(Http::Code::Forbidden),
+                              Envoy::Http::CodeUtility::toString(Http::Code::NotFound),
                               kRcDetailMethodBlocked));
     return true; // Block the request.
   }
@@ -184,8 +185,8 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
-  request_msg_converter_ = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
+  request_msg_converter_ = std::make_unique<MessageConverter>(std::move(cord_message_data_factory),
+                                                              decoder_callbacks_->bufferLimit());
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
@@ -329,8 +330,8 @@ ProtoApiScrubberFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, b
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
-  response_msg_converter_ = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
+  response_msg_converter_ = std::make_unique<MessageConverter>(std::move(cord_message_data_factory),
+                                                               encoder_callbacks_->bufferLimit());
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }

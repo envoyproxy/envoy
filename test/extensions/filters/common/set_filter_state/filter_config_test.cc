@@ -1,3 +1,5 @@
+#include "envoy/common/hashable.h"
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 #include "source/server/generic_factory_context.h"
@@ -91,6 +93,19 @@ TEST_F(ConfigTest, SetValueWithFactory) {
   ASSERT_NE(nullptr, foo);
   EXPECT_EQ(foo->serializeAsString(), "XXX");
   EXPECT_EQ(0, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
+}
+
+TEST_F(ConfigTest, SetHashableValueWithFactory) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.hashable_string
+    format_string:
+      text_format_source:
+        inline_string: "XXX"
+  )YAML"});
+  update();
+  const auto* foo = info_.filterState()->getDataReadOnly<Hashable>("my_key");
+  ASSERT_NE(nullptr, foo);
 }
 
 TEST_F(ConfigTest, SetValueConnection) {

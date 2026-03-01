@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
+
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
@@ -12,6 +14,7 @@
 #include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/cel.pb.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
@@ -1499,6 +1502,60 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldParentMapPopulation) {
   // Verify negative case (unregistered field).
   Protobuf::Field dummy_field;
   EXPECT_EQ(filter_config_->getParentType(&dummy_field), nullptr);
+}
+
+// Verifies that identical matchers share the same pointer.
+TEST_F(ProtoApiScrubberFilterConfigTest, MatcherDeduplication) {
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      api_->fileSystem()
+          .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+          .value();
+
+  // Construct a shared Matcher configuration.
+  xds::type::matcher::v3::Matcher matcher;
+  auto* matcher_entry = matcher.mutable_matcher_list()->add_matchers();
+
+  // Set Predicate (CEL: true).
+  auto* single_predicate = matcher_entry->mutable_predicate()->mutable_single_predicate();
+  single_predicate->mutable_input()->set_name("envoy.matching.inputs.cel_data_input");
+  single_predicate->mutable_input()->mutable_typed_config()->PackFrom(
+      xds::type::matcher::v3::HttpAttributesCelMatchInput());
+
+  xds::type::matcher::v3::CelMatcher cel_matcher;
+  cel_matcher.mutable_expr_match()
+      ->mutable_parsed_expr()
+      ->mutable_expr()
+      ->mutable_const_expr()
+      ->set_bool_value(true);
+  single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(cel_matcher);
+
+  // Set Action (RemoveField).
+  auto* action = matcher_entry->mutable_on_match()->mutable_action();
+  action->set_name("remove");
+  action->mutable_typed_config()->PackFrom(
+      envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction());
+
+  // Apply the same matcher to two different fields.
+  auto& method_rules = (*config.mutable_restrictions()
+                             ->mutable_method_restrictions())["/apikeys.ApiKeys/CreateApiKey"];
+  *(*method_rules.mutable_request_field_restrictions())["field_a"].mutable_matcher() = matcher;
+  *(*method_rules.mutable_request_field_restrictions())["field_b"].mutable_matcher() = matcher;
+
+  auto config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(config_or_status, IsOk());
+  filter_config_ = std::move(config_or_status.value());
+
+  auto matcher_a =
+      filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "field_a");
+  auto matcher_b =
+      filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "field_b");
+
+  ASSERT_NE(matcher_a, nullptr);
+  ASSERT_NE(matcher_b, nullptr);
+
+  // Verify pointers are identical.
+  EXPECT_EQ(matcher_a.get(), matcher_b.get());
 }
 
 } // namespace

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "library/cc/network_change_monitor.h"
 #include "library/cc/stream_client.h"
@@ -19,23 +21,29 @@ using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
 
 class Engine : public std::enable_shared_from_this<Engine>, public NetworkChangeListener {
 public:
+  // Creates a non-owning Engine wrapper around an existing InternalEngine handle.
+  // The returned Engine will not auto-terminate the underlying InternalEngine in its destructor.
+  static absl::StatusOr<std::shared_ptr<Engine>>
+  createFromInternalEngineHandle(int64_t internal_engine_handle);
+
   ~Engine();
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
-  void initializeNetworkChangeMonitor();
+  int64_t getInternalEngineHandle() const;
   void onDefaultNetworkChangeEvent(int network);
   // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().
   void onDefaultNetworkChanged(int network);
   void onDefaultNetworkUnavailable();
   void onDefaultNetworkAvailable();
+  void initializeNetworkChangeMonitor();
   envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
   Envoy::InternalEngine* engine() { return engine_; }
 
 private:
-  Engine(::Envoy::InternalEngine* engine);
+  Engine(::Envoy::InternalEngine* engine, bool handle_termination = true);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -45,6 +53,7 @@ private:
   friend class ::Envoy::BaseClientIntegrationTest;
 
   Envoy::InternalEngine* engine_;
+  const bool handle_termination_;
   StreamClientSharedPtr stream_client_;
   std::unique_ptr<NetworkChangeMonitor> network_change_monitor_;
 };

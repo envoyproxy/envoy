@@ -22,6 +22,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -215,7 +216,7 @@ public:
   // Returns the filter statistics helper.
   const ProtoApiScrubberStats& stats() const { return stats_; }
 
-  // Returns the time source used for latency measurements.
+  // Returns the time source used for measuring latency.
   TimeSource& timeSource() const { return time_source_; }
 
 protected:
@@ -226,6 +227,14 @@ protected:
 
 private:
   friend class MockProtoApiScrubberFilterConfig;
+
+  // Helper method to look up or create a MatchTree.
+  // This allows deduplication of identical matchers in the configuration, ensuring that
+  // if multiple fields share the same matcher config, they share the same MatchTree pointer.
+  // This is critical for efficient caching in FieldChecker.
+  MatchTreeHttpMatchingDataSharedPtr
+  getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
+                     Server::Configuration::FactoryContext& context);
 
   // Validates the filtering mode. Currently, only FilteringMode::OVERRIDE is supported.
   // For any unsupported FilteringMode, it returns absl::InvalidArgument.
@@ -299,7 +308,7 @@ private:
   initializeMethodFieldRestrictions(absl::string_view method_name,
                                     StringPairToMatchTreeMap& field_restrictions,
                                     const Map<std::string, RestrictionConfig>& restrictions,
-                                    Server::Configuration::FactoryContext& context);
+                                    Envoy::Server::Configuration::FactoryContext& context);
 
   // Initializes the method-level restrictions.
   absl::Status
@@ -330,6 +339,9 @@ private:
 
   // A map from {message_name, field_name} to the respective match tree for fields within a message.
   StringPairToMatchTreeMap message_field_restrictions_;
+
+  // Map to deduplicate matchers. Key is the hash of the Matcher proto.
+  absl::flat_hash_map<uint64_t, MatchTreeHttpMatchingDataSharedPtr> unique_matchers_;
 
   // A global map used to recover the parent Type context from a Field pointer.
   // This is read-only after initialization.

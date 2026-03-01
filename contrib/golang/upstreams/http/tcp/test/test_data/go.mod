@@ -1,9 +1,9 @@
 module example.com/test-data
 
-go 1.23
+go 1.24.6
 
 require github.com/envoyproxy/envoy v1.33.2
 
-require google.golang.org/protobuf v1.36.10
+require google.golang.org/protobuf v1.36.11
 
 replace github.com/envoyproxy/envoy => ../../../../../../../

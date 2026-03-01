@@ -393,7 +393,7 @@ The filter populates the following `Response Code Details <config_access_log_for
      - 400 (Bad Request)
      - The gRPC method specified in the ``:path`` header could not be found in the configured descriptor set.
    * - ``proto_api_scrubber_Forbidden{METHOD_BLOCKED}``
-     - 403 (Forbidden)
+     - 404 (Not Found)
      - A method-level restriction matcher evaluated to true, triggering an early rejection of the request.
    * - ``proto_api_scrubber_FAILED_PRECONDITION{REQUEST_BUFFER_CONVERSION_FAIL}``
      - 400 (Bad Request)

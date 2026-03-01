@@ -183,7 +183,7 @@ bool Filter::shouldEncodeSXG(const Http::ResponseHeaderMap& headers) {
 }
 
 bool Filter::encoderBufferLimitReached(uint64_t buffer_length) {
-  const auto limit = encoder_callbacks_->encoderBufferLimit();
+  const auto limit = encoder_callbacks_->bufferLimit();
   const auto header_size = response_headers_->byteSize();
 
   ENVOY_LOG(debug,

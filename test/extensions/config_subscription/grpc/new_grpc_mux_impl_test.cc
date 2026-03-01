@@ -89,7 +89,7 @@ public:
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
-        /*skip_subsequent_node_=*/false};
+        /*skip_subsequent_node_=*/skip_subsequent_node_};
     if (isUnifiedMuxTest()) {
       grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
       return;
@@ -97,33 +97,40 @@ public:
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
   }
 
-  void expectSendMessage(const std::string& type_url,
-                         const std::vector<std::string>& resource_names_subscribe,
-                         const std::vector<std::string>& resource_names_unsubscribe,
-                         const std::string& nonce = "",
-                         const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-                         const std::string& error_message = "",
-                         const std::map<std::string, std::string>& initial_resource_versions = {},
-                         Grpc::MockAsyncStream* async_stream = nullptr) {
+  struct ExpectedMessage {
+    std::string type_url;
+    std::vector<std::string> resource_names_subscribe = {};
+    std::vector<std::string> resource_names_unsubscribe = {};
+    std::string nonce = "";
+    Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok;
+    std::string error_message = "";
+    std::map<std::string, std::string> initial_resource_versions = {};
+    Grpc::MockAsyncStream* async_stream = nullptr;
+    bool with_node = true;
+  };
+
+  void expectSendMessage(const ExpectedMessage& expected_message) {
     API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) expected_request;
-    expected_request.mutable_node()->CopyFrom(local_info_.node());
-    for (const auto& resource : resource_names_subscribe) {
+    if (expected_message.with_node) {
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
+    }
+    for (const auto& resource : expected_message.resource_names_subscribe) {
       expected_request.add_resource_names_subscribe(resource);
     }
-    for (const auto& resource : resource_names_unsubscribe) {
+    for (const auto& resource : expected_message.resource_names_unsubscribe) {
       expected_request.add_resource_names_unsubscribe(resource);
     }
-    for (const auto& v : initial_resource_versions) {
+    for (const auto& v : expected_message.initial_resource_versions) {
       (*expected_request.mutable_initial_resource_versions())[v.first] = v.second;
     }
-    expected_request.set_response_nonce(nonce);
-    expected_request.set_type_url(type_url);
-    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    expected_request.set_response_nonce(expected_message.nonce);
+    expected_request.set_type_url(expected_message.type_url);
+    if (expected_message.error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
-      error_detail->set_code(error_code);
-      error_detail->set_message(error_message);
+      error_detail->set_code(expected_message.error_code);
+      error_detail->set_message(expected_message.error_message);
     }
-    EXPECT_CALL(async_stream ? *async_stream : async_stream_,
+    EXPECT_CALL(expected_message.async_stream ? *expected_message.async_stream : async_stream_,
                 sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
@@ -194,6 +201,7 @@ public:
   Stats::Gauge& control_plane_connected_state_;
   bool should_use_unified_;
   MockEdsResourcesCache* eds_resources_cache_{nullptr};
+  bool skip_subsequent_node_{false};
   const bool using_xds_failover_;
 };
 
@@ -202,6 +210,84 @@ public:
   NewGrpcMuxImplTest() : NewGrpcMuxImplTestBase(std::get<0>(GetParam())) {}
   Event::SimulatedTimeSystem time_system_;
 };
+
+// Validate behavior when skip_subsequent_node parameter is set to true.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  // The node has been sent already, so it won't be sent again.
+  expectSendMessage({.type_url = "bar", .with_node = false});
+  grpc_mux_->start();
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = false});
+}
+
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  grpc_mux_->start();
+
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  // On reconnection, node should be sent again with the first message.
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  remoteClose();
+
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = false});
+}
+
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFeatureFlagDisabled) {
+  if (isUnifiedMuxTest()) {
+    delete async_client_;
+    GTEST_SKIP() << "This test is only relevant for the legacy mux.";
+  }
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node", "false"}});
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  // Though skip_subsequent_node is true, the feature flag is disabled, so the node will be sent
+  // again.
+  expectSendMessage({.type_url = "bar", .with_node = true});
+  grpc_mux_->start();
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = true});
+}
 
 INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
                          testing::Combine(testing::ValuesIn({LegacyOrUnified::Legacy,
@@ -215,19 +301,19 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, {});
-  expectSendMessage("bar", {}, {});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
+  expectSendMessage({.type_url = "bar"});
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
   // Update to foo type should resend Node.
-  expectSendMessage("foo", {}, {});
+  expectSendMessage({.type_url = "foo"});
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
   // Update to bar type should resend Node.
-  expectSendMessage("bar", {}, {});
+  expectSendMessage({.type_url = "bar"});
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
 
-  expectSendMessage("foo", {}, {"x", "y"});
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
 }
 
 // Validate cached nonces are cleared on reconnection.
@@ -248,7 +334,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send on connection.
-  expectSendMessage(type_url, {"x", "y"}, {});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
   auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
   response->set_type_url(type_url);
@@ -281,14 +367,15 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
     // response path, and so the failover isn't aware that the test suite
     // passed a valid response back to the mux. Thus, the xds-failover will not set
     // the flag that triggers the initial-resource-versions population.
-    expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "");
+    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
   } else {
-    expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                      {{"x", "2000"}, {"y", "3000"}});
+    expectSendMessage({.type_url = type_url,
+                       .resource_names_subscribe = {"x", "y"},
+                       .initial_resource_versions = {{"x", "2000"}, {"y", "3000"}}});
   }
   remoteClose();
 
-  expectSendMessage(type_url, {}, {"x", "y"});
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x", "y"}});
 }
 
 // Validate resources are not sent on wildcard watch reconnection.
@@ -308,7 +395,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send a wildcard request on new connection.
-  expectSendMessage(type_url, {}, {});
+  expectSendMessage({.type_url = type_url});
   grpc_mux_->start();
 
   // An helper function to create a response with a single load_assignment resource
@@ -344,7 +431,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
           return absl::OkStatus();
         }));
     // Expect an ack with the nonce.
-    expectSendMessage(type_url, {}, {}, "111");
+    expectSendMessage({.type_url = type_url, .nonce = "111"});
     onDiscoveryResponse(std::move(response));
   }
   // Send another response with a different resource, but where EDS is paused.
@@ -376,10 +463,10 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
     // response path, and so the failover isn't aware that the test suite
     // passed a valid response back to the mux. Thus, the xds-failover will not set
     // the flag that triggers the initial-resource-versions population.
-    expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "");
+    expectSendMessage({.type_url = type_url});
   } else {
-    expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                      {{"x", "1000"}, {"y", "2000"}});
+    expectSendMessage(
+        {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
   }
   remoteClose();
   // Destruction of wildcard will not issue unsubscribe requests for the resources.
@@ -586,13 +673,13 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
 
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, {});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
-  expectSendMessage("foo", {"z"}, {});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
   grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 
-  expectSendMessage("foo", {}, {"x", "y"});
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
 }
 
 TEST_P(NewGrpcMuxImplTest, Shutdown) {
@@ -600,7 +687,7 @@ TEST_P(NewGrpcMuxImplTest, Shutdown) {
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, {});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
   shutdownMux();
@@ -632,7 +719,7 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
   auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x"}, {});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
   grpc_mux_->start();
 
   // Reply with the resource, it will be added to the cache.
@@ -657,13 +744,13 @@ TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
           return absl::OkStatus();
         }));
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
-    expectSendMessage(type_url, {}, {}); // Ack.
+    expectSendMessage({.type_url = type_url}); // Ack.
     onDiscoveryResponse(std::move(response));
   }
 
   // Envoy will unsubscribe from all resources.
   EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
-  expectSendMessage(type_url, {}, {"x"});
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x"}});
 }
 
 // Validate that an update to an EDS resource watcher is reflected in the cache,
@@ -677,7 +764,7 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
   auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x"}, {});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
   grpc_mux_->start();
 
   // Reply with the resource, it will be added to the cache.
@@ -702,18 +789,20 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
           return absl::OkStatus();
         }));
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
-    expectSendMessage(type_url, {}, {}); // Ack.
+    expectSendMessage({.type_url = type_url}); // Ack.
     onDiscoveryResponse(std::move(response));
   }
 
   // Update the cache to another resource.
   EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
-  expectSendMessage(type_url, {"y"}, {"x"});
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"y"},
+                     .resource_names_unsubscribe = {"x"}});
   watch->update({"y"});
 
   // Envoy will unsubscribe from all resources.
   EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
-  expectSendMessage(type_url, {}, {"y"});
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
 }
 
 // Validate that adding and removing watchers reflects on the cache changes,
@@ -729,7 +818,7 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
     auto watch1 = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
 
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-    expectSendMessage(type_url, {"x"}, {});
+    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
     grpc_mux_->start();
 
     // Reply with the resource, it will be added to the cache.
@@ -754,19 +843,19 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
             return absl::OkStatus();
           }));
       EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
-      expectSendMessage(type_url, {}, {}); // Ack.
+      expectSendMessage({.type_url = type_url}); // Ack.
       onDiscoveryResponse(std::move(response));
     }
 
     // Watcher (watch1) going out of scope, the resource should be removed, as well as
     // the interest.
     EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
-    expectSendMessage(type_url, {}, {"x"});
+    expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x"}});
   }
 
   // Update to a new resource interest.
   {
-    expectSendMessage(type_url, {"y"}, {});
+    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"y"}});
     auto watch2 = grpc_mux_->addWatch(type_url, {"y"}, callbacks_, resource_decoder_, {});
 
     // Reply with the resource, it will be added to the cache.
@@ -791,14 +880,14 @@ TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
             return absl::OkStatus();
           }));
       EXPECT_CALL(*eds_resources_cache_, setResource("y", ProtoEq(load_assignment)));
-      expectSendMessage(type_url, {}, {}); // Ack.
+      expectSendMessage({.type_url = type_url}); // Ack.
       onDiscoveryResponse(std::move(response));
     }
 
     // Watcher (watch2) going out of scope, the resource should be removed, as well as
     // the interest.
     EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
-    expectSendMessage(type_url, {}, {"y"});
+    expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
   }
 }
 
@@ -811,8 +900,8 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
   auto foo_sub = grpc_mux_->addWatch("type_url_foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("type_url_bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("type_url_foo", {"x", "y"}, {});
-  expectSendMessage("type_url_bar", {}, {});
+  expectSendMessage({.type_url = "type_url_foo", .resource_names_subscribe = {"x", "y"}});
+  expectSendMessage({.type_url = "type_url_bar"});
   grpc_mux_->start();
   EXPECT_EQ(1, control_plane_connected_state_.value());
 
@@ -824,10 +913,10 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
   EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
       .WillOnce(Return(&replaced_async_stream_));
   // Expect the initial messages to be sent to the new stream.
-  expectSendMessage("type_url_foo", {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                    {}, &replaced_async_stream_);
-  expectSendMessage("type_url_bar", {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
-                    &replaced_async_stream_);
+  expectSendMessage({.type_url = "type_url_foo",
+                     .resource_names_subscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
+  expectSendMessage({.type_url = "type_url_bar", .async_stream = &replaced_async_stream_});
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
@@ -837,8 +926,9 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       empty_ads_config));
   // Ending test, removing subscriptions for type_url_foo.
-  expectSendMessage("type_url_foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                    {}, &replaced_async_stream_);
+  expectSendMessage({.type_url = "type_url_foo",
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
 }
 
 // Updating the mux object after receiving a response, sends the correct requests.
@@ -850,7 +940,7 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x", "y"}, {});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
   // Send back a response for one of the resources.
@@ -874,7 +964,7 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
         }));
-    expectSendMessage(type_url, {}, {}, "n1");
+    expectSendMessage({.type_url = type_url, .nonce = "n1"});
     onDiscoveryResponse(std::move(response));
   }
 
@@ -887,8 +977,10 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
       .WillOnce(Return(&replaced_async_stream_));
   // Expect the initial message to be sent to the new stream.
   // It will include "x" in its initial_resource_versions.
-  expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                    {{"x", "x1"}}, &replaced_async_stream_);
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"x", "y"},
+                     .initial_resource_versions = {{"x", "x1"}},
+                     .async_stream = &replaced_async_stream_});
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
@@ -919,14 +1011,15 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
               TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
           return absl::OkStatus();
         }));
-    expectSendMessage(type_url, {}, {}, "n2", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
-                      &replaced_async_stream_);
+    expectSendMessage(
+        {.type_url = type_url, .nonce = "n2", .async_stream = &replaced_async_stream_});
     onDiscoveryResponse(std::move(response));
   }
 
   // Ending test, removing subscriptions for the subscription.
-  expectSendMessage(type_url, {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
-                    &replaced_async_stream_);
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
 }
 
 // Updating the mux object with wrong rate limit settings is rejected.
@@ -938,7 +1031,7 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
   const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x", "y"}, {});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
   EXPECT_EQ(1, control_plane_connected_state_.value());
 
@@ -964,8 +1057,9 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                        ads_config_wrong_settings)
                    .ok());
   // Ending test, removing subscriptions for type_url_foo.
-  expectSendMessage(type_url, {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
-                    &async_stream_);
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &async_stream_});
 }
 
 TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {

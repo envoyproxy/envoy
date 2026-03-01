@@ -42,6 +42,7 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::ElementsAre;
 using testing::EndsWith;
+using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -656,6 +657,29 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ProtocolStreamId) {
+  allow_metadata_ = true;
+  initialize();
+
+  std::vector<uint32_t> expected_stream_ids;
+  uint32_t expected_stream_id = 1;
+  for (int i = 0; i < 10; ++i) {
+    RequestEncoder* request_encoder =
+        i == 0 ? request_encoder_ : &client_->newStream(response_decoder_);
+    TestRequestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+    EXPECT_TRUE(request_encoder->encodeHeaders(request_headers, false).ok());
+    driveToCompletion();
+
+    expected_stream_ids.insert(expected_stream_ids.begin(), expected_stream_id);
+    EXPECT_THAT(request_encoder->getStream().codecStreamId(), Eq(expected_stream_id));
+    EXPECT_THAT(getActiveStreamsIds(*client_), Eq(expected_stream_ids));
+    EXPECT_THAT(getActiveStreamsIds(*server_), Eq(expected_stream_ids));
+    expected_stream_id += 2;
+  }
 }
 
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {

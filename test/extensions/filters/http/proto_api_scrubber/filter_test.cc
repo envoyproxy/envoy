@@ -139,7 +139,7 @@ public:
 // Mock class for `Matcher::MatchTree`
 class MockMatchTree : public Matcher::MatchTree<HttpMatchingData> {
 public:
-  MOCK_METHOD(Matcher::MatchResult, match,
+  MOCK_METHOD(Matcher::ActionMatchResult, match,
               (const HttpMatchingData& matching_data, Matcher::SkippedMatchCb skipped_match_cb),
               (override));
 };
@@ -186,11 +186,9 @@ protected:
   }
 
   void setupMocks() {
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
-    ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
     ON_CALL(mock_factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
 
@@ -550,7 +548,7 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 using ProtoApiScrubberRequestRejectedTests = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -573,7 +571,7 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
 }
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, ResponseBufferLimitedExceeded) {
-  ON_CALL(mock_encoder_callbacks_, encoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1319,15 +1317,15 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
 
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
 
   EXPECT_CALL(mock_decoder_callbacks_,
-              sendLocalReply(Http::Code::Forbidden, "Method not allowed", Eq(nullptr),
-                             Eq(Status::PermissionDenied),
-                             "proto_api_scrubber_Forbidden{METHOD_BLOCKED}"));
+              sendLocalReply(Http::Code::NotFound, "Method not allowed", Eq(nullptr),
+                             Eq(Status::NotFound), "proto_api_scrubber_Not Found{METHOD_BLOCKED}"));
 
   // Verify Trace Tag.
   EXPECT_CALL(mock_decoder_callbacks_.active_span_,
@@ -1349,7 +1347,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
       .WillOnce(Return(mock_match_tree));
 
   // Explicitly return NoMatch state from the matcher.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1387,7 +1386,7 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedMatcherInsufficientData) {
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
   EXPECT_CALL(*mock_match_tree, match(_, _))
-      .WillOnce(Return(Matcher::MatchResult::insufficientData()));
+      .WillOnce(Return(Matcher::ActionMatchResult::insufficientData()));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1411,7 +1410,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
 
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   // Setup field restriction on the real config
   ProtoApiScrubberConfig field_config_proto;
@@ -1552,7 +1552,8 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
       .WillOnce(Return(mock_match_tree));
 
   // Return Match to simulate block.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1561,8 +1562,8 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
   EXPECT_CALL(mock_decoder_callbacks_.active_span_,
               setTag("proto_api_scrubber.outcome", "blocked"));
 
-  // Verify 403.
-  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  // Verify 404.
+  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::NotFound, _, _, _, _));
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(headers, false));
 

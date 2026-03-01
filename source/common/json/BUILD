@@ -18,7 +18,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_github_nlohmann_json//:json",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -41,9 +41,9 @@ envoy_cc_library(
         ":json_internal_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
-        "@com_github_nlohmann_json//:json",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
         "@com_google_protobuf//third_party/utf8_range:utf8_validity",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -63,7 +63,7 @@ envoy_cc_library(
     name = "constants_lib",
     hdrs = ["constants.h"],
     deps = [
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -74,5 +74,27 @@ envoy_cc_library(
     deps = [
         ":json_streamer_lib",
         "//source/common/protobuf:utility_lib_header",
+    ],
+)
+
+envoy_cc_library(
+    name = "json_rpc_parser_lib",
+    srcs = [
+        "json_rpc_field_extractor.cc",
+        "json_rpc_parser_config.cc",
+    ],
+    hdrs = [
+        "json_rpc_field_extractor.h",
+        "json_rpc_parser_config.h",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )

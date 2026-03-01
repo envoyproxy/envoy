@@ -1,0 +1,28 @@
+diff --git a/yq/private/yq.bzl b/yq/private/yq.bzl
+index 42c8fc1..5b1ede0 100644
+--- a/yq/private/yq.bzl
++++ b/yq/private/yq.bzl
+@@ -72,10 +72,13 @@ def _yq_impl(ctx):
+ 
+     # For split operations, yq outputs files in the same directory so we
+     # must cd to the correct output dir before executing it
+-    bin_dir = "/".join([ctx.bin_dir.path, ctx.label.package]) if ctx.label.package else ctx.bin_dir.path
++    bin_dir = ctx.bin_dir.path
++    if ctx.label.workspace_name:
++        bin_dir = "%s/external/%s" % (bin_dir, ctx.label.workspace_name)
++    bin_dir = bin_dir + "/" + ctx.label.package
+     escape_bin_dir = _escape_path(bin_dir)
+     cmd = "cd {bin_dir} && {yq} {args} {eval_cmd} {expression} {sources} {maybe_out}".format(
+-        bin_dir = ctx.bin_dir.path + "/" + ctx.label.package,
++        bin_dir = bin_dir,
+         yq = escape_bin_dir + yq_bin.path,
+         eval_cmd = "eval" if len(inputs) <= 1 else "eval-all",
+         args = " ".join(args),
+@@ -84,7 +87,6 @@ def _yq_impl(ctx):
+         # In the -s/--split-exr case, the out file names are determined by the yq expression
+         maybe_out = (" > %s%s" % (escape_bin_dir, outs[0].path)) if len(outs) == 1 else "",
+     )
+-
+     ctx.actions.run_shell(
+         tools = [yq_bin],
+         inputs = inputs,

@@ -129,7 +129,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/certs", "print certs on machine",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
-                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
+                      MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false,
+                      {{Admin::ParamDescriptor::Type::String, "filter",
+                        "Regular expression (Google re2) for filtering clusters by name"}}),
           makeHandler(
               "/config_dump", "dump current Envoy configs (experimental)",
               MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
@@ -309,17 +311,18 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
-                                  const Http::FilterChainOptions&) const {
-  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
-  };
-  manager.applyFilterFactoryCb({}, factory);
+bool AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const {
+  callbacks.setFilterConfigName("");
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   return true;
 }
 
 void AdminImpl::addAllowlistedPath(Matchers::StringMatcherPtr matcher) {
   allowlisted_paths_.emplace_back(std::move(matcher));
+}
+
+const Matcher::MatchTreePtr<Http::HttpMatchingData>& AdminImpl::forwardClientCertMatcher() const {
+  return forward_client_cert_matcher_;
 }
 
 namespace {

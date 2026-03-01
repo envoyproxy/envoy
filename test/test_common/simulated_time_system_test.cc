@@ -262,7 +262,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
     for (;;) {
       {
-        absl::MutexLock lock(&mutex);
+        absl::MutexLock lock(mutex);
         if (done) {
           return;
         }
@@ -274,7 +274,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
 
   TimerPtr timer = scheduler_->createTimer(
       [&mutex, &done]() {
-        absl::MutexLock lock(&mutex);
+        absl::MutexLock lock(mutex);
         done = true;
       },
       dispatcher_);
@@ -283,7 +283,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   // Wait 1ms of real time. waitFor() does not advance simulated time, so this is just going to
   // verify that we return quickly and nothing has fired.
   {
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::milliseconds(1)));
   }
   EXPECT_FALSE(done);
@@ -292,7 +292,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   // Fire the timeout by advancing time and then verify that waitFor() returns without any timeout.
   time_system_.advanceTimeWait(std::chrono::seconds(60));
   {
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);
@@ -303,7 +303,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   // the max duration and return a timeout.
   done = false;
   {
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
@@ -416,7 +416,7 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer2) {
   auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
     for (;;) {
       {
-        absl::MutexLock lock(&mutex);
+        absl::MutexLock lock(mutex);
         if (done) {
           return;
         }
@@ -428,21 +428,21 @@ TEST_F(SimulatedTimeSystemTest, DuplicateTimer2) {
 
   TimerPtr timer = scheduler_->createTimer(
       [&mutex, &done]() {
-        absl::MutexLock lock(&mutex);
+        absl::MutexLock lock(mutex);
         done = true;
       },
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(10));
 
   {
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_FALSE(done);
 
   time_system_.advanceTimeWait(std::chrono::seconds(10));
   {
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(0)));
   }
   EXPECT_TRUE(done);

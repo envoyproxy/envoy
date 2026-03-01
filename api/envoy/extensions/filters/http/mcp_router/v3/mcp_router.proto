@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_router.v3;
 
+import "envoy/type/metadata/v3/metadata.proto";
+
 import "google/protobuf/duration.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -33,6 +35,57 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
 // * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
 //
+
+// Extract identity from a request header.
+message HeaderSource {
+  // Header name to extract (e.g., "x-user-identity").
+  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+}
+
+// Extract identity from dynamic metadata (e.g., populated by JWT or ext_authz filter).
+message DynamicMetadataSource {
+  // The metadata key to retrieve the value from.
+  type.metadata.v3.MetadataKey key = 1 [(validate.rules).message = {required: true}];
+}
+
+// Defines how the identity (user/principal) is extracted from the request.
+// Exactly one of ``header`` or ``dynamic_metadata`` must be set.
+message IdentityExtractor {
+  // Extract identity from a request header.
+  HeaderSource header = 1;
+
+  // Extract identity from dynamic metadata.
+  DynamicMetadataSource dynamic_metadata = 2;
+}
+
+// Specifies how to handle requests where the identity is missing or mismatched.
+message ValidationPolicy {
+  enum Mode {
+    // Not specified. Defaults to DISABLED behavior.
+    MODE_UNSPECIFIED = 0;
+
+    // Bind identity on Initialize if present, but do not validate subsequent requests.
+    // If extraction fails, the session proceeds anonymously.
+    DISABLED = 1;
+
+    // Reject the request (403) if the identity cannot be extracted
+    // or if the session identity does not match the request identity.
+    ENFORCE = 2;
+  }
+
+  Mode mode = 1 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Session identity configuration.
+message SessionIdentity {
+  // Defines how the identity (user/principal) is extracted from the request.
+  IdentityExtractor identity = 1 [(validate.rules).message = {required: true}];
+
+  // Specifies how to handle requests where the subject is missing or invalid.
+  // Defaults to DISABLED.
+  ValidationPolicy validation = 2;
+}
+
 message McpRouter {
   // Specification of the MCP server.
   message McpBackend {
@@ -68,4 +121,8 @@ message McpRouter {
   // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
   // that the client presented to Envoy.
   repeated McpBackend servers = 1;
+
+  // If set, extracts a request "subject" and binds it into the MCP session.
+  // If not set, sessions are created without identity binding.
+  SessionIdentity session_identity = 2;
 }

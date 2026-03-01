@@ -37,6 +37,12 @@ constexpr const char* UrlBodyTemplateWithCredentialsForRefreshToken =
 constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
     "grant_type=refresh_token&refresh_token={0}";
 
+constexpr const char* UrlBodyTemplateWithoutSecretForAuthCode =
+    "grant_type=authorization_code&code={0}&client_id={1}&redirect_uri={2}&code_verifier={3}";
+
+constexpr const char* UrlBodyTemplateWithoutSecretForRefreshToken =
+    "grant_type=refresh_token&refresh_token={0}&client_id={1}";
+
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
@@ -57,7 +63,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                        Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url,
                        code_verifier);
     break;
-  case AuthType::BasicAuth:
+  case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
     const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
@@ -67,10 +73,18 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                        code_verifier);
     break;
   }
+  case AuthType::TlsClientAuth:
+    // For mTLS, authentication is done via the client certificate in the TLS handshake.
+    // No client_secret is sent in the request body or headers.
+    body = fmt::format(UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"), encoded_cb_url,
+                       code_verifier);
+    break;
+  }
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
+  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for access token.", *decoder_callbacks_);
   dispatchRequest(std::move(request));
 }
 
@@ -90,7 +104,7 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
                        Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
                        Http::Utility::PercentEncoding::encode(secret, ":/=&?"));
     break;
-  case AuthType::BasicAuth:
+  case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
     const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
@@ -100,10 +114,19 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
                        Http::Utility::PercentEncoding::encode(refresh_token));
     break;
   }
+  case AuthType::TlsClientAuth:
+    // For mTLS, authentication is done via the client certificate in the TLS handshake.
+    // No client_secret is sent in the request body or headers.
+    body = fmt::format(UrlBodyTemplateWithoutSecretForRefreshToken,
+                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"));
+    break;
+  }
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_LOG(debug, "Dispatching OAuth request for update access token by refresh token.");
+  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
+                   *decoder_callbacks_);
   dispatchRequest(std::move(request));
 }
 
@@ -138,8 +161,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
 
   if (response_code != "200") {
-    ENVOY_LOG(debug, "Oauth response code: {}", response_code);
-    ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
+    ENVOY_STREAM_LOG(debug, "Oauth response code: {}", *decoder_callbacks_, response_code);
+    ENVOY_STREAM_LOG(debug, "Oauth response body: {}", *decoder_callbacks_,
+                     message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
       parent_->sendUnauthorizedResponse(
@@ -204,7 +228,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
-  ENVOY_LOG(debug, "OAuth request failed.");
+  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   in_flight_request_ = nullptr;
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;

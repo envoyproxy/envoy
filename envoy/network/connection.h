@@ -78,15 +78,6 @@ enum class ConnectionCloseType {
 };
 
 /**
- * Type of connection close which is detected from the socket.
- */
-enum class DetectedCloseType {
-  Normal,      // The normal socket close from Envoy's connection perspective.
-  LocalReset,  // The local reset initiated from Envoy.
-  RemoteReset, // The peer reset detected by the connection.
-};
-
-/**
  * Combines connection event and close type for connection close operations
  */
 struct ConnectionCloseAction {
@@ -191,7 +182,7 @@ public:
   /**
    * @return the detected close type from socket.
    */
-  virtual DetectedCloseType detectedCloseType() const PURE;
+  virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.

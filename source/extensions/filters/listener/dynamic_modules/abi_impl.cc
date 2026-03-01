@@ -3,12 +3,16 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
+#include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -106,6 +110,253 @@ void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
   if (callbacks != nullptr && hash.ptr != nullptr && hash.length > 0) {
     callbacks->socket().setJA4Hash(std::string(hash.ptr, hash.length));
   }
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view sni = callbacks->socket().requestedServerName();
+  if (sni.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(sni.data());
+  result_out->length = sni.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view protocol = callbacks->socket().detectedTransportProtocol();
+  if (protocol.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(protocol.data());
+  result_out->length = protocol.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  return callbacks->socket().requestedApplicationProtocols().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto& protocols = callbacks->socket().requestedApplicationProtocols();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < protocols.size(); ++i) {
+    protocols_out[i].ptr = const_cast<char*>(protocols[i].data());
+    protocols_out[i].length = protocols[i].size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view hash = callbacks->socket().ja3Hash();
+  if (hash.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(hash.data());
+  result_out->length = hash.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const absl::string_view hash = callbacks->socket().ja4Hash();
+  if (hash.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(hash.data());
+  result_out->length = hash.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  return ssl != nullptr;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return 0;
+  }
+
+  return ssl->uriSanPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return false;
+  }
+
+  const auto& uri_sans = ssl->uriSanPeerCertificate();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < uri_sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(uri_sans[i].data());
+    sans_out[i].length = uri_sans[i].size();
+  }
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return 0;
+  }
+
+  return ssl->dnsSansPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    return false;
+  }
+
+  const auto& dns_sans = ssl->dnsSansPeerCertificate();
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < dns_sans.size(); ++i) {
+    sans_out[i].ptr = const_cast<char*>(dns_sans[i].data());
+    sans_out[i].length = dns_sans[i].size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const auto ssl = callbacks->socket().connectionInfoProvider().sslConnection();
+  if (!ssl) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  const std::string& subject = ssl->subjectPeerCertificate();
+  result_out->ptr = const_cast<char*>(subject.data());
+  result_out->length = subject.size();
+  return true;
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
@@ -377,12 +628,119 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 }
 
 void envoy_dynamic_module_callback_listener_filter_close_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return;
+  }
+  if (details.ptr != nullptr && details.length > 0) {
+    callbacks->streamInfo().setConnectionTerminationDetails(
+        absl::string_view(details.ptr, details.length));
+  }
+  callbacks->socket().ioHandle().close();
+}
+
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return -1;
+  }
+  if (data.ptr == nullptr || data.length == 0) {
+    return -1;
+  }
+  Buffer::OwnedImpl buffer;
+  buffer.add(data.ptr, data.length);
+  Api::IoCallUint64Result result = callbacks->socket().ioHandle().write(buffer);
+  if (result.ok()) {
+    return static_cast<int64_t>(result.return_value_);
+  }
+  return -1;
+}
+
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
-  if (callbacks != nullptr) {
-    callbacks->socket().ioHandle().close();
+  if (callbacks == nullptr) {
+    return -1;
   }
+  return callbacks->socket().ioHandle().fdDoNotUse();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  int int_value = static_cast<int>(value);
+  auto result = callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, sizeof(int_value));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value.ptr == nullptr) {
+    return false;
+  }
+
+  auto result =
+      callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                          value.ptr, static_cast<socklen_t>(value.length));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr) {
+    return false;
+  }
+
+  int int_value = 0;
+  socklen_t optlen = sizeof(int_value);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *value_out = int_value;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr || actual_size_out == nullptr) {
+    return false;
+  }
+
+  socklen_t optlen = static_cast<socklen_t>(value_size);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    value_out, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *actual_size_out = optlen;
+  return true;
 }
 
 void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
@@ -408,22 +766,24 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
   callbacks->setDynamicMetadata(ns, metadata);
 }
 
-void envoy_dynamic_module_callback_listener_filter_set_filter_state(
+bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
 
   if (callbacks == nullptr || key.ptr == nullptr || value.ptr == nullptr) {
-    return;
+    return false;
   }
 
   std::string key_str(key.ptr, key.length);
   std::string value_str(value.ptr, value.length);
 
+  // TODO(wbpcode): check whether the key already exists and whether overwriting is allowed.
   callbacks->filterState().setData(key_str, std::make_shared<Router::StringAccessorImpl>(value_str),
                                    StreamInfo::FilterState::StateType::ReadOnly,
                                    StreamInfo::FilterState::LifeSpan::Connection);
+  return true;
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
@@ -480,6 +840,281 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
   const auto start_time = callbacks->streamInfo().startTime();
   const auto duration = start_time.time_since_epoch();
   return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+
+  const auto& metadata = callbacks->dynamicMetadata();
+  const auto& fields = metadata.filter_metadata();
+  auto ns_it = fields.find(ns);
+
+  if (ns_it == fields.end()) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  const auto& ns_fields = ns_it->second.fields();
+  auto field_it = ns_fields.find(key_str);
+
+  if (field_it == ns_fields.end() ||
+      field_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  const std::string& value = field_it->second.string_value();
+  value_out->ptr = const_cast<char*>(value.c_str());
+  value_out->length = value.size();
+  return true;
+}
+
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr ||
+      value.ptr == nullptr) {
+    // TODO(wbpcode): These should never happen and may be converted to asserts.
+    return;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+  std::string value_str(value.ptr, value.length);
+
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[key_str].set_string_value(value_str);
+
+  callbacks->setDynamicMetadata(ns, metadata);
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  return filter->maxReadBytes();
+}
+
+// -----------------------------------------------------------------------------
+// Metrics Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
+  *counter_id_ptr = config->addCounter({c});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_increment_counter(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto counter = filter->getFilterConfig().getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
+                                                       Stats::Gauge::ImportMode::Accumulate);
+  *gauge_id_ptr = config->addGauge({g});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_listener_filter_set_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
+  auto* config = static_cast<DynamicModuleListenerFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
+      *config->stats_scope_, {main_stat_name}, Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->addHistogram({h});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto histogram = filter->getFilterConfig().getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// -----------------------------------------------------------------------------
+// HTTP Callout Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_listener_filter_http_callout(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+
+  // Build the request message.
+  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+
+  // Add headers.
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = headers[i];
+    message->headers().addCopy(
+        Http::LowerCaseString(std::string(header.key_ptr, header.key_length)),
+        std::string(header.value_ptr, header.value_length));
+  }
+
+  // Add body if present.
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(body.ptr, body.length);
+  }
+
+  // Validate required headers.
+  if (message->headers().Method() == nullptr || message->headers().Path() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  // Send the callout.
+  return filter->sendHttpCallout(callout_id_out, std::string(cluster_name.ptr, cluster_name.length),
+                                 std::move(message), timeout_milliseconds);
+}
+
+// -----------------------------------------------------------------------------
+// Scheduler Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  Event::Dispatcher* dispatcher = filter->dispatcher();
+  if (dispatcher == nullptr) {
+    return nullptr;
+  }
+  return new DynamicModuleListenerFilterScheduler(filter->weak_from_this(), *dispatcher);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr) {
+  auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
+  return new DynamicModuleListenerFilterConfigScheduler(filter_config->weak_from_this(),
+                                                        filter_config->main_thread_dispatcher_);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+// -----------------------------------------------------------------------------
+// Misc ABI Callbacks
+// -----------------------------------------------------------------------------
+
+uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
 }
 
 } // extern "C"

@@ -100,6 +100,13 @@ TEST_P(AccessLogIntegrationTest, DownstreamDisconnectBeforeHeadersResponseCode) 
   EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0;CEL_METHOD=GET"));
 }
 
+TEST_P(AccessLogIntegrationTest, DownstreamDetectedCloseType) {
+  useAccessLog("CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("CLOSE_TYPE=Normal"));
+}
+
 TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
   // Add incomplete UTF-8 strings.
   default_request_headers_.setForwardedFor("\xec");

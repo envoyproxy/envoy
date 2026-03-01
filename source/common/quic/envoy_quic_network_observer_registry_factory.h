@@ -22,6 +22,12 @@ public:
     quic_observers_.erase(&observer);
   }
 
+  // Get the default network handle.
+  virtual NetworkHandle getDefaultNetwork() PURE;
+
+  // Get an alternative network handle different from the given one.
+  virtual NetworkHandle getAlternativeNetwork(NetworkHandle network) PURE;
+
 protected:
   const absl::flat_hash_set<QuicNetworkConnectivityObserver*>& registeredQuicObservers() const {
     return quic_observers_;
@@ -36,9 +42,7 @@ public:
   virtual ~EnvoyQuicNetworkObserverRegistryFactory() = default;
 
   virtual std::unique_ptr<EnvoyQuicNetworkObserverRegistry>
-  createQuicNetworkObserverRegistry(Event::Dispatcher& /*dispatcher*/) {
-    return std::make_unique<EnvoyQuicNetworkObserverRegistry>();
-  }
+  createQuicNetworkObserverRegistry(Event::Dispatcher& /*dispatcher*/) PURE;
 };
 
 using EnvoyQuicNetworkObserverRegistryPtr = std::unique_ptr<EnvoyQuicNetworkObserverRegistry>;

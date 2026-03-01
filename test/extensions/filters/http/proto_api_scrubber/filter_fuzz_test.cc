@@ -194,8 +194,8 @@ DEFINE_PROTO_FUZZER(const ProtoApiScrubberFuzzInput& input) {
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
 
   // Set buffer limits high to avoid triggering resource exhausted errors prematurely.
-  ON_CALL(decoder_callbacks, decoderBufferLimit()).WillByDefault(testing::Return(1024 * 1024));
-  ON_CALL(encoder_callbacks, encoderBufferLimit()).WillByDefault(testing::Return(1024 * 1024));
+  ON_CALL(decoder_callbacks, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
+  ON_CALL(encoder_callbacks, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
 
   auto config_proto = createFuzzConfig();
   auto config_or_error = ProtoApiScrubberFilterConfig::create(config_proto, factory_context);

@@ -40,7 +40,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
-        "@com_google_absl//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:node_hash_set",
         "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
@@ -115,7 +115,7 @@ envoy_cc_library(
     hdrs = ["alts_channel_pool.h"],
     external_deps = ["grpc"],
     deps = [
-        "@com_google_absl//absl/random",
+        "@abseil-cpp//absl/random",
     ],
 )
 
@@ -131,9 +131,9 @@ envoy_cc_library(
     external_deps = ["grpc"],
     deps = [
         ":handshaker_cc_grpc",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -146,7 +146,7 @@ envoy_cc_library(
         ":alts_proxy",
         ":handshaker_cc_grpc",
         ":tsi_frame_protector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/status",
     ],
 )

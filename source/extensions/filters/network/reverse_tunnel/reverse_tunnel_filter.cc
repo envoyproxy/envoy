@@ -26,6 +26,29 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
+namespace {
+
+Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager* getThreadLocalSocketManager() {
+  auto* base_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  if (base_interface == nullptr) {
+    return nullptr;
+  }
+  const auto* acceptor =
+      dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
+          base_interface);
+  if (acceptor == nullptr) {
+    return nullptr;
+  }
+  auto* tls_registry = acceptor->getLocalRegistry();
+  if (tls_registry == nullptr) {
+    return nullptr;
+  }
+  return tls_registry->socketManager();
+}
+
+} // namespace
+
 // Stats helper implementation.
 ReverseTunnelFilter::ReverseTunnelStats
 ReverseTunnelFilter::ReverseTunnelStats::generateStats(const std::string& prefix,
@@ -113,7 +136,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
           proto_config.has_validation() &&
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
-              : "envoy.filters.network.reverse_tunnel") {}
+              : "envoy.filters.network.reverse_tunnel"),
+      required_cluster_name_(proto_config.required_cluster_name()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
@@ -318,6 +342,66 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
+  // Get tenant isolation setting from socket manager (configured at bootstrap level).
+  bool tenant_isolation_enabled = false;
+  if (auto* socket_manager = getThreadLocalSocketManager()) {
+    tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
+  }
+
+  if (tenant_isolation_enabled) {
+    const absl::string_view delimiter = ReverseTunnelFilterConfig::tenantDelimiter();
+    const auto contains_delimiter = [&](absl::string_view value) -> bool {
+      return value.find(delimiter) != absl::string_view::npos;
+    };
+    if (contains_delimiter(node_id) || contains_delimiter(cluster_id) ||
+        contains_delimiter(tenant_id)) {
+      parent_.stats_.parse_error_.inc();
+      ENVOY_CONN_LOG(debug,
+                     "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
+                     "isolation is enabled",
+                     parent_.read_callbacks_->connection(), delimiter);
+      sendLocalReply(
+          Http::Code::BadRequest,
+          fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation is "
+                      "enabled",
+                      delimiter),
+          nullptr, absl::nullopt, "reverse_tunnel_invalid_identifier");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+  }
+
+  // Check for upstream cluster name header and validate if required.
+  if (!parent_.config_->requiredClusterName().empty()) {
+    const auto upstream_cluster_vals = headers_->get(
+        Extensions::Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
+
+    if (upstream_cluster_vals.empty()) {
+      parent_.stats_.parse_error_.inc();
+      ENVOY_CONN_LOG(
+          debug, "reverse_tunnel: missing upstream cluster name header when enforcement is enabled",
+          parent_.read_callbacks_->connection());
+      sendLocalReply(Http::Code::BadRequest, "Missing upstream cluster name header", nullptr,
+                     absl::nullopt, "reverse_tunnel_missing_cluster_name_header");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+
+    const absl::string_view upstream_cluster_name =
+        upstream_cluster_vals[0]->value().getStringView();
+    if (upstream_cluster_name != parent_.config_->requiredClusterName()) {
+      parent_.stats_.validation_failed_.inc();
+      ENVOY_CONN_LOG(debug,
+                     "reverse_tunnel: upstream cluster name mismatch. Expected: '{}', Actual: '{}'",
+                     parent_.read_callbacks_->connection(), parent_.config_->requiredClusterName(),
+                     upstream_cluster_name);
+      sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, absl::nullopt,
+                     "reverse_tunnel_cluster_mismatch");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+  }
+
   // Validate node_id and cluster_id if validation is configured.
   auto& connection = parent_.read_callbacks_->connection();
   const bool validation_passed =
@@ -363,34 +447,10 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Lookup the reverse tunnel acceptor socket interface to retrieve the TLS registry.
   // Note: This is a global lookup that should be thread-safe but may return nullptr
   // if the socket interface isn't registered or we're in a test environment.
-  auto* base_interface =
-      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (base_interface == nullptr) {
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: socket interface not registered, skipping socket reuse",
-                   connection);
-    return;
-  }
-
-  const auto* acceptor =
-      dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
-          base_interface);
-  if (acceptor == nullptr) {
-    ENVOY_CONN_LOG(error, "reverse_tunnel: reverse tunnel socket interface not found", connection);
-    return;
-  }
-
-  // The TLS registry access must be done on the same thread where it was created.
-  // In integration tests, this might not always be the case.
-  auto* tls_registry = acceptor->getLocalRegistry();
-  if (tls_registry == nullptr) {
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: thread local registry not available on this thread",
-                   connection);
-    return;
-  }
-
-  auto* socket_manager = tls_registry->socketManager();
+  auto* socket_manager = getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
-    ENVOY_CONN_LOG(error, "reverse_tunnel: socket manager not available", connection);
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: socket manager not available, skipping socket reuse",
+                   connection);
     return;
   }
 
@@ -423,13 +483,24 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Register the wrapped socket for reuse under the provided identifiers.
   // Note: The socket manager is expected to be thread-safe.
-  if (socket_manager != nullptr) {
-    ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
-    socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
-                                        std::move(wrapped_socket), ping_seconds);
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
-                   connection);
-  }
+  // Get tenant isolation setting from socket manager (configured at bootstrap level).
+  const bool tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
+  const std::string socket_node_id =
+      tenant_isolation_enabled
+          ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                buildTenantScopedIdentifier(tenant_id, node_id)
+          : std::string(node_id);
+  const std::string socket_cluster_id =
+      tenant_isolation_enabled
+          ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                buildTenantScopedIdentifier(tenant_id, cluster_id)
+          : std::string(cluster_id);
+
+  ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
+  socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id, std::move(wrapped_socket),
+                                      ping_seconds);
+  ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
+                 connection);
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {

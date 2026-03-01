@@ -11,7 +11,11 @@
 #include <string>
 #include <thread>
 
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 
 #include "absl/strings/str_split.h"
 
@@ -30,30 +34,24 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
         CpuUtilizationConfig& /*config*/,
     std::unique_ptr<CpuStatsReader> cpu_stats_reader)
     : cpu_stats_reader_(std::move(cpu_stats_reader)) {
-  previous_cpu_times_ = cpu_stats_reader_->getCpuTimes();
+  // Initialize by calling getUtilization() once to establish baseline
+  (void)cpu_stats_reader_->getUtilization();
 }
 
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
-  CpuTimes cpu_times = cpu_stats_reader_->getCpuTimes();
-  if (!cpu_times.is_valid) {
-    const auto& error = EnvoyException("Can't open file to read CPU utilization");
+  absl::StatusOr<double> utilization_result = cpu_stats_reader_->getUtilization();
+
+  if (!utilization_result.ok()) {
+    const auto& error = EnvoyException(std::string(utilization_result.status().message()));
     callbacks.onFailure(error);
     return;
   }
-  const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
-  const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
-  if (work_over_period < 0 || total_over_period <= 0) {
-    const auto& error = EnvoyException(
-        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
-                    "be a negative number and total_over_period='{}' must be a positive number.",
-                    work_over_period, total_over_period));
-    callbacks.onFailure(error);
-    return;
-  }
-  const double current_utilization = work_over_period / total_over_period;
-  ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
-                 previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
-                 cpu_times.total_time);
+
+  const double current_utilization = utilization_result.value();
+
+  // Debug logging
+  ENVOY_LOG_MISC(trace, "CPU utilization: {}", current_utilization);
+
   // The new utilization is calculated/smoothed using EWMA
   utilization_ = current_utilization * DAMPENING_ALPHA + (1 - DAMPENING_ALPHA) * utilization_;
 
@@ -61,8 +59,6 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
   usage.resource_pressure_ = utilization_;
 
   callbacks.onSuccess(usage);
-
-  previous_cpu_times_ = cpu_times;
 }
 
 } // namespace CpuUtilizationMonitor

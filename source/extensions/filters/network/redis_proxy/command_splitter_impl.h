@@ -32,6 +32,7 @@ struct ResponseValues {
   const std::string UpstreamFailure = "upstream failure";
   const std::string UpstreamProtocolError = "upstream protocol error";
   const std::string AuthRequiredError = "NOAUTH Authentication required.";
+  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
 };
 
 using Response = ConstSingleton<ResponseValues>;

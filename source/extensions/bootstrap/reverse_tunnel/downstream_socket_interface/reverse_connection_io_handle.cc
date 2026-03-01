@@ -567,12 +567,15 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     }
     // Get current number of successful connections to this host.
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
+    uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
     ENVOY_LOG(info,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
-              "Current: {}, Required: {}",
-              host_address, cluster_name, current_connections,
+              "Current: {}, Pending: {}, Required: {}",
+              host_address, cluster_name, current_connections, pending_connections,
               cluster_config.reverse_connection_count);
+    // Update with the pending connections also for checking against required.
+    current_connections += pending_connections;
     if (current_connections >= cluster_config.reverse_connection_count) {
       ENVOY_LOG(debug,
                 "reverse_tunnel: No more reverse connections needed to host {} of cluster {}",
@@ -734,10 +737,18 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
   // Update connection state in host info and handle old state.
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
+    // Increment first and then decrement if needed.
+    if (new_state == ReverseConnectionState::Connecting) {
+      host_it->second.connecting_count++;
+    }
+
     // Remove old connection state if it exists.
     auto old_state_it = host_it->second.connection_states.find(connection_key);
     if (old_state_it != host_it->second.connection_states.end()) {
       ReverseConnectionState old_state = old_state_it->second;
+      if (old_state == ReverseConnectionState::Connecting) {
+        host_it->second.connecting_count--;
+      }
       // Decrement old state gauge using unified function.
       updateStateGauge(host_address, cluster_name, old_state, false /* decrement */);
     }

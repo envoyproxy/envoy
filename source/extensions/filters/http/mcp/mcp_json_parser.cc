@@ -10,11 +10,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-using namespace McpConstants;
+using namespace Filters::Common::Mcp::McpConstants;
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
-  method_fields_[std::string(method)] = std::move(fields);
+  const std::string method_key(method);
+  method_fields_[method_key] = std::move(fields);
+  buildFieldRequirements();
 }
 
 void McpParserConfig::initializeDefaults() {
@@ -24,35 +26,49 @@ void McpParserConfig::initializeDefaults() {
   always_extract_.insert("id");
 
   // Tools
-  addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
+  addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule(std::string(Paths::PARAMS_NAME))});
 
-  // Resources
-  addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
+  // Resources.
+  addMethodConfig(Methods::RESOURCES_LIST, {});
+  addMethodConfig(Methods::RESOURCES_READ,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_SUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
 
-  // Prompts
-  addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
+  // Prompts.
+  addMethodConfig(Methods::PROMPTS_LIST, {});
+  addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule(std::string(Paths::PARAMS_NAME))});
 
-  // Completion
-  addMethodConfig(Methods::COMPLETION_COMPLETE, {});
+  // Completion.
+  addMethodConfig(Methods::COMPLETION_COMPLETE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REF))});
 
   // Logging
-  addMethodConfig(Methods::LOGGING_SET_LEVEL, {AttributeExtractionRule("params.level")});
+  addMethodConfig(Methods::LOGGING_SET_LEVEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
 
   // Lifecycle
-  addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule("params.protocolVersion"),
-                                        AttributeExtractionRule("params.clientInfo.name")});
+  addMethodConfig(Methods::INITIALIZE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
-  // Notifications
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
-
-  addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule("params.progressToken"),
-                                                   AttributeExtractionRule("params.progress")});
-
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
-
-  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule("params.level")});
+  // Notifications.
+  addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REQUEST_ID))});
+  addMethodConfig(Methods::NOTIFICATION_PROGRESS,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS_TOKEN)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS))});
+  addMethodConfig(Methods::NOTIFICATION_MESSAGE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
+  addMethodConfig(Methods::NOTIFICATION_ROOTS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::NOTIFICATION_TOOLS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_PROMPTS_LIST_CHANGED, {});
 }
 
 McpParserConfig
@@ -63,21 +79,38 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
   config.always_extract_.insert("method");
   config.initializeDefaults();
 
-  // Process method-specific overrides
+  config.group_metadata_key_ = proto.group_metadata_key();
+
+  // Process method-specific configs (for both extraction rules and group overrides)
   for (const auto& method_proto : proto.methods()) {
-    std::vector<AttributeExtractionRule> extraction_rules;
+    MethodConfigEntry entry;
+    entry.method_pattern = method_proto.method();
+    entry.group = method_proto.group();
+
     for (const auto& extraction_rule_proto : method_proto.extraction_rules()) {
-      extraction_rules.emplace_back(extraction_rule_proto.path());
+      entry.extraction_rules.emplace_back(extraction_rule_proto.path());
     }
-    config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+
+    config.method_configs_.push_back(std::move(entry));
+
+    // Also update method_fields_ for extraction rules (for backward compatibility)
+    if (!method_proto.extraction_rules().empty()) {
+      std::vector<AttributeExtractionRule> extraction_rules;
+      for (const auto& rule_proto : method_proto.extraction_rules()) {
+        extraction_rules.emplace_back(rule_proto.path());
+      }
+      config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+    }
   }
 
+  config.buildFieldRequirements();
   return config;
 }
 
 McpParserConfig McpParserConfig::createDefault() {
   McpParserConfig config;
   config.initializeDefaults();
+  config.buildFieldRequirements();
   return config;
 }
 
@@ -88,6 +121,107 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   return (it != method_fields_.end()) ? it->second : empty;
 }
 
+const McpParserConfig::FieldRequirements&
+McpParserConfig::getFieldRequirementsForMethod(const std::string& method) const {
+  auto it = method_requirements_.find(method);
+  if (it != method_requirements_.end()) {
+    return it->second;
+  }
+  return default_requirements_;
+}
+
+std::string McpParserConfig::getMethodGroup(const std::string& method) const {
+  // Check user-configured rules first (exact match only)
+  for (const auto& entry : method_configs_) {
+    if (method == entry.method_pattern && !entry.group.empty()) {
+      return entry.group;
+    }
+  }
+
+  // Fall back to built-in groups
+  return getBuiltInMethodGroup(method);
+}
+
+std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) const {
+  using namespace Methods;
+  using namespace MethodGroups;
+
+  // Lifecycle methods
+  if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
+    return std::string(LIFECYCLE);
+  }
+
+  // Tool methods
+  if (method == TOOLS_CALL || method == TOOLS_LIST) {
+    return std::string(TOOL);
+  }
+
+  // Resource methods
+  if (method == RESOURCES_READ || method == RESOURCES_LIST || method == RESOURCES_SUBSCRIBE ||
+      method == RESOURCES_UNSUBSCRIBE || method == RESOURCES_TEMPLATES_LIST) {
+    return std::string(RESOURCE);
+  }
+
+  // Prompt methods
+  if (method == PROMPTS_GET || method == PROMPTS_LIST) {
+    return std::string(PROMPT);
+  }
+
+  // Logging
+  if (method == LOGGING_SET_LEVEL) {
+    return std::string(LOGGING);
+  }
+
+  // Sampling
+  if (method == SAMPLING_CREATE_MESSAGE) {
+    return std::string(SAMPLING);
+  }
+
+  // Completion
+  if (method == COMPLETION_COMPLETE) {
+    return std::string(COMPLETION);
+  }
+
+  // General notifications (prefix match, excluding those already categorized)
+  if (absl::StartsWith(method, NOTIFICATION_PREFIX)) {
+    return std::string(NOTIFICATION);
+  }
+
+  return std::string(UNKNOWN);
+}
+
+void McpParserConfig::buildFieldRequirements() {
+  buildMethodRequirements({}, default_requirements_);
+
+  method_requirements_.clear();
+  method_requirements_.reserve(method_fields_.size());
+  for (const auto& entry : method_fields_) {
+    FieldRequirements requirements;
+    buildMethodRequirements(entry.second, requirements);
+    method_requirements_.emplace(entry.first, std::move(requirements));
+  }
+}
+
+void McpParserConfig::buildMethodRequirements(
+    const std::vector<AttributeExtractionRule>& method_fields,
+    FieldRequirements& requirements) const {
+  requirements.required.clear();
+  requirements.optional.clear();
+
+  absl::flat_hash_set<std::string> required_set;
+
+  // All method-specific extraction rules are required.
+  for (const auto& field : method_fields) {
+    if (required_set.insert(field.path).second) {
+      requirements.required.push_back(field.path);
+    }
+  }
+
+  if (!required_set.contains(std::string(Paths::PARAMS_META))) {
+    requirements.optional.push_back(std::string(Paths::PARAMS_META));
+  }
+}
+
 // McpFieldExtractor implementation
 McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config)
     : root_metadata_(metadata), config_(config) {
@@ -95,7 +229,8 @@ McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParser
   context_stack_.push({&temp_storage_, ""});
 
   // Pre-calculate total fields needed for early stop optimization
-  fields_needed_ = config_.getAlwaysExtract().size();
+  required_fields_needed_ = config_.getAlwaysExtract().size();
+  fields_needed_ = required_fields_needed_;
 }
 
 McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
@@ -117,6 +252,11 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
       current_path_cache_ += ".";
     }
     current_path_cache_ += name;
+
+    // Track when we enter the "params" object (direct child of root)
+    if (depth_ == 2 && name == "params") {
+      params_depth_ = depth_;
+    }
   }
 
   auto* parent = context_stack_.top().struct_ptr;
@@ -138,7 +278,23 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
   }
 
   if (depth_ > 0) {
+    // Before updating path, mark object path as collected for early-stop optimization.
+    // This enables extraction rules targeting object paths (e.g., "params.ref") to work
+    // with early termination, since objects themselves are not rendered as primitives.
+    if (!current_path_cache_.empty()) {
+      if (collected_fields_.insert(current_path_cache_).second) {
+        fields_collected_count_++;
+      }
+    }
+
     depth_--;
+
+    // Check if we just exited the "params" object using depth tracking
+    if (params_depth_ > 0 && depth_ < params_depth_) {
+      params_depth_ = 0; // Reset - we've exited params
+      checkEarlyStop();
+    }
+
     if (!path_stack_.empty()) {
       // Update cached path before removing from stack
       size_t last_dot = current_path_cache_.rfind('.');
@@ -154,9 +310,12 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
   }
 
-  // When we finish the root object, do selective extraction
+  // When we finish the root object, do selective extraction.
+  // Also set can_stop_parsing_ to avoid buffering more data — the root object
+  // is complete, so no more top-level fields (jsonrpc, method, id) can appear.
   if (depth_ == 0 && !can_stop_parsing_) {
     finalizeExtraction();
+    can_stop_parsing_ = true;
   }
 
   return this;
@@ -342,22 +501,81 @@ void McpFieldExtractor::checkEarlyStop() {
     return;
   }
 
-  // Update fields_needed_ now that we know the method
-  if (!fields_needed_updated_) {
-    const auto& required_fields = config_.getFieldsForMethod(method_);
-    fields_needed_ += required_fields.size();
-    // Notifications don't have 'id' field, so reduce the expected count
-    if (is_notification_) {
-      fields_needed_--;
-    }
-    fields_needed_updated_ = true;
-  }
+  updateFieldRequirements();
 
   // Fast path: check if we have collected enough fields
-  if (fields_collected_count_ < fields_needed_) {
-    return; // Still missing fields
+  if (fields_collected_count_ < required_fields_needed_) {
+    return; // Still missing required fields
   }
 
+  if (!requiredFieldsCollected()) {
+    return;
+  }
+
+  // No optional fields configured - can stop now.
+  if (!has_optional_fields_) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: Have all required fields for method {}", method_);
+    return;
+  }
+
+  // Check if we've collected all optional fields
+  bool all_optional_collected = true;
+  for (const auto& field : optional_fields_) {
+    if (collected_fields_.count(field) == 0) {
+      all_optional_collected = false;
+      break;
+    }
+  }
+
+  if (all_optional_collected) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: Have all required + optional fields for method {}", method_);
+    return;
+  }
+
+  // If we're currently inside the params object, we must continue parsing because
+  // optional fields (like params._meta) may still appear.
+  if (params_depth_ > 0) {
+    ENVOY_LOG(debug, "still inside params object (depth={}), waiting for optional fields",
+              params_depth_);
+    return;
+  }
+
+  // params_depth_ == 0 means: either we never entered params, or we already exited it.
+  // In either case, params.* optional fields can't appear anymore.
+  can_stop_parsing_ = true;
+  ENVOY_LOG(debug,
+            "early stop: params object exited or not present - optional fields cannot appear");
+}
+
+void McpFieldExtractor::updateFieldRequirements() {
+  if (fields_needed_updated_) {
+    return;
+  }
+
+  const auto& requirements = config_.getFieldRequirementsForMethod(method_);
+  required_fields_ = requirements.required;
+  optional_fields_ = requirements.optional;
+
+  required_fields_needed_ = config_.getAlwaysExtract().size() + required_fields_.size();
+  fields_needed_ = required_fields_needed_ + optional_fields_.size();
+
+  // Notifications don't have 'id' field, so reduce the expected count
+  if (is_notification_) {
+    if (required_fields_needed_ > 0) {
+      required_fields_needed_--;
+    }
+    if (fields_needed_ > 0) {
+      fields_needed_--;
+    }
+  }
+
+  has_optional_fields_ = !optional_fields_.empty();
+  fields_needed_updated_ = true;
+}
+
+bool McpFieldExtractor::requiredFieldsCollected() const {
   // Verify we actually have all required fields (not just the count)
   // Notifications don't have an 'id' field per JSON-RPC spec, so skip it for them
   for (const auto& field : config_.getAlwaysExtract()) {
@@ -365,19 +583,17 @@ void McpFieldExtractor::checkEarlyStop() {
       continue;
     }
     if (collected_fields_.count(field) == 0) {
-      return;
+      return false;
     }
   }
 
-  const auto& required_fields = config_.getFieldsForMethod(method_);
-  for (const auto& field : required_fields) {
-    if (collected_fields_.count(field.path) == 0) {
-      return;
+  for (const auto& field : required_fields_) {
+    if (collected_fields_.count(field) == 0) {
+      return false;
     }
   }
 
-  can_stop_parsing_ = true;
-  ENVOY_LOG(debug, "early stop: Have all fields for method {}", method_);
+  return true;
 }
 
 void McpFieldExtractor::finalizeExtraction() {
@@ -394,15 +610,42 @@ void McpFieldExtractor::finalizeExtraction() {
   validateRequiredFields();
 }
 
+bool McpFieldExtractor::hasOptionalFields() {
+  if (!has_method_) {
+    return false;
+  }
+  updateFieldRequirements();
+  return has_optional_fields_;
+}
+
+bool McpFieldExtractor::hasAllRequiredFields() {
+  if (!has_jsonrpc_ || !has_method_) {
+    return false;
+  }
+  updateFieldRequirements();
+  return requiredFieldsCollected();
+}
+
 void McpFieldExtractor::copySelectedFields() {
+  absl::flat_hash_set<std::string> copied_fields;
+
   for (const auto& field : config_.getAlwaysExtract()) {
-    copyFieldByPath(field);
+    if (copied_fields.insert(field).second) {
+      copyFieldByPath(field);
+    }
   }
 
   // Copy method-specific fields
   const auto& fields = config_.getFieldsForMethod(method_);
   for (const auto& field : fields) {
-    copyFieldByPath(field.path);
+    if (copied_fields.insert(field.path).second) {
+      copyFieldByPath(field.path);
+    }
+  }
+
+  const std::string meta_field(Paths::PARAMS_META);
+  if (copied_fields.insert(meta_field).second) {
+    copyFieldByPath(meta_field);
   }
 }
 
@@ -453,11 +696,11 @@ void McpFieldExtractor::copyFieldByPath(const std::string& path) {
 }
 
 void McpFieldExtractor::validateRequiredFields() {
-  const auto& fields = config_.getFieldsForMethod(method_);
-  for (const auto& field : fields) {
-    if (extracted_fields_.count(field.path) == 0) {
-      missing_required_fields_.push_back(field.path);
-      ENVOY_LOG(debug, "missing required field for {}: {}", method_, field.path);
+  updateFieldRequirements();
+  for (const auto& field : required_fields_) {
+    if (extracted_fields_.count(field) == 0) {
+      missing_required_fields_.push_back(field);
+      ENVOY_LOG(debug, "missing required field for {}: {}", method_, field);
     }
   }
 }
@@ -493,6 +736,12 @@ absl::Status McpJsonParser::finishParse() {
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
+
+bool McpJsonParser::hasOptionalFields() { return extractor_ && extractor_->hasOptionalFields(); }
+
+bool McpJsonParser::hasAllRequiredFields() {
+  return extractor_ && extractor_->hasAllRequiredFields();
+}
 
 const std::string& McpJsonParser::getMethod() const {
   static const std::string empty;

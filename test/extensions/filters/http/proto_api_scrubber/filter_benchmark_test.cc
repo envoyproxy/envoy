@@ -105,8 +105,8 @@ public:
     payload_ = generatePayload(num_entries);
 
     using testing::Return;
-    ON_CALL(callbacks_, decoderBufferLimit()).WillByDefault(Return(100 * 1024 * 1024));
-    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(100 * 1024 * 1024));
+    ON_CALL(callbacks_, bufferLimit()).WillByDefault(Return(100 * 1024 * 1024));
+    ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(100 * 1024 * 1024));
   }
 
   void addRule(envoy::extensions::filters::http::proto_api_scrubber::v3::MethodRestrictions& config,

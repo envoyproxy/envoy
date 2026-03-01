@@ -234,21 +234,19 @@ protected:
                absl::Status& creation_status);
 
 public:
-  bool createFilterChain(
-      Http::FilterChainManager& manager,
-      const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.
     if (upstream_http_filter_factories_.empty()) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
+    Http::FilterChainUtility::createFilterChainForFactories(callbacks,
                                                             upstream_http_filter_factories_);
     return true;
   }
 
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
@@ -449,8 +447,8 @@ public:
     if (!is_retry_) {
       return original_priority_load;
     }
-    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
-                                              priority_mapping_func);
+    return retry_state_->priorityLoadForRetry(requestStreamInfo(), priority_set,
+                                              original_priority_load, priority_mapping_func);
   }
 
   uint32_t hostSelectionRetryCount() const override {

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 
+#include "envoy/common/hashable.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/formatter/substitution_format_string.h"
@@ -21,6 +22,25 @@ public:
 };
 
 REGISTER_FACTORY(GenericStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+class HashableString : public Router::StringAccessorImpl, public Hashable {
+public:
+  HashableString(absl::string_view value) : StringAccessorImpl(value) {}
+
+  // Hashable
+  absl::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
+};
+
+class GenericHashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.hashable_string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<HashableString>(data);
+  }
+};
+
+REGISTER_FACTORY(GenericHashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,

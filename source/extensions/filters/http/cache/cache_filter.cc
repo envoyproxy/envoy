@@ -21,7 +21,7 @@ namespace HttpFilters {
 namespace Cache {
 
 namespace {
-// This value is only used if there is no encoderBufferLimit on the stream;
+// This value is only used if there is no bufferLimit on the stream;
 // without *some* constraint here, a very large chunk can be requested and
 // attempt to load into a memory buffer.
 //
@@ -261,7 +261,7 @@ void CacheFilter::getBody() {
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
 
   // We don't want to request more than a buffer-size at a time from the cache.
-  uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
+  uint64_t fetch_size_limit = encoder_callbacks_->bufferLimit();
   // If there is no buffer size limit, we still want *some* constraint.
   if (fetch_size_limit == 0) {
     fetch_size_limit = MAX_BYTES_TO_FETCH_FROM_CACHE_PER_REQUEST;

@@ -5,14 +5,37 @@ declare_init_functions!(init, new_nop_http_filter_config_fn);
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ProgramInitFunction`] signature.
 fn init() -> bool {
+  LOAD_ID.fetch_add(1, Ordering::SeqCst);
   true
 }
 
-static SOME_VARIABLE: AtomicI32 = AtomicI32::new(1);
+static LOAD_ID: AtomicI32 = AtomicI32::new(0);
+static SEEN_LOAD_ID: AtomicI32 = AtomicI32::new(-1);
+static SOME_VARIABLE: AtomicI32 = AtomicI32::new(0);
 
 #[no_mangle]
 pub extern "C" fn getSomeVariable() -> i32 {
-  SOME_VARIABLE.fetch_add(1, Ordering::SeqCst)
+  let current_load = LOAD_ID.load(Ordering::SeqCst);
+  let mut seen = SEEN_LOAD_ID.load(Ordering::SeqCst);
+  loop {
+    if seen != current_load {
+      match SEEN_LOAD_ID.compare_exchange(seen, current_load, Ordering::SeqCst, Ordering::SeqCst) {
+        Ok(_) => {
+          SOME_VARIABLE.store(1, Ordering::SeqCst);
+          return 1;
+        },
+        Err(actual) => {
+          seen = actual;
+          continue;
+        },
+      }
+    }
+    let current = SOME_VARIABLE.load(Ordering::SeqCst);
+    match SOME_VARIABLE.compare_exchange(current, current + 1, Ordering::SeqCst, Ordering::SeqCst) {
+      Ok(_) => return current + 1,
+      Err(_) => continue,
+    }
+  }
 }
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]

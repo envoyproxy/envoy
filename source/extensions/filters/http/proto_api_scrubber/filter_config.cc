@@ -47,22 +47,34 @@ bool isApiNameValid(absl::string_view api_name) {
                       [](const absl::string_view s) { return s.empty(); });
 }
 
-// Creates and returns a CEL matcher.
+} // namespace
+
 MatchTreeHttpMatchingDataSharedPtr
-getMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_context,
-           const xds::type::matcher::v3::Matcher& matcher) {
+ProtoApiScrubberFilterConfig::getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
+                                                 Server::Configuration::FactoryContext& context) {
+  // Use MessageUtil::hash for deterministic key generation.
+  uint64_t key = MessageUtil::hash(matcher);
+
+  if (auto it = unique_matchers_.find(key); it != unique_matchers_.end()) {
+    // Return existing matcher if configuration is identical.
+    return it->second;
+  }
+
   ProtoApiScrubberRemoveFieldAction remove_field_action;
   MatcherInputValidatorVisitor validation_visitor;
   Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
-      remove_field_action, server_factory_context, validation_visitor);
+      remove_field_action, context.serverFactoryContext(), validation_visitor);
   Matcher::MatchTreeFactoryCb<HttpMatchingData> match_tree_factory_cb =
       matcher_factory.create(matcher);
 
-  // Call the match tree factory callback to return the underlying match_tree.
-  return match_tree_factory_cb();
-}
+  auto match_tree = match_tree_factory_cb();
 
-} // namespace
+  // Use try_emplace with std::move to handle unique_ptr -> shared_ptr conversion.
+  auto result = unique_matchers_.try_emplace(key, std::move(match_tree));
+
+  // Return the stored shared pointer.
+  return result.first->second;
+}
 
 absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
 ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
@@ -110,6 +122,9 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
         initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context));
   }
 
+  // Clear temporary deduplication map to free memory after init.
+  unique_matchers_.clear();
+
   initializeTypeUtils();
   precomputeTypeCache(descriptor_set_or_error.value());
 
@@ -125,7 +140,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
     Envoy::Server::Configuration::FactoryContext& context) {
   if (method_config.has_method_restriction()) {
     method_level_restrictions_[method_name] =
-        getMatcher(context.serverFactoryContext(), method_config.method_restriction().matcher());
+        getOrCreateMatcher(method_config.method_restriction().matcher(), context);
   }
   return absl::OkStatus();
 }
@@ -142,14 +157,14 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
     }
     if (message_config.has_config()) {
       message_level_restrictions_[message_name] =
-          getMatcher(context.serverFactoryContext(), message_config.config().matcher());
+          getOrCreateMatcher(message_config.config().matcher(), context);
     }
 
     for (const auto& field_restriction : message_config.field_restrictions()) {
       absl::string_view field_mask = field_restriction.first;
       RETURN_IF_ERROR(validateFieldMask(field_mask));
       message_field_restrictions_[std::make_pair(message_name, std::string(field_mask))] =
-          getMatcher(context.serverFactoryContext(), field_restriction.second.matcher());
+          getOrCreateMatcher(field_restriction.second.matcher(), context);
     }
   }
   return absl::OkStatus();
@@ -305,7 +320,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
     absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
     field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
-        getMatcher(context.serverFactoryContext(), restriction.second.matcher());
+        getOrCreateMatcher(restriction.second.matcher(), context);
   }
 
   return absl::OkStatus();
