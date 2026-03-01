@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gmock/gmock.h"
+#include "library/cc/network_change_monitor.h"
 #include "library/common/system/system_helper.h"
 
 namespace Envoy {
