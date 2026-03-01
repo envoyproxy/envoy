@@ -3,11 +3,8 @@
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
+#include "library/common/system/system_helper.h"
 #include "library/common/types/c_types.h"
-
-#if defined(__APPLE__)
-#include "library/cc/apple/apple_network_change_monitor.h"
-#endif
 
 namespace Envoy {
 namespace Platform {
@@ -45,9 +42,7 @@ int64_t Engine::getInternalEngineHandle() const { return reinterpret_cast<int64_
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
 
 void Engine::initializeNetworkChangeMonitor() {
-#if defined(__APPLE__)
-  network_change_monitor_ = std::make_unique<AppleNetworkChangeMonitor>(*this);
-#endif
+  network_change_monitor_ = SystemHelper::getInstance().initializeNetworkChangeMonitor(*this);
   if (network_change_monitor_ != nullptr) {
     network_change_monitor_->start();
   }

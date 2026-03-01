@@ -7,6 +7,7 @@
 #import <Network/Network.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
+// TODO(abeyad): Delete this file and use AppleNetworkChangeMonitor directly in EnvoyEngine instead.
 @implementation EnvoyNetworkMonitor {
   Envoy::InternalEngine *_engine;
   nw_path_monitor_t _path_monitor;

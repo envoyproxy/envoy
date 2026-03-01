@@ -6,7 +6,7 @@
 #import <Foundation/Foundation.h>
 #import <Network/Network.h>
 
-#include "library/cc/apple/apple_network_change_monitor_bridge.h"
+#include "library/common/network/apple_network_change_monitor_bridge.h"
 #include "library/common/engine_types.h"
 #include "library/common/network/network_types.h"
 

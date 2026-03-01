@@ -100,10 +100,7 @@ envoy_cc_library(
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",
-    ] + select({
-        "@envoy//bazel:apple": ["//library/cc/apple:apple_network_change_monitor_lib"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 envoy_cc_library(

@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "library/cc/apple/apple_network_change_monitor.h"
-#include "library/cc/apple/apple_network_change_monitor_bridge.h"
+#include "library/common/network/apple_network_change_monitor.h"
+#include "library/common/network/apple_network_change_monitor_bridge.h"
 
 namespace Envoy {
 namespace Platform {
