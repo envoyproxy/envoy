@@ -5,10 +5,10 @@ package envoy.extensions.dynamic_modules.v3;
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
-option java_outer_classname = "DynamicModulesProto";
-option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dynamic_modules/v3;dynamic_modulesv3";
+option java_multiple_files = true;
+option java_outer_classname = "DynamicModulesProto";
+option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic Modules Common Configuration]
@@ -44,11 +44,6 @@ message DynamicModuleConfig {
   //
   // .. note::
   //   There is some remaining work to make the search path configurable via command line options.
-  //
-  // If the symbol ``<name>_envoy_dynamic_module_on_program_init`` is found in the process binary,
-  // the module is treated as statically linked. In that case, Envoy uses ``dlsym(RTLD_DEFAULT,
-  // ...)`` to resolve module symbols with each symbol name prefixed by ``<name>_``, and the
-  // ``do_not_close`` and ``load_globally`` fields are ignored.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // If true, prevents the module from being unloaded with ``dlclose``.
