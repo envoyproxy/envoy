@@ -242,6 +242,21 @@ public:
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
 
+  // Override to provide the lifetimeCallbacks.
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::Connected ||
+        event == Network::ConnectionEvent::ConnectedZeroRtt) {
+      parent().onConnectionOpen(codec_client_->connection());
+    } else if (event == Network::ConnectionEvent::LocalClose ||
+               event == Network::ConnectionEvent::RemoteClose) {
+      // Makes sense semantically for the load balancers to process closes as drains.
+      // They just have to know that they cannot route to that connection anymore.
+      parent().onConnectionDraining(codec_client_->connection());
+    }
+
+    ActiveClient::onEvent(event);
+  }
+
 private:
   bool closed_with_active_rq_{};
 };
