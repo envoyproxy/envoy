@@ -25,7 +25,7 @@ namespace {
 
 class InternalEngineNetworkChangeListener final : public Envoy::Platform::NetworkChangeListener {
 public:
-  explicit InternalEngineNetworkChangeListener(Envoy::InternalEngine& engine) : engine_(engine) {}
+  explicit InternalEngineNetworkChangeListener(Envoy::InternalEngine &engine) : engine_(engine) {}
 
   void onDefaultNetworkChangeEvent(int network) override {
     engine_.onDefaultNetworkChangeEvent(network);
@@ -36,7 +36,7 @@ public:
   void onDefaultNetworkUnavailable() override { engine_.onDefaultNetworkUnavailable(); }
 
 private:
-  Envoy::InternalEngine& engine_;
+  Envoy::InternalEngine &engine_;
 };
 
 } // namespace
@@ -449,8 +449,8 @@ static envoy_data ios_get_string(const void *context) {
 
   if (networkMonitoringMode != 0) {
     _networkChangeListener = std::make_unique<InternalEngineNetworkChangeListener>(*_engine);
-    _networkMonitor = std::make_unique<Envoy::Platform::AppleNetworkChangeMonitor>(
-        *_networkChangeListener.get());
+    _networkMonitor =
+        std::make_unique<Envoy::Platform::AppleNetworkChangeMonitor>(*_networkChangeListener.get());
     _networkMonitor->start();
   }
 

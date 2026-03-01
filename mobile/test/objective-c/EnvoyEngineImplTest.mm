@@ -13,9 +13,9 @@
 
 - (void)assertNetworkMonitoringMode:(int)mode monitorEnabled:(BOOL)expectedEnabled {
   EnvoyEngineImpl *engine = [[EnvoyEngineImpl alloc] initWithRunningCallback:nil
-                                                                       logger:nil
-                                                                 eventTracker:nil
-                                                        networkMonitoringMode:mode];
+                                                                      logger:nil
+                                                                eventTracker:nil
+                                                       networkMonitoringMode:mode];
 
   XCTAssertEqual([engine isNetworkMonitorEnabledForTesting], expectedEnabled);
 }
