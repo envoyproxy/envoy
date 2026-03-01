@@ -1427,6 +1427,54 @@ WEAK_STUB(NetworkFilterGetConnectionState,
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
 
+WEAK_STUB(UpstreamBridgeGetRequestHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeadersSize,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
+                                                                                    nullptr,
+                                                                                    nullptr))
+WEAK_STUB(UpstreamBridgeSetRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_request_buffer(nullptr,
+                                                                                    {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeDrainRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_drain_request_buffer(nullptr, 0))
+WEAK_STUB(UpstreamBridgeAppendRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_request_buffer(nullptr,
+                                                                                       {nullptr,
+                                                                                        0}))
+WEAK_STUB(UpstreamBridgeGetResponseBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(nullptr,
+                                                                                     nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeSetResponseHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header(nullptr,
+                                                                                     {nullptr, 0},
+                                                                                     {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeAddResponseHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_header(nullptr,
+                                                                                     {nullptr, 0},
+                                                                                     {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeSetResponseBody,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_body(nullptr,
+                                                                                   {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeAppendResponseBody,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_response_body(nullptr,
+                                                                                      {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeSetResponseTrailer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_trailer(nullptr,
+                                                                                      {nullptr, 0},
+                                                                                      {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeAddResponseTrailer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_trailer(nullptr,
+                                                                                      {nullptr, 0},
+                                                                                      {nullptr, 0}))
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions
