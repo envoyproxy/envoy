@@ -174,11 +174,11 @@ TEST(StaticModule, SymbolNotFound) {
 
 TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module =
-      newDynamicModuleByName("static://matcher_no_op", /*do_not_close=*/false);
+      newDynamicModuleByName("matcher_no_op", /*do_not_close=*/false);
   EXPECT_TRUE(c_module.ok()) << c_module.status().message();
 
   absl::StatusOr<DynamicModulePtr> c_module_2 =
-      newDynamicModuleByName("static://matcher_no_op", /*do_not_close=*/false);
+      newDynamicModuleByName("matcher_no_op", /*do_not_close=*/false);
   EXPECT_TRUE(c_module_2.ok()) << c_module_2.status().message();
 }
 

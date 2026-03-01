@@ -8,7 +8,6 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -83,9 +82,12 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
                                                         const bool load_globally) {
-  constexpr absl::string_view kStaticPrefix = "static://";
-  if (absl::StartsWith(module_name, kStaticPrefix)) {
-    return newStaticModule(module_name.substr(kStaticPrefix.size()));
+  // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
+  // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
+  const std::string static_init_symbol =
+      absl::StrCat(module_name, "_envoy_dynamic_module_on_program_init");
+  if (dlsym(RTLD_DEFAULT, static_init_symbol.c_str()) != nullptr) {
+    return newStaticModule(module_name);
   }
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);

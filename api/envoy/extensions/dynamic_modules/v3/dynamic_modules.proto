@@ -45,12 +45,10 @@ message DynamicModuleConfig {
   // .. note::
   //   There is some remaining work to make the search path configurable via command line options.
   //
-  // To load a module that has been statically linked into the Envoy binary, prefix the name with
-  // ``static://``. For example, ``static://foo`` loads a statically linked module named ``foo``.
-  // In this case, Envoy uses ``dlsym(RTLD_DEFAULT, ...)`` to resolve module symbols, with each
-  // symbol name prefixed by ``<name>_``. For example, ``foo_envoy_dynamic_module_on_program_init``
-  // is resolved instead of ``envoy_dynamic_module_on_program_init``.
-  // When using ``static://``, the ``do_not_close`` and ``load_globally`` fields are ignored.
+  // If the symbol ``<name>_envoy_dynamic_module_on_program_init`` is found in the process binary,
+  // the module is treated as statically linked. In that case, Envoy uses ``dlsym(RTLD_DEFAULT,
+  // ...)`` to resolve module symbols with each symbol name prefixed by ``<name>_``, and the
+  // ``do_not_close`` and ``load_globally`` fields are ignored.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // If true, prevents the module from being unloaded with ``dlclose``.

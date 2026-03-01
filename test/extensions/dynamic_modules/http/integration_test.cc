@@ -23,8 +23,7 @@ public:
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
                    bool upstream_filter = false) {
-    const std::string module_name =
-        GetParam() == "rust_static" ? "static://http_integration_test" : "http_integration_test";
+    const std::string module_name = "http_integration_test";
     if (GetParam() != "rust_static") {
       TestEnvironment::setEnvVar(
           "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",

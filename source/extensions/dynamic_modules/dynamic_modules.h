@@ -84,9 +84,10 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * Creates a new DynamicModule by name under the search path specified by the environment variable
  * `DYNAMIC_MODULES_SEARCH_PATH`. The file name is assumed to be `lib<module_name>.so`.
  * This is mostly a wrapper around newDynamicModule.
- * @param module_name the name of the module to load. If prefixed with "static://", the remainder
- * is treated as a statically linked module name and newStaticModule is called instead of loading
- * a shared object. In that case, do_not_close and load_globally are ignored.
+ * @param module_name the name of the module to load. If the symbol
+ * ``<module_name>_envoy_dynamic_module_on_program_init`` is found in the process binary, the
+ * module is treated as statically linked and newStaticModule is called instead of loading a
+ * shared object. In that case, do_not_close and load_globally are ignored.
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated.
