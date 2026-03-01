@@ -115,6 +115,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
+      parent().onConnectionDraining(codec_client_->connection());
       parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
     }
   }
