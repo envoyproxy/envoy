@@ -12,21 +12,23 @@ namespace {
 
 class ForwardingNetworkChangeListener : public NetworkChangeListener {
 public:
-  explicit ForwardingNetworkChangeListener(NetworkChangeListener& network_change_listener)
+  explicit ForwardingNetworkChangeListener(NetworkChangeListener &network_change_listener)
       : network_change_listener_(network_change_listener) {}
 
   void onDefaultNetworkChangeEvent(int network) override {
     network_change_listener_.onDefaultNetworkChangeEvent(network);
   }
 
-  void onDefaultNetworkAvailable() override { network_change_listener_.onDefaultNetworkAvailable(); }
+  void onDefaultNetworkAvailable() override {
+    network_change_listener_.onDefaultNetworkAvailable();
+  }
 
   void onDefaultNetworkUnavailable() override {
     network_change_listener_.onDefaultNetworkUnavailable();
   }
 
 private:
-  NetworkChangeListener& network_change_listener_;
+  NetworkChangeListener &network_change_listener_;
 };
 
 } // namespace
