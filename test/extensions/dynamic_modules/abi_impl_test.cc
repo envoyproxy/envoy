@@ -808,680 +808,621 @@ TEST(CommonAbiImplTest, MatcherGetHeaderValueEnvoyBug) {
 // in the corresponding filter type.
 // =============================================================================
 
-// Macros to reduce copy-paste for the four common return-type patterns.
-
-// WEAK_STUB_VOID: stub returns void.
-#define WEAK_STUB_VOID(TestSuffix, call)                                                           \
+// Macro to reduce copy-paste: verify each weak stub triggers ENVOY_BUG.
+#define WEAK_STUB(TestSuffix, call)                                                                \
   TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
     EXPECT_ENVOY_BUG({ call; }, "not implemented in this context");                                \
   }
 
-// WEAK_STUB_FALSE: stub returns bool (expected false).
-#define WEAK_STUB_FALSE(TestSuffix, call)                                                          \
-  TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
-    EXPECT_ENVOY_BUG({ EXPECT_FALSE(call); }, "not implemented in this context");                  \
-  }
-
-// WEAK_STUB_ZERO: stub returns an integer (expected 0).
-#define WEAK_STUB_ZERO(TestSuffix, call)                                                           \
-  TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
-    EXPECT_ENVOY_BUG({ EXPECT_EQ(call, 0); }, "not implemented in this context");                  \
-  }
-
-// WEAK_STUB_NULLPTR: stub returns a pointer (expected nullptr).
-#define WEAK_STUB_NULLPTR(TestSuffix, call)                                                        \
-  TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
-    EXPECT_ENVOY_BUG({ EXPECT_EQ(call, nullptr); }, "not implemented in this context");            \
-  }
-
-// WEAK_STUB_METRICS: stub returns envoy_dynamic_module_type_metrics_result (expected Success).
-#define WEAK_STUB_METRICS(TestSuffix, call)                                                        \
-  TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
-    EXPECT_ENVOY_BUG(                                                                              \
-        { EXPECT_EQ(call, envoy_dynamic_module_type_metrics_result_Success); },                    \
-        "not implemented in this context");                                                        \
-  }
-
-// WEAK_STUB_CALLOUT: stub returns http_callout_init_result (expected CannotCreateRequest).
-#define WEAK_STUB_CALLOUT(TestSuffix, call)                                                        \
-  TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
-    EXPECT_ENVOY_BUG(                                                                              \
-        {                                                                                          \
-          EXPECT_EQ(call, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest); \
-        },                                                                                         \
-        "not implemented in this context");                                                        \
-  }
-
-// Void-returning weak stubs
-WEAK_STUB_VOID(NetworkFilterWrite,
+WEAK_STUB(NetworkFilterWrite,
                envoy_dynamic_module_callback_network_filter_write(nullptr, {nullptr, 0}, false))
-WEAK_STUB_VOID(NetworkFilterInjectReadData,
+WEAK_STUB(NetworkFilterInjectReadData,
                envoy_dynamic_module_callback_network_filter_inject_read_data(nullptr, {nullptr, 0},
                                                                              false))
-WEAK_STUB_VOID(NetworkFilterInjectWriteData,
+WEAK_STUB(NetworkFilterInjectWriteData,
                envoy_dynamic_module_callback_network_filter_inject_write_data(nullptr, {nullptr, 0},
                                                                               false))
-WEAK_STUB_VOID(NetworkFilterContinueReading,
+WEAK_STUB(NetworkFilterContinueReading,
                envoy_dynamic_module_callback_network_filter_continue_reading(nullptr))
-WEAK_STUB_VOID(NetworkFilterClose,
+WEAK_STUB(NetworkFilterClose,
                envoy_dynamic_module_callback_network_filter_close(
                    nullptr, envoy_dynamic_module_type_network_connection_close_type_FlushWrite))
-WEAK_STUB_VOID(NetworkFilterDisableClose,
+WEAK_STUB(NetworkFilterDisableClose,
                envoy_dynamic_module_callback_network_filter_disable_close(nullptr, false))
-WEAK_STUB_VOID(NetworkFilterCloseWithDetails,
+WEAK_STUB(NetworkFilterCloseWithDetails,
                envoy_dynamic_module_callback_network_filter_close_with_details(
                    nullptr, envoy_dynamic_module_type_network_connection_close_type_FlushWrite,
                    {nullptr, 0}))
-WEAK_STUB_VOID(NetworkSetDynamicMetadataString,
+WEAK_STUB(NetworkSetDynamicMetadataString,
                envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
                    nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
-WEAK_STUB_VOID(NetworkSetDynamicMetadataNumber,
+WEAK_STUB(NetworkSetDynamicMetadataNumber,
                envoy_dynamic_module_callback_network_set_dynamic_metadata_number(nullptr,
                                                                                  {nullptr, 0},
                                                                                  {nullptr, 0}, 0))
-WEAK_STUB_VOID(NetworkFilterEnableHalfClose,
+WEAK_STUB(NetworkFilterEnableHalfClose,
                envoy_dynamic_module_callback_network_filter_enable_half_close(nullptr, false))
-WEAK_STUB_VOID(NetworkFilterSetBufferLimits,
+WEAK_STUB(NetworkFilterSetBufferLimits,
                envoy_dynamic_module_callback_network_filter_set_buffer_limits(nullptr, 0))
-WEAK_STUB_VOID(NetworkFilterSchedulerCommit,
+WEAK_STUB(NetworkFilterSchedulerCommit,
                envoy_dynamic_module_callback_network_filter_scheduler_commit(nullptr, 0))
-WEAK_STUB_VOID(NetworkFilterSchedulerDelete,
+WEAK_STUB(NetworkFilterSchedulerDelete,
                envoy_dynamic_module_callback_network_filter_scheduler_delete(nullptr))
-WEAK_STUB_VOID(NetworkFilterConfigSchedulerDelete,
+WEAK_STUB(NetworkFilterConfigSchedulerDelete,
                envoy_dynamic_module_callback_network_filter_config_scheduler_delete(nullptr))
-WEAK_STUB_VOID(NetworkFilterConfigSchedulerCommit,
+WEAK_STUB(NetworkFilterConfigSchedulerCommit,
                envoy_dynamic_module_callback_network_filter_config_scheduler_commit(nullptr, 0))
-WEAK_STUB_VOID(NetworkSetSocketOptionInt,
+WEAK_STUB(NetworkSetSocketOptionInt,
                envoy_dynamic_module_callback_network_set_socket_option_int(
                    nullptr, 0, 0, envoy_dynamic_module_type_socket_option_state_Prebind, 0))
-WEAK_STUB_VOID(NetworkSetSocketOptionBytes,
+WEAK_STUB(NetworkSetSocketOptionBytes,
                envoy_dynamic_module_callback_network_set_socket_option_bytes(
                    nullptr, 0, 0, envoy_dynamic_module_type_socket_option_state_Prebind,
                    {nullptr, 0}))
-WEAK_STUB_VOID(NetworkGetSocketOptions,
+WEAK_STUB(NetworkGetSocketOptions,
                envoy_dynamic_module_callback_network_get_socket_options(nullptr, nullptr))
-WEAK_STUB_VOID(ListenerFilterSchedulerCommit,
+WEAK_STUB(ListenerFilterSchedulerCommit,
                envoy_dynamic_module_callback_listener_filter_scheduler_commit(nullptr, 0))
-WEAK_STUB_VOID(ListenerFilterSchedulerDelete,
+WEAK_STUB(ListenerFilterSchedulerDelete,
                envoy_dynamic_module_callback_listener_filter_scheduler_delete(nullptr))
-WEAK_STUB_VOID(ListenerFilterConfigSchedulerDelete,
+WEAK_STUB(ListenerFilterConfigSchedulerDelete,
                envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(nullptr))
-WEAK_STUB_VOID(ListenerFilterConfigSchedulerCommit,
+WEAK_STUB(ListenerFilterConfigSchedulerCommit,
                envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(nullptr, 0))
-WEAK_STUB_VOID(AccessLoggerGetBytesInfo,
+WEAK_STUB(AccessLoggerGetBytesInfo,
                envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, nullptr))
-WEAK_STUB_VOID(AccessLoggerGetTimingInfo,
+WEAK_STUB(AccessLoggerGetTimingInfo,
                envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, nullptr))
-WEAK_STUB_VOID(ListenerFilterCloseSocket,
+WEAK_STUB(ListenerFilterCloseSocket,
                envoy_dynamic_module_callback_listener_filter_close_socket(nullptr, {nullptr, 0}))
-WEAK_STUB_VOID(
+WEAK_STUB(
     ListenerFilterSetDownstreamTransportFailureReason,
     envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(nullptr,
                                                                                           {nullptr,
                                                                                            0}))
-WEAK_STUB_VOID(ListenerFilterSetDynamicMetadataString,
+WEAK_STUB(ListenerFilterSetDynamicMetadataString,
                envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
                    nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
-WEAK_STUB_VOID(ListenerFilterUseOriginalDst,
+WEAK_STUB(ListenerFilterUseOriginalDst,
                envoy_dynamic_module_callback_listener_filter_use_original_dst(nullptr, false))
 
-// Bool-returning weak stubs
-WEAK_STUB_FALSE(NetworkFilterGetReadBufferChunks,
+WEAK_STUB(NetworkFilterGetReadBufferChunks,
                 envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(nullptr,
                                                                                     nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetWriteBufferChunks,
+WEAK_STUB(NetworkFilterGetWriteBufferChunks,
                 envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(nullptr,
                                                                                      nullptr))
-WEAK_STUB_FALSE(NetworkFilterDrainReadBuffer,
+WEAK_STUB(NetworkFilterDrainReadBuffer,
                 envoy_dynamic_module_callback_network_filter_drain_read_buffer(nullptr, 0))
-WEAK_STUB_FALSE(NetworkFilterDrainWriteBuffer,
+WEAK_STUB(NetworkFilterDrainWriteBuffer,
                 envoy_dynamic_module_callback_network_filter_drain_write_buffer(nullptr, 0))
-WEAK_STUB_FALSE(NetworkFilterPrependReadBuffer,
+WEAK_STUB(NetworkFilterPrependReadBuffer,
                 envoy_dynamic_module_callback_network_filter_prepend_read_buffer(nullptr,
                                                                                  {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkFilterAppendReadBuffer,
+WEAK_STUB(NetworkFilterAppendReadBuffer,
                 envoy_dynamic_module_callback_network_filter_append_read_buffer(nullptr,
                                                                                 {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkFilterPrependWriteBuffer,
+WEAK_STUB(NetworkFilterPrependWriteBuffer,
                 envoy_dynamic_module_callback_network_filter_prepend_write_buffer(nullptr,
                                                                                   {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkFilterAppendWriteBuffer,
+WEAK_STUB(NetworkFilterAppendWriteBuffer,
                 envoy_dynamic_module_callback_network_filter_append_write_buffer(nullptr,
                                                                                  {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkFilterGetRemoteAddress,
+WEAK_STUB(NetworkFilterGetRemoteAddress,
                 envoy_dynamic_module_callback_network_filter_get_remote_address(nullptr, nullptr,
                                                                                 nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetLocalAddress,
+WEAK_STUB(NetworkFilterGetLocalAddress,
                 envoy_dynamic_module_callback_network_filter_get_local_address(nullptr, nullptr,
                                                                                nullptr))
-WEAK_STUB_FALSE(NetworkFilterIsSsl, envoy_dynamic_module_callback_network_filter_is_ssl(nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetRequestedServerName,
+WEAK_STUB(NetworkFilterIsSsl, envoy_dynamic_module_callback_network_filter_is_ssl(nullptr))
+WEAK_STUB(NetworkFilterGetRequestedServerName,
                 envoy_dynamic_module_callback_network_filter_get_requested_server_name(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetDirectRemoteAddress,
+WEAK_STUB(NetworkFilterGetDirectRemoteAddress,
                 envoy_dynamic_module_callback_network_filter_get_direct_remote_address(nullptr,
                                                                                        nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetSslUriSans,
+WEAK_STUB(NetworkFilterGetSslUriSans,
                 envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(nullptr, nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetSslDnsSans,
+WEAK_STUB(NetworkFilterGetSslDnsSans,
                 envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(nullptr, nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetSslSubject,
+WEAK_STUB(NetworkFilterGetSslSubject,
                 envoy_dynamic_module_callback_network_filter_get_ssl_subject(nullptr, nullptr))
-WEAK_STUB_FALSE(NetworkSetFilterStateBytes,
+WEAK_STUB(NetworkSetFilterStateBytes,
                 envoy_dynamic_module_callback_network_set_filter_state_bytes(nullptr, {nullptr, 0},
                                                                              {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkGetFilterStateBytes,
+WEAK_STUB(NetworkGetFilterStateBytes,
                 envoy_dynamic_module_callback_network_get_filter_state_bytes(nullptr, {nullptr, 0},
                                                                              nullptr))
-WEAK_STUB_FALSE(NetworkSetFilterStateTyped,
+WEAK_STUB(NetworkSetFilterStateTyped,
                 envoy_dynamic_module_callback_network_set_filter_state_typed(nullptr, {nullptr, 0},
                                                                              {nullptr, 0}))
-WEAK_STUB_FALSE(NetworkGetFilterStateTyped,
+WEAK_STUB(NetworkGetFilterStateTyped,
                 envoy_dynamic_module_callback_network_get_filter_state_typed(nullptr, {nullptr, 0},
                                                                              nullptr))
-WEAK_STUB_FALSE(NetworkGetDynamicMetadataString,
+WEAK_STUB(NetworkGetDynamicMetadataString,
                 envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
                     nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
-WEAK_STUB_FALSE(NetworkGetDynamicMetadataNumber,
+WEAK_STUB(NetworkGetDynamicMetadataNumber,
                 envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
                     nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetClusterHostCount,
+WEAK_STUB(NetworkFilterGetClusterHostCount,
                 envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
                     nullptr, {nullptr, 0}, 0, nullptr, nullptr, nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetUpstreamHostAddress,
+WEAK_STUB(NetworkFilterGetUpstreamHostAddress,
                 envoy_dynamic_module_callback_network_filter_get_upstream_host_address(nullptr,
                                                                                        nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetUpstreamHostHostname,
+WEAK_STUB(NetworkFilterGetUpstreamHostHostname,
                 envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(NetworkFilterGetUpstreamHostCluster,
+WEAK_STUB(NetworkFilterGetUpstreamHostCluster,
                 envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(NetworkFilterHasUpstreamHost,
+WEAK_STUB(NetworkFilterHasUpstreamHost,
                 envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     NetworkFilterStartUpstreamSecureTransport,
     envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
-WEAK_STUB_FALSE(NetworkFilterReadEnabled,
+WEAK_STUB(NetworkFilterReadEnabled,
                 envoy_dynamic_module_callback_network_filter_read_enabled(nullptr))
-WEAK_STUB_FALSE(NetworkFilterIsHalfCloseEnabled,
+WEAK_STUB(NetworkFilterIsHalfCloseEnabled,
                 envoy_dynamic_module_callback_network_filter_is_half_close_enabled(nullptr))
-WEAK_STUB_FALSE(NetworkFilterAboveHighWatermark,
+WEAK_STUB(NetworkFilterAboveHighWatermark,
                 envoy_dynamic_module_callback_network_filter_above_high_watermark(nullptr))
-WEAK_STUB_FALSE(NetworkGetSocketOptionInt,
+WEAK_STUB(NetworkGetSocketOptionInt,
                 envoy_dynamic_module_callback_network_get_socket_option_int(
                     nullptr, 0, 0, envoy_dynamic_module_type_socket_option_state_Prebind, nullptr))
-WEAK_STUB_FALSE(NetworkGetSocketOptionBytes,
+WEAK_STUB(NetworkGetSocketOptionBytes,
                 envoy_dynamic_module_callback_network_get_socket_option_bytes(
                     nullptr, 0, 0, envoy_dynamic_module_type_socket_option_state_Prebind, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetBufferChunk,
+WEAK_STUB(ListenerFilterGetBufferChunk,
                 envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterDrainBuffer,
+WEAK_STUB(ListenerFilterDrainBuffer,
                 envoy_dynamic_module_callback_listener_filter_drain_buffer(nullptr, 0))
-WEAK_STUB_FALSE(ListenerFilterGetRemoteAddress,
+WEAK_STUB(ListenerFilterGetRemoteAddress,
                 envoy_dynamic_module_callback_listener_filter_get_remote_address(nullptr, nullptr,
                                                                                  nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetDirectRemoteAddress,
+WEAK_STUB(ListenerFilterGetDirectRemoteAddress,
                 envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(nullptr,
                                                                                         nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetLocalAddress,
+WEAK_STUB(ListenerFilterGetLocalAddress,
                 envoy_dynamic_module_callback_listener_filter_get_local_address(nullptr, nullptr,
                                                                                 nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetDirectLocalAddress,
+WEAK_STUB(ListenerFilterGetDirectLocalAddress,
                 envoy_dynamic_module_callback_listener_filter_get_direct_local_address(nullptr,
                                                                                        nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetConnectionTerminationDetails,
+WEAK_STUB(AccessLoggerGetConnectionTerminationDetails,
                 envoy_dynamic_module_callback_access_logger_get_connection_termination_details(
                     nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamDirectLocalAddress,
+WEAK_STUB(AccessLoggerGetDownstreamDirectLocalAddress,
                 envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address(
                     nullptr, nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamDirectRemoteAddress,
+WEAK_STUB(AccessLoggerGetDownstreamDirectRemoteAddress,
                 envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address(
                     nullptr, nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamLocalAddress,
+WEAK_STUB(AccessLoggerGetDownstreamLocalAddress,
                 envoy_dynamic_module_callback_access_logger_get_downstream_local_address(nullptr,
                                                                                          nullptr,
                                                                                          nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamLocalDnsSan,
+WEAK_STUB(AccessLoggerGetDownstreamLocalDnsSan,
                 envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(nullptr,
                                                                                          nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamLocalSubject,
+WEAK_STUB(AccessLoggerGetDownstreamLocalSubject,
                 envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(nullptr,
                                                                                          nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamLocalUriSan,
+WEAK_STUB(AccessLoggerGetDownstreamLocalUriSan,
                 envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(nullptr,
                                                                                          nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerCertDigest,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(nullptr, nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerCertPresented,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerCertValidated,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamPeerDnsSan,
+WEAK_STUB(AccessLoggerGetDownstreamPeerDnsSan,
                 envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerFingerprint1,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamPeerIssuer,
+WEAK_STUB(AccessLoggerGetDownstreamPeerIssuer,
                 envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamPeerSerial,
+WEAK_STUB(AccessLoggerGetDownstreamPeerSerial,
                 envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamPeerSubject,
+WEAK_STUB(AccessLoggerGetDownstreamPeerSubject,
                 envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamPeerUriSan,
+WEAK_STUB(AccessLoggerGetDownstreamPeerUriSan,
                 envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamRemoteAddress,
+WEAK_STUB(AccessLoggerGetDownstreamRemoteAddress,
                 envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(nullptr,
                                                                                           nullptr,
                                                                                           nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamTlsCipher,
+WEAK_STUB(AccessLoggerGetDownstreamTlsCipher,
                 envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamTlsSessionId,
+WEAK_STUB(AccessLoggerGetDownstreamTlsSessionId,
                 envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id(nullptr,
                                                                                           nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamTlsVersion,
+WEAK_STUB(AccessLoggerGetDownstreamTlsVersion,
                 envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDownstreamTransportFailureReason,
+WEAK_STUB(AccessLoggerGetDownstreamTransportFailureReason,
                 envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
                     nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetDynamicMetadata,
+WEAK_STUB(AccessLoggerGetDynamicMetadata,
                 envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
                     nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetFilterState,
+WEAK_STUB(AccessLoggerGetFilterState,
                 envoy_dynamic_module_callback_access_logger_get_filter_state(nullptr, {nullptr, 0},
                                                                              nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetHeaderValue,
+WEAK_STUB(AccessLoggerGetHeaderValue,
                 envoy_dynamic_module_callback_access_logger_get_header_value(
                     nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
                     nullptr, 0, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetHeaders,
+WEAK_STUB(AccessLoggerGetHeaders,
                 envoy_dynamic_module_callback_access_logger_get_headers(
                     nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetJa3Hash,
+WEAK_STUB(AccessLoggerGetJa3Hash,
                 envoy_dynamic_module_callback_access_logger_get_ja3_hash(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetJa4Hash,
+WEAK_STUB(AccessLoggerGetJa4Hash,
                 envoy_dynamic_module_callback_access_logger_get_ja4_hash(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetLocalReplyBody,
+WEAK_STUB(AccessLoggerGetLocalReplyBody,
                 envoy_dynamic_module_callback_access_logger_get_local_reply_body(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetProtocol,
+WEAK_STUB(AccessLoggerGetProtocol,
                 envoy_dynamic_module_callback_access_logger_get_protocol(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetRequestId,
+WEAK_STUB(AccessLoggerGetRequestId,
                 envoy_dynamic_module_callback_access_logger_get_request_id(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetRequestedServerName,
+WEAK_STUB(AccessLoggerGetRequestedServerName,
                 envoy_dynamic_module_callback_access_logger_get_requested_server_name(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetResponseCodeDetails,
+WEAK_STUB(AccessLoggerGetResponseCodeDetails,
                 envoy_dynamic_module_callback_access_logger_get_response_code_details(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetRouteName,
+WEAK_STUB(AccessLoggerGetRouteName,
                 envoy_dynamic_module_callback_access_logger_get_route_name(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetSpanId,
+WEAK_STUB(AccessLoggerGetSpanId,
                 envoy_dynamic_module_callback_access_logger_get_span_id(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetTraceId,
+WEAK_STUB(AccessLoggerGetTraceId,
                 envoy_dynamic_module_callback_access_logger_get_trace_id(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamCluster,
+WEAK_STUB(AccessLoggerGetUpstreamCluster,
                 envoy_dynamic_module_callback_access_logger_get_upstream_cluster(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamHost,
+WEAK_STUB(AccessLoggerGetUpstreamHost,
                 envoy_dynamic_module_callback_access_logger_get_upstream_host(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamLocalAddress,
+WEAK_STUB(AccessLoggerGetUpstreamLocalAddress,
                 envoy_dynamic_module_callback_access_logger_get_upstream_local_address(nullptr,
                                                                                        nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamLocalDnsSan,
+WEAK_STUB(AccessLoggerGetUpstreamLocalDnsSan,
                 envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamLocalSubject,
+WEAK_STUB(AccessLoggerGetUpstreamLocalSubject,
                 envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamLocalUriSan,
+WEAK_STUB(AccessLoggerGetUpstreamLocalUriSan,
                 envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(nullptr,
                                                                                        nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamPeerCertDigest,
+WEAK_STUB(AccessLoggerGetUpstreamPeerCertDigest,
                 envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(nullptr,
                                                                                           nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamPeerDnsSan,
+WEAK_STUB(AccessLoggerGetUpstreamPeerDnsSan,
                 envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamPeerIssuer,
+WEAK_STUB(AccessLoggerGetUpstreamPeerIssuer,
                 envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(nullptr,
                                                                                      nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamPeerSubject,
+WEAK_STUB(AccessLoggerGetUpstreamPeerSubject,
                 envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamPeerUriSan,
+WEAK_STUB(AccessLoggerGetUpstreamPeerUriSan,
                 envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(nullptr,
                                                                                       nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamProtocol,
+WEAK_STUB(AccessLoggerGetUpstreamProtocol,
                 envoy_dynamic_module_callback_access_logger_get_upstream_protocol(nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamRemoteAddress,
+WEAK_STUB(AccessLoggerGetUpstreamRemoteAddress,
                 envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(nullptr,
                                                                                         nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamTlsCipher,
+WEAK_STUB(AccessLoggerGetUpstreamTlsCipher,
                 envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher(nullptr,
                                                                                     nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamTlsSessionId,
+WEAK_STUB(AccessLoggerGetUpstreamTlsSessionId,
                 envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamTlsVersion,
+WEAK_STUB(AccessLoggerGetUpstreamTlsVersion,
                 envoy_dynamic_module_callback_access_logger_get_upstream_tls_version(nullptr,
                                                                                      nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetUpstreamTransportFailureReason,
+WEAK_STUB(AccessLoggerGetUpstreamTransportFailureReason,
                 envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
                     nullptr, nullptr))
-WEAK_STUB_FALSE(AccessLoggerGetVirtualClusterName,
+WEAK_STUB(AccessLoggerGetVirtualClusterName,
                 envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(nullptr,
                                                                                      nullptr))
-WEAK_STUB_FALSE(AccessLoggerHasResponseFlag,
+WEAK_STUB(AccessLoggerHasResponseFlag,
                 envoy_dynamic_module_callback_access_logger_has_response_flag(
                     nullptr, envoy_dynamic_module_type_response_flag_FailedLocalHealthCheck))
-WEAK_STUB_FALSE(AccessLoggerIsHealthCheck,
+WEAK_STUB(AccessLoggerIsHealthCheck,
                 envoy_dynamic_module_callback_access_logger_is_health_check(nullptr))
-WEAK_STUB_FALSE(AccessLoggerIsMtls, envoy_dynamic_module_callback_access_logger_is_mtls(nullptr))
-WEAK_STUB_FALSE(AccessLoggerIsTraceSampled,
+WEAK_STUB(AccessLoggerIsMtls, envoy_dynamic_module_callback_access_logger_is_mtls(nullptr))
+WEAK_STUB(AccessLoggerIsTraceSampled,
                 envoy_dynamic_module_callback_access_logger_is_trace_sampled(nullptr))
-WEAK_STUB_FALSE(
+WEAK_STUB(
     ListenerFilterGetDetectedTransportProtocol,
     envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetDynamicMetadataString,
+WEAK_STUB(ListenerFilterGetDynamicMetadataString,
                 envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
                     nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetJa3Hash,
+WEAK_STUB(ListenerFilterGetJa3Hash,
                 envoy_dynamic_module_callback_listener_filter_get_ja3_hash(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetJa4Hash,
+WEAK_STUB(ListenerFilterGetJa4Hash,
                 envoy_dynamic_module_callback_listener_filter_get_ja4_hash(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetOriginalDst,
+WEAK_STUB(ListenerFilterGetOriginalDst,
                 envoy_dynamic_module_callback_listener_filter_get_original_dst(nullptr, nullptr,
                                                                                nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetRequestedApplicationProtocols,
+WEAK_STUB(ListenerFilterGetRequestedApplicationProtocols,
                 envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
                     nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetRequestedServerName,
+WEAK_STUB(ListenerFilterGetRequestedServerName,
                 envoy_dynamic_module_callback_listener_filter_get_requested_server_name(nullptr,
                                                                                         nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetSocketOptionBytes,
+WEAK_STUB(ListenerFilterGetSocketOptionBytes,
                 envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(nullptr, 0, 0,
                                                                                       nullptr, 0,
                                                                                       nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetSocketOptionInt,
+WEAK_STUB(ListenerFilterGetSocketOptionInt,
                 envoy_dynamic_module_callback_listener_filter_get_socket_option_int(nullptr, 0, 0,
                                                                                     nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetSslDnsSans,
+WEAK_STUB(ListenerFilterGetSslDnsSans,
                 envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetSslSubject,
+WEAK_STUB(ListenerFilterGetSslSubject,
                 envoy_dynamic_module_callback_listener_filter_get_ssl_subject(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterGetSslUriSans,
+WEAK_STUB(ListenerFilterGetSslUriSans,
                 envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(nullptr, nullptr))
-WEAK_STUB_FALSE(ListenerFilterIsLocalAddressRestored,
+WEAK_STUB(ListenerFilterIsLocalAddressRestored,
                 envoy_dynamic_module_callback_listener_filter_is_local_address_restored(nullptr))
-WEAK_STUB_FALSE(ListenerFilterIsSsl, envoy_dynamic_module_callback_listener_filter_is_ssl(nullptr))
-WEAK_STUB_FALSE(ListenerFilterSetSocketOptionBytes,
+WEAK_STUB(ListenerFilterIsSsl, envoy_dynamic_module_callback_listener_filter_is_ssl(nullptr))
+WEAK_STUB(ListenerFilterSetSocketOptionBytes,
                 envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(nullptr, 0, 0,
                                                                                       {nullptr, 0}))
-WEAK_STUB_FALSE(ListenerFilterSetSocketOptionInt,
+WEAK_STUB(ListenerFilterSetSocketOptionInt,
                 envoy_dynamic_module_callback_listener_filter_set_socket_option_int(nullptr, 0, 0,
                                                                                     0))
-WEAK_STUB_FALSE(UdpListenerFilterGetDatagramDataChunks,
+WEAK_STUB(UdpListenerFilterGetDatagramDataChunks,
                 envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(nullptr,
                                                                                            nullptr))
-WEAK_STUB_FALSE(UdpListenerFilterGetLocalAddress,
+WEAK_STUB(UdpListenerFilterGetLocalAddress,
                 envoy_dynamic_module_callback_udp_listener_filter_get_local_address(nullptr,
                                                                                     nullptr,
                                                                                     nullptr))
-WEAK_STUB_FALSE(UdpListenerFilterGetPeerAddress,
+WEAK_STUB(UdpListenerFilterGetPeerAddress,
                 envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(nullptr, nullptr,
                                                                                    nullptr))
-WEAK_STUB_FALSE(UdpListenerFilterSendDatagram,
+WEAK_STUB(UdpListenerFilterSendDatagram,
                 envoy_dynamic_module_callback_udp_listener_filter_send_datagram(nullptr,
                                                                                 {nullptr, 0},
                                                                                 {nullptr, 0}, 0))
-WEAK_STUB_FALSE(UdpListenerFilterSetDatagramData,
+WEAK_STUB(UdpListenerFilterSetDatagramData,
                 envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(nullptr,
                                                                                     {nullptr, 0}))
 
-// Integer-returning weak stubs (return 0)
-WEAK_STUB_ZERO(NetworkFilterGetReadBufferChunksSize,
+WEAK_STUB(NetworkFilterGetReadBufferChunksSize,
                envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetReadBufferSize,
+WEAK_STUB(NetworkFilterGetReadBufferSize,
                envoy_dynamic_module_callback_network_filter_get_read_buffer_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetWriteBufferChunksSize,
+WEAK_STUB(NetworkFilterGetWriteBufferChunksSize,
                envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetWriteBufferSize,
+WEAK_STUB(NetworkFilterGetWriteBufferSize,
                envoy_dynamic_module_callback_network_filter_get_write_buffer_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetConnectionId,
+WEAK_STUB(NetworkFilterGetConnectionId,
                envoy_dynamic_module_callback_network_filter_get_connection_id(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetSslUriSansSize,
+WEAK_STUB(NetworkFilterGetSslUriSansSize,
                envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetSslDnsSansSize,
+WEAK_STUB(NetworkFilterGetSslDnsSansSize,
                envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetBufferLimit,
+WEAK_STUB(NetworkFilterGetBufferLimit,
                envoy_dynamic_module_callback_network_filter_get_buffer_limit(nullptr))
-WEAK_STUB_ZERO(NetworkFilterGetWorkerIndex,
+WEAK_STUB(NetworkFilterGetWorkerIndex,
                envoy_dynamic_module_callback_network_filter_get_worker_index(nullptr))
-WEAK_STUB_ZERO(NetworkGetSocketOptionsSize,
+WEAK_STUB(NetworkGetSocketOptionsSize,
                envoy_dynamic_module_callback_network_get_socket_options_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetAttemptCount,
+WEAK_STUB(AccessLoggerGetAttemptCount,
                envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetConnectionId,
+WEAK_STUB(AccessLoggerGetConnectionId,
                envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetDownstreamLocalDnsSanSize,
     envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetDownstreamLocalUriSanSize,
     envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetDownstreamPeerCertVEnd,
+WEAK_STUB(AccessLoggerGetDownstreamPeerCertVEnd,
                envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerCertVStart,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerDnsSanSize,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetDownstreamPeerUriSanSize,
     envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetHeadersSize,
+WEAK_STUB(AccessLoggerGetHeadersSize,
                envoy_dynamic_module_callback_access_logger_get_headers_size(
                    nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
-WEAK_STUB_ZERO(AccessLoggerGetRequestHeadersBytes,
+WEAK_STUB(AccessLoggerGetRequestHeadersBytes,
                envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetResponseCode,
+WEAK_STUB(AccessLoggerGetResponseCode,
                envoy_dynamic_module_callback_access_logger_get_response_code(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetResponseFlags,
+WEAK_STUB(AccessLoggerGetResponseFlags,
                envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetResponseHeadersBytes,
+WEAK_STUB(AccessLoggerGetResponseHeadersBytes,
                envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetResponseTrailersBytes,
+WEAK_STUB(AccessLoggerGetResponseTrailersBytes,
                envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamConnectionId,
+WEAK_STUB(AccessLoggerGetUpstreamConnectionId,
                envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamLocalDnsSanSize,
+WEAK_STUB(AccessLoggerGetUpstreamLocalDnsSanSize,
                envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamLocalUriSanSize,
+WEAK_STUB(AccessLoggerGetUpstreamLocalUriSanSize,
                envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamPeerCertVEnd,
+WEAK_STUB(AccessLoggerGetUpstreamPeerCertVEnd,
                envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamPeerCertVStart,
+WEAK_STUB(AccessLoggerGetUpstreamPeerCertVStart,
                envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamPeerDnsSanSize,
+WEAK_STUB(AccessLoggerGetUpstreamPeerDnsSanSize,
                envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetUpstreamPeerUriSanSize,
+WEAK_STUB(AccessLoggerGetUpstreamPeerUriSanSize,
                envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     AccessLoggerGetUpstreamPoolReadyDurationNs,
     envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(nullptr))
-WEAK_STUB_ZERO(AccessLoggerGetWorkerIndex,
+WEAK_STUB(AccessLoggerGetWorkerIndex,
                envoy_dynamic_module_callback_access_logger_get_worker_index(nullptr))
-WEAK_STUB_ZERO(ListenerFilterGetConnectionStartTimeMs,
+WEAK_STUB(ListenerFilterGetConnectionStartTimeMs,
                envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(nullptr))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     ListenerFilterGetRequestedApplicationProtocolsSize,
     envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(nullptr))
-WEAK_STUB_ZERO(ListenerFilterGetSocketFd,
+WEAK_STUB(ListenerFilterGetSocketFd,
                envoy_dynamic_module_callback_listener_filter_get_socket_fd(nullptr))
-WEAK_STUB_ZERO(ListenerFilterGetSslDnsSansSize,
+WEAK_STUB(ListenerFilterGetSslDnsSansSize,
                envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(nullptr))
-WEAK_STUB_ZERO(ListenerFilterGetSslUriSansSize,
+WEAK_STUB(ListenerFilterGetSslUriSansSize,
                envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(nullptr))
-WEAK_STUB_ZERO(ListenerFilterGetWorkerIndex,
+WEAK_STUB(ListenerFilterGetWorkerIndex,
                envoy_dynamic_module_callback_listener_filter_get_worker_index(nullptr))
-WEAK_STUB_ZERO(ListenerFilterMaxReadBytes,
+WEAK_STUB(ListenerFilterMaxReadBytes,
                envoy_dynamic_module_callback_listener_filter_max_read_bytes(nullptr))
-WEAK_STUB_ZERO(ListenerFilterWriteToSocket,
+WEAK_STUB(ListenerFilterWriteToSocket,
                envoy_dynamic_module_callback_listener_filter_write_to_socket(nullptr, {nullptr, 0}))
-WEAK_STUB_ZERO(
+WEAK_STUB(
     UdpListenerFilterGetDatagramDataChunksSize,
     envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(nullptr))
-WEAK_STUB_ZERO(UdpListenerFilterGetDatagramDataSize,
+WEAK_STUB(UdpListenerFilterGetDatagramDataSize,
                envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(nullptr))
-WEAK_STUB_ZERO(UdpListenerFilterGetWorkerIndex,
+WEAK_STUB(UdpListenerFilterGetWorkerIndex,
                envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(nullptr))
 
-// Pointer-returning weak stubs (return nullptr)
-WEAK_STUB_NULLPTR(NetworkFilterSchedulerNew,
+WEAK_STUB(NetworkFilterSchedulerNew,
                   envoy_dynamic_module_callback_network_filter_scheduler_new(nullptr))
-WEAK_STUB_NULLPTR(NetworkFilterConfigSchedulerNew,
+WEAK_STUB(NetworkFilterConfigSchedulerNew,
                   envoy_dynamic_module_callback_network_filter_config_scheduler_new(nullptr))
-WEAK_STUB_NULLPTR(ListenerFilterSchedulerNew,
+WEAK_STUB(ListenerFilterSchedulerNew,
                   envoy_dynamic_module_callback_listener_filter_scheduler_new(nullptr))
-WEAK_STUB_NULLPTR(ListenerFilterConfigSchedulerNew,
+WEAK_STUB(ListenerFilterConfigSchedulerNew,
                   envoy_dynamic_module_callback_listener_filter_config_scheduler_new(nullptr))
 
-// Metrics-result weak stubs (return Success)
-WEAK_STUB_METRICS(NetworkFilterConfigDefineCounter,
+WEAK_STUB(NetworkFilterConfigDefineCounter,
                   envoy_dynamic_module_callback_network_filter_config_define_counter(nullptr,
                                                                                      {nullptr, 0},
                                                                                      nullptr))
-WEAK_STUB_METRICS(NetworkFilterIncrementCounter,
+WEAK_STUB(NetworkFilterIncrementCounter,
                   envoy_dynamic_module_callback_network_filter_increment_counter(nullptr, 0, 0))
-WEAK_STUB_METRICS(NetworkFilterConfigDefineGauge,
+WEAK_STUB(NetworkFilterConfigDefineGauge,
                   envoy_dynamic_module_callback_network_filter_config_define_gauge(nullptr,
                                                                                    {nullptr, 0},
                                                                                    nullptr))
-WEAK_STUB_METRICS(NetworkFilterSetGauge,
+WEAK_STUB(NetworkFilterSetGauge,
                   envoy_dynamic_module_callback_network_filter_set_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(NetworkFilterIncrementGauge,
+WEAK_STUB(NetworkFilterIncrementGauge,
                   envoy_dynamic_module_callback_network_filter_increment_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(NetworkFilterDecrementGauge,
+WEAK_STUB(NetworkFilterDecrementGauge,
                   envoy_dynamic_module_callback_network_filter_decrement_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(NetworkFilterConfigDefineHistogram,
+WEAK_STUB(NetworkFilterConfigDefineHistogram,
                   envoy_dynamic_module_callback_network_filter_config_define_histogram(nullptr,
                                                                                        {nullptr, 0},
                                                                                        nullptr))
-WEAK_STUB_METRICS(NetworkFilterRecordHistogramValue,
+WEAK_STUB(NetworkFilterRecordHistogramValue,
                   envoy_dynamic_module_callback_network_filter_record_histogram_value(nullptr, 0,
                                                                                       0))
-WEAK_STUB_METRICS(ListenerFilterConfigDefineCounter,
+WEAK_STUB(ListenerFilterConfigDefineCounter,
                   envoy_dynamic_module_callback_listener_filter_config_define_counter(nullptr,
                                                                                       {nullptr, 0},
                                                                                       nullptr))
-WEAK_STUB_METRICS(ListenerFilterConfigDefineGauge,
+WEAK_STUB(ListenerFilterConfigDefineGauge,
                   envoy_dynamic_module_callback_listener_filter_config_define_gauge(nullptr,
                                                                                     {nullptr, 0},
                                                                                     nullptr))
-WEAK_STUB_METRICS(ListenerFilterConfigDefineHistogram,
+WEAK_STUB(ListenerFilterConfigDefineHistogram,
                   envoy_dynamic_module_callback_listener_filter_config_define_histogram(
                       nullptr, {nullptr, 0}, nullptr))
-WEAK_STUB_METRICS(AccessLoggerConfigDefineCounter,
+WEAK_STUB(AccessLoggerConfigDefineCounter,
                   envoy_dynamic_module_callback_access_logger_config_define_counter(nullptr,
                                                                                     {nullptr, 0},
                                                                                     nullptr))
-WEAK_STUB_METRICS(AccessLoggerConfigDefineGauge,
+WEAK_STUB(AccessLoggerConfigDefineGauge,
                   envoy_dynamic_module_callback_access_logger_config_define_gauge(nullptr,
                                                                                   {nullptr, 0},
                                                                                   nullptr))
-WEAK_STUB_METRICS(AccessLoggerConfigDefineHistogram,
+WEAK_STUB(AccessLoggerConfigDefineHistogram,
                   envoy_dynamic_module_callback_access_logger_config_define_histogram(nullptr,
                                                                                       {nullptr, 0},
                                                                                       nullptr))
-WEAK_STUB_METRICS(AccessLoggerDecrementGauge,
+WEAK_STUB(AccessLoggerDecrementGauge,
                   envoy_dynamic_module_callback_access_logger_decrement_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(AccessLoggerIncrementCounter,
+WEAK_STUB(AccessLoggerIncrementCounter,
                   envoy_dynamic_module_callback_access_logger_increment_counter(nullptr, 0, 0))
-WEAK_STUB_METRICS(AccessLoggerIncrementGauge,
+WEAK_STUB(AccessLoggerIncrementGauge,
                   envoy_dynamic_module_callback_access_logger_increment_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(AccessLoggerRecordHistogramValue,
+WEAK_STUB(AccessLoggerRecordHistogramValue,
                   envoy_dynamic_module_callback_access_logger_record_histogram_value(nullptr, 0, 0))
-WEAK_STUB_METRICS(AccessLoggerSetGauge,
+WEAK_STUB(AccessLoggerSetGauge,
                   envoy_dynamic_module_callback_access_logger_set_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(ListenerFilterDecrementGauge,
+WEAK_STUB(ListenerFilterDecrementGauge,
                   envoy_dynamic_module_callback_listener_filter_decrement_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(ListenerFilterIncrementCounter,
+WEAK_STUB(ListenerFilterIncrementCounter,
                   envoy_dynamic_module_callback_listener_filter_increment_counter(nullptr, 0, 0))
-WEAK_STUB_METRICS(ListenerFilterIncrementGauge,
+WEAK_STUB(ListenerFilterIncrementGauge,
                   envoy_dynamic_module_callback_listener_filter_increment_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(ListenerFilterRecordHistogramValue,
+WEAK_STUB(ListenerFilterRecordHistogramValue,
                   envoy_dynamic_module_callback_listener_filter_record_histogram_value(nullptr, 0,
                                                                                        0))
-WEAK_STUB_METRICS(ListenerFilterSetGauge,
+WEAK_STUB(ListenerFilterSetGauge,
                   envoy_dynamic_module_callback_listener_filter_set_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(UdpListenerFilterConfigDefineCounter,
+WEAK_STUB(UdpListenerFilterConfigDefineCounter,
                   envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
                       nullptr, {nullptr, 0}, nullptr))
-WEAK_STUB_METRICS(UdpListenerFilterConfigDefineGauge,
+WEAK_STUB(UdpListenerFilterConfigDefineGauge,
                   envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
                       nullptr, {nullptr, 0}, nullptr))
-WEAK_STUB_METRICS(UdpListenerFilterConfigDefineHistogram,
+WEAK_STUB(UdpListenerFilterConfigDefineHistogram,
                   envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
                       nullptr, {nullptr, 0}, nullptr))
-WEAK_STUB_METRICS(UdpListenerFilterDecrementGauge,
+WEAK_STUB(UdpListenerFilterDecrementGauge,
                   envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(UdpListenerFilterIncrementCounter,
+WEAK_STUB(UdpListenerFilterIncrementCounter,
                   envoy_dynamic_module_callback_udp_listener_filter_increment_counter(nullptr, 0,
                                                                                       0))
-WEAK_STUB_METRICS(UdpListenerFilterIncrementGauge,
+WEAK_STUB(UdpListenerFilterIncrementGauge,
                   envoy_dynamic_module_callback_udp_listener_filter_increment_gauge(nullptr, 0, 0))
-WEAK_STUB_METRICS(UdpListenerFilterRecordHistogramValue,
+WEAK_STUB(UdpListenerFilterRecordHistogramValue,
                   envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(nullptr,
                                                                                            0, 0))
-WEAK_STUB_METRICS(UdpListenerFilterSetGauge,
+WEAK_STUB(UdpListenerFilterSetGauge,
                   envoy_dynamic_module_callback_udp_listener_filter_set_gauge(nullptr, 0, 0))
 
-// HTTP callout weak stubs (return CannotCreateRequest)
-WEAK_STUB_CALLOUT(NetworkFilterHttpCallout,
+WEAK_STUB(NetworkFilterHttpCallout,
                   envoy_dynamic_module_callback_network_filter_http_callout(nullptr, nullptr,
                                                                             {nullptr, 0}, nullptr,
                                                                             0, {nullptr, 0}, 0))
-WEAK_STUB_CALLOUT(ListenerFilterHttpCallout,
+WEAK_STUB(ListenerFilterHttpCallout,
                   envoy_dynamic_module_callback_listener_filter_http_callout(nullptr, nullptr,
                                                                              {nullptr, 0}, nullptr,
                                                                              0, {nullptr, 0}, 0))
 
-// Special-cased weak stubs with enum return types.
-
-TEST(CommonAbiImplTest, NetworkFilterGetConnectionStateEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_network_filter_get_connection_state(nullptr);
-        EXPECT_EQ(result, envoy_dynamic_module_type_network_connection_state_Closed);
-      },
-      "not implemented in this context");
-}
-
-TEST(CommonAbiImplTest, NetworkFilterReadDisableEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true);
-        EXPECT_EQ(result, envoy_dynamic_module_type_network_read_disable_status_NoTransition);
-      },
-      "not implemented in this context");
-}
+WEAK_STUB(NetworkFilterGetConnectionState,
+         envoy_dynamic_module_callback_network_filter_get_connection_state(nullptr))
+WEAK_STUB(NetworkFilterReadDisable,
+         envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
 
 } // namespace
 } // namespace DynamicModules
