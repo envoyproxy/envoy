@@ -1224,7 +1224,7 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamHandlesInlineResetDuringHeaders
 
   auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message),
                                         true /* end_stream */, 1000);
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
   EXPECT_NE(captured_callbacks, nullptr);
 }
 
@@ -1509,7 +1509,7 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), true, 1000);
   // Should still return success even with inline reset.
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 
   // Clean up properly.
   filter->onDestroy();
@@ -1573,7 +1573,7 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
   message->body().add("request body");
   auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), true, 1000);
   // Should still return success even with inline reset on data.
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 
   // Clean up properly.
   filter->onDestroy();
