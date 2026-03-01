@@ -364,47 +364,48 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilterConfig
   const uint64_t callout_id = getNextCalloutId();
   auto callback = std::make_unique<DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback>(
       shared_from_this(), callout_id);
-  DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback& callback_ref = *callback;
-  http_stream_callouts_[callout_id] = std::move(callback);
 
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
 
-  Http::AsyncClient::Stream* async_stream = cluster->httpAsyncClient().start(callback_ref, options);
+  Http::AsyncClient::Stream* async_stream = cluster->httpAsyncClient().start(*callback, options);
   if (!async_stream) {
-    http_stream_callouts_.erase(callout_id);
     return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
 
-  callback_ref.stream_ = async_stream;
-  callback_ref.request_message_ = std::move(message);
-  *stream_id_out = callout_id;
-
-  bool has_initial_body = callback_ref.request_message_->body().length() > 0;
+  bool has_initial_body = message->body().length() > 0;
   if (has_initial_body) {
-    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(),
-                                      false /* end_stream */);
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendHeaders(message->headers(), false /* end_stream */);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
-    callback_ref.stream_->sendData(callback_ref.request_message_->body(), end_stream);
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendData(message->body(), end_stream);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
   } else {
-    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(), end_stream);
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendHeaders(message->headers(), end_stream);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
   }
+
+  // If no any initial failure happened, we can add the callback to the map and return success.
+  // The callback will be responsible for cleaning up the stream when it's done.
+  callback->stream_ = async_stream;
+  callback->request_message_ = std::move(message);
+  http_stream_callouts_.emplace(callout_id, std::move(callback));
+  *stream_id_out = callout_id;
+
   return envoy_dynamic_module_type_http_callout_init_result_Success;
 }
 
 void DynamicModuleHttpFilterConfig::resetHttpStream(uint64_t stream_id) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it != http_stream_callouts_.end() && it->second->stream_) {
-    it->second->stream_->reset();
+  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+    return;
   }
+  it->second->stream_->reset();
 }
 
 bool DynamicModuleHttpFilterConfig::sendStreamData(uint64_t stream_id, Buffer::Instance& data,
@@ -430,7 +431,10 @@ bool DynamicModuleHttpFilterConfig::sendStreamTrailers(uint64_t stream_id,
 
 void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onHeaders(
     Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
-  if (!config_->in_module_config_ || !config_->on_http_filter_config_http_stream_headers_) {
+  // If stream_ is nullptr, that means the stream haven't completed the initialization or it have
+  // been reset. In either way, ignore the response.
+  if (config_->in_module_config_ == nullptr ||
+      config_->on_http_filter_config_http_stream_headers_ == nullptr || stream_ == nullptr) {
     return;
   }
   absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
@@ -449,7 +453,10 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onHeaders(
 
 void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onData(Buffer::Instance& data,
                                                                       bool end_stream) {
-  if (!config_->in_module_config_ || !config_->on_http_filter_config_http_stream_data_) {
+  // If stream_ is nullptr, that means the stream haven't completed the initialization or it have
+  // been reset. In either way, ignore the response.
+  if (config_->in_module_config_ == nullptr ||
+      config_->on_http_filter_config_http_stream_data_ == nullptr || stream_ == nullptr) {
     return;
   }
   const uint64_t length = data.length();
@@ -468,7 +475,10 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onData(Buffer::In
 
 void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onTrailers(
     Http::ResponseTrailerMapPtr&& trailers) {
-  if (!config_->in_module_config_ || !config_->on_http_filter_config_http_stream_trailers_) {
+  // If stream_ is nullptr, that means the stream haven't completed the initialization or it have
+  // been reset. In either way, ignore the response.
+  if (config_->in_module_config_ == nullptr ||
+      config_->on_http_filter_config_http_stream_trailers_ == nullptr || stream_ == nullptr) {
     return;
   }
   absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> trailers_vector;
@@ -492,24 +502,24 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onComplete() {
   }
   cleaned_up_ = true;
 
+  // Clean up it from the map first to make sure no other events can come in after this point.
   DynamicModuleHttpFilterConfigSharedPtr config = std::move(config_);
-  Event::Dispatcher& dispatcher = config->main_thread_dispatcher_;
-
-  if (config->in_module_config_ && config->on_http_filter_config_http_stream_complete_) {
-    config->on_http_filter_config_http_stream_complete_(config.get(), config->in_module_config_,
-                                                        callout_id_);
-  }
-
-  stream_ = nullptr;
-  request_message_.reset();
-  request_trailers_.reset();
-
   auto it = config->http_stream_callouts_.find(callout_id_);
   if (it != config->http_stream_callouts_.end()) {
-    std::unique_ptr<Event::DeferredDeletable> deletable(it->second.release());
-    dispatcher.deferredDelete(std::move(deletable));
+    config->main_thread_dispatcher_.deferredDelete(std::move(it->second));
     config->http_stream_callouts_.erase(it);
   }
+
+  // If stream_ is nullptr, that means the stream haven't completed the initialization or it have
+  // been reset. In either way, ignore the event.
+  if (config->in_module_config_ == nullptr ||
+      config->on_http_filter_config_http_stream_complete_ == nullptr || stream_ == nullptr) {
+    return;
+  }
+
+  config->on_http_filter_config_http_stream_complete_(config.get(), config->in_module_config_,
+                                                      callout_id_);
+  stream_ = nullptr;
 }
 
 void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onReset() {
@@ -518,25 +528,25 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onReset() {
   }
   cleaned_up_ = true;
 
+  // Clean up it from the map first to make sure no other events can come in after this point.
   DynamicModuleHttpFilterConfigSharedPtr config = std::move(config_);
-  Event::Dispatcher& dispatcher = config->main_thread_dispatcher_;
-
-  if (stream_ && config->in_module_config_ && config->on_http_filter_config_http_stream_reset_) {
-    config->on_http_filter_config_http_stream_reset_(
-        config.get(), config->in_module_config_, callout_id_,
-        envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
-  }
-
-  stream_ = nullptr;
-  request_message_.reset();
-  request_trailers_.reset();
-
   auto it = config->http_stream_callouts_.find(callout_id_);
   if (it != config->http_stream_callouts_.end()) {
-    std::unique_ptr<Event::DeferredDeletable> deletable(it->second.release());
-    dispatcher.deferredDelete(std::move(deletable));
+    config->main_thread_dispatcher_.deferredDelete(std::move(it->second));
     config->http_stream_callouts_.erase(it);
   }
+
+  // If stream_ is nullptr, that means the stream haven't completed the initialization or it have
+  // been reset. In either way, ignore the event.
+  if (!config->in_module_config_ || !config->on_http_filter_config_http_stream_reset_ ||
+      stream_ == nullptr) {
+    return;
+  }
+
+  config->on_http_filter_config_http_stream_reset_(
+      config.get(), config->in_module_config_, callout_id_,
+      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
+  stream_ = nullptr;
 }
 
 } // namespace HttpFilters
