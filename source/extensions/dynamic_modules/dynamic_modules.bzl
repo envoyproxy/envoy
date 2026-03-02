@@ -16,10 +16,6 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     This rule is language-independent: the archive may come from cc_library,
     rust_static_library, or any other rule that produces a static archive.
 
-    To use the resulting module, set name = "static://<module_name>" in the
-    DynamicModuleConfig proto. The module's Bazel target must appear in the deps of
-    the Envoy binary so that its symbols are linked in and available at runtime.
-
     Args:
         name: Bazel target name.
         module_name: The module name used to prefix symbols. Must be a valid C identifier.
