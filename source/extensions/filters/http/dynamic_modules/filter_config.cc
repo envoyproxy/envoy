@@ -37,7 +37,9 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
     auto callout = std::move(it->second);
     http_callouts_.erase(it);
     if (callout->request_ != nullptr) {
-      callout->request_->cancel();
+      auto request = callout->request_;
+      callout->request_ = nullptr;
+      request->cancel();
     }
   }
 
@@ -46,10 +48,10 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
     auto it = http_stream_callouts_.begin();
     auto callout = std::move(it->second);
     http_stream_callouts_.erase(it);
-    auto callout_ptr = callout.get();
-    main_thread_dispatcher_.deferredDelete(std::move(callout));
-    if (callout_ptr->stream_ != nullptr) {
-      callout_ptr->stream_->reset();
+    if (callout->stream_ != nullptr) {
+      auto stream = callout->stream_;
+      callout->stream_ = nullptr;
+      stream->reset();
     }
   }
 }
@@ -541,7 +543,7 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onComplete() {
   if (it == config.http_stream_callouts_.end()) {
     return;
   }
-  config.main_thread_dispatcher_.deferredDelete(std::move(it->second));
+  auto callback = std::move(it->second);
   config.http_stream_callouts_.erase(it);
 
   // Any in map callback must have a non-null stream_.
@@ -571,7 +573,7 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onReset() {
   if (it == config.http_stream_callouts_.end()) {
     return;
   }
-  config.main_thread_dispatcher_.deferredDelete(std::move(it->second));
+  auto callback = std::move(it->second);
   config.http_stream_callouts_.erase(it);
 
   // Any in map callback must have a non-null stream_.
