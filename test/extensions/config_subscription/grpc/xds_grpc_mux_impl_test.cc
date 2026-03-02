@@ -1447,6 +1447,14 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                     &async_stream_);
 }
 
+// A temp test to increase coverage. The test will be modified once the
+// implementation will be added.
+TEST_P(GrpcMuxImplTest, LrsCoverageIncrease) {
+  setup();
+  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
 class NullGrpcMuxImplTest : public testing::Test {
 public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
@@ -1483,6 +1491,11 @@ TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
 }
 
 TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_->edsResourcesCache()); }
+
+TEST_F(NullGrpcMuxImplTest, LrsCoverageIncrease) {
+  EXPECT_EQ(null_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(null_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
 
 TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
   auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
