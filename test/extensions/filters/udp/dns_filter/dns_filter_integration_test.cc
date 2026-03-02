@@ -89,6 +89,13 @@ public:
 
   void setupResponseParser() { histogram_.unit_ = Stats::Histogram::Unit::Milliseconds; }
 
+  void TearDown() override {
+    if (test_server_) {
+      test_server_.reset();
+    }
+    fake_upstreams_.clear();
+  }
+
   static std::string configToUse() {
     return fmt::format(R"EOF(
 admin:
