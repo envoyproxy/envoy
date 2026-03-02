@@ -1601,6 +1601,8 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
 // by sending back an immediate_response message, which should be
 // returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -1629,6 +1631,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value());
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_imm_resp = json_log->getString("received_immediate_response_field");
+  EXPECT_EQ(*field_imm_resp, "1");
 }
 
 // Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
@@ -5195,7 +5201,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5273,7 +5278,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5313,7 +5317,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   // Ensure that we replaced and did not append to the request.
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   // No header mutations but a body replacement happened due to continue & replace.
   // Test that the request_body_effect shows mutation applied
@@ -5348,7 +5351,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Failed mutation request
@@ -5379,7 +5381,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
@@ -5427,13 +5428,124 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
   EXPECT_EQ(*field_request_header_effect, "2");
 
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+
+  initializeConfigDuplexStreamed(false);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  codec_client_->sendData(*request_encoder_, "sss", false);
+  codec_client_->sendData(*request_encoder_, "xxx", true);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(50ms);
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), "sssxxx");
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode->set_request_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_response_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_request_header_mode(ProcessingMode::SKIP);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+  });
+
+  const std::string body_sent(3 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", std::to_string(200)}};
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request, true, true);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp(true, true);
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  upstream_request_->encodeData("mmmmm", false);
+  upstream_request_->encodeData("nnnn", true);
+
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  timeSystem().advanceTimeWaitImpl(20ms);
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request, true, true);
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp(true, true);
+
+  timeSystem().advanceTimeWaitImpl(50ms);
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ("mmmmmnnnn", response->body());
 }
 
 } // namespace ExternalProcessing

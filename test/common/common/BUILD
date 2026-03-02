@@ -62,7 +62,7 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/base",
+        "@abseil-cpp//absl/base",
     ],
 )
 
@@ -230,7 +230,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -322,7 +322,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -424,8 +424,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_googlesource_code_re2//:re2",
+        "@benchmark",
+        "@re2",
     ],
 )
 
@@ -436,8 +436,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
@@ -452,8 +452,8 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:radix_tree_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
@@ -469,8 +469,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:radix_tree_lib",
         "//source/common/http:headers_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
@@ -485,7 +485,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:assert_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -511,7 +511,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:thread_lib",
         "//test/test_common:thread_factory_for_test_lib",
-        "@com_google_absl//absl/hash:hash_testing",
+        "@abseil-cpp//absl/hash:hash_testing",
     ],
 )
 
@@ -541,7 +541,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/version:version_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -625,7 +625,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:inline_map",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

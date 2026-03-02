@@ -37,7 +37,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )

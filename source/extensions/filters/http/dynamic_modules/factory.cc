@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -44,7 +45,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(filter_config.status().message()));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const std::string& worker_name = callbacks.dispatcher().name();
@@ -57,8 +64,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);
-    filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
+
+    // The addStreamFilter() will call the setDecoderFilterCallbacks first then
+    // setEncoderFilterCallbacks.
+    // We can initialize the in-module filter after we have both callbacks to ensure the in module
+    // filter can access all the necessary information during creation.
+    filter->initializeInModuleFilter();
   };
 }
 

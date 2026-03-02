@@ -19,6 +19,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
@@ -217,6 +218,9 @@ private:
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
   // Formatter for computing host identifier from request context.
   Envoy::Formatter::FormatterPtr host_id_formatter_;
+  // Optional formatter for computing tenant identifier from request context.
+  // Used when tenant isolation is enabled to create tenant-scoped identifiers.
+  Envoy::Formatter::FormatterPtr tenant_id_formatter_;
   friend class RevConClusterFactory;
 };
 

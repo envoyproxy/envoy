@@ -35,21 +35,26 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
+RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_get_header_tag_from_header_map);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
+RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
+RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
@@ -79,6 +84,7 @@ RUNTIME_GUARD(envoy_reloadable_features_reset_ignore_upstream_reason);
 RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
@@ -99,6 +105,7 @@ RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
+RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -199,6 +206,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // Flip back to true once performance aligns with nghttp2 and
 // https://github.com/envoyproxy/envoy/issues/40070 is resolved.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// When enabled, dynamic modules metrics will be registered as custom stat namespaces, causing
+// the namespace prefix to be stripped from prometheus output and no envoy_ prefix added.
+// This is the legacy behavior. When disabled which is the default, metrics appear with the
+// standard envoy_ prefix followed by the namespace.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_prefix);
+// TODO(haoyuewang): Flip true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

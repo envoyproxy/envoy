@@ -58,6 +58,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )

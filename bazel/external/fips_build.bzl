@@ -10,7 +10,7 @@ export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread --sysroot=$${SYSROOT}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
 else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
     export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
@@ -67,7 +67,7 @@ SYSROOT="$$(realpath $$(dirname "$(location %s)"))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
     export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -lc++ -lc++abi -lm -pthread --sysroot=$${SYSROOT}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
 else
     export CXXFLAGS="--sysroot=$${SYSROOT}"
     export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"

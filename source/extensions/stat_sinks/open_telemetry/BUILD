@@ -35,8 +35,8 @@ envoy_cc_library(
         "//source/common/stats:stat_match_input_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:metrics_proto_cc",
-        "@opentelemetry_proto//:metrics_service_proto_cc",
+        "@opentelemetry-proto//:metrics_proto_cc",
+        "@opentelemetry-proto//:metrics_service_proto_cc",
     ],
 )
 

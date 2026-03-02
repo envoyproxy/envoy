@@ -15,7 +15,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@proto-field-extraction//:all_libs",
     ],
 )

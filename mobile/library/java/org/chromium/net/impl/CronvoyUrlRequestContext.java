@@ -112,6 +112,15 @@ public final class CronvoyUrlRequestContext extends CronvoyEngineBase {
     }
   }
 
+  public long getEngineHandle() {
+    synchronized (mLock) {
+      if (mEngine == null) {
+        throw new IllegalStateException("Engine is shut down.");
+      }
+      return mEngine.getEngineHandle();
+    }
+  }
+
   void setTaskToExecuteWhenInitializationIsCompleted(Runnable runnable) {
     if (!mInitializationCompleter.compareAndSet(null, runnable)) {
       // The fact that the initializationCompleter was not null implies that the initialization

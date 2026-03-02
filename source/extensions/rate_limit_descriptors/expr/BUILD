@@ -28,7 +28,7 @@ envoy_cc_extension(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
-                "@com_google_cel_cpp//parser",
+                "@cel-cpp//parser",
             ],
         },
     ),

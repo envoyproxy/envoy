@@ -54,6 +54,7 @@ envoy_cc_library(
         ":watched_directory_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
+        "//envoy/singleton:instance_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
@@ -83,7 +84,7 @@ envoy_cc_library(
         "//envoy/config:subscription_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
-        "@com_google_absl//absl/container:btree",
+        "@abseil-cpp//absl/container:btree",
     ],
 )
 
@@ -233,7 +234,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/version:api_version_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

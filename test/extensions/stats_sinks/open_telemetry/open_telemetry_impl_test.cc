@@ -112,7 +112,8 @@ public:
   }
 
   void addHistogramToSnapshot(const std::string& name, bool is_delta = false, bool used = true,
-                              const Stats::TagVector& tags = {{"hist_key", "hist_val"}}) {
+                              const Stats::TagVector& tags = {{"hist_key", "hist_val"}},
+                              bool add_values = true) {
     auto histogram = std::make_unique<NiceMock<Stats::MockParentHistogram>>();
 
     histogram_t* hist = hist_alloc();
@@ -130,8 +131,10 @@ public:
       values = {0.7, 7, 35, 200, 750, 4000, 20000, 200000, 1500000, 4000000};
     }
 
-    for (auto value : values) {
-      hist_insert(hist, value, 1);
+    if (add_values) {
+      for (auto value : values) {
+        hist_insert(hist, value, 1);
+      }
     }
 
     histogram_ptrs_.push_back(hist);
@@ -554,6 +557,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
+  addCounterToSnapshot("test_counter3", 0, 4);
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
@@ -591,6 +595,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 
   addHistogramToSnapshot("test_histogram1", true);
   addHistogramToSnapshot("test_histogram2", true);
+  addHistogramToSnapshot("test_histogram3", true, true, {}, false);
 
   MetricsExportRequestSharedPtr metrics =
       flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);

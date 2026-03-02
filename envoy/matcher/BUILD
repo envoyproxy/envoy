@@ -14,8 +14,8 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/hash",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",

@@ -256,7 +256,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_config_define_counter(
                 static_cast<void*>(config_.get()), name, &counter_id));
-  EXPECT_EQ(0, counter_id);
+  EXPECT_EQ(1, counter_id);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_increment_counter(
@@ -276,7 +276,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsGaugeDefineAndManipulate) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_config_define_gauge(
                 static_cast<void*>(config_.get()), name, &gauge_id));
-  EXPECT_EQ(0, gauge_id);
+  EXPECT_EQ(1, gauge_id);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_set_gauge(static_cast<void*>(config_.get()),
@@ -304,7 +304,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsHistogramDefineAndRecord) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_config_define_histogram(
                 static_cast<void*>(config_.get()), name, &histogram_id));
-  EXPECT_EQ(0, histogram_id);
+  EXPECT_EQ(1, histogram_id);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(

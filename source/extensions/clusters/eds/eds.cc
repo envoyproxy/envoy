@@ -10,6 +10,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -172,10 +173,13 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
           returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
       address_list.emplace_back(address);
     }
-    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-      // All addresses must by IP addresses.
-      if (!address->ip()) {
-        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses")) {
+      for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+        // All addresses must by IP addresses.
+        if (!address->ip()) {
+          throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+        }
       }
     }
   }
@@ -413,6 +417,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
 
   HostVector hosts_added;
   HostVector hosts_removed;
+  hosts_added.reserve(new_hosts.size());
+  hosts_removed.reserve(host_set.hosts().size());
   // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
   // when the locality weight map or the overprovisioning factor. Note calling updateDynamicHostList
   // is responsible for both determining whether there was a change and to perform the actual update

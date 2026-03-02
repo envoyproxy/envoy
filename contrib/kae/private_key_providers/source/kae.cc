@@ -1,18 +1,17 @@
 #include "contrib/kae/private_key_providers/source/kae.h"
-#include "kae.h"
 
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
+#include <openssl/rsa.h>
+#include <openssl/ssl.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <thread>
 
-#include "libuadk.h"
-#include "libuadk_impl.h"
-#include "openssl/rsa.h"
-#include "openssl/ssl.h"
+#include "contrib/kae/private_key_providers/source/libuadk.h"
+#include "contrib/kae/private_key_providers/source/libuadk_impl.h"
 
 namespace Envoy {
 namespace Extensions {

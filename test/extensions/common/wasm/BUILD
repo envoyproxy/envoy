@@ -63,7 +63,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -90,8 +90,8 @@ envoy_cc_test_binary(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
+        "@benchmark",
     ],
 )
 

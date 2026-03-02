@@ -250,6 +250,13 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   if (read_side_closed()) {
     return;
   }
+  // If read has been disabled, QUIC should not deliver any more data upstream to increase the bytes
+  // buffered/processed.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_disable_data_read_immediately") &&
+      read_disable_counter_ > 0) {
+    return;
+  }
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.

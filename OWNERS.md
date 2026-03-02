@@ -46,7 +46,7 @@ routing PRs, questions, etc. to the right place.
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
-* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
   * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.

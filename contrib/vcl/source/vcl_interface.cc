@@ -94,7 +94,7 @@ uint32_t vclEpollHandle(uint32_t wrk_index) {
 
 void vclInterfaceWorkerRegister() {
   {
-    absl::MutexLock lk(&wrk_lock);
+    absl::MutexLock lk(wrk_lock);
     RELEASE_ASSERT(vppcom_worker_register() == VPPCOM_OK, "failed to register VCL worker");
   }
   const int wrk_index = vppcom_worker_index();

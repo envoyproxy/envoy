@@ -22,6 +22,11 @@ public:
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
       const std::string& stats_prefix,
       Server::Configuration::FactoryContext& factory_context) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context) override;
 };
 
 } // namespace GrpcHttp1Bridge

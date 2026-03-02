@@ -46,7 +46,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@opentelemetry-cpp//api",
     ],
 )

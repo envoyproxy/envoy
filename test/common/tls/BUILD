@@ -305,7 +305,7 @@ envoy_cc_benchmark_binary(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

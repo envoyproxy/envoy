@@ -66,6 +66,7 @@ paths:
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
+    - docs
 
   # `build_urls`:
   #   We want all URL references to exist in repository_locations.bzl files and have
@@ -81,6 +82,7 @@ paths:
     - api/bazel/repository_locations.bzl
     - bazel/external/cargo/crates.bzl
     - bazel/repository_locations.bzl
+    - docs/bazel/repository_locations.bzl
 
   exception:
     include:
@@ -164,6 +166,8 @@ paths:
     - source/extensions/common/wasm
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
+    - source/extensions/content_parsers/json/config.cc
+    - source/extensions/content_parsers/json/json_content_parser_impl.cc
     - source/extensions/compression/zstd/common/dictionary_manager.h
     - source/extensions/filters/http/adaptive_concurrency/controller
     - source/extensions/filters/http/admission_control/config.cc

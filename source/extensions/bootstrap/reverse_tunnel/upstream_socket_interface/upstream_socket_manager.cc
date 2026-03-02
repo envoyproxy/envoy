@@ -140,7 +140,8 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
 
   // Update stats registry.
   if (auto extension = getUpstreamExtension()) {
-    extension->updateConnectionStats(node_id, cluster_id, true /* increment */);
+    extension->updateConnectionStats(node_id, cluster_id, true /* increment */,
+                                     tenant_isolation_enabled_);
     ENVOY_LOG(debug, "reverse_tunnel: updated stats registry for node '{}' cluster '{}'.", node_id,
               cluster_id);
   }
@@ -310,7 +311,8 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
 
   // Update Envoy's stats system.
   if (auto extension = getUpstreamExtension()) {
-    extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
+    extension->updateConnectionStats(node_id, cluster_id, false /* decrement */,
+                                     tenant_isolation_enabled_);
     // Report the disconnection to the extension for further action.
     extension->reportDisconnection(node_id, cluster_id);
 

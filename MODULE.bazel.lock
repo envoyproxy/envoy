@@ -1115,7 +1115,7 @@
               ]
             }
           },
-          "com_google_absl": {
+          "abseil-cpp": {
             "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
             "ruleClassName": "http_archive",
             "attributes": {

@@ -22,6 +22,7 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -500,13 +501,14 @@ public:
 
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
+   * @param stream_info request stream information.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
    * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
   virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
-      const Upstream::PrioritySet& priority_set,
+      StreamInfo::StreamInfo* stream_info, const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**

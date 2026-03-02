@@ -110,28 +110,23 @@ private:
   // Sets common fields for a data point.
   // For gauge metrics,
   // temporality should be AGGREGATION_TEMPORALITY_UNSPECIFIED.
-  // For the aggregation case, attributes should be nullptr as they have already been
-  // set.
   template <typename DataPoint>
   void setCommonDataPoint(
       DataPoint& data_point,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* attributes,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
     data_point.set_time_unix_nano(snapshot_time_ns_);
-    if (attributes) {
-      // When attributes are present, set the start time for delta/cumulative metrics.
-      data_point.mutable_attributes()->CopyFrom(*attributes);
-      switch (temporality) {
-      case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
-        data_point.set_start_time_unix_nano(delta_start_time_ns_);
-        break;
-      case AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE:
-        data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
-        break;
-      default:
-        // Do not set start time for UNSPECIFIED.
-        break;
-      }
+    data_point.mutable_attributes()->CopyFrom(attributes);
+    switch (temporality) {
+    case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
+      data_point.set_start_time_unix_nano(delta_start_time_ns_);
+      break;
+    case AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE:
+      data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
+      break;
+    default:
+      // Do not set start time for UNSPECIFIED.
+      break;
     }
   }
 

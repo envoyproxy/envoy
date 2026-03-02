@@ -37,10 +37,12 @@
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
+using testing::ByMove;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
 using testing::NotNull;
 using testing::Pointee;
+using testing::Ref;
 using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
@@ -695,6 +697,74 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   EXPECT_LE(800, sampled_count);
   EXPECT_GE(1200, sampled_count);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing: {}
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // By default, trace context propagation is enabled (no_context_propagation is false)
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is disabled when the flag is set to true
+  EXPECT_TRUE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: false
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is enabled when the flag is explicitly set to false
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
@@ -3910,6 +3980,65 @@ http_filters:
   EXPECT_TRUE(creation_status_.ok());
   EXPECT_TRUE(config.httpsDestinationPorts().empty());
   EXPECT_TRUE(config.httpDestinationPorts().empty());
+}
+
+class MockSrdsFactory : public Router::SrdsFactory {
+public:
+  std::string name() const override { return "envoy.srds_factory.default"; }
+  std::unique_ptr<Envoy::Config::ConfigProviderManager>
+  createScopedRoutesConfigProviderManager(Server::Configuration::ServerFactoryContext&,
+                                          Router::RouteConfigProviderManager&) override {
+    return nullptr;
+  }
+  MOCK_METHOD(Envoy::Config::ConfigProviderPtr, createConfigProvider,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
+               Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager));
+  MOCK_METHOD(Router::ScopeKeyBuilderPtr, createScopeKeyBuilder,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config));
+};
+
+// Test that SRDS createConfigProvider and createScopeKeyBuilder receive the listener init manager.
+TEST_F(HttpConnectionManagerConfigTest, SrdsUsesListenerInitManager) {
+  MockSrdsFactory mock_srds_factory;
+  Registry::InjectFactory<Router::SrdsFactory> registration(mock_srds_factory);
+
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+scoped_routes:
+  name: scoped_routes
+  scope_key_builder:
+    fragments:
+    - header_value_extractor:
+        name: X-Route-Selector
+        element_separator: ","
+        element:
+          separator: =
+          key: vip
+  rds_config_source:
+    ads: {}
+  scoped_rds:
+    scoped_rds_config_source:
+      ads: {}
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(mock_srds_factory, createConfigProvider(_, _, Ref(context_.init_manager_), _, _))
+      .WillOnce(Return(ByMove(Envoy::Config::ConfigProviderPtr())));
+  EXPECT_CALL(mock_srds_factory, createScopeKeyBuilder(_))
+      .WillOnce(Return(ByMove(Router::ScopeKeyBuilderPtr())));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 }
 
 } // namespace

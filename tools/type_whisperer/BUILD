@@ -101,7 +101,7 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf",
         "//tools/type_whisperer:api_type_db_proto_cc_proto",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_map",
         "@xds//udpa/annotations:pkg_cc_proto",
     ],
 )

@@ -2,7 +2,6 @@
 #include <cstdint>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 #include "absl/synchronization/mutex.h"
 #include "sdk.h"
@@ -226,6 +225,61 @@ public:
     return value;
   }
 
+  absl::optional<bool> getMetadataBool(absl::string_view ns, absl::string_view key) override {
+    bool value = false;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_bool(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, &value);
+
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
+  std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) override {
+    size_t count = envoy_dynamic_module_callback_http_get_metadata_keys_count(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()});
+    if (count == 0) {
+      return {};
+    }
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_keys(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()}, buffers.data());
+    if (!ret) {
+      return {};
+    }
+    std::vector<absl::string_view> keys;
+    keys.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+      keys.emplace_back(buffers[i].ptr, buffers[i].length);
+    }
+    return keys;
+  }
+
+  std::vector<absl::string_view> getMetadataNamespaces() override {
+    size_t count = envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic);
+    if (count == 0) {
+      return {};
+    }
+    std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_namespaces(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic, buffers.data());
+    if (!ret) {
+      return {};
+    }
+    std::vector<absl::string_view> namespaces;
+    namespaces.reserve(count);
+    for (size_t i = 0; i < count; i++) {
+      namespaces.emplace_back(buffers[i].ptr, buffers[i].length);
+    }
+    return namespaces;
+  }
+
   void setMetadata(absl::string_view ns, absl::string_view key, absl::string_view value) override {
     envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
@@ -235,6 +289,12 @@ public:
 
   void setMetadata(absl::string_view ns, absl::string_view key, double value) override {
     envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
+  }
+
+  void setMetadata(absl::string_view ns, absl::string_view key, bool value) override {
+    envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
@@ -274,6 +334,17 @@ public:
   absl::optional<uint64_t> getAttributeNumber(AttributeID id) override {
     uint64_t value = 0;
     const bool ret = envoy_dynamic_module_callback_http_filter_get_attribute_int(
+        host_plugin_ptr_, static_cast<envoy_dynamic_module_type_attribute_id>(id), &value);
+
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
+  absl::optional<bool> getAttributeBool(AttributeID id) override {
+    bool value = false;
+    const bool ret = envoy_dynamic_module_callback_http_filter_get_attribute_bool(
         host_plugin_ptr_, static_cast<envoy_dynamic_module_type_attribute_id>(id), &value);
 
     if (!ret) {
@@ -335,11 +406,15 @@ public:
 
   BodyBuffer& bufferedRequestBody() override { return buffered_request_body_; }
 
+  BodyBuffer& receivedRequestBody() override { return received_request_body_; }
+
   HeaderMap& requestTrailers() override { return request_trailers_; }
 
   HeaderMap& responseHeaders() override { return response_headers_; }
 
   BodyBuffer& bufferedResponseBody() override { return buffered_response_body_; }
+
+  BodyBuffer& receivedResponseBody() override { return received_response_body_; }
 
   HeaderMap& responseTrailers() override { return response_trailers_; }
 
@@ -590,7 +665,7 @@ struct HttpFilterFactoryWrapper {
 extern "C" {
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return Envoy::Extensions::DynamicModules::kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 envoy_dynamic_module_type_http_filter_config_module_ptr
@@ -671,6 +746,7 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
     DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create plugin instance");
     return nullptr;
   }
+  // So the plugin_ field will never be null as long as the plugin handle is alive.
   plugin_handle->plugin_ = std::move(plugin);
 
   return wrapPointer(plugin_handle.release());
@@ -679,6 +755,10 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
   auto* plugin_handle = unwrapPointer<HttpFilterHandleImpl>(filter_module_ptr);
+  if (plugin_handle == nullptr) {
+    return;
+  }
+  plugin_handle->plugin_->onDestroy();
   delete plugin_handle;
 }
 

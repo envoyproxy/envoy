@@ -15,10 +15,10 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
+using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
@@ -60,10 +60,11 @@ public:
     }
   }
 
-  MatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
+  ActionMatchResult match(const DataType& data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
-      return MatchResult::insufficientData();
+      return ActionMatchResult::insufficientData();
     }
 
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
@@ -78,7 +79,7 @@ public:
     // 1. Try exact match first (highest priority).
     auto exact_it = config_->exact_matches_.find(domain);
     if (exact_it != config_->exact_matches_.end()) {
-      MatchResult result =
+      ActionMatchResult result =
           MatchTree<DataType>::handleRecursionAndSkips(*(exact_it->second), data, skipped_match_cb);
 
       // If ``keep_matching`` is used, treat as no match and continue to wildcards.
@@ -91,7 +92,7 @@ public:
     // For "www.example.com", try "example.com", then "com".
     auto wildcard_matches = findAllWildcardMatches(domain);
     for (const auto& wildcard_match : wildcard_matches) {
-      MatchResult result =
+      ActionMatchResult result =
           MatchTree<DataType>::handleRecursionAndSkips(*wildcard_match, data, skipped_match_cb);
 
       // If ``keep_matching`` is used, treat as no match and continue to next wildcard.
@@ -102,7 +103,7 @@ public:
 
     // 3. Finally try global wildcard "*" (lowest priority).
     if (config_->global_wildcard_match_) {
-      MatchResult result = MatchTree<DataType>::handleRecursionAndSkips(
+      ActionMatchResult result = MatchTree<DataType>::handleRecursionAndSkips(
           *(config_->global_wildcard_match_), data, skipped_match_cb);
 
       if (result.isMatch() || result.isInsufficientData()) {

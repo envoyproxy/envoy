@@ -31,8 +31,8 @@ envoy_cc_library(
         "//envoy/event:deferred_deletable",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
-        "@com_google_absl//absl/numeric:int128",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/numeric:int128",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -108,8 +108,8 @@ envoy_cc_library(
     hdrs = ["drain_decision.h"],
     deps = [
         "//envoy/common:callback",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/status",
     ],
 )
 
@@ -140,7 +140,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         ":connection_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -155,7 +155,7 @@ envoy_cc_library(
         "//envoy/event:file_event_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

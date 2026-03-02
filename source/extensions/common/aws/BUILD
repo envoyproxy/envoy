@@ -79,7 +79,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -162,7 +162,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
@@ -173,7 +173,7 @@ envoy_cc_library(
     hdrs = ["region_provider.h"],
     deps = [
         "//envoy/common:pure_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

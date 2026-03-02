@@ -114,8 +114,10 @@ def api_proto_plugin_aspect(
             executable = True,
             cfg = "exec",
         ),
+        # Handle both string labels and pre-constructed Label objects.
+        # Use type comparison instead of string check for robustness.
         "_api_proto_plugin": attr.label(
-            default = Label(tool_label),
+            default = tool_label if type(tool_label) == type(Label("//foo:bar")) else Label(tool_label),
             executable = True,
             cfg = "exec",
         ),

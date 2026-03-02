@@ -28,6 +28,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -71,6 +72,11 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   // Gets the gRPC status returned by the authorization server when it is making a gRPC call.
   const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
+  // Returns true if the ext_authz stream failed open.
+  bool failedOpen() const { return failed_open_; }
+  const Filters::Common::ProcessingEffect::Effect& requestProcessingEffect() const {
+    return last_req_processing_effect_;
+  }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -80,6 +86,10 @@ public:
   }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
     upstream_host_ = std::move(upstream_host);
+  }
+  void setFailedOpen() { failed_open_ = true; }
+  void setReqProcessingEffect(const Filters::Common::ProcessingEffect::Effect effect) {
+    last_req_processing_effect_ = effect;
   }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
   void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
@@ -107,6 +117,8 @@ public:
 private:
   const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
+  // The last processing effect applied to the request by the ext_authz filter.
+  Filters::Common::ProcessingEffect::Effect last_req_processing_effect_{};
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;
@@ -114,6 +126,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The gRPC status returned by the authorization server when it is making a gRPC call.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  // True if the call failed open.
+  bool failed_open_{false};
 };
 
 /**
@@ -438,6 +452,17 @@ private:
   bool
   validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::ResponsePtr& response);
 
+  // Helper to check if we can add more headers to the response, respecting header limits.
+  // Returns true if we can add more headers, false if the limit has been reached.
+  bool canAddResponseHeader(Http::HeaderMap& response_headers);
+
+  // Helper to add error response headers (both set and append) to the response header map,
+  // respecting enforceResponseHeaderLimits().
+  void addErrorResponseHeaders(
+      Http::HeaderMap& response_headers,
+      const std::vector<std::pair<std::string, std::string>>& headers_to_set,
+      const std::vector<std::pair<std::string, std::string>>& headers_to_append);
+
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
   createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
@@ -452,6 +477,7 @@ private:
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
+  void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
@@ -478,8 +504,10 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
-  // Ordered list of response header mutations to apply during encoding.
-  Filters::Common::ExtAuthz::HeaderMutationVector response_header_mutations_{};
+  Http::HeaderVector response_headers_to_add_{};
+  Http::HeaderVector response_headers_to_set_{};
+  Http::HeaderVector response_headers_to_add_if_absent_{};
+  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

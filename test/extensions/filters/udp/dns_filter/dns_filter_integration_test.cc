@@ -507,6 +507,7 @@ TEST_P(DnsFilterIntegrationTest, WildcardLookupTest) {
   EXPECT_EQ(3, response_ctx_->answers_.size());
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters

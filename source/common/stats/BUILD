@@ -46,7 +46,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/common:thread_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -199,8 +199,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 
@@ -228,7 +228,7 @@ envoy_cc_library(
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:node_hash_set",
+        "@abseil-cpp//absl/container:node_hash_set",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )

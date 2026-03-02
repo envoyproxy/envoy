@@ -35,6 +35,7 @@ public:
   const absl::optional<std::string>& cityHeader() const { return city_header_; }
   const absl::optional<std::string>& regionHeader() const { return region_header_; }
   const absl::optional<std::string>& asnHeader() const { return asn_header_; }
+  const absl::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
 
   const absl::optional<std::string>& anonHeader() const { return anon_header_; }
   const absl::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
@@ -91,6 +92,7 @@ private:
   absl::optional<std::string> city_header_;
   absl::optional<std::string> region_header_;
   absl::optional<std::string> asn_header_;
+  absl::optional<std::string> asn_org_header_;
 
   absl::optional<std::string> anon_header_;
   absl::optional<std::string> anon_vpn_header_;

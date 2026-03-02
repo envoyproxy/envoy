@@ -80,7 +80,7 @@ index 00000000..3b4f8eca
 +
 +# Copy source tree to a build directory
 +SRC_DIR="$(dirname "$(realpath "$0")")"
-+BUILD_DIR="$(basename "$SRC_DIR")"
++BUILD_DIR="$(basename "$SRC_DIR")_build"
 +cp -r "$SRC_DIR" "$BUILD_DIR"
 +cd "$BUILD_DIR"
 +
