@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
+#include "envoy/extensions/upstreams/host_specific_http/v3/host_specific_http.pb.h"
+#include "envoy/extensions/upstreams/host_specific_http/v3/host_specific_http.pb.validate.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/upstream.h"
 
@@ -11,15 +11,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
-namespace Http {
+namespace HostSpecificHttp {
 
 /**
  * Compiled endpoint-specific options with pre-constructed matchers.
  */
 struct CompiledEpSpecificOptions {
   CompiledEpSpecificOptions(
-      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions::
-          EndpointSpecificOptions& options,
+      const envoy::extensions::upstreams::host_specific_http::v3::
+          EndpointSpecificHttpProtocolOptions::EndpointSpecificOptions& options,
       Server::Configuration::CommonFactoryContext& context)
       : http2_protocol_options(options.has_http2_protocol_options()
                                    ? absl::optional<envoy::config::core::v3::Http2ProtocolOptions>(
@@ -46,7 +46,8 @@ struct CompiledEpSpecificOptions {
 class EpSpecificProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   EpSpecificProtocolOptionsConfigImpl(
-      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions& config,
+      const envoy::extensions::upstreams::host_specific_http::v3::
+          EndpointSpecificHttpProtocolOptions& config,
       Server::Configuration::CommonFactoryContext& context) {
     for (const auto& ep_option : config.endpoint_specific_options()) {
       compiled_options_.emplace_back(ep_option, context);
@@ -71,30 +72,33 @@ public:
       const Protobuf::Message& config,
       Server::Configuration::ProtocolOptionsFactoryContext& context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions&>(
-        config, context.messageValidationVisitor());
+        const envoy::extensions::upstreams::host_specific_http::v3::
+            EndpointSpecificHttpProtocolOptions&>(config,
+                                                  context.messageValidationVisitor());
     return std::make_shared<EpSpecificProtocolOptionsConfigImpl>(typed_config,
                                                                  context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
+        envoy::extensions::upstreams::host_specific_http::v3::
+            EndpointSpecificHttpProtocolOptions>();
   }
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
     return std::make_unique<
-        envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
+        envoy::extensions::upstreams::host_specific_http::v3::
+            EndpointSpecificHttpProtocolOptions>();
   }
 
   std::string category() const override { return "envoy.upstream_options"; }
 
   std::string name() const override {
-    return "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions";
+    return "envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions";
   }
 };
 
-} // namespace Http
+} // namespace HostSpecificHttp
 } // namespace Upstreams
 } // namespace Extensions
 } // namespace Envoy

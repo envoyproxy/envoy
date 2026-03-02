@@ -58,7 +58,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_pool.h"
-#include "source/extensions/upstreams/http/ep_specific_config.h"
+#include "source/extensions/upstreams/host_specific_http/host_specific_config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -1376,8 +1376,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // Pre-compute merged HttpProtocolOptions for endpoint-specific H2 overrides.
   const auto ep_specific_protocol_options =
-      extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-          "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+      extensionProtocolOptionsTyped<Extensions::Upstreams::HostSpecificHttp::EpSpecificProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions");
   if (ep_specific_protocol_options != nullptr && http_protocol_options_) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
       if (ep_option.http2_protocol_options.has_value()) {
@@ -1728,8 +1728,8 @@ uint32_t ClusterInfoImpl::maxRequestsPerConnection(HostDescriptionConstSharedPtr
 
   // Check for endpoint-specific max_requests_per_connection
   const auto ep_specific_protocol_options =
-      extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-          "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+      extensionProtocolOptionsTyped<Extensions::Upstreams::HostSpecificHttp::EpSpecificProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
@@ -1751,8 +1751,8 @@ uint32_t ClusterInfoImpl::maxRequestsPerConnection(HostDescriptionConstSharedPtr
 const HttpProtocolOptionsConfig& ClusterInfoImpl::httpProtocolOptions(HostDescriptionConstSharedPtr host) const {
   if (!ep_specific_merged_http_options_.empty() && host->metadata() != nullptr) {
     const auto ep_specific_protocol_options =
-        extensionProtocolOptionsTyped<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-            "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+        extensionProtocolOptionsTyped<Extensions::Upstreams::HostSpecificHttp::EpSpecificProtocolOptionsConfigImpl>(
+            "envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions");
 
     if (ep_specific_protocol_options != nullptr) {
       size_t index = 0;
