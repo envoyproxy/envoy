@@ -261,8 +261,8 @@ new_features:
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 - area: tls
   change: |
-    Added a new stat ``no_certificate_for_upstream`` to track upstream TLS connections where Envoy
-    does not provide a client certificate.
+    Added a new stat ``client_certificate_presented`` to track upstream TLS connections where Envoy
+    presented a client certificate (mTLS).
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules

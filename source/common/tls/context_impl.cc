@@ -562,9 +562,9 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-  // Client (upstream): own cert absent means Envoy connected with one-way TLS.
-  if (!SSL_is_server(ssl) && SSL_get_certificate(ssl) == nullptr) {
-    stats_.no_certificate_for_upstream_.inc();
+  // Client (upstream): own cert present means Envoy connected with mTLS.
+  if (!SSL_is_server(ssl) && SSL_get_certificate(ssl) != nullptr) {
+    stats_.client_certificate_presented_.inc();
   }
 
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an

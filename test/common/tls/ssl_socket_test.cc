@@ -1723,7 +1723,7 @@ TEST_P(SslSocketTest, NoCert) {
                .setExpectNoCertChain());
 }
 
-TEST_P(SslSocketTest, NoClientCertificateStatsOnUpstream) {
+TEST_P(SslSocketTest, NoClientCertificateOnUpstream) {
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
   )EOF";
@@ -1738,10 +1738,10 @@ TEST_P(SslSocketTest, NoClientCertificateStatsOnUpstream) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectedClientStats("ssl.no_certificate_for_upstream"));
+  testUtil(test_options.setNotExpectedClientStats("ssl.client_certificate_presented"));
 }
 
-TEST_P(SslSocketTest, ClientCertificateNoStatsOnUpstream) {
+TEST_P(SslSocketTest, ClientCertificatePresentedOnUpstream) {
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
       tls_certificates:
@@ -1761,7 +1761,7 @@ TEST_P(SslSocketTest, ClientCertificateNoStatsOnUpstream) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setNotExpectedClientStats("ssl.no_certificate_for_upstream"));
+  testUtil(test_options.setExpectedClientStats("ssl.client_certificate_presented"));
 }
 
 TEST_P(SslSocketTest, NoLocalCert) {

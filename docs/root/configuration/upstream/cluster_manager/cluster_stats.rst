@@ -304,7 +304,7 @@ If TLS is used by the cluster the following statistics are rooted at *cluster.<n
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  no_certificate_for_upstream, Counter, Total successful upstream TLS connections with no client certificate provided
+  client_certificate_presented, Counter, Total successful upstream TLS connections where Envoy presented a client certificate (mTLS)
 
 .. _config_cluster_manager_cluster_stats_certs:
 
