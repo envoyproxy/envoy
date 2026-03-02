@@ -24,10 +24,11 @@ message FixedHeapConfig {
       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig";
 
   // Static value for max heap size in bytes set at startup.
-  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_source must be set.
+  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
   uint64 max_heap_size_bytes = 1;
 
-  // Source to read max heap size in bytes from at startup.
-  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_source must be set.
-  config.core.v3.DataSource max_heap_size_bytes_source = 2;
+  // Runtime overlay for max heap size in bytes. When set, the value can be overridden
+  // at runtime during startup or later without restart.
+  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
+  config.core.v3.RuntimeUInt64 max_heap_size_bytes_runtime = 2;
 }

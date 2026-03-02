@@ -665,6 +665,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Runtime is initialized before the overload manager so resource monitor factories can use
+  // runtime keys (e.g. RuntimeUInt64).
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  validation_context_.setRuntime(runtime());
+
   // Initialize the overload manager early so other modules can register for actions.
   auto overload_manager_or_error = createOverloadManager();
   RETURN_IF_NOT_OK(overload_manager_or_error.status());
@@ -747,11 +752,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
   // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
   // during RTDS initialization and invalid configuration will be rejected.
-
-  // Runtime gets initialized before the main configuration since during main configuration
-  // load things may grab a reference to the loader for later use.
-  runtime_ = component_factory.createRuntime(*this, initial_config);
-  validation_context_.setRuntime(runtime());
 
 #ifndef WIN32
   // Envoy automatically raises soft file limits, but we do it here in order to allow

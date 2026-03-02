@@ -6,8 +6,8 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
-#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
@@ -28,32 +28,33 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
 
-TEST(FixedHeapMonitorFactoryTest, CreateMonitorWithStartupOverride) {
-  const std::string env_var = "ENVOY_FIXED_HEAP_TEST_MAX_BYTES";
-  TestEnvironment::setEnvVar(env_var, "2000", 1);
-
+TEST(FixedHeapMonitorFactoryTest, CreateMonitorWithRuntimeOverride) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.fixed_heap");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.mutable_max_heap_size_bytes_source()->set_environment_variable(env_var);
+  config.mutable_max_heap_size_bytes_runtime()->set_default_value(2000);
+  config.mutable_max_heap_size_bytes_runtime()->set_runtime_key("fixed_heap.max_bytes");
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_CALL(runtime, snapshot()).WillRepeatedly(testing::ReturnRef(runtime.snapshot_));
+  EXPECT_CALL(runtime.snapshot_, getInteger("fixed_heap.max_bytes", 2000))
+      .WillRepeatedly(testing::Return(2000));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
-
-  TestEnvironment::unsetEnvVar(env_var);
 }
 
 TEST(FixedHeapMonitorFactoryTest, RejectNeitherSet) {
@@ -66,10 +67,11 @@ TEST(FixedHeapMonitorFactoryTest, RejectNeitherSet) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_source must "
+                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must "
                           "be set");
 }
 
@@ -81,66 +83,36 @@ TEST(FixedHeapMonitorFactoryTest, RejectBothSet) {
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
-  config.mutable_max_heap_size_bytes_source()->set_inline_string("2000");
+  config.mutable_max_heap_size_bytes_runtime()->set_default_value(2000);
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_source must "
+                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must "
                           "be set");
 }
 
-TEST(FixedHeapMonitorFactoryTest, RejectDataSourceInvalidInteger) {
+TEST(FixedHeapMonitorFactoryTest, RejectRuntimeDefaultZero) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.fixed_heap");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.mutable_max_heap_size_bytes_source()->set_inline_string("not_a_number");
+  config.mutable_max_heap_size_bytes_runtime()->set_default_value(0);
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_CALL(runtime, snapshot()).WillRepeatedly(testing::ReturnRef(runtime.snapshot_));
+  EXPECT_CALL(runtime.snapshot_, getInteger(_, 0)).WillRepeatedly(testing::Return(0));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "fixed_heap max_heap_size_bytes_source must be a positive integer");
-}
-
-TEST(FixedHeapMonitorFactoryTest, RejectDataSourceZero) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.fixed_heap");
-  ASSERT_NE(factory, nullptr);
-
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.mutable_max_heap_size_bytes_source()->set_inline_string("0");
-  Event::MockDispatcher dispatcher;
-  Api::ApiPtr api = Api::createApiForTest();
-  Server::MockOptions options;
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
                           "max heap size must be greater than 0");
-}
-
-TEST(FixedHeapMonitorFactoryTest, RejectDataSourceReadFailure) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.fixed_heap");
-  ASSERT_NE(factory, nullptr);
-
-  envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
-  config.mutable_max_heap_size_bytes_source()->set_environment_variable(
-      "ENVOY_FIXED_HEAP_NONEXISTENT_VAR_12345");
-  Event::MockDispatcher dispatcher;
-  Api::ApiPtr api = Api::createApiForTest();
-  Server::MockOptions options;
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 }
 
 } // namespace

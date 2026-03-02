@@ -5,6 +5,7 @@
 #include "source/extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 #include "source/server/resource_monitor_config_impl.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -63,13 +64,14 @@ protected:
     envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
-        *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor());
+        *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor(), runtime_);
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Server::MockOptions options_;
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;

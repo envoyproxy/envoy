@@ -31,7 +31,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:datasource_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
