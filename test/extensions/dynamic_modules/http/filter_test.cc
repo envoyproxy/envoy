@@ -16,6 +16,8 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -1313,9 +1315,11 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Mock AsyncClient
   NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
                            const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_callbacks = &cb;
         return &stream;
       }));
 
@@ -1330,7 +1334,11 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Expect reset to be called on the stream - once by resetHttpStream and possibly again by
   // onDestroy cleanup.
-  EXPECT_CALL(stream, reset()).Times(testing::AtLeast(1));
+  EXPECT_CALL(stream, reset()).WillOnce(testing::Invoke([&]() {
+    // Simulate stream being reset and cleaned up. The async client stream may call onReset callback
+    // inline during reset, so we need to make sure to handle that correctly.
+    captured_callbacks->onReset();
+  }));
   filter->resetHttpStream(stream_id);
 
   // Resetting a non-existent stream should not crash.
