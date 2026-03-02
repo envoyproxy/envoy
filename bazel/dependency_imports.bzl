@@ -234,6 +234,5 @@ def crates_repositories():
     crates_repository(
         name = "dynamic_modules_rust_sdk_crate_index",
         cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
         manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )
