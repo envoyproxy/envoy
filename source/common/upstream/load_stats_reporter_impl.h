@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/async_client_impl.h"
@@ -13,30 +14,15 @@
 namespace Envoy {
 namespace Upstream {
 
-/**
- * All load reporter stats. @see stats_macros.h
- */
-#define ALL_LOAD_REPORTER_STATS(COUNTER)                                                           \
-  COUNTER(requests)                                                                                \
-  COUNTER(responses)                                                                               \
-  COUNTER(errors)                                                                                  \
-  COUNTER(retries)
-
-/**
- * Struct definition for all load reporter stats. @see stats_macros.h
- */
-struct LoadReporterStats {
-  ALL_LOAD_REPORTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-class LoadStatsReporter
-    : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
-      Logger::Loggable<Logger::Id::upstream> {
+class LoadStatsReporterImpl
+    : public LoadStatsReporter,
+      public Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
+      public Logger::Loggable<Logger::Id::upstream> {
 public:
-  LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
-                    Event::Dispatcher& dispatcher);
-  virtual ~LoadStatsReporter();
+  LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
+                        Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
+                        Event::Dispatcher& dispatcher);
+  ~LoadStatsReporterImpl() override;
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -45,7 +31,9 @@ public:
       std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-  const LoadReporterStats& getStats() { return stats_; };
+
+  // Upstream::LoadStatsReporter
+  const LoadReporterStats& getStats() const override { return stats_; };
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
@@ -72,8 +60,6 @@ private:
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
 };
-
-using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;
 
 } // namespace Upstream
 } // namespace Envoy

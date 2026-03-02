@@ -357,8 +357,8 @@ envoy_extension_cc_test(
     deps = [
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
+        "//source/extensions/filters/common/processing_effect:processing_effect_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
-        "//source/extensions/filters/http/ext_proc:processing_effect_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:status_utility_lib",

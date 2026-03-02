@@ -1,5 +1,7 @@
 #include <vector>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -23,6 +25,63 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace NetworkFilters {
+
+namespace {
+
+// Test ObjectFactory that creates a StringAccessorImpl from bytes. Used to test the typed filter
+// state ABI callbacks.
+class TestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    if (data == "BAD_VALUE") {
+      return nullptr;
+    }
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(TestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// A filter state object that does not support serialization. Used to test the
+// get_filter_state_typed fallback when serializeAsString() returns nullopt.
+class NonSerializableObject : public StreamInfo::FilterState::Object {};
+
+class NonSerializableObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.non_serializable_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view) const override {
+    return std::make_unique<NonSerializableObject>();
+  }
+};
+
+REGISTER_FACTORY(NonSerializableObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// Tracking variables for watermark and scheduled callback invocations.
+bool g_scheduled_called = false;
+uint64_t g_scheduled_event_id = 0;
+bool g_above_watermark_called = false;
+bool g_below_watermark_called = false;
+
+void testOnScheduled(envoy_dynamic_module_type_network_filter_envoy_ptr,
+                     envoy_dynamic_module_type_network_filter_module_ptr, uint64_t event_id) {
+  g_scheduled_called = true;
+  g_scheduled_event_id = event_id;
+}
+
+void testOnAboveWriteBufferHighWatermark(envoy_dynamic_module_type_network_filter_envoy_ptr,
+                                         envoy_dynamic_module_type_network_filter_module_ptr) {
+  g_above_watermark_called = true;
+}
+
+void testOnBelowWriteBufferLowWatermark(envoy_dynamic_module_type_network_filter_envoy_ptr,
+                                        envoy_dynamic_module_type_network_filter_module_ptr) {
+  g_below_watermark_called = true;
+}
+
+} // namespace
 
 class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
@@ -926,6 +985,114 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateBytesEmptyValue)
       filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, result.length);
+}
+
+// =============================================================================
+// Tests for Typed Filter State.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetFilterStateTyped) {
+  const std::string key = "envoy.test.typed_object";
+  const std::string value = "test_cluster";
+
+  bool ok = envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back via the typed getter.
+  envoy_dynamic_module_type_envoy_buffer result;
+  ok = envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(value.size(), result.length);
+  EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateTypedNoFactory) {
+  const std::string key = "nonexistent.factory.key";
+  const std::string value = "some_value";
+
+  bool ok = envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateTypedBadValue) {
+  const std::string key = "envoy.test.typed_object";
+  const std::string value = "BAD_VALUE";
+
+  bool ok = envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetFilterStateTypedNonExisting) {
+  const std::string key = "envoy.test.typed_object";
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  bool ok = envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetFilterStateTypedNonSerializable) {
+  // Set a non-serializable typed object via the factory.
+  const std::string key = "envoy.test.non_serializable_object";
+  const std::string value = "any_value";
+
+  bool ok = envoy_dynamic_module_callback_network_set_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(value.data()), value.size()});
+  EXPECT_TRUE(ok);
+
+  // Attempting to get the value should fail because serializeAsString() returns nullopt.
+  envoy_dynamic_module_type_envoy_buffer result;
+  ok = envoy_dynamic_module_callback_network_get_filter_state_typed(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_FALSE(ok);
+}
+
+// =============================================================================
+// Tests for onScheduled, onAboveWriteBufferHighWatermark, onBelowWriteBufferLowWatermark.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, OnScheduledInvokesModuleCallback) {
+  // Set the function pointer to our test callback.
+  filter_config_->on_network_filter_scheduled_ = testOnScheduled;
+  g_scheduled_called = false;
+  g_scheduled_event_id = 0;
+
+  filter_->onScheduled(42);
+
+  EXPECT_TRUE(g_scheduled_called);
+  EXPECT_EQ(42, g_scheduled_event_id);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       OnAboveWriteBufferHighWatermarkInvokesModuleCallback) {
+  // Set the function pointer to our test callback.
+  filter_config_->on_network_filter_above_write_buffer_high_watermark_ =
+      testOnAboveWriteBufferHighWatermark;
+  g_above_watermark_called = false;
+
+  filter_->onAboveWriteBufferHighWatermark();
+
+  EXPECT_TRUE(g_above_watermark_called);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       OnBelowWriteBufferLowWatermarkInvokesModuleCallback) {
+  // Set the function pointer to our test callback.
+  filter_config_->on_network_filter_below_write_buffer_low_watermark_ =
+      testOnBelowWriteBufferLowWatermark;
+  g_below_watermark_called = false;
+
+  filter_->onBelowWriteBufferLowWatermark();
+
+  EXPECT_TRUE(g_below_watermark_called);
 }
 
 // =============================================================================
