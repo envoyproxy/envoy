@@ -44,6 +44,19 @@ class TestFetchRequest(unittest.TestCase):
         self.assertTrue(engine_running.wait(timeout=30), "Engine did not start within timeout")
         return engine
 
+    def _copy_final_stream_intel(self, source, destination):
+        """Copy attributes from source FinalStreamIntel to destination."""
+        if source is None or destination is None:
+            return
+        attrs = [a for a in dir(source) if not a.startswith("_")]
+        for attr in attrs:
+            try:
+                val = getattr(source, attr)
+                setattr(destination, attr, val)
+            except (AttributeError, TypeError) as e:
+                # Some attributes may not be copyable; skip them.
+                print(f"Warning: Could not copy attribute '{attr}': {e}")
+
     def _create_stream_with_callbacks(self, engine):
         """Helper to create a stream with standard callbacks.
 
@@ -54,20 +67,6 @@ class TestFetchRequest(unittest.TestCase):
         response_status = {}
         response_body_parts = []
         final_stream = FinalStreamIntel()
-
-        def _copy_final_stream_intel(source, destination):
-            if source is None or destination is None:
-                return
-            try:
-                attrs = [a for a in dir(source) if not a.startswith("_")]
-                for attr in attrs:
-                    try:
-                        val = getattr(source, attr)
-                        setattr(destination, attr, val)
-                    except Exception as e:
-                        print(f"Error copying attribute {attr}: {e}")
-            except Exception as e:
-                print(f"Error copying final stream intel: {e}")
 
         def on_headers(headers, end_stream, stream_intel):
             # Look for :status header.
@@ -80,16 +79,16 @@ class TestFetchRequest(unittest.TestCase):
         def on_complete(stream_intel, final_stream_intel):
             self.assertGreater(stream_intel.consumed_bytes_from_response, 0)
             self.assertEqual(stream_intel.attempt_count, 1)
-            _copy_final_stream_intel(final_stream_intel, final_stream)
+            self._copy_final_stream_intel(final_stream_intel, final_stream)
             stream_finished.set()
 
         def on_error(error, stream_intel, final_stream_intel):
             response_status["error"] = error.message
-            _copy_final_stream_intel(final_stream_intel, final_stream)
+            self._copy_final_stream_intel(final_stream_intel, final_stream)
             stream_finished.set()
 
         def on_cancel(stream_intel, final_stream_intel):
-            _copy_final_stream_intel(final_stream_intel, final_stream)
+            self._copy_final_stream_intel(final_stream_intel, final_stream)
             stream_finished.set()
 
         stream = (
