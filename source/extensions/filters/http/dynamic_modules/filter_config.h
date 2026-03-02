@@ -376,8 +376,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilterConfig> config, uint64_t id)
-        : config_(std::move(config)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
+        : config_(config), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -390,7 +390,7 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleHttpFilterConfig> config_;
+    DynamicModuleHttpFilterConfig& config_;
     const uint64_t callout_id_{};
   };
 
@@ -400,9 +400,8 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilterConfig> config,
-                              uint64_t callout_id)
-        : callout_id_(callout_id), config_(std::move(config)) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
+        : callout_id_(callout_id), config_(config) {}
     ~HttpStreamCalloutCallback() override = default;
 
     void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
@@ -418,8 +417,14 @@ private:
     bool cleaned_up_ = false;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilterConfig> config_;
+    DynamicModuleHttpFilterConfig& config_;
   };
+
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
 
