@@ -51,7 +51,7 @@ def test_program(name):
 
     envoy_dynamic_module_prefix_symbols(
         name = name + "_static",
-        module_name = name,
+        module_name = name + "_static",
         archive = ":" + _static_lib_name,
         tags = ["notidy"],
     )

@@ -23,12 +23,15 @@ public:
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
                    bool upstream_filter = false) {
+    std::string module_name = "http_integration_test";
     if (GetParam() != "rust_static") {
       TestEnvironment::setEnvVar(
           "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
           TestEnvironment::substitute(
               "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam()),
           1);
+    } else {
+      module_name += "_static";
     }
     TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
@@ -37,7 +40,7 @@ name: envoy.extensions.filters.http.dynamic_modules
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
   dynamic_module_config:
-    name: http_integration_test
+    name: {}
   filter_name: {}
   filter_config:
     "@type": {}
@@ -47,7 +50,7 @@ typed_config:
     if (!per_route_config.empty()) {
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
-  name: http_integration_test
+  name: {}
 per_route_config_name: {}
 filter_config:
   "@type": {}
@@ -55,9 +58,9 @@ filter_config:
 )EOF";
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
-      TestUtility::loadFromYaml(
-          fmt::format(filter_per_route_config, filter_name, type_url, per_route_config),
-          per_route_config_proto);
+      TestUtility::loadFromYaml(fmt::format(filter_per_route_config, module_name, filter_name,
+                                            type_url, per_route_config),
+                                per_route_config_proto);
 
       config_helper_.addConfigModifier(
           [per_route_config_proto](envoy::extensions::filters::network::http_connection_manager::
@@ -74,8 +77,8 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
-                                 !upstream_filter);
+    config_helper_.prependFilter(
+        fmt::format(filter_config, module_name, filter_name, type_url, config), !upstream_filter);
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
