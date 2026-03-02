@@ -1253,10 +1253,12 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamWithBody) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
 
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
                            const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &cb;
         return &stream;
       }));
   EXPECT_CALL(stream, sendHeaders(_, false));
@@ -1275,6 +1277,7 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamWithBody) {
   EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
             envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(sid, 0u);
+  captured_cb->onComplete();
   dispatcher.clearDeferredDeleteList();
 }
 
