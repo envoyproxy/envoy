@@ -275,7 +275,8 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return Http::FilterDataStatus::Continue;
   }
 
-  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", data.length(), bytes_parsed_);
+  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
+            bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
 
