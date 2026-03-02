@@ -54,46 +54,6 @@ bool A2aFilter::shouldRejectRequest() const {
 
 uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBodySize(); }
 
-// Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-//                                                    bool end_stream) {
-//   if (isValidA2aGetOrDeleteRequest(headers)) {
-//     is_a2a_request_ = true;
-//     ENVOY_LOG(debug, "valid A2A GET/DELETE request, passing through");
-//     return Http::FilterHeadersStatus::Continue;
-//   }
-
-//   if (isValidA2aPostRequest(headers)) {
-//     is_json_post_request_ = true;
-//     ENVOY_LOG(debug, "valid A2A Post request");
-//     if (end_stream) {
-//       is_a2a_request_ = false;
-//     } else {
-//       // Need to buffer the body to check for JSON-RPC 2.0
-//       is_a2a_request_ = true;
-
-//       const uint32_t max_size = getMaxRequestBodySize();
-//       if (max_size > 0) {
-//         decoder_callbacks_->setDecoderBufferLimit(max_size);
-//         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
-//       }
-
-//       // Stop iteration to buffer the body for validation
-//       return Http::FilterHeadersStatus::StopIteration;
-//     }
-//   }
-
-//   if (!is_a2a_request_ && shouldRejectRequest()) {
-//     ENVOY_LOG(debug, "rejecting non-A2A traffic");
-//     config_->stats().requests_rejected_.inc();
-//     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only A2A traffic is allowed",
-//                                        nullptr, absl::nullopt, "a2a_filter_reject");
-//     return Http::FilterHeadersStatus::StopIteration;
-//   }
-
-//   ENVOY_LOG(debug, "A2A filter passing through during decoding headers");
-//   return Http::FilterHeadersStatus::Continue;
-// }
-
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
   if (isValidA2aGetOrDeleteRequest(headers)) {
@@ -187,6 +147,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
+      // TODO(tyxia) Support the case that size limit hit before optional fields.
       if (size_limit_hit) {
         config_->stats().body_too_large_.inc();
         handleParseError("request body is too large.");
