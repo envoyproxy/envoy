@@ -239,7 +239,9 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
       resource_attributes_(generateResourceAttributes(resource)),
-      matcher_(createMatcher(sink_config.custom_metric_conversions(), server)) {}
+      matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
+      max_datapoints_per_request_(sink_config.max_datapoints_per_request()),
+      max_resource_metrics_per_request_(sink_config.max_resource_metrics_per_request()) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -326,10 +328,9 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
   return attributes;
 }
 
-MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
+std::vector<MetricsExportRequestPtr> OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
                                                       int64_t delta_start_time_ns,
                                                       int64_t cumulative_start_time_ns) const {
-  auto request = std::make_unique<MetricsExportRequest>();
   MetricAggregator aggregator =
       MetricAggregator(config_->enableMetricAggregation(),
                        std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -415,10 +416,129 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
                               histogram_temporality, attributes);
     }
   }
-  // Add all aggregated metrics to the request.
-  *request->mutable_resource_metrics() =
-      aggregator.getResourceMetrics(config_->resource_attributes());
-  return request;
+  auto resource_metrics = aggregator.getResourceMetrics(config_->resource_attributes());
+  return chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(), config_->maxResourceMetricsPerRequest());
+}
+
+std::vector<MetricsExportRequestPtr> OtlpMetricsFlusherImpl::chunkRequests(
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& resource_metrics,
+    const uint32_t max_dp, const uint32_t max_rm) {
+  std::vector<MetricsExportRequestPtr> requests;
+  auto current_request = std::make_unique<MetricsExportRequest>();
+  uint32_t current_dp_count = 0;
+  uint32_t current_rm_count = 0;
+
+  auto rollover = [&]() {
+    if (current_dp_count > 0 || current_rm_count > 0) {
+      requests.push_back(std::move(current_request));
+      current_request = std::make_unique<MetricsExportRequest>();
+      current_dp_count = 0;
+      current_rm_count = 0;
+    }
+  };
+
+  for (const auto& rm : resource_metrics) {
+    if (max_rm > 0 && current_rm_count >= max_rm) {
+      rollover();
+    }
+    
+    opentelemetry::proto::metrics::v1::ResourceMetrics* current_rm = nullptr;
+    auto get_rm = [&]() {
+      if (!current_rm) {
+        if (max_rm > 0 && current_rm_count >= max_rm) {
+          rollover();
+        }
+        current_rm = current_request->add_resource_metrics();
+        current_rm->mutable_resource()->CopyFrom(rm.resource());
+        current_rm->mutable_schema_url()->assign(rm.schema_url());
+        current_rm_count++;
+      }
+      return current_rm;
+    };
+
+    for (const auto& sm : rm.scope_metrics()) {
+      opentelemetry::proto::metrics::v1::ScopeMetrics* current_sm = nullptr;
+      auto get_sm = [&]() {
+        if (!current_sm) {
+          current_sm = get_rm()->add_scope_metrics();
+          current_sm->mutable_scope()->CopyFrom(sm.scope());
+          current_sm->mutable_schema_url()->assign(sm.schema_url());
+        }
+        return current_sm;
+      };
+
+      for (const auto& metric : sm.metrics()) {
+        opentelemetry::proto::metrics::v1::Metric* current_metric = nullptr;
+        auto get_metric = [&]() {
+          if (!current_metric) {
+            current_metric = get_sm()->add_metrics();
+            current_metric->set_name(metric.name());
+            current_metric->set_description(metric.description());
+            current_metric->set_unit(metric.unit());
+            if (metric.has_sum()) {
+              current_metric->mutable_sum()->set_aggregation_temporality(
+                  metric.sum().aggregation_temporality());
+              current_metric->mutable_sum()->set_is_monotonic(metric.sum().is_monotonic());
+            } else if (metric.has_histogram()) {
+              current_metric->mutable_histogram()->set_aggregation_temporality(
+                  metric.histogram().aggregation_temporality());
+            } else if (metric.has_exponential_histogram()) {
+              current_metric->mutable_exponential_histogram()->set_aggregation_temporality(
+                  metric.exponential_histogram().aggregation_temporality());
+            }
+          }
+          return current_metric;
+        };
+
+        auto process_dps = [&](const auto& datapoints, auto append_func) {
+          for (const auto& dp : datapoints) {
+            if (max_dp > 0 && current_dp_count >= max_dp) {
+              rollover();
+              current_rm = nullptr;
+              current_sm = nullptr;
+              current_metric = nullptr;
+            }
+            append_func(get_metric(), dp);
+            current_dp_count++;
+          }
+        };
+
+        switch (metric.data_case()) {
+        case opentelemetry::proto::metrics::v1::Metric::DataCase::kGauge:
+          process_dps(metric.gauge().data_points(),
+                      [](auto* m, const auto& dp) { *m->mutable_gauge()->add_data_points() = dp; });
+          break;
+        case opentelemetry::proto::metrics::v1::Metric::DataCase::kSum:
+          process_dps(metric.sum().data_points(),
+                      [](auto* m, const auto& dp) { *m->mutable_sum()->add_data_points() = dp; });
+          break;
+        case opentelemetry::proto::metrics::v1::Metric::DataCase::kHistogram:
+          process_dps(metric.histogram().data_points(), [](auto* m, const auto& dp) {
+            *m->mutable_histogram()->add_data_points() = dp;
+          });
+          break;
+        case opentelemetry::proto::metrics::v1::Metric::DataCase::kExponentialHistogram:
+          process_dps(metric.exponential_histogram().data_points(), [](auto* m, const auto& dp) {
+            *m->mutable_exponential_histogram()->add_data_points() = dp;
+          });
+          break;
+        case opentelemetry::proto::metrics::v1::Metric::DataCase::kSummary:
+          process_dps(metric.summary().data_points(), [](auto* m, const auto& dp) {
+            *m->mutable_summary()->add_data_points() = dp;
+          });
+          break;
+        default:
+          break;
+        }
+      }
+    }
+  }
+
+  rollover();
+  if (requests.empty()) {
+    requests.push_back(std::move(current_request));
+  }
+  return requests;
 }
 } // namespace OpenTelemetry
 } // namespace StatSinks

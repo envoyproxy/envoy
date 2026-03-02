@@ -161,6 +161,13 @@ public:
   }
   bool enableMetricAggregation() const { return enable_metric_aggregation_; }
 
+  uint32_t maxDatapointsPerRequest() const {
+    return max_datapoints_per_request_;
+  }
+  uint32_t maxResourceMetricsPerRequest() const {
+    return max_resource_metrics_per_request_;
+  }
+
 private:
   const bool report_counters_as_deltas_;
   const bool report_histograms_as_deltas_;
@@ -170,6 +177,8 @@ private:
   bool enable_metric_aggregation_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
   const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
+  const uint32_t max_datapoints_per_request_;
+  const uint32_t max_resource_metrics_per_request_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
@@ -182,7 +191,7 @@ public:
    * Creates an OTLP export request from metric snapshot.
    * @param snapshot supplies the metrics snapshot to send.
    */
-  virtual MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
+  virtual std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot,
                                         int64_t delta_start_time_ns,
                                         int64_t cumulative_start_time_ns) const PURE;
 };
@@ -200,8 +209,12 @@ public:
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate) {}
 
-  MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
+  std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
                                 int64_t cumulative_start_time_ns) const override;
+
+  static std::vector<MetricsExportRequestPtr> chunkRequests(
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& resource_metrics,
+      const uint32_t max_dp, const uint32_t max_rm);
 
 private:
   struct MetricConfig {
@@ -316,8 +329,10 @@ public:
     const int64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                         snapshot.snapshotTime().time_since_epoch())
                                         .count();
-    metrics_exporter_->send(
-        metrics_flusher_->flush(snapshot, last_flush_time_ns_, proxy_start_time_ns_));
+    auto requests = metrics_flusher_->flush(snapshot, last_flush_time_ns_, proxy_start_time_ns_);
+    for (auto& request : requests) {
+      metrics_exporter_->send(std::move(request));
+    }
     last_flush_time_ns_ = current_time_ns;
   }
 
