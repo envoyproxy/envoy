@@ -46,6 +46,44 @@ TEST_F(A2aFilterTest, ValidPostRequest) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(A2aFilterTest, ValidPostRequestWithA2aContentType) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/a2a+json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, InvalidPostRequestJsonPrefixMismatch) {
+  // "application/jsonp" starts with "application/json" but is not a match
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/jsonp"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, InvalidPostRequestA2aJsonPrefixMismatch) {
+  // "application/a2a+jsonp" starts with "application/a2a+json" but is not a match
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/a2a+jsonp"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, ValidPostRequestWithJsonAndCharset) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json; charset=utf-8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, ValidPostRequestWithJsonAndWhitespace) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json "}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(A2aFilterTest, ValidPostRequestWithA2aJsonAndCharset) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/a2a+json; charset=utf-8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
 TEST_F(A2aFilterTest, InvalidPostRequestNoJson) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
 
