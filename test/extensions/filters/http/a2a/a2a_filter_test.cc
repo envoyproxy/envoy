@@ -53,14 +53,12 @@ TEST_F(A2aFilterTest, ValidPostRequestWithA2aContentType) {
 }
 
 TEST_F(A2aFilterTest, InvalidPostRequestJsonPrefixMismatch) {
-  // "application/jsonp" starts with "application/json" but is not a match
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/jsonp"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
 TEST_F(A2aFilterTest, InvalidPostRequestA2aJsonPrefixMismatch) {
-  // "application/a2a+jsonp" starts with "application/a2a+json" but is not a match
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/a2a+jsonp"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
