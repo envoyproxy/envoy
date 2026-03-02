@@ -1228,64 +1228,6 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamHandlesInlineResetDuringHeaders
   EXPECT_NE(captured_callbacks, nullptr);
 }
 
-TEST(DynamicModuleHttpStreamTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto stats_scope = stats_store.createScope("");
-
-  Upstream::MockClusterManager cluster_manager;
-  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-
-  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
-      .WillRepeatedly(testing::Return(cluster.get()));
-
-  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
-
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
-          *stats_scope, context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(), 0);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
-  filter->setDecoderFilterCallbacks(decoder_callbacks);
-
-  // Mock AsyncClient
-  NiceMock<Http::MockAsyncClientStream> stream;
-  Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
-  EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
-        captured_callbacks = &callbacks;
-        return &stream;
-      }));
-
-  uint64_t stream_id;
-  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
-      std::initializer_list<std::pair<std::string, std::string>>{
-          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
-  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
-  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
-  ASSERT_NE(captured_callbacks, nullptr);
-
-  EXPECT_CALL(dispatcher, deferredDelete_(_));
-  filter->onDestroy();
-
-  // Upstream callbacks may still run after destroy; ensure they safely return.
-  captured_callbacks->onComplete();
-
-  dispatcher.clearDeferredDeleteList();
-}
-
 TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
@@ -1396,7 +1338,6 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
@@ -1452,7 +1393,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
@@ -1513,7 +1453,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
@@ -1577,7 +1516,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 // Test that startHttpStream returns CannotCreateRequest when async_client.start() returns nullptr.
