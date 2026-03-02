@@ -1,16 +1,16 @@
-#include "source/extensions/upstreams/http/ep_specific_config.h"
+#include "source/extensions/upstreams/host_specific_http/host_specific_config.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
-namespace Http {
+namespace HostSpecificHttp {
 
 // Register the factory
 LEGACY_REGISTER_FACTORY(EpSpecificProtocolOptionsConfigFactory,
                         Server::Configuration::ProtocolOptionsFactory,
                         "envoy.upstreams.http.ep_specific");
 
-} // namespace Http
+} // namespace HostSpecificHttp
 } // namespace Upstreams
 } // namespace Extensions
 } // namespace Envoy

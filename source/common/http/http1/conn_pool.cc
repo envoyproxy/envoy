@@ -18,7 +18,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/upstreams/http/ep_specific_config.h"
+#include "source/extensions/upstreams/host_specific_http/host_specific_config.h"
 
 #include "absl/strings/match.h"
 

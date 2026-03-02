@@ -71,7 +71,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/upstreams/http:ep_specific_config",
+        "//source/extensions/upstreams/host_specific_http:host_specific_config",
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",

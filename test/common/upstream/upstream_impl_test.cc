@@ -6519,8 +6519,8 @@ protected:
             max_concurrent_streams: {}
         common_http_protocol_options:
           max_requests_per_connection: {}
-      envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions
+      envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.host_specific_http.v3.EndpointSpecificHttpProtocolOptions
 {}
     )EOF",
                                    cluster_max_concurrent_streams,
