@@ -978,6 +978,58 @@ TEST(HttpFilter, SendStreamTrailersOnInvalidStream) {
   EXPECT_FALSE(filter.sendStreamTrailers(0, std::move(trailers)));
 }
 
+TEST(DynamicModuleHttpCalloutTest, CancelPendingRequest) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->initializeInModuleFilter();
+
+  Http::AsyncClient::Callbacks* captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured = &cb;
+            return &req;
+          }));
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(filter->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured, nullptr);
+
+  // Cancel the callout when destroying the config. This should call cancel() on the async client
+  // request.
+  EXPECT_CALL(req, cancel());
+  filter->onDestroy();
+}
+
 TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnComplete) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
