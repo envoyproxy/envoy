@@ -1076,6 +1076,47 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, SendHttpCalloutCannotCreateReques
             envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 }
 
+// Test canceling a pending callout.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, CancelPendingCallout) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::Callbacks* captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured = &cb;
+            return &req;
+          }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured, nullptr);
+
+  // Cancel the callout when destroying the config. This should call cancel() on the async client
+  // request.
+  EXPECT_CALL(req, cancel());
+  config.reset();
+}
+
 // Test that if the callout succeeds but no callback is registered (no_op module), onSuccess and
 // onFailure early return without crashing.
 TEST(DynamicModuleHttpFilterConfigCalloutTest, HttpCalloutCallbackOnSuccessNoCallback) {
@@ -1278,7 +1319,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamWithBody) {
             envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(sid, 0u);
   captured_cb->onComplete();
-  dispatcher.clearDeferredDeleteList();
 }
 
 // Test inline reset during sendHeaders.
@@ -1320,7 +1360,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnHeader
   auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
             envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
-  dispatcher.clearDeferredDeleteList();
 }
 
 // Inline reset during sending initial data chunk.
@@ -1364,7 +1403,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnData) 
   msg->body().add("payload");
   EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
             envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamNonExistent) {
@@ -1419,7 +1457,47 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamExisting) {
 
   EXPECT_CALL(stream, reset()).Times(testing::AtLeast(1));
   config->resetHttpStream(sid);
-  dispatcher.clearDeferredDeleteList();
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, CancelPendingStreamCallout) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Cancel the stream callout when destroying the config. This should call reset() on the async
+  // client stream.
+  EXPECT_CALL(stream, reset());
+  config.reset();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamDataNonExistent) {
@@ -1473,7 +1551,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamDataValid) {
   EXPECT_CALL(stream, sendData(_, false));
   Buffer::OwnedImpl data("chunk");
   EXPECT_TRUE(config->sendStreamData(sid, data, false));
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamTrailersNonExistent) {
@@ -1527,7 +1604,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamTrailersValid) {
   EXPECT_CALL(stream, sendTrailers(_));
   auto trailers = Http::RequestTrailerMapImpl::create();
   EXPECT_TRUE(config->sendStreamTrailers(sid, std::move(trailers)));
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnHeadersNoCallback) {
@@ -1570,7 +1646,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnHeadersNoCallback)
   Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({}));
   captured_cb->onHeaders(std::move(resp_headers), true);
   captured_cb->onComplete();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnDataNoCallbackAndEmptyData) {
@@ -1617,7 +1692,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnDataNoCallbackAndE
   captured_cb->onData(data, true);
 
   captured_cb->onComplete();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnTrailersNoCallback) {
@@ -1660,7 +1734,6 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnTrailersNoCallback
   Http::ResponseTrailerMapPtr trailers(new Http::TestResponseTrailerMapImpl({}));
   captured_cb->onTrailers(std::move(trailers));
   captured_cb->onComplete();
-  dispatcher.clearDeferredDeleteList();
 }
 
 // This test verifies that handling of per-route config is correct in terms of lifetimes.
@@ -2134,8 +2207,6 @@ TEST(DynamicModuleHttpStreamTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
 
   // Upstream callbacks may still run after destroy; ensure they safely return.
   captured_callbacks->onComplete();
-
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
@@ -2248,7 +2319,6 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
@@ -2304,7 +2374,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
@@ -2365,7 +2434,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
@@ -2429,7 +2497,6 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
 
   // Clean up properly.
   filter->onDestroy();
-  dispatcher.clearDeferredDeleteList();
 }
 
 // Test that startHttpStream returns CannotCreateRequest when async_client.start() returns nullptr.

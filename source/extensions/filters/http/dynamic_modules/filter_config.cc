@@ -548,12 +548,13 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onComplete() {
 
   // Any in map callback must have a non-null stream_.
   ASSERT(stream_ != nullptr);
+  stream_ = nullptr;
+
   if (config.in_module_config_ == nullptr ||
       config.on_http_filter_config_http_stream_complete_ == nullptr) {
     return;
   }
 
-  stream_ = nullptr;
   config.on_http_filter_config_http_stream_complete_(config.thisAsVoidPtr(),
                                                      config.in_module_config_, callout_id);
 }
@@ -578,12 +579,13 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onReset() {
 
   // Any in map callback must have a non-null stream_.
   ASSERT(stream_ != nullptr);
+  stream_ = nullptr;
+
   if (config.in_module_config_ == nullptr ||
       config.on_http_filter_config_http_stream_reset_ == nullptr) {
     return;
   }
 
-  stream_ = nullptr;
   config.on_http_filter_config_http_stream_reset_(
       config.thisAsVoidPtr(), config.in_module_config_, callout_id,
       envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
