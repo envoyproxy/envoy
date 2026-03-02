@@ -594,6 +594,15 @@ common:debug --config=debug-tests
 common:bes --config=bes-envoy-engflow
 common:rbe --config=remote-envoy-engflow
 
+common:engflow-common --google_default_credentials=false
+common:engflow-common --grpc_keepalive_time=60s
+common:engflow-common --grpc_keepalive_timeout=30s
+common:engflow-common --remote_cache_compression
+
+common:remote-cache --config=engflow-common
+common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:remote-cache --remote_timeout=3600s
+
 try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
