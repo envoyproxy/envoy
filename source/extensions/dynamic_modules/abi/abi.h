@@ -26,9 +26,14 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
-// This is the ABI version that we bump the minor version when we make deprecating changes to the
-// ABI. Until we reach v1.0, we only guarantee backward compatibility in the next minor version. For
-// example, v0.1.y is guaranteed to be compatible with v0.2.x, but not with v0.3.x.
+// This is the ABI version that we bump the minor version at least once for any ABI changes in same
+// Envoy release cycle to indicate the ABI change.
+//
+// Break change in the ABI is not allowed except the ABI has not been released yet.
+//
+// Until we reach v1.0, we only guarantee backward
+// compatibility in the next minor version. For example, v0.1.y is guaranteed to be compatible with
+// v0.2.x, but not with v0.3.x.
 //
 // This is used only for tracking the ABI version of dynamic modules and emitting warnings when
 // there's a mismatch.
@@ -1604,6 +1609,40 @@ bool envoy_dynamic_module_callback_http_append_body(
 bool envoy_dynamic_module_callback_http_drain_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_body_type body_type, size_t number_of_bytes);
+
+/**
+ * envoy_dynamic_module_callback_http_received_buffered_request_body is called by the module to
+ * check if the latest received request body actually is the previously buffered request body.
+ *
+ * For example, the previous filter X have stopped the filter chain and buffered the request body.
+ * Then X resumes the filter chain after receiving the whole request body.
+ * When the next filter Y will receives the buffered request body and this callback will return
+ * true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return true if the latest received request body is the previously buffered request body, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_http_received_buffered_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_received_buffered_response_body is called by the module to
+ * check if the latest received response body actually is the previously buffered response body.
+ *
+ * For example, the previous filter X have stopped the filter chain and buffered the response body.
+ * Then X resumes the filter chain after receiving the whole response body.
+ * When the next filter Y will receives the buffered response body and this callback will return
+ * true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return true if the latest received response body is the previously buffered response body, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_http_received_buffered_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // ---------------------------- Metadata Callbacks -----------------------------
 

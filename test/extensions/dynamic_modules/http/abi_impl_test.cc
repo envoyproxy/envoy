@@ -2947,6 +2947,54 @@ TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
   envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
 }
 
+TEST(ABIImpl, ReceivedBufferedRequestBody) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // No current body - should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+
+  Buffer::OwnedImpl current_body;
+  filter.current_request_body_ = &current_body;
+
+  // current_request_body_ set but decodingBuffer() returns a different pointer - not buffered.
+  Buffer::OwnedImpl other_buffer;
+  EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&other_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+
+  // current_request_body_ is the same as decodingBuffer() - received buffered body.
+  EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&current_body));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+}
+
+TEST(ABIImpl, ReceivedBufferedResponseBody) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setEncoderFilterCallbacks(callbacks);
+
+  // No current body - should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  Buffer::OwnedImpl current_body;
+  filter.current_response_body_ = &current_body;
+
+  // current_response_body_ set but encodingBuffer() returns a different pointer - not buffered.
+  Buffer::OwnedImpl other_buffer;
+  EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&other_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  // current_response_body_ is the same as encodingBuffer() - received buffered body.
+  EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&current_body));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

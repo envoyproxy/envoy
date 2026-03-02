@@ -851,6 +851,24 @@ bool envoy_dynamic_module_callback_http_drain_body(
   return false;
 }
 
+bool envoy_dynamic_module_callback_http_received_buffered_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->current_request_body_ == nullptr) {
+    return false;
+  }
+  return filter->current_request_body_ == filter->decoder_callbacks_->decodingBuffer();
+}
+
+bool envoy_dynamic_module_callback_http_received_buffered_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->current_response_body_ == nullptr) {
+    return false;
+  }
+  return filter->current_response_body_ == filter->encoder_callbacks_->encodingBuffer();
+}
+
 void envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
