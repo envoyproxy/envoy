@@ -14,7 +14,7 @@ template <envoy_dynamic_module_type_http_body_type Type> class BodyBufferImpl : 
 public:
   BodyBufferImpl(void* host_plugin_ptr) : host_plugin_ptr_(host_plugin_ptr) {}
 
-  std::vector<BufferView> getChunks() override {
+  std::vector<BufferView> getChunks() const override {
     size_t chunks_size =
         envoy_dynamic_module_callback_http_get_body_chunks_size(host_plugin_ptr_, Type);
     if (chunks_size == 0) {
@@ -28,7 +28,7 @@ public:
     return result_chunks;
   }
 
-  size_t getSize() override {
+  size_t getSize() const override {
     return envoy_dynamic_module_callback_http_get_body_size(host_plugin_ptr_, Type);
   }
 
@@ -415,6 +415,14 @@ public:
   BodyBuffer& bufferedResponseBody() override { return buffered_response_body_; }
 
   BodyBuffer& receivedResponseBody() override { return received_response_body_; }
+
+  bool receivedBufferedRequestBody() override {
+    return envoy_dynamic_module_callback_http_received_buffered_request_body(host_plugin_ptr_);
+  }
+
+  bool receivedBufferedResponseBody() override {
+    return envoy_dynamic_module_callback_http_received_buffered_response_body(host_plugin_ptr_);
+  }
 
   HeaderMap& responseTrailers() override { return response_trailers_; }
 

@@ -319,57 +319,48 @@ DynamicModuleHttpFilter::startHttpStream(uint64_t* stream_id_out, absl::string_v
   const uint64_t callout_id = getNextCalloutId();
   auto callback = std::make_unique<DynamicModuleHttpFilter::HttpStreamCalloutCallback>(
       shared_from_this(), callout_id);
-  DynamicModuleHttpFilter::HttpStreamCalloutCallback& callback_ref = *callback;
-  // Store the callback first so if start fails inline, we can clean it up properly.
-  http_stream_callouts_[callout_id] = std::move(callback);
 
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
 
-  Http::AsyncClient::Stream* async_stream = cluster->httpAsyncClient().start(callback_ref, options);
+  Http::AsyncClient::Stream* async_stream = cluster->httpAsyncClient().start(*callback, options);
   if (!async_stream) {
-    // Failed to create the stream, clean up.
-    http_stream_callouts_.erase(callout_id);
     return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
 
-  callback_ref.stream_ = async_stream;
-  callback_ref.request_message_ = std::move(message);
-  *stream_id_out = callout_id;
-
-  // Send headers. The end_stream flag controls whether headers alone end the stream.
-  // If body is provided, send it immediately.
-  bool has_initial_body = callback_ref.request_message_->body().length() > 0;
+  bool has_initial_body = message->body().length() > 0;
   if (has_initial_body) {
-    // Send headers without end_stream, then send body with the end_stream flag.
-    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(),
-                                      false /* end_stream */);
-
-    // The stream might reset inline while sending headers. Bail out if that happened.
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendHeaders(message->headers(), false /* end_stream */);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
-
-    callback_ref.stream_->sendData(callback_ref.request_message_->body(), end_stream);
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendData(message->body(), end_stream);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
   } else {
-    // No body, so end_stream applies to headers.
-    callback_ref.stream_->sendHeaders(callback_ref.request_message_->headers(), end_stream);
-    if (callback_ref.stream_ == nullptr) {
-      return envoy_dynamic_module_type_http_callout_init_result_Success;
+    async_stream->sendHeaders(message->headers(), end_stream);
+    if (callback->cleaned_up_) {
+      return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
     }
   }
+
+  // If no any initial failure happened, we can add the callback to the map and return success.
+  // The callback will be responsible for cleaning up the stream when it's done.
+  callback->stream_ = async_stream;
+  callback->request_message_ = std::move(message);
+  http_stream_callouts_.emplace(callout_id, std::move(callback));
+  *stream_id_out = callout_id;
 
   return envoy_dynamic_module_type_http_callout_init_result_Success;
 }
 
 void DynamicModuleHttpFilter::resetHttpStream(uint64_t stream_id) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it != http_stream_callouts_.end() && it->second->stream_) {
-    it->second->stream_->reset();
+  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+    return;
   }
+  it->second->stream_->reset();
 }
 
 bool DynamicModuleHttpFilter::sendStreamData(uint64_t stream_id, Buffer::Instance& data,
@@ -398,7 +389,9 @@ bool DynamicModuleHttpFilter::sendStreamTrailers(uint64_t stream_id,
 void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onHeaders(ResponseHeaderMapPtr&& headers,
                                                                    bool end_stream) {
   // Check if the filter is destroyed before the stream completes.
-  if (!filter_->in_module_filter_) {
+  // Also check if the stream is already cleaned up by onComplete or onReset or it haven't been
+  // initialized successfully in startHttpStream.
+  if (filter_->in_module_filter_ == nullptr || stream_ == nullptr) {
     return;
   }
 
@@ -420,7 +413,9 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onHeaders(ResponseHeade
 void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onData(Buffer::Instance& data,
                                                                 bool end_stream) {
   // Check if the filter is destroyed before the stream completes.
-  if (!filter_->in_module_filter_) {
+  // Also check if the stream is already cleaned up by onComplete or onReset or it haven't been
+  // initialized successfully in startHttpStream.
+  if (filter_->in_module_filter_ == nullptr || stream_ == nullptr) {
     return;
   }
 
@@ -441,7 +436,9 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onData(Buffer::Instance
 void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onTrailers(
     ResponseTrailerMapPtr&& trailers) {
   // Check if the filter is destroyed before the stream completes.
-  if (!filter_->in_module_filter_) {
+  // Also check if the stream is already cleaned up by onComplete or onReset or it haven't been
+  // initialized successfully in startHttpStream.
+  if (filter_->in_module_filter_ == nullptr || stream_ == nullptr) {
     return;
   }
 
@@ -474,31 +471,22 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onComplete() {
   DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
 
   // Check if the filter is destroyed before we can invoke the callback.
-  if (!filter->in_module_filter_ || !filter->decoder_callbacks_) {
+  if (filter->in_module_filter_ == nullptr || filter->decoder_callbacks_ == nullptr ||
+      stream_ == nullptr) {
     return;
   }
-
-  // Cache the dispatcher before we call the module callback, as the callback may destroy the filter
-  // which will clear decoder_callbacks_.
-  Event::Dispatcher& dispatcher = filter->decoder_callbacks_->dispatcher();
-
-  filter->config_->on_http_filter_http_stream_complete_(filter->thisAsVoidPtr(),
-                                                        filter->in_module_filter_, callout_id_);
-
-  stream_ = nullptr;
-  request_message_.reset();
-  request_trailers_.reset();
 
   // Schedule deferred deletion of this callback to avoid deleting 'this' while we're still in it.
   // The stream may call other callbacks like onReset() after onComplete().
   auto it = filter->http_stream_callouts_.find(callout_id_);
   if (it != filter->http_stream_callouts_.end()) {
-    // Cast unique_ptr<HttpStreamCalloutCallback> to unique_ptr<DeferredDeletable> for deferred
-    // deletion.
-    std::unique_ptr<Event::DeferredDeletable> deletable(it->second.release());
-    dispatcher.deferredDelete(std::move(deletable));
+    filter->decoder_callbacks_->dispatcher().deferredDelete(std::move(it->second));
     filter->http_stream_callouts_.erase(it);
   }
+
+  filter->config_->on_http_filter_http_stream_complete_(filter->thisAsVoidPtr(),
+                                                        filter->in_module_filter_, callout_id_);
+  stream_ = nullptr;
 }
 
 void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
@@ -514,35 +502,23 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
   DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
 
   // Check if the filter is destroyed before we can invoke the callback.
-  if (!filter->in_module_filter_ || !filter->decoder_callbacks_) {
+  if (filter->in_module_filter_ == nullptr || filter->decoder_callbacks_ == nullptr ||
+      stream_ == nullptr) {
     return;
   }
-
-  // Cache the dispatcher before we call the module callback, as the callback may destroy the filter
-  // which will clear decoder_callbacks_.
-  Event::Dispatcher& dispatcher = filter->decoder_callbacks_->dispatcher();
-
-  // Only invoke the callback if the stream was actually started.
-  if (stream_) {
-    // Since we don't have detailed reset reason here, use a generic one.
-    filter->config_->on_http_filter_http_stream_reset_(
-        filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id_,
-        envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
-  }
-
-  stream_ = nullptr;
-  request_message_.reset();
-  request_trailers_.reset();
 
   // Schedule deferred deletion of this callback to avoid deleting 'this' while we're still in it.
   auto it = filter->http_stream_callouts_.find(callout_id_);
   if (it != filter->http_stream_callouts_.end()) {
-    // Cast unique_ptr<HttpStreamCalloutCallback> to unique_ptr<DeferredDeletable> for deferred
-    // deletion.
-    std::unique_ptr<Event::DeferredDeletable> deletable(it->second.release());
-    dispatcher.deferredDelete(std::move(deletable));
+    filter->decoder_callbacks_->dispatcher().deferredDelete(std::move(it->second));
     filter->http_stream_callouts_.erase(it);
   }
+
+  // Only invoke the callback if the stream was actually started.
+  filter->config_->on_http_filter_http_stream_reset_(
+      filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id_,
+      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
+  stream_ = nullptr;
 }
 
 Http::LocalErrorStatus

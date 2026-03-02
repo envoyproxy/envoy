@@ -1247,6 +1247,22 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn append_buffered_response_body(&mut self, data: &[u8]) -> bool;
 
+  /// Returns true if the latest received request body is the previously buffered request body.
+  ///
+  /// This is true when a previous filter in the chain stopped and buffered the request body,
+  /// then resumed, and this filter is now receiving that buffered body.
+  ///
+  /// NOTE: This is only meaningful inside [`HttpFilter::on_request_body`].
+  fn received_buffered_request_body(&mut self) -> bool;
+
+  /// Returns true if the latest received response body is the previously buffered response body.
+  ///
+  /// This is true when a previous filter in the chain stopped and buffered the response body,
+  /// then resumed, and this filter is now receiving that buffered body.
+  ///
+  /// NOTE: This is only meaningful inside [`HttpFilter::on_response_body`].
+  fn received_buffered_response_body(&mut self) -> bool;
+
   /// Clear the route cache calculated during a previous phase of the filter chain.
   ///
   /// This is useful when the filter wants to force a re-evaluation of the route selection after
@@ -2739,6 +2755,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         bytes_to_module_buffer(data),
       )
     }
+  }
+
+  fn received_buffered_request_body(&mut self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_http_received_buffered_request_body(self.raw_ptr) }
+  }
+
+  fn received_buffered_response_body(&mut self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_http_received_buffered_response_body(self.raw_ptr) }
   }
 
   fn clear_route_cache(&mut self) {

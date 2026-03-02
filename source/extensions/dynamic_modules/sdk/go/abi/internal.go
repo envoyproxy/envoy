@@ -829,6 +829,18 @@ func (h *dymHttpFilterHandle) ReceivedResponseBody() shared.BodyBuffer {
 	return &h.receivedResponseBody
 }
 
+func (h *dymHttpFilterHandle) ReceivedBufferedRequestBody() bool {
+	return bool(C.envoy_dynamic_module_callback_http_received_buffered_request_body(
+		h.hostPluginPtr,
+	))
+}
+
+func (h *dymHttpFilterHandle) ReceivedBufferedResponseBody() bool {
+	return bool(C.envoy_dynamic_module_callback_http_received_buffered_response_body(
+		h.hostPluginPtr,
+	))
+}
+
 func (h *dymHttpFilterHandle) ResponseTrailers() shared.HeaderMap {
 	return &h.responseTrailerMap
 }

@@ -8,6 +8,8 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -80,6 +82,13 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
                                                         const bool load_globally) {
+  // Probe for the module's init symbol with the module name as a prefix. If the symbol is found
+  // in the process binary (via dlsym(RTLD_DEFAULT)), treat this as a statically linked module.
+  const std::string static_init_symbol =
+      absl::StrCat(module_name, "_envoy_dynamic_module_on_program_init");
+  if (dlsym(RTLD_DEFAULT, static_init_symbol.c_str()) != nullptr) {
+    return newStaticModule(module_name);
+  }
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (!module_search_path) {
@@ -119,13 +128,52 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                    dynamic_module.status().message()));
 }
 
-DynamicModule::~DynamicModule() { dlclose(handle_); }
+DynamicModule::~DynamicModule() {
+  if (!static_module_name_.empty()) {
+    // Static modules have no dlopen handle to close.
+    return;
+  }
+  dlclose(handle_);
+}
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
+  if (!static_module_name_.empty()) {
+    // For statically linked modules, look up the prefixed symbol in the process binary.
+    const std::string prefixed = absl::StrCat(static_module_name_, "_", symbol_ref);
+    return dlsym(RTLD_DEFAULT, prefixed.c_str());
+  }
   // TODO(mathetake): maybe we should accept null-terminated const char* instead of string_view to
   // avoid unnecessary copy because it is likely that this is only called for a constant string,
   // though this is not a performance critical path.
   return dlsym(handle_, std::string(symbol_ref).c_str());
+}
+
+absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {
+  auto dynamic_module = std::make_unique<DynamicModule>(module_name);
+
+  const auto init_function =
+      dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
+          "envoy_dynamic_module_on_program_init");
+  if (!init_function.ok()) {
+    return init_function.status();
+  }
+
+  const char* abi_version = (*init_function.value())();
+  if (abi_version == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize static module: ", module_name));
+  }
+  if (absl::string_view(abi_version) != absl::string_view(ENVOY_DYNAMIC_MODULES_ABI_VERSION)) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "Static module ABI version {} is deprecated. Please recompile the module against the "
+        "SDK with the exact Envoy version used by the main program.",
+        abi_version);
+  } else {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        "Static module ABI version {} matched.", abi_version);
+  }
+  return dynamic_module;
 }
 
 } // namespace DynamicModules
