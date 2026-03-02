@@ -154,6 +154,14 @@ bug_fixes:
   change: |
     Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed message-valued CEL attribute serialization (for example
+    ``xds.virtual_host_metadata``) to use protobuf text format instead of debug string output.
+    This restores ext_proc compatibility with protobuf 30+ where debug-string output is
+    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
+    be reverted by setting runtime guard
+    ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
@@ -458,6 +466,13 @@ new_features:
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: formatter
+  change: |
+    Added new access log formatters for tracking upstream hosts and connection IDs attempted during
+    request processing: ``%UPSTREAM_HOSTS_ATTEMPTED%``, ``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``,
+    ``%UPSTREAM_HOST_NAMES_ATTEMPTED%``, ``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``, and
+    ``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``. These are useful for debugging retry behavior and
+    understanding which hosts were tried before a successful connection or final failure.
 - area: dynamic_modules
   change: |
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target

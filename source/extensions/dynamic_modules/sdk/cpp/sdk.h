@@ -101,13 +101,13 @@ public:
    * Returns all data chunks in the buffer.
    * @return Vector of buffer views containing all chunks.
    */
-  virtual std::vector<BufferView> getChunks() = 0;
+  virtual std::vector<BufferView> getChunks() const = 0;
 
   /**
    * Returns the total size of the buffer.
    * @return The total size in bytes.
    */
-  virtual size_t getSize() = 0;
+  virtual size_t getSize() const = 0;
 
   /**
    * Removes size from the front of the buffer.
@@ -563,6 +563,24 @@ public:
    * @return Reference to BodyBuffer containing the latest received response body chunk.
    */
   virtual BodyBuffer& receivedResponseBody() = 0;
+
+  /**
+   * Returns true if the latest received request body is the previously buffered request body.
+   * This is true when a previous filter in the chain stopped and buffered the request body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onRequestBody callback.
+   * @return true if the received request body is the previously buffered request body.
+   */
+  virtual bool receivedBufferedRequestBody() = 0;
+
+  /**
+   * Returns true if the latest received response body is the previously buffered response body.
+   * This is true when a previous filter in the chain stopped and buffered the response body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onResponseBody callback.
+   * @return true if the received response body is the previously buffered response body.
+   */
+  virtual bool receivedBufferedResponseBody() = 0;
 
   /**
    * Returns reference to response trailers.
