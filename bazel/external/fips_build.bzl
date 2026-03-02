@@ -94,10 +94,10 @@ fi
 cp ninja $$OUT_FILE
 """
 
-def _config_name(prefix, arch, lib, hermetic):
-    return "%s_%s_%s%s" % (prefix, arch, lib, "_hermetic" if hermetic else "")
+def _config_name(prefix, arch, lib, hermetic_sysroot):
+    return "%s_%s_%s%s" % (prefix, arch, lib, "_hermetic_sysroot" if hermetic_sysroot else "")
 
-def _create_build_config(prefix, lib, arch, arch_alias, hermetic):
+def _create_build_config(prefix, lib, arch, arch_alias, hermetic_sysroot):
     """Create the config_setting_group combination."""
     conditions = ["@platforms//cpu:%s" % arch]
 
@@ -107,21 +107,21 @@ def _create_build_config(prefix, lib, arch, arch_alias, hermetic):
     else:
         conditions.append("@envoy//bazel:libstdc++_enabled")
 
-    if hermetic:
-        conditions.append("@envoy_repo//:use_hermetic_llvm")
+    if hermetic_sysroot:
+        conditions.append("@envoy_repo//:use_hermetic_sysroot")
     else:
-        conditions.append("@envoy_repo//:use_local_llvm")
+        conditions.append("@envoy_repo//:use_local_sysroot")
 
     selects.config_setting_group(
-        name = _config_name(prefix, arch, lib, hermetic),
+        name = _config_name(prefix, arch, lib, hermetic_sysroot),
         match_all = conditions,
     )
 
-def _create_boringssl_fips_build_command(lib, arch, arch_alias, hermetic):
+def _create_boringssl_fips_build_command(lib, arch, arch_alias, hermetic_sysroot):
     """Create the command."""
-    _create_build_config("boringssl", lib, arch, arch_alias, hermetic)
+    _create_build_config("boringssl", lib, arch, arch_alias, hermetic_sysroot)
     return BUILD_COMMAND % (
-        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic else "",
+        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic_sysroot else "",
         lib,
         "@fips_cmake_linux_%s" % arch,
         "@fips_go_linux_%s" % arch_alias,
@@ -130,35 +130,35 @@ def _create_boringssl_fips_build_command(lib, arch, arch_alias, hermetic):
 def boringssl_fips_build_command(arches, libs):
     """Create conditional commands from the cartesian product of possible arches/stdlib."""
     return {
-        ":%s" % _config_name("boringssl", arch, lib, hermetic): _create_boringssl_fips_build_command(
+        ":%s" % _config_name("boringssl", arch, lib, hermetic_sysroot): _create_boringssl_fips_build_command(
             lib,
             arch,
             arch_alias,
-            hermetic,
+            hermetic_sysroot,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
-        for hermetic in [False, True]
+        for hermetic_sysroot in [False, True]
     }
 
-def _create_ninja_build_command(lib, arch, arch_alias, hermetic):
+def _create_ninja_build_command(lib, arch, arch_alias, hermetic_sysroot):
     """Create the command."""
-    _create_build_config("ninja", lib, arch, arch_alias, hermetic)
+    _create_build_config("ninja", lib, arch, arch_alias, hermetic_sysroot)
     return NINJA_BUILD_COMMAND % (
-        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic else "",
+        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic_sysroot else "",
         lib,
     )
 
 def ninja_build_command(arches, libs):
     """Create the ninja command conditioned to correct stdlib."""
     return {
-        ":%s" % _config_name("ninja", arch, lib, hermetic): _create_ninja_build_command(
+        ":%s" % _config_name("ninja", arch, lib, hermetic_sysroot): _create_ninja_build_command(
             lib,
             arch,
             arch_alias,
-            hermetic,
+            hermetic_sysroot,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
-        for hermetic in [False, True]
+        for hermetic_sysroot in [False, True]
     }

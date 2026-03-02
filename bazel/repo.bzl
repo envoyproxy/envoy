@@ -95,7 +95,11 @@ def _envoy_repo_impl(repository_ctx):
 
     # By default, even when local toolchain is used, we still use the hermetic
     # sysroot, when it's undesirable, you can set this environment variable to True
-    # to fallback to the host libc
+    # to fallback to the host libc.
+    #
+    # NOTE: The cleanest way to provide this environment variable would be via Bazel's
+    # repo_env flag. It's particularly important when using remote build execution (aka
+    # RBE), as host environment variables are not directly passed to remote workers.
     local_sysroot = repository_ctx.os.environ.get("BAZEL_USE_HOST_SYSROOT", "False")
 
     repository_ctx.file("compiler.bzl", """
@@ -122,17 +126,6 @@ config_setting(
     name = "use_local_llvm",
     flag_values = {
         ":use_local_llvm_flag": "True",
-    },
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "use_hermetic_llvm",
-    flag_values = {
-        ":use_local_llvm_flag": "False",
     },
     constraint_values = [
         "@platforms//os:linux",
