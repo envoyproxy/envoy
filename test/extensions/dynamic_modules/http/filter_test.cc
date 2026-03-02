@@ -1405,6 +1405,54 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnData) 
             envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 }
 
+// Test inline complete during initialization.
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineComplete) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  EXPECT_CALL(stream, sendHeaders(_, false));
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    captured_cb->onHeaders(Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl({})},
+                           false);
+    Buffer::OwnedImpl body("response body");
+    captured_cb->onData(body, false);
+    captured_cb->onTrailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl({})});
+    captured_cb->onComplete();
+  }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  msg->body().add("payload");
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
 TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamNonExistent) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
