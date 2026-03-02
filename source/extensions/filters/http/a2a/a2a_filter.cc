@@ -54,6 +54,46 @@ bool A2aFilter::shouldRejectRequest() const {
 
 uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBodySize(); }
 
+// Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+//                                                    bool end_stream) {
+//   if (isValidA2aGetOrDeleteRequest(headers)) {
+//     is_a2a_request_ = true;
+//     ENVOY_LOG(debug, "valid A2A GET/DELETE request, passing through");
+//     return Http::FilterHeadersStatus::Continue;
+//   }
+
+//   if (isValidA2aPostRequest(headers)) {
+//     is_json_post_request_ = true;
+//     ENVOY_LOG(debug, "valid A2A Post request");
+//     if (end_stream) {
+//       is_a2a_request_ = false;
+//     } else {
+//       // Need to buffer the body to check for JSON-RPC 2.0
+//       is_a2a_request_ = true;
+
+//       const uint32_t max_size = getMaxRequestBodySize();
+//       if (max_size > 0) {
+//         decoder_callbacks_->setDecoderBufferLimit(max_size);
+//         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
+//       }
+
+//       // Stop iteration to buffer the body for validation
+//       return Http::FilterHeadersStatus::StopIteration;
+//     }
+//   }
+
+//   if (!is_a2a_request_ && shouldRejectRequest()) {
+//     ENVOY_LOG(debug, "rejecting non-A2A traffic");
+//     config_->stats().requests_rejected_.inc();
+//     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only A2A traffic is allowed",
+//                                        nullptr, absl::nullopt, "a2a_filter_reject");
+//     return Http::FilterHeadersStatus::StopIteration;
+//   }
+
+//   ENVOY_LOG(debug, "A2A filter passing through during decoding headers");
+//   return Http::FilterHeadersStatus::Continue;
+// }
+
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
   if (isValidA2aGetOrDeleteRequest(headers)) {
@@ -71,17 +111,18 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Need to buffer the body to check for JSON-RPC 2.0
       is_a2a_request_ = true;
 
+      // Set the buffer limit - Envoy will automatically send 413 if exceeded
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setDecoderBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
 
-      // Stop iteration to buffer the body for validation
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
 
+  ENVOY_LOG(debug, "after the post check");
   if (!is_a2a_request_ && shouldRejectRequest()) {
     ENVOY_LOG(debug, "rejecting non-A2A traffic");
     config_->stats().requests_rejected_.inc();
@@ -93,6 +134,7 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
   ENVOY_LOG(debug, "A2A filter passing through during decoding headers");
   return Http::FilterHeadersStatus::Continue;
 }
+
 
 Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (!is_json_post_request_ || !is_a2a_request_) {
@@ -110,27 +152,10 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
   ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", data.length(), bytes_parsed_);
 
   const uint32_t max_size = getMaxRequestBodySize();
-  if (max_size > 0 && bytes_parsed_ >= max_size) {
-    config_->stats().body_too_large_.inc();
-    handleParseError("request body is too large.");
-    return Http::FilterDataStatus::StopIterationNoBuffer;
-  }
-
-  uint64_t bytes_to_skip = bytes_parsed_;
 
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
-    if (bytes_to_skip >= slice.len_) {
-      bytes_to_skip -= slice.len_;
-      continue;
-    }
-
-    // This slice contains the "new" data
-    const char* start = static_cast<const char*>(slice.mem_) + bytes_to_skip;
-    size_t len = slice.len_ - bytes_to_skip;
-
-    // Once we've skipped the initial 'bytes_parsed_',
-    // we process all remaining bytes in this and future slices.
-    bytes_to_skip = 0;
+    const char* start = static_cast<const char*>(slice.mem_);
+    size_t len = slice.len_;
 
     if (max_size > 0) {
       len = std::min(len, static_cast<size_t>(max_size - bytes_parsed_));
@@ -146,23 +171,29 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       }
 
       if (!status.ok()) {
+        config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
                                            absl::nullopt, "a2a_filter_not_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
     }
 
-    if (max_size > 0 && bytes_parsed_ >= max_size)
+    if (max_size > 0 && bytes_parsed_ == max_size)
       break;
   }
 
-  // If we are here, we haven't collected all fields yet.
-  bool size_limit_hit = (max_size > 0 && bytes_parsed_ >= max_size);
+    // If we are here, we haven't collected all fields yet.
+  bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      config_->stats().body_too_large_.inc();
-      handleParseError("reached end_stream or configured body size, don't get enough data.");
+      if (size_limit_hit) {
+        config_->stats().body_too_large_.inc();
+        handleParseError("request body is too large.");
+      } else {
+        config_->stats().invalid_json_.inc();
+        handleParseError("not a valid JSON (incomplete).");
+      }
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
     return completeParsing();
@@ -193,6 +224,20 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  // Set dynamic metadata
+  // const auto& metadata = parser_->metadata();
+  // if (!metadata.fields().empty()) {
+  //   decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
+  //                                                       metadata);
+  //   ENVOY_LOG(debug, "A2A filter set dynamic metadata: {}", metadata.DebugString());
+
+  //   if (config_->clearRouteCache()) {
+  //     if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
+  //       cb->clearRouteCache();
+  //       ENVOY_LOG(debug, "A2A filter cleared route cache for metadata-based routing");
+  //     }
+  //   }
+  // }
   return Http::FilterDataStatus::Continue;
 }
 
