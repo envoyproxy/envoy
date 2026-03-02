@@ -74,8 +74,8 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(
-        fmt::format(filter_config, module_name, filter_name, type_url, config), !upstream_filter);
+    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
+                                 !upstream_filter);
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
