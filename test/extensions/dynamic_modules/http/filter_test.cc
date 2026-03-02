@@ -1057,11 +1057,14 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, SendHttpCalloutCannotCreateReques
   EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
 
   // send_ returns nullptr to simulate CannotCreateRequest.
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(Invoke([](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        return nullptr;
-      }));
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            cb.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_TRUE(config_or.ok());
@@ -1088,13 +1091,11 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, CancelPendingCallout) {
       .WillRepeatedly(testing::Return(cluster.get()));
   EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
 
-  Http::AsyncClient::Callbacks* captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured = &cb;
             return &req;
           }));
 
@@ -1109,7 +1110,6 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, CancelPendingCallout) {
   auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   ASSERT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
             envoy_dynamic_module_type_http_callout_init_result_Success);
-  ASSERT_NE(captured, nullptr);
 
   // Cancel the callout when destroying the config. This should call cancel() on the async client
   // request.
@@ -1455,7 +1455,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamExisting) {
   ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
             envoy_dynamic_module_type_http_callout_init_result_Success);
 
-  EXPECT_CALL(stream, reset()).Times(testing::AtLeast(1));
+  EXPECT_CALL(stream, reset()).WillOnce(Invoke([&]() {
+    // Simulate the stream being reset, which should trigger the stream callbacks and clean up
+    // stream state in the config.
+    captured_cb->onReset();
+  }));
   config->resetHttpStream(sid);
 }
 
@@ -1731,7 +1735,7 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnTrailersNoCallback
   ASSERT_NE(captured_cb, nullptr);
 
   // onTrailers with no registered callback: should not crash.
-  Http::ResponseTrailerMapPtr trailers(new Http::TestResponseTrailerMapImpl({}));
+  Http::ResponseTrailerMapPtr trailers(new Http::TestResponseTrailerMapImpl({{"cat", "dog"}}));
   captured_cb->onTrailers(std::move(trailers));
   captured_cb->onComplete();
 }
@@ -2257,9 +2261,7 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
   EXPECT_NE(captured_callbacks, nullptr);
 
   // Invoke onReset
-  if (captured_callbacks) {
-    captured_callbacks->onReset();
-  }
+  captured_callbacks->onReset();
 }
 
 TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
