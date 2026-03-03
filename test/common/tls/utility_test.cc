@@ -340,8 +340,8 @@ TEST(UtilityTest, TestGetX509ErrorInfoWithCrlError) {
   EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_ERR_UNABLE_TO_GET_CRL);
 
   EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
-            "X509_verify_cert: certificate verification error at depth 0: CRL for certificate was "
-            "not provided, "
+            "X509_verify_cert: certificate verification error at depth 0: certificate revocation "
+            "check against provided CRLs failed: unable to get certificate CRL, "
             "certificate CRL distribution points: [http://crl.example.com/ca.crl, "
             "http://backup-crl.example.com/ca.crl]");
 }

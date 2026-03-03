@@ -535,25 +535,18 @@ absl::string_view Utility::getErrorDescription(int err) {
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 
-std::string translateX509VerificationErrorCode(int n) {
-  switch (n) {
-  case X509_V_ERR_UNABLE_TO_GET_CRL:
-    return "CRL for certificate was not provided";
-    break;
-  default:
-    return X509_verify_cert_error_string(n);
-  }
-}
-
 std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
   const int n = X509_STORE_CTX_get_error(ctx);
   const int depth = X509_STORE_CTX_get_error_depth(ctx);
   std::string error_details =
-      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
-                   translateX509VerificationErrorCode(n));
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ");
 
   if (n == X509_V_ERR_UNABLE_TO_GET_CRL || n == X509_V_ERR_CRL_NOT_YET_VALID ||
       n == X509_V_ERR_CRL_HAS_EXPIRED || n == X509_V_ERR_CERT_REVOKED) {
+    const std::string crl_error_msg =
+        fmt::format("certificate revocation check against provided CRLs failed: {}",
+                    X509_verify_cert_error_string(n));
+    absl::StrAppend(&error_details, crl_error_msg);
     X509* cert = X509_STORE_CTX_get_current_cert(ctx);
     if (cert != nullptr) {
       std::vector<std::string> crldps = getCertificateCrlDpsForLogging(cert);
@@ -563,6 +556,8 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
         absl::StrAppend(&error_details, error_msg);
       }
     }
+  } else {
+    absl::StrAppend(&error_details, X509_verify_cert_error_string(n));
   }
 
   return error_details;

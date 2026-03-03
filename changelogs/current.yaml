@@ -528,9 +528,9 @@ new_features:
     formatters now include the certificate's CRL Distribution Point (CRLDP) information when CRL
     validation fails. For errors such as ``CRL for certificate was not provided``, ``CRL has expired``, ``CRL
     is not yet valid``, or ``certificate revoked``, the error message now includes the certificate's
-    CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: unable
-    to get certificate CRL, certificate CRL distribution points: [http://crl.example.com/ca.crl,
-    http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL validation failures and helps
-    operators identify connectivity or CRL server issues without requiring debug-level logging.
+    CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: certificate revocation
+    check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
+    [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
+    validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
 
 deprecated:
