@@ -158,6 +158,8 @@ public:
             {"sha256PeerCertificateDigest", static_luaSha256PeerCertificateDigest},
             {"serialNumberPeerCertificate", static_luaSerialNumberPeerCertificate},
             {"issuerPeerCertificate", static_luaIssuerPeerCertificate},
+            {"issuerPeerCertificateHash", static_luaIssuerPeerCertificateHash},
+            {"issuerPeerCertificateSerial", static_luaIssuerPeerCertificateSerial},
             {"subjectPeerCertificate", static_luaSubjectPeerCertificate},
             {"parsedSubjectPeerCertificate", static_luaParsedSubjectPeerCertificate},
             {"uriSanPeerCertificate", static_luaUriSanPeerCertificate},
@@ -217,6 +219,18 @@ private:
    * there is no peer certificate, or no issuer.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificate);
+
+  /**
+   * Returns the SHA-256 digest of the issuer certificate in the peer certificate chain. Returns
+   * empty string if there is no peer certificate chain or no issuer certificate.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificateHash);
+
+  /**
+   * Returns the serial number of the issuer certificate in the peer certificate chain. Returns
+   * empty string if there is no peer certificate chain or no issuer certificate.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificateSerial);
 
   /**
    * Returns the subject field of the peer certificate in RFC 2253 format. Returns empty string if

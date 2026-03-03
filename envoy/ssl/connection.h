@@ -94,6 +94,18 @@ public:
   virtual const std::string& issuerPeerCertificate() const PURE;
 
   /**
+   * @return std::string the SHA-256 digest of the issuer certificate in the peer certificate chain.
+   *         Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& issuerPeerCertificateHash() const PURE;
+
+  /**
+   * @return std::string the serial number of the issuer certificate in the peer certificate chain.
+   *         Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& issuerPeerCertificateSerial() const PURE;
+
+  /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no subject.
    **/

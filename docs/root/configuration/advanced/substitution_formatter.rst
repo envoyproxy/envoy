@@ -1307,6 +1307,20 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%``
+  HTTP/TCP/THRIFT
+    The hex-encoded SHA256 fingerprint of the direct issuer (CA) certificate from the downstream TLS peer certificate chain.
+    Returns ``"-"`` if there is no peer certificate chain or no issuer certificate.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+  HTTP/TCP/THRIFT
+    The serial number of the direct issuer (CA) certificate from the downstream TLS peer certificate chain.
+    Returns ``"-"`` if there is no peer certificate chain or no issuer certificate.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_PEER_CERT%``
   HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.

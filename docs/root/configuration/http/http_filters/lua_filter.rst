@@ -1465,6 +1465,28 @@ certificate, or no serial number.
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
+``issuerPeerCertificateHash()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:issuerPeerCertificateHash()
+
+Returns the hex-encoded SHA256 fingerprint of the direct issuer (CA) certificate from the peer
+certificate chain. The issuer certificate is the second certificate in the chain (index 1).
+Returns ``""`` if there is no peer certificate chain or no issuer certificate.
+
+``issuerPeerCertificateSerial()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:issuerPeerCertificateSerial()
+
+Returns the serial number of the direct issuer (CA) certificate from the peer certificate chain.
+The issuer certificate is the second certificate in the chain (index 1).
+Returns ``""`` if there is no peer certificate chain or no issuer certificate.
+
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
