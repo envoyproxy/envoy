@@ -88,7 +88,9 @@ protected:
 
   size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
   size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
-  size_t getFDToPingSendTimerMapSize() { return socket_manager_->fd_to_ping_send_timer_map_.size(); }
+  size_t getFDToPingSendTimerMapSize() {
+    return socket_manager_->fd_to_ping_send_timer_map_.size();
+  }
 
   bool verifyFDToPingSendTimerMap(int fd) {
     return socket_manager_->fd_to_ping_send_timer_map_.find(fd) !=

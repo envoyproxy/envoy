@@ -160,12 +160,11 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
 
   // Create per-connection send timer with initial jitter spread across the full interval
   // to distribute pings from burst-added connections across time.
-  fd_to_ping_send_timer_map_[fd] = dispatcher_.createTimer(
-      [this, fd]() { sendPingForConnection(fd); });
+  fd_to_ping_send_timer_map_[fd] =
+      dispatcher_.createTimer([this, fd]() { sendPingForConnection(fd); });
   uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
   uint64_t jitter_ms = random_generator_->random() % std::max<uint64_t>(1, interval_ms);
-  fd_to_ping_send_timer_map_[fd]->enableTimer(
-      std::chrono::milliseconds(interval_ms + jitter_ms));
+  fd_to_ping_send_timer_map_[fd]->enableTimer(std::chrono::milliseconds(interval_ms + jitter_ms));
 
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             node_id, connectionKey, fd);
@@ -340,7 +339,6 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
 }
 
-
 void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
   // Clean the given node ID if there are no active sockets.
   if (accepted_reverse_connections_.find(node_id) != accepted_reverse_connections_.end() &&
@@ -468,8 +466,8 @@ void UpstreamSocketManager::sendPingForConnection(int fd) {
     ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping request. return_value: {}",
               node_id, fd, result.return_value_);
     if (result.return_value_ == 0) {
-      ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping rc {}, error - {}", node_id,
-                fd, result.return_value_, result.err_->getErrorDetails());
+      ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping rc {}, error - {}", node_id, fd,
+                result.return_value_, result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
         markSocketDead(fd);
