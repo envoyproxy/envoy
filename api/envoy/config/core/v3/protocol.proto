@@ -744,6 +744,10 @@ message Http2ProtocolOptions {
   // length on the wire, not the decoded length. If not specified, defaults to ``64`` KB
   // which is the ``nghttp2`` default.
   //
+  // This limit applies to headers received by the codec. When configured on the downstream
+  // HTTP Connection Manager, it limits individual request header fields. When configured on an
+  // upstream cluster, it limits individual response header fields.
+  //
   // Due to Huffman encoding, the decoded header size that passes a given wire limit depends
   // on the compression ratio of the content. For example, at the default ``64`` KB wire
   // limit, highly compressible header values can be approximately ``100`` KB when decoded.
@@ -755,7 +759,7 @@ message Http2ProtocolOptions {
   // applicable aggregate total header size limit. Since a single header field cannot be larger
   // than the total size allowed for all headers combined, this value is validated against
   // :ref:`max_request_headers_kb <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`
-  // when configured on the HTTP Connection Manager, and against
+  // when configured on the downstream HTTP Connection Manager, and against
   // :ref:`max_response_headers_kb <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>`
   // when configured on an upstream cluster.
   //

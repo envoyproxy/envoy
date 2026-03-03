@@ -71,7 +71,7 @@ diff --git a/lib/nghttp2_option.h b/lib/nghttp2_option.h
    NGHTTP2_OPT_NO_RFC9113_LEADING_AND_TRAILING_WS_VALIDATION = 1 << 14,
    NGHTTP2_OPT_STREAM_RESET_RATE_LIMIT = 1 << 15,
    NGHTTP2_OPT_MAX_CONTINUATIONS = 1 << 16,
-+  NGHTTP2_OPT_MAX_HD_NV_SIZE = 1 << 17,
++  NGHTTP2_OPT_MAX_HD_NV_SIZE = 1 << 29,
    NGHTTP2_OPT_DISABLE_HUFFMAN = 1 << 30,
  } nghttp2_option_flag;
  
