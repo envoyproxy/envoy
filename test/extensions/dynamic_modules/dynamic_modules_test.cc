@@ -306,8 +306,7 @@ TEST(CreateDynamicModulesFromBytes, TempFilePermissions) {
   EXPECT_TRUE(module.ok()) << module.status().message();
 
   const std::filesystem::path temp_file =
-      std::filesystem::temp_directory_path() /
-      fmt::format("envoy_dynmod_{}.so", expected_hash);
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynmod_{}.so", expected_hash);
   EXPECT_TRUE(std::filesystem::exists(temp_file));
 
   // Verify 0600 permissions (no group/other access).

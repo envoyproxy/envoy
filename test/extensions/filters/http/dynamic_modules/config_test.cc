@@ -224,7 +224,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeSuccess) {
   const std::string worker_name = "worker_0";
   NiceMock<Event::MockDispatcher> worker_dispatcher(worker_name);
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(worker_dispatcher));
-  EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(1);
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb_or_error.value()(filter_callback);
 }
 
@@ -395,9 +395,9 @@ TEST_F(DynamicModuleFilterConfigTest, ServerContextRemoteNoInitManager) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProtoWithServerContextTyped(
-                   proto_config, "stats", context_.server_factory_context_),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoWithServerContextTyped(
+                              proto_config, "stats", context_.server_factory_context_),
+                          EnvoyException, "not supported via the server context factory path");
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigPerRouteConfigFail) {
@@ -526,8 +526,8 @@ TEST_F(DynamicModuleFilterConfigTest, ModulePrecedenceOverName) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
-  // If name were used, this would fail because "nonexistent_module_should_be_ignored" doesn't exist.
-  // Since module takes precedence, it should succeed with the local file.
+  // If name were used, this would fail because "nonexistent_module_should_be_ignored" doesn't
+  // exist. Since module takes precedence, it should succeed with the local file.
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
 }

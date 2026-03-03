@@ -53,9 +53,9 @@ public:
 
 private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromAsyncDataSource(const FilterConfig& proto_config,
-                                         Server::Configuration::ServerFactoryContext& context,
-                                         Stats::Scope& scope, Init::Manager* init_manager);
+  createFilterFactoryFromRemoteSource(const FilterConfig& proto_config,
+                                      Server::Configuration::ServerFactoryContext& context,
+                                      Stats::Scope& scope, Init::Manager* init_manager);
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 
