@@ -110,7 +110,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   // Attempt to insert the entry into the store. If it already exists, remove
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
-  ValueWithTtl value_with_ttl(value, absolute_ttl);
+  ValueWithTtl value_with_ttl(std::move(value), std::move(absolute_ttl));
   if (!store_.emplace(key, value_with_ttl).second) {
     store_.erase(key);
     store_.emplace(key, value_with_ttl);
