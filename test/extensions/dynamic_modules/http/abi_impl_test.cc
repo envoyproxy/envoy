@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <memory>
 #include <set>
@@ -2945,6 +2946,237 @@ TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
   auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
   // Should not crash when decoder_callbacks_ is nullptr.
   envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
+}
+
+// ----------------------------- Config-Level HTTP Callout ABI Tests -----------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_MissingRequiredHeaders) {
+  const std::string cluster = "some_cluster";
+  uint64_t callout_id = 0;
+  // Call with no headers (nullptr, size 0) — ABI wrapper returns MissingRequiredHeaders before
+  // reaching the cluster lookup.
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster.data(), cluster.size()}, nullptr, 0,
+                {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_ClusterNotFound) {
+  const std::string cluster_name = "missing_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_Success) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::Callbacks* captured_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> mock_request(&thread_local_cluster_.async_client_);
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cbs,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
+            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/");
+            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
+            EXPECT_EQ(options.timeout.value(), std::chrono::milliseconds(1000));
+            // body is present: content-length must be set
+            EXPECT_EQ(message->body().length(), 4u);
+            EXPECT_NE(message->headers().ContentLength(), nullptr);
+            EXPECT_EQ(message->headers().ContentLength()->value().getStringView(), "4");
+            captured_callbacks = &cbs;
+            return &mock_request;
+          }));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  char body_data[] = "body";
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {body_data, strlen(body_data)}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(callout_id, 0u);
+  ASSERT_NE(captured_callbacks, nullptr);
+
+  // Clean up: call onFailure to break the circular reference between the pending
+  // HttpCalloutCallback and the filter config.
+  captured_callbacks->onFailure(mock_request, Http::AsyncClient::FailureReason::Reset);
+}
+
+// ----------------------------- Config-Level HTTP Stream ABI Tests ----------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest,
+       HttpFilterConfigStartHttpStream_MissingRequiredHeaders) {
+  const std::string cluster = "some_cluster";
+  uint64_t stream_id = 0;
+  // Call with no headers — ABI wrapper returns MissingRequiredHeaders before cluster lookup.
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster.data(), cluster.size()}, nullptr, 0,
+                {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStartHttpStream_ClusterNotFound) {
+  const std::string cluster_name = "missing_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStartHttpStream_Success) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::StreamCallbacks* captured_stream_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientStream> mock_stream;
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cbs,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_stream_callbacks = &cbs;
+        return &mock_stream;
+      }));
+  // No body, end_stream=true → sendHeaders(headers, true).
+  EXPECT_CALL(mock_stream, sendHeaders(_, true));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(stream_id, 0u);
+  ASSERT_NE(captured_stream_callbacks, nullptr);
+
+  // Clean up: call onComplete to remove the stream from http_stream_callouts_ and break
+  // the circular reference. The MockDispatcher will hold the deferred deletable.
+  captured_stream_callbacks->onComplete();
+}
+
+// ----------------------------- Config-Level Stream Control ABI Tests -------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigResetHttpStream_InvalidStream) {
+  // Resetting a non-existent stream ID should be a no-op and not crash.
+  envoy_dynamic_module_callback_http_filter_config_reset_http_stream(filter_config_.get(), 99999);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStreamSendData_InvalidStream) {
+  // Sending data on a non-existent stream ID should return false.
+  char data[] = "data";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+      filter_config_.get(), 99999, {data, strlen(data)}, false));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStreamSendTrailers_InvalidStream) {
+  // Sending trailers on a non-existent stream ID should return false.
+  char key[] = "x-custom";
+  char val[] = "value";
+  envoy_dynamic_module_type_module_http_header trailers[] = {{key, strlen(key), val, strlen(val)}};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+      filter_config_.get(), 99999, trailers, 1));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStream_SendDataAndTrailers) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::StreamCallbacks* captured_stream_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientStream> mock_stream;
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cbs,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_stream_callbacks = &cbs;
+        return &mock_stream;
+      }));
+  // end_stream=false: sendHeaders with end_stream=false (module will send body separately).
+  EXPECT_CALL(mock_stream, sendHeaders(_, false));
+
+  char method_key[] = ":method";
+  char method_val[] = "POST";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(stream_id, 0u);
+
+  // Send data on the active stream.
+  char data[] = "hello";
+  EXPECT_CALL(mock_stream, sendData(_, false));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+      filter_config_.get(), stream_id, {data, strlen(data)}, false));
+
+  // Send trailers to finish the stream.
+  char trailer_key[] = "x-end";
+  char trailer_val[] = "true";
+  envoy_dynamic_module_type_module_http_header trailers[] = {
+      {trailer_key, strlen(trailer_key), trailer_val, strlen(trailer_val)}};
+  EXPECT_CALL(mock_stream, sendTrailers(_));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+      filter_config_.get(), stream_id, trailers, 1));
+
+  // Clean up: call onComplete to remove the stream and break the circular reference.
+  ASSERT_NE(captured_stream_callbacks, nullptr);
+  captured_stream_callbacks->onComplete();
 }
 
 TEST(ABIImpl, ReceivedBufferedRequestBody) {

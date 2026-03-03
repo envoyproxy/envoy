@@ -634,6 +634,64 @@ public:
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
   }
 
+  std::pair<HttpCalloutInitResult, uint64_t>
+  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
+              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) override {
+    uint64_t callout_id_out = 0;
+    auto result = envoy_dynamic_module_callback_http_filter_config_http_callout(
+        host_config_ptr_, &callout_id_out,
+        envoy_dynamic_module_type_module_buffer{cluster.data(), cluster.size()},
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+        timeout_ms);
+
+    if (result == envoy_dynamic_module_type_http_callout_init_result_Success) {
+      callout_callbacks_[callout_id_out] = &cb;
+    }
+    return {static_cast<HttpCalloutInitResult>(result), callout_id_out};
+  }
+
+  std::pair<HttpCalloutInitResult, uint64_t>
+  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
+                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+                  HttpStreamCallback& cb) override {
+    uint64_t stream_id_out = 0;
+    auto result = envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+        host_config_ptr_, &stream_id_out,
+        envoy_dynamic_module_type_module_buffer{cluster.data(), cluster.size()},
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+        end_of_stream, timeout_ms);
+
+    if (result == envoy_dynamic_module_type_http_callout_init_result_Success) {
+      stream_callbacks_[stream_id_out] = &cb;
+    }
+    return {static_cast<HttpCalloutInitResult>(result), stream_id_out};
+  }
+
+  bool sendHttpStreamData(uint64_t stream_id, absl::string_view body, bool end_of_stream) override {
+    return envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+        host_config_ptr_, stream_id,
+        envoy_dynamic_module_type_module_buffer{body.data(), body.size()}, end_of_stream);
+  }
+
+  bool sendHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {
+    return envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+        host_config_ptr_, stream_id,
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(trailers.data())),
+        trailers.size());
+  }
+
+  void resetHttpStream(uint64_t stream_id) override {
+    envoy_dynamic_module_callback_http_filter_config_reset_http_stream(host_config_ptr_, stream_id);
+  }
+
+  absl::flat_hash_map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
+  absl::flat_hash_map<uint64_t, HttpStreamCallback*> stream_callbacks_;
+
 private:
   void* host_config_ptr_;
 };
@@ -1012,6 +1070,141 @@ envoy_dynamic_module_on_http_filter_local_reply(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
     envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent) {
   return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_callout_done(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
+  auto* typed_body_chunks = reinterpret_cast<BufferView*>(body_chunks);
+
+  auto it = config_handle->callout_callbacks_.find(callout_id);
+  if (it != config_handle->callout_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->callout_callbacks_.erase(it);
+    cb->onHttpCalloutDone(static_cast<HttpCalloutResult>(result), {typed_headers, headers_size},
+                          {typed_body_chunks, body_chunks_size});
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
+    it->second->onHttpStreamHeaders(stream_id, {typed_headers, headers_size}, end_stream);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    const envoy_dynamic_module_type_envoy_buffer* chunks, size_t chunks_size, bool end_stream) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_chunks =
+        reinterpret_cast<BufferView*>(const_cast<envoy_dynamic_module_type_envoy_buffer*>(chunks));
+    it->second->onHttpStreamData(stream_id, {typed_chunks, chunks_size}, end_stream);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_trailers = reinterpret_cast<HeaderView*>(trailers);
+    it->second->onHttpStreamTrailers(stream_id, {typed_trailers, trailers_size});
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->stream_callbacks_.erase(it);
+    cb->onHttpStreamComplete(stream_id);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_http_stream_reset_reason reason) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->stream_callbacks_.erase(it);
+    cb->onHttpStreamReset(stream_id, static_cast<HttpStreamResetReason>(reason));
+  }
 }
 }
 

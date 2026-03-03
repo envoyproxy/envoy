@@ -813,6 +813,983 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_resetting) {
   callbacks_captured->onFailure(req, Http::AsyncClient::FailureReason::Reset);
 }
 
+// Config-context callout tests. The module initiates an HTTP callout during
+// on_http_filter_config_new, and subsequent filter requests check the result.
+
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpCallout_success) {
+  const std::string filter_name = "http_config_callout";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  // The config-level callout target cluster.
+  const std::string filter_config = "success_cluster";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  // Capture the async client callback that will be triggered during config creation.
+  Http::AsyncClient::Callbacks* config_callbacks_captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> config_request(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions& option) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/config-init");
+            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
+            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
+            EXPECT_EQ(option.timeout.value(), std::chrono::milliseconds(1000));
+            config_callbacks_captured = &callbacks;
+            return &config_request;
+          }));
+
+  // Config creation triggers the callout.
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_TRUE(config_callbacks_captured);
+
+  // Simulate the config callout response. This calls on_http_filter_config_http_callout_done.
+  Http::ResponseHeaderMapPtr resp_headers(
+      new Http::TestResponseHeaderMapImpl({{"x-callout-response", "ok"}}));
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add("config_callout_body");
+  NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+  config_callbacks_captured->onSuccess(req, std::move(response));
+
+  // Now create a filter. The filter should see callout_done=true and respond with 200.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::OK, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+}
+
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpCallout_failing) {
+  const std::string filter_name = "http_config_callout";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "failing_cluster";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  Http::AsyncClient::Callbacks* config_callbacks_captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> config_request(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            config_callbacks_captured = &callbacks;
+            return &config_request;
+          }));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_TRUE(config_callbacks_captured);
+
+  // Simulate a callout failure.
+  NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+  config_callbacks_captured->onFailure(req, Http::AsyncClient::FailureReason::Reset);
+
+  // The filter should see callout_done=false and respond with 503.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+}
+
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpStream_success) {
+  const std::string filter_name = "http_config_stream";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "stream_cluster";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  // Capture the stream callbacks triggered during config creation.
+  Http::AsyncClient::StreamCallbacks* stream_callbacks_captured = nullptr;
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        stream_callbacks_captured = &callbacks;
+        return &stream;
+      }));
+  // expect the initial headers to be sent on the stream
+  EXPECT_CALL(stream, sendHeaders(_, true));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_TRUE(stream_callbacks_captured);
+
+  // Deliver response headers then complete the stream.
+  Http::ResponseHeaderMapPtr resp_headers(
+      new Http::TestResponseHeaderMapImpl({{"x-stream-response", "ok"}}));
+  stream_callbacks_captured->onHeaders(std::move(resp_headers), false);
+  stream_callbacks_captured->onComplete();
+
+  // Filter should see stream_done=true and respond with 200.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::OK, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+}
+
+// Helper: build a config backed by the "no_op" module (no config-level callbacks registered).
+static absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
+makeNoOpConfig(NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+               Stats::Scope& scope) {
+  auto mod = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  if (!mod.ok()) {
+    return mod.status();
+  }
+  return newDynamicModuleHttpFilterConfig("filter", "", DefaultMetricsNamespace, false,
+                                          std::move(mod.value()), scope, context);
+}
+
+// Test the case where sendHttpCallout fails because the cluster is not found.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, SendHttpCalloutClusterNotFound) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_)).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->sendHttpCallout(&id, "unknown_cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+// Test the case where sendHttpCallout fails because the async client fails to create a request.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, SendHttpCalloutCannotCreateRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  // send_ returns nullptr to simulate CannotCreateRequest.
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            cb.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Test canceling a pending callout.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, CancelPendingCallout) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            return &req;
+          }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Cancel the callout when destroying the config. This should call cancel() on the async client
+  // request.
+  EXPECT_CALL(req, cancel());
+  config.reset();
+}
+
+// Test that if the callout succeeds but no callback is registered (no_op module), onSuccess and
+// onFailure early return without crashing.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, HttpCalloutCallbackOnSuccessNoCallback) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::Callbacks* captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured = &cb;
+            return &req;
+          }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured, nullptr);
+
+  // onSuccess fires. on_http_filter_config_http_callout_done_ is null (no_op module), so this
+  // should hit the early-return guard and not crash.
+  NiceMock<Http::MockAsyncClientRequest> dummy_req(&cluster->async_client_);
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({}));
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  captured->onSuccess(dummy_req, std::move(response));
+}
+
+// Test that if the callout fails with Reset reason but no callback is registered (no_op module),
+// onFailure early returns without crashing.
+TEST(DynamicModuleHttpFilterConfigCalloutTest, HttpCalloutCallbackOnFailureResetNoCallback) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::Callbacks* captured = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured = &cb;
+            return &req;
+          }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->sendHttpCallout(&id, "cluster", std::move(msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured, nullptr);
+
+  // onFailure fires with Reset. on_http_filter_config_http_callout_done_ is null → early return.
+  NiceMock<Http::MockAsyncClientRequest> dummy_req(&cluster->async_client_);
+  captured->onFailure(dummy_req, Http::AsyncClient::FailureReason::Reset);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamClusterNotFound) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_)).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->startHttpStream(&sid, "unknown_cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamMissingRequiredHeaders) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  // Message missing :path header.
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{{":method", "GET"},
+                                                                 {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamCannotCreateRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([](Http::AsyncClient::StreamCallbacks&,
+                          const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return nullptr;
+      }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Test startHttpStream with a request body: verifies sendHeaders(false) then sendData is called.
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamWithBody) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &cb;
+        return &stream;
+      }));
+  EXPECT_CALL(stream, sendHeaders(_, false));
+  EXPECT_CALL(stream, sendData(_, true));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "POST"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  msg->body().add("request body");
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(sid, 0u);
+  captured_cb->onComplete();
+}
+
+// Test inline reset during sendHeaders.
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnHeaders) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+    captured_cb->onReset();
+  }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Inline reset during sending initial data chunk.
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnData) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  EXPECT_CALL(stream, sendHeaders(_, false));
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    captured_cb->onReset();
+  }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "POST"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  msg->body().add("payload");
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Test inline complete during initialization.
+TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineComplete) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  EXPECT_CALL(stream, sendHeaders(_, false));
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    captured_cb->onHeaders(Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl({})},
+                           false);
+    Buffer::OwnedImpl body("response body");
+    captured_cb->onData(body, false);
+    captured_cb->onTrailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl({})});
+    captured_cb->onComplete();
+  }));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  msg->body().add("payload");
+  EXPECT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamNonExistent) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_)).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  // Resetting a non-existent stream should be a no-op and not crash.
+  config_or.value()->resetHttpStream(99999);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamExisting) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  EXPECT_CALL(stream, reset()).WillOnce(Invoke([&]() {
+    // Simulate the stream being reset, which should trigger the stream callbacks and clean up
+    // stream state in the config.
+    captured_cb->onReset();
+  }));
+  config->resetHttpStream(sid);
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, CancelPendingStreamCallout) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &callbacks;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Cancel the stream callout when destroying the config. This should call reset() on the async
+  // client stream.
+  EXPECT_CALL(stream, reset());
+  config.reset();
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamDataNonExistent) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_)).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  Buffer::OwnedImpl data("test");
+  EXPECT_FALSE(config_or.value()->sendStreamData(99999, data, false));
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamDataValid) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  EXPECT_CALL(stream, sendData(_, false));
+  Buffer::OwnedImpl data("chunk");
+  EXPECT_TRUE(config->sendStreamData(sid, data, false));
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamTrailersNonExistent) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_)).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto trailers = Http::RequestTrailerMapImpl::create();
+  EXPECT_FALSE(config_or.value()->sendStreamTrailers(99999, std::move(trailers)));
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamTrailersValid) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  EXPECT_CALL(stream, sendTrailers(_));
+  auto trailers = Http::RequestTrailerMapImpl::create();
+  EXPECT_TRUE(config->sendStreamTrailers(sid, std::move(trailers)));
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnHeadersNoCallback) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &cb;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured_cb, nullptr);
+
+  // onHeaders with no registered callback: should not crash.
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({}));
+  captured_cb->onHeaders(std::move(resp_headers), true);
+  captured_cb->onComplete();
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnDataNoCallbackAndEmptyData) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &cb;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured_cb, nullptr);
+
+  Buffer::OwnedImpl empty_data;
+  captured_cb->onData(empty_data, false);
+
+  // Non-empty data with no callback: hits the null-callback guard.
+  Buffer::OwnedImpl data("body");
+  captured_cb->onData(data, true);
+
+  captured_cb->onComplete();
+}
+
+TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnTrailersNoCallback) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_cb = &cb;
+        return &stream;
+      }));
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+
+  auto config_or = makeNoOpConfig(context, *stats_scope);
+  ASSERT_TRUE(config_or.ok());
+  auto config = config_or.value();
+
+  uint64_t sid = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto msg = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(captured_cb, nullptr);
+
+  // onTrailers with no registered callback: should not crash.
+  Http::ResponseTrailerMapPtr trailers(new Http::TestResponseTrailerMapImpl({{"cat", "dog"}}));
+  captured_cb->onTrailers(std::move(trailers));
+  captured_cb->onComplete();
+}
+
 // This test verifies that handling of per-route config is correct in terms of lifetimes.
 TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
   const std::string filter_name = "per_route_config";
@@ -1330,9 +2307,7 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
   EXPECT_NE(captured_callbacks, nullptr);
 
   // Invoke onReset
-  if (captured_callbacks) {
-    captured_callbacks->onReset();
-  }
+  captured_callbacks->onReset();
 }
 
 TEST(DynamicModulesTest, HttpFilterResetHttpStream) {

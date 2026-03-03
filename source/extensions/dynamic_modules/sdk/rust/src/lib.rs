@@ -315,6 +315,97 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   /// * `event_id` is the ID of the event that was scheduled with
   ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
   fn on_scheduled(&self, _event_id: u64) {}
+
+  /// This is called when an HTTP callout initiated via
+  /// [`EnvoyHttpFilterConfig::send_http_callout`] completes.
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `callout_id` is the opaque handle returned from
+  ///   [`EnvoyHttpFilterConfig::send_http_callout`].
+  /// * `result` indicates the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers.
+  /// * `response_body` is the response body chunks.
+  fn on_http_callout_done(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
+
+  /// This is called when response headers are received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_headers` is a list of key-value pairs of the response headers.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_headers(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response data is received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_data` is the response body data chunks.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_data(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_data: &[EnvoyBuffer],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response trailers are received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_trailers` is a list of key-value pairs of the response trailers.
+  fn on_http_stream_trailers(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
+  ) {
+  }
+
+  /// This is called when an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`]
+  /// completes successfully.
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  fn on_http_stream_complete(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+  ) {
+  }
+
+  /// This is called when an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`]
+  /// is reset (failed or cancelled).
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  /// * `reset_reason` indicates why the stream was reset.
+  fn on_http_stream_reset(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+  ) {
+  }
 }
 
 /// The trait that corresponds to an Envoy Http filter for each stream
@@ -579,6 +670,60 @@ pub trait EnvoyHttpFilterConfig {
   ///
   /// This can be used to schedule an event to the main thread where the filter config is running.
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler>;
+
+  /// Perform an HTTP callout from the config context. The result will be delivered to
+  /// [`HttpFilterConfig::on_http_callout_done`].
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+
+  /// Start an HTTP stream from the config context. Events will be delivered to
+  /// [`HttpFilterConfig::on_http_stream_headers`], etc.
+  fn start_http_stream<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    end_stream: bool,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+
+  /// Send data on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn send_http_stream_data(
+    &mut self,
+    stream_handle: u64,
+    data: &[u8],
+    end_stream: bool,
+  ) -> bool;
+
+  /// Send trailers on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    stream_handle: u64,
+    trailers: Vec<(&'a str, &'a [u8])>,
+  ) -> bool;
+
+  /// Reset an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn reset_http_stream(&mut self, stream_handle: u64);
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -718,6 +863,110 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       Box::new(EnvoyHttpFilterConfigSchedulerImpl {
         raw_ptr: scheduler_ptr,
       })
+    }
+  }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_http_callout(
+        self.raw_ptr,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
+
+  fn start_http_stream<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    end_stream: bool,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    let mut stream_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+        self.raw_ptr,
+        &mut stream_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        end_stream,
+        timeout_milliseconds,
+      )
+    };
+
+    (result, stream_id)
+  }
+
+  unsafe fn send_http_stream_data(
+    &mut self,
+    stream_handle: u64,
+    data: &[u8],
+    end_stream: bool,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+        self.raw_ptr,
+        stream_handle,
+        bytes_to_module_buffer(data),
+        end_stream,
+      )
+    }
+  }
+
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    stream_handle: u64,
+    trailers: Vec<(&'a str, &'a [u8])>,
+  ) -> bool {
+    let trailers_ptr =
+      trailers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+        self.raw_ptr,
+        stream_handle,
+        trailers_ptr as *const _ as *mut _,
+        trailers.len(),
+      )
+    }
+  }
+
+  unsafe fn reset_http_stream(&mut self, stream_handle: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
+        self.raw_ptr,
+        stream_handle,
+      );
     }
   }
 }
@@ -4129,6 +4378,156 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_reset(
   let filter = &mut **filter;
   filter.on_http_stream_reset(
     &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+    stream_handle,
+    reset_reason,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_callout_done(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_chunks_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
+  } else {
+    None
+  };
+  config.on_http_callout_done(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
+    callout_id,
+    result,
+    headers,
+    body,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  stream_handle: u64,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  end_stream: bool,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  let headers = if headers_size > 0 {
+    unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    }
+  } else {
+    &[]
+  };
+  config.on_http_stream_headers(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
+    stream_handle,
+    headers,
+    end_stream,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_data(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  stream_handle: u64,
+  data: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  data_count: usize,
+  end_stream: bool,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  let data = if data_count > 0 {
+    unsafe { std::slice::from_raw_parts(data as *const EnvoyBuffer, data_count) }
+  } else {
+    &[]
+  };
+  config.on_http_stream_data(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
+    stream_handle,
+    data,
+    end_stream,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  stream_handle: u64,
+  trailers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  trailers_size: usize,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  let trailers = if trailers_size > 0 {
+    unsafe {
+      std::slice::from_raw_parts(trailers as *const (EnvoyBuffer, EnvoyBuffer), trailers_size)
+    }
+  } else {
+    &[]
+  };
+  config.on_http_stream_trailers(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
+    stream_handle,
+    trailers,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  stream_handle: u64,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  config.on_http_stream_complete(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
+    stream_handle,
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+  envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  stream_handle: u64,
+  reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  config.on_http_stream_reset(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_config_ptr,
+    },
     stream_handle,
     reset_reason,
   );

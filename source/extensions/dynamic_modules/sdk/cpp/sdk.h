@@ -775,6 +775,61 @@ public:
    * @param message The message to log.
    */
   virtual void log(LogLevel level, absl::string_view message) = 0;
+
+  /**
+   * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
+   * HttpFilterConfigFactory::onHttpCalloutDone.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The request body.
+   * @param timeout_ms The timeout in milliseconds.
+   * @param cb The callback to invoke when the callout completes.
+   * @return HttpCalloutInitResult and callout ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
+              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
+
+  /**
+   * Starts a streamable HTTP callout to a cluster. Stream events will be delivered via
+   * HttpFilterConfigFactory::onHttpStream* methods.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The initial request body (may be empty).
+   * @param end_of_stream If true, the stream ends after sending the initial headers/body.
+   * @param timeout_ms The timeout in milliseconds (0 for no timeout).
+   * @param cb The callback to invoke for stream events.
+   * @return HttpCalloutInitResult and stream ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
+                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+                  HttpStreamCallback& cb) = 0;
+
+  /**
+   * Sends data on an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param body The data to send.
+   * @param end_of_stream If true, this is the last data chunk.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamData(uint64_t stream_id, absl::string_view body,
+                                  bool end_of_stream) = 0;
+
+  /**
+   * Sends trailers on an active stream, implicitly ending the stream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param trailers The trailers to send.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamTrailers(uint64_t stream_id,
+                                      absl::Span<const HeaderView> trailers) = 0;
+
+  /**
+   * Resets an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   */
+  virtual void resetHttpStream(uint64_t stream_id) = 0;
 };
 
 /**

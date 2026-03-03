@@ -1159,6 +1159,21 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) DefineHistogram(name any, tagK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DefineHistogram), varargs...)
 }
 
+// HttpCallout mocks base method.
+func (m *MockHttpFilterConfigHandle) HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64, cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HttpCallout", cluster, headers, body, timeoutMs, cb)
+	ret0, _ := ret[0].(shared.HttpCalloutInitResult)
+	ret1, _ := ret[1].(uint64)
+	return ret0, ret1
+}
+
+// HttpCallout indicates an expected call of HttpCallout.
+func (mr *MockHttpFilterConfigHandleMockRecorder) HttpCallout(cluster, headers, body, timeoutMs, cb any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HttpCallout", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).HttpCallout), cluster, headers, body, timeoutMs, cb)
+}
+
 // Log mocks base method.
 func (m *MockHttpFilterConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	m.ctrl.T.Helper()
@@ -1174,4 +1189,59 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) Log(level, format any, args ..
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{level, format}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).Log), varargs...)
+}
+
+// ResetHttpStream mocks base method.
+func (m *MockHttpFilterConfigHandle) ResetHttpStream(streamID uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ResetHttpStream", streamID)
+}
+
+// ResetHttpStream indicates an expected call of ResetHttpStream.
+func (mr *MockHttpFilterConfigHandleMockRecorder) ResetHttpStream(streamID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).ResetHttpStream), streamID)
+}
+
+// SendHttpStreamData mocks base method.
+func (m *MockHttpFilterConfigHandle) SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendHttpStreamData", streamID, body, endOfStream)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SendHttpStreamData indicates an expected call of SendHttpStreamData.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SendHttpStreamData(streamID, body, endOfStream any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHttpStreamData", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SendHttpStreamData), streamID, body, endOfStream)
+}
+
+// SendHttpStreamTrailers mocks base method.
+func (m *MockHttpFilterConfigHandle) SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendHttpStreamTrailers", streamID, trailers)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SendHttpStreamTrailers indicates an expected call of SendHttpStreamTrailers.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SendHttpStreamTrailers(streamID, trailers any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHttpStreamTrailers", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SendHttpStreamTrailers), streamID, trailers)
+}
+
+// StartHttpStream mocks base method.
+func (m *MockHttpFilterConfigHandle) StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool, timeoutMs uint64, cb shared.HttpStreamCallback) (shared.HttpCalloutInitResult, uint64) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartHttpStream", cluster, headers, body, endOfStream, timeoutMs, cb)
+	ret0, _ := ret[0].(shared.HttpCalloutInitResult)
+	ret1, _ := ret[1].(uint64)
+	return ret0, ret1
+}
+
+// StartHttpStream indicates an expected call of StartHttpStream.
+func (mr *MockHttpFilterConfigHandleMockRecorder) StartHttpStream(cluster, headers, body, endOfStream, timeoutMs, cb any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).StartHttpStream), cluster, headers, body, endOfStream, timeoutMs, cb)
 }

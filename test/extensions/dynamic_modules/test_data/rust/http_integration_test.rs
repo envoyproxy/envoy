@@ -98,6 +98,43 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 
       Some(Box::new(ConfigSchedulerConfig { shared_status }))
     },
+    "http_config_callout" => {
+      let cluster_name = String::from_utf8(config.to_owned()).unwrap();
+      let callout_done = Arc::new(AtomicBool::new(false));
+      let (result, _callout_id) = envoy_filter_config.send_http_callout(
+        &cluster_name,
+        vec![
+          (":path", b"/config-init"),
+          (":method", b"GET"),
+          ("host", b"example.com"),
+        ],
+        None,
+        1000,
+      );
+      if result != abi::envoy_dynamic_module_type_http_callout_init_result::Success {
+        return None;
+      }
+      Some(Box::new(ConfigCalloutConfig { callout_done }))
+    },
+    "http_config_stream" => {
+      let cluster_name = String::from_utf8(config.to_owned()).unwrap();
+      let stream_done = Arc::new(AtomicBool::new(false));
+      let (result, _stream_id) = envoy_filter_config.start_http_stream(
+        &cluster_name,
+        vec![
+          (":path", b"/config-stream"),
+          (":method", b"GET"),
+          ("host", b"example.com"),
+        ],
+        None,
+        true, // end_stream immediately
+        1000,
+      );
+      if result != abi::envoy_dynamic_module_type_http_callout_init_result::Success {
+        return None;
+      }
+      Some(Box::new(ConfigStreamConfig { stream_done }))
+    },
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -145,6 +182,108 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigSchedulerFilter {
       envoy_filter.set_request_header("x-test-status", b"false");
     }
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
+
+// =============================================================================
+// ConfigCallout: Config-level one-shot HTTP callout initiated during config creation.
+// The filter checks whether the config callout completed successfully.
+// =============================================================================
+
+struct ConfigCalloutConfig {
+  callout_done: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigCalloutConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ConfigCalloutFilter {
+      callout_done: self.callout_done.clone(),
+    })
+  }
+
+  fn on_http_callout_done(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+    if result == abi::envoy_dynamic_module_type_http_callout_result::Success {
+      self.callout_done.store(true, Ordering::SeqCst);
+    }
+  }
+}
+
+struct ConfigCalloutFilter {
+  callout_done: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigCalloutFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if self.callout_done.load(Ordering::SeqCst) {
+      envoy_filter.send_response(200, vec![("x-config-callout", b"success")], None, None);
+    } else {
+      envoy_filter.send_response(503, vec![("x-config-callout", b"pending")], None, None);
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+// =============================================================================
+// ConfigStream: Config-level HTTP stream initiated during config creation.
+// The filter checks whether the config stream completed successfully.
+// =============================================================================
+
+struct ConfigStreamConfig {
+  stream_done: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigStreamConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ConfigStreamFilter {
+      stream_done: self.stream_done.clone(),
+    })
+  }
+
+  fn on_http_stream_complete(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+  ) {
+    self.stream_done.store(true, Ordering::SeqCst);
+  }
+
+  fn on_http_stream_reset(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+  ) {
+    // Stream reset; leave stream_done as false.
+  }
+}
+
+struct ConfigStreamFilter {
+  stream_done: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if self.stream_done.load(Ordering::SeqCst) {
+      envoy_filter.send_response(200, vec![("x-config-stream", b"success")], None, None);
+    } else {
+      envoy_filter.send_response(503, vec![("x-config-stream", b"pending")], None, None);
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 }
 
