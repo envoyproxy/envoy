@@ -460,7 +460,7 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
-    Added support for loading dynamic module binaries from local files, inline bytes, or remote
+    Added support for loading dynamic module binaries from local file paths or remote
     URLs via the new :ref:`module
     <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` field in
     ``DynamicModuleConfig``. For remote sources, SHA256 verification is required. The server

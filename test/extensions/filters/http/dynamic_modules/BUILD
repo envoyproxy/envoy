@@ -17,7 +17,6 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",

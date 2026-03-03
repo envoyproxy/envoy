@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
@@ -109,36 +108,24 @@ TEST_F(DynamicModuleFilterConfigTest, LocalFileLoading) {
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
 }
 
-TEST_F(DynamicModuleFilterConfigTest, InlineBytesLoading) {
-  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
-
-  std::ifstream file(module_path, std::ios::binary);
-  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
-  std::string module_bytes((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-  ASSERT_FALSE(module_bytes.empty());
-
-  const std::string yaml = absl::StrCat(R"EOF(
+TEST_F(DynamicModuleFilterConfigTest, InlineBytesRejected) {
+  const std::string yaml = R"EOF(
   dynamic_module_config:
     module:
       local:
-        inline_bytes: ")EOF",
-                                        Base64::encode(module_bytes.data(), module_bytes.size()),
-                                        R"EOF("
+        inline_bytes: "AAAA"
     do_not_close: true
   filter_name: "test_filter"
-  )EOF");
+  )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
-
-  EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(),
+              testing::HasSubstr("Only local.filename is supported"));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, NoModuleOrName) {

@@ -131,8 +131,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   return createFilterFactoryCallback(filter_config.value());
 }
 
-// Handles the AsyncDataSource-based module loading path (local files, inline bytes, and remote
-// HTTP). For remote sources, the server blocks during initialization (warming mode) until the
+// Handles the AsyncDataSource-based module loading path (local files and remote HTTP).
+// For remote sources, the server blocks during initialization (warming mode) until the
 // fetch completes (or fails).
 absl::StatusOr<Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
@@ -148,6 +148,14 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
           : module_config.metrics_namespace();
 
   if (async_source.has_local()) {
+    // Only local.filename is supported. Inline bytes/strings are not a good practice
+    // for binary module data.
+    if (!async_source.local().has_filename()) {
+      return absl::InvalidArgumentError(
+          "Only local.filename is supported for module sources; "
+          "inline_bytes and inline_string are not supported");
+    }
+
     auto data_or_error = Config::DataSource::read(async_source.local(), true, context.api());
     if (!data_or_error.ok()) {
       return absl::InvalidArgumentError("Failed to read module data: " +
