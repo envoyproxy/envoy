@@ -663,6 +663,52 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
+TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
+  const std::string body_sent(10, 'a');
+  proto_config_.set_allow_content_length_header(true);
+  initializeConfigDuplexStreamed(false);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+  headers.setContentLength(body_sent.size());
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc server receives the body.
+  serverReceiveBodyDuplexStreamed(body_sent, processor_stream_);
+
+  // The ext_proc server sends back the header response with updated content-length.
+  processor_stream_->startGrpcStream();
+  ProcessingResponse response_header;
+  auto* header_resp = response_header.mutable_request_headers();
+  auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* cl_header = header_mutation->add_set_headers();
+  cl_header->mutable_header()->set_key("content-length");
+  cl_header->mutable_header()->set_raw_value("100");
+  processor_stream_->sendGrpcMessage(response_header);
+
+  // The ext_proc server sends back the body response with 100 'a's.
+  const std::string new_body(100, 'a');
+  serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true,
+                                   /*response*/ false, new_body);
+
+  handleUpstreamRequest();
+
+  // Verify that the content length header is updated to 100.
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("content-length", "100"));
+  EXPECT_EQ(upstream_request_->body().toString(), new_body);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

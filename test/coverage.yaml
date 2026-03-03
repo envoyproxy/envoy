@@ -48,6 +48,7 @@ directories:
   source/extensions/filters/http/grpc_json_transcoder: 94.0  # TODO(#28232)
   source/extensions/filters/http/ip_tagging: 95.9
   source/extensions/filters/http/kill_request: 91.7  # Death tests don't report LCOV
+  source/extensions/filters/http/mcp_json_rest_bridge: 80  # TODO(guoyilin42): adjust up. Overriden to check-in boilerplate.
   source/extensions/filters/http/mcp_router: 80  # TODO(yanavlasov): adjust up. Overriden to just scheck-in boilerplate.
   source/extensions/filters/http/oauth2: 97.6
   source/extensions/filters/listener: 96.5

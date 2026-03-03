@@ -64,8 +64,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);
-    filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
+
+    // The addStreamFilter() will call the setDecoderFilterCallbacks first then
+    // setEncoderFilterCallbacks.
+    // We can initialize the in-module filter after we have both callbacks to ensure the in module
+    // filter can access all the necessary information during creation.
+    filter->initializeInModuleFilter();
   };
 }
 

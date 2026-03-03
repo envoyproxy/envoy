@@ -5956,6 +5956,56 @@ TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
   EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
 }
 
+TEST_F(HttpFilterTest, KeepContentLength) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "STREAMED"
+  allow_content_length_header: true
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Test content-length header is preserved in request in streamed mode.
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "100");
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, KeepContentLengthFullDuplex) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+  allow_content_length_header: true
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Test content-length header is preserved in request in full duplex streamed mode.
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "100");
+
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

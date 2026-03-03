@@ -283,7 +283,7 @@ TEST_F(CodecClientTest, IdleTimeoutWhenConnectedDefault) {
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
   // Trigger idle timeout - it should close the connection and increment stats.
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
   client_->triggerIdleTimeout();
 
   // Verify idle timeout stat was incremented.
@@ -300,7 +300,7 @@ TEST_F(CodecClientTest, IdleTimeoutWhenConnectedOldBehavior) {
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
   // Trigger idle timeout - it should close the connection and increment stats.
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
   client_->triggerIdleTimeout();
 
   // Verify idle timeout stat was incremented.
@@ -367,7 +367,7 @@ TEST_F(CodecClientTest, IdleTimerEnabledWhenNotConnectedOldBehavior) {
 TEST_F(CodecClientTest, ProtocolError) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -379,7 +379,7 @@ TEST_F(CodecClientTest, 408Response) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Return(prematureResponseError("", Code::RequestTimeout)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -390,7 +390,7 @@ TEST_F(CodecClientTest, 408Response) {
 TEST_F(CodecClientTest, PrematureResponse) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(prematureResponseError("", Code::OK)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -572,7 +572,7 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
       .WillOnce(Return(HeaderValidator::ValidationResult{
           HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // By default H/2 and H/3 connections are disconnected on protocol errors
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(_, _));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   // Connection closure will cause stream to be reset
   inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,

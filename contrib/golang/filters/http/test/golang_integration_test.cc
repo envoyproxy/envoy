@@ -1,8 +1,11 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/tls/context_manager_impl.h"
+
 #include "test/config/v2_link_hacks.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -941,6 +944,34 @@ typed_config:
   const std::string ADDDATA{"add_data"};
   const std::string BUFFERINJECTDATA{"bufferinjectdata"};
   const std::string SECRETS{"secrets"};
+  const std::string SSL{"ssl"};
+
+  // Setup SSL configuration for tests that need client certificates
+  void setupSslWithClientCert() {
+    config_helper_.addSslConfig(
+        ConfigHelper::ServerSslOptions().setRsaCert(true).setExpectClientEcdsaCert(false));
+  }
+
+  // Create SSL client connection with certificates
+  Network::ClientConnectionPtr makeSslClientConnection() {
+    // Create SSL context manager on first use
+    if (!ssl_context_manager_) {
+      ssl_context_manager_ =
+          std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+              server_factory_context_);
+    }
+
+    Network::Address::InstanceConstSharedPtr address =
+        Ssl::getSslAddress(version_, lookupPort("http"));
+    auto client_transport_socket_factory_ptr = Ssl::createClientSslTransportSocketFactory(
+        Ssl::ClientSslTransportOptions(), *ssl_context_manager_, *api_);
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
+  }
+
+protected:
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1006,6 +1037,139 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   // check body for passthrough
   auto body = absl::StrFormat("%s%s", good, bye);
   EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+// Test SSL filter with non-SSL connection
+// Verifies that the filter correctly detects no SSL and sets appropriate headers
+TEST_P(GolangIntegrationTest, SslConnectionNonSsl) {
+  initializeConfig(SSL, genSoPath(), SSL);
+  initialize();
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  // Verify the filter detected no SSL and set the appropriate header
+  auto ssl_tested = getHeader(upstream_request_->headers(), "x-ssl-tested");
+  ASSERT_FALSE(ssl_tested.empty());
+  EXPECT_EQ("no-ssl", ssl_tested);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test SSL filter with actual SSL connection and client certificates
+// Verifies all 20+ SSL API methods work correctly
+TEST_P(GolangIntegrationTest, SslConnectionWithCertificate) {
+  initializeConfig(SSL, genSoPath(), SSL);
+  setupSslWithClientCert();
+  initialize();
+  registerTestServerPorts({"https"});
+
+  codec_client_ = makeHttpConnection(makeSslClientConnection());
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "https"}, {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  // Verify SSL was detected
+  auto ssl_tested = getHeader(upstream_request_->headers(), "x-ssl-tested");
+  EXPECT_EQ("yes", ssl_tested);
+
+  // Verify certificate presentation and validation
+  auto cert_presented = getHeader(upstream_request_->headers(), "x-cert-presented");
+  EXPECT_EQ("true", cert_presented);
+
+  auto cert_validated = getHeader(upstream_request_->headers(), "x-cert-validated");
+  EXPECT_EQ("true", cert_validated);
+
+  // Verify certificate string fields are present and non-empty
+  auto cert_digest = getHeader(upstream_request_->headers(), "x-cert-digest");
+  EXPECT_FALSE(cert_digest.empty());
+
+  auto cert_subject = getHeader(upstream_request_->headers(), "x-cert-subject");
+  EXPECT_FALSE(cert_subject.empty());
+
+  auto cert_issuer = getHeader(upstream_request_->headers(), "x-cert-issuer");
+  EXPECT_FALSE(cert_issuer.empty());
+
+  auto cert_serial = getHeader(upstream_request_->headers(), "x-cert-serial");
+  EXPECT_FALSE(cert_serial.empty());
+
+  auto cert_subject_local = getHeader(upstream_request_->headers(), "x-cert-subject-local");
+  EXPECT_FALSE(cert_subject_local.empty());
+
+  // Verify PEM encoding fields
+  auto cert_pem_length = getHeader(upstream_request_->headers(), "x-cert-pem-length");
+  if (!cert_pem_length.empty()) {
+    EXPECT_NE("0", cert_pem_length);
+  }
+
+  auto cert_chain_length = getHeader(upstream_request_->headers(), "x-cert-chain-length");
+  if (!cert_chain_length.empty()) {
+    EXPECT_NE("0", cert_chain_length);
+  }
+
+  // Verify SAN counts (may be 0 depending on certificate)
+  auto dns_sans_peer = getHeader(upstream_request_->headers(), "x-cert-dns-sans-peer-count");
+  EXPECT_FALSE(dns_sans_peer.empty());
+
+  auto dns_sans_local = getHeader(upstream_request_->headers(), "x-cert-dns-sans-local-count");
+  EXPECT_FALSE(dns_sans_local.empty());
+
+  auto uri_sans_peer = getHeader(upstream_request_->headers(), "x-cert-uri-sans-peer-count");
+  EXPECT_FALSE(uri_sans_peer.empty());
+
+  auto uri_sans_local = getHeader(upstream_request_->headers(), "x-cert-uri-sans-local-count");
+  EXPECT_FALSE(uri_sans_local.empty());
+
+  // Verify certificate validity timestamps
+  auto cert_valid_from = getHeader(upstream_request_->headers(), "x-cert-valid-from");
+  EXPECT_FALSE(cert_valid_from.empty());
+
+  auto cert_expiration = getHeader(upstream_request_->headers(), "x-cert-expiration");
+  EXPECT_FALSE(cert_expiration.empty());
+
+  // Verify TLS connection details
+  auto tls_version = getHeader(upstream_request_->headers(), "x-tls-version");
+  EXPECT_FALSE(tls_version.empty());
+  EXPECT_THAT(std::string(tls_version), HasSubstr("TLS"));
+
+  auto cipher_suite = getHeader(upstream_request_->headers(), "x-cipher-suite");
+  EXPECT_FALSE(cipher_suite.empty());
+
+  auto cipher_id = getHeader(upstream_request_->headers(), "x-cipher-id");
+  if (!cipher_id.empty()) {
+    EXPECT_NE("0", cipher_id);
+    EXPECT_NE("65535", cipher_id); // 0xffff
+  }
+
+  // Verify session ID (may or may not be present depending on TLS version and configuration)
+  // Note: We don't assert on session ID as it's optional
+  [[maybe_unused]] auto session_id_length =
+      getHeader(upstream_request_->headers(), "x-session-id-length");
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanup();
 }

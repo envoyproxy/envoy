@@ -2,9 +2,9 @@
 //!
 //! This module provides traits and types for implementing access loggers as dynamic modules.
 
-use crate::abi;
+use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
-use std::{ptr, slice, str};
+use std::ptr;
 
 // -----------------------------------------------------------------------------
 // Metrics Support
@@ -262,17 +262,110 @@ pub struct BytesInfo {
   pub wire_bytes_sent: u64,
 }
 
+/// Access log type indicating when the log was recorded.
+///
+/// This corresponds to `envoy::data::accesslog::v3::AccessLogType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum AccessLogType {
+  NotSet               = 0,
+  TcpUpstreamConnected = 1,
+  TcpPeriodic          = 2,
+  TcpConnectionEnd     = 3,
+  DownstreamStart      = 4,
+  DownstreamPeriodic   = 5,
+  DownstreamEnd        = 6,
+  UpstreamPoolReady    = 7,
+  UpstreamPeriodic     = 8,
+  UpstreamEnd          = 9,
+  DownstreamTunnelSuccessfullyEstablished = 10,
+  UdpTunnelUpstreamConnected = 11,
+  UdpPeriodic          = 12,
+  UdpSessionEnd        = 13,
+}
+
+impl AccessLogType {
+  /// Convert from the ABI enum value. Used internally by the macro.
+  #[doc(hidden)]
+  pub fn from_abi(value: abi::envoy_dynamic_module_type_access_log_type) -> Self {
+    match value {
+      abi::envoy_dynamic_module_type_access_log_type::TcpUpstreamConnected => {
+        AccessLogType::TcpUpstreamConnected
+      },
+      abi::envoy_dynamic_module_type_access_log_type::TcpPeriodic => AccessLogType::TcpPeriodic,
+      abi::envoy_dynamic_module_type_access_log_type::TcpConnectionEnd => {
+        AccessLogType::TcpConnectionEnd
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamStart => {
+        AccessLogType::DownstreamStart
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamPeriodic => {
+        AccessLogType::DownstreamPeriodic
+      },
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamEnd => AccessLogType::DownstreamEnd,
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamPoolReady => {
+        AccessLogType::UpstreamPoolReady
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamPeriodic => {
+        AccessLogType::UpstreamPeriodic
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UpstreamEnd => AccessLogType::UpstreamEnd,
+      abi::envoy_dynamic_module_type_access_log_type::DownstreamTunnelSuccessfullyEstablished => {
+        AccessLogType::DownstreamTunnelSuccessfullyEstablished
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UdpTunnelUpstreamConnected => {
+        AccessLogType::UdpTunnelUpstreamConnected
+      },
+      abi::envoy_dynamic_module_type_access_log_type::UdpPeriodic => AccessLogType::UdpPeriodic,
+      abi::envoy_dynamic_module_type_access_log_type::UdpSessionEnd => AccessLogType::UdpSessionEnd,
+      _ => AccessLogType::NotSet,
+    }
+  }
+
+  /// Get the string representation matching Envoy's `AccessLogType_Name`.
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      AccessLogType::NotSet => "NotSet",
+      AccessLogType::TcpUpstreamConnected => "TcpUpstreamConnected",
+      AccessLogType::TcpPeriodic => "TcpPeriodic",
+      AccessLogType::TcpConnectionEnd => "TcpConnectionEnd",
+      AccessLogType::DownstreamStart => "DownstreamStart",
+      AccessLogType::DownstreamPeriodic => "DownstreamPeriodic",
+      AccessLogType::DownstreamEnd => "DownstreamEnd",
+      AccessLogType::UpstreamPoolReady => "UpstreamPoolReady",
+      AccessLogType::UpstreamPeriodic => "UpstreamPeriodic",
+      AccessLogType::UpstreamEnd => "UpstreamEnd",
+      AccessLogType::DownstreamTunnelSuccessfullyEstablished => {
+        "DownstreamTunnelSuccessfullyEstablished"
+      },
+      AccessLogType::UdpTunnelUpstreamConnected => "UdpTunnelUpstreamConnected",
+      AccessLogType::UdpPeriodic => "UdpPeriodic",
+      AccessLogType::UdpSessionEnd => "UdpSessionEnd",
+    }
+  }
+}
+
 /// Read-only context for accessing log event data.
 pub struct LogContext {
   // Private field - only accessible within this crate.
   pub(crate) envoy_ptr: *mut c_void,
+  /// The type of access log event.
+  pub(crate) log_type: AccessLogType,
 }
 
 impl LogContext {
   /// Create a new LogContext. Used internally by the macro.
   #[doc(hidden)]
-  pub fn new(envoy_ptr: *mut c_void) -> Self {
-    Self { envoy_ptr }
+  pub fn new(envoy_ptr: *mut c_void, log_type: AccessLogType) -> Self {
+    Self {
+      envoy_ptr,
+      log_type,
+    }
+  }
+
+  /// Get the access log type indicating when this log event was recorded.
+  pub fn log_type(&self) -> AccessLogType {
+    self.log_type
   }
 
   /// Get the HTTP response code.
@@ -288,42 +381,14 @@ impl LogContext {
   }
 
   /// Get the response code details string.
-  pub fn response_code_details(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_response_code_details(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn response_code_details(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_response_code_details)
   }
 
   /// Get the request protocol (e.g., "HTTP/1.1", "HTTP/2").
-  pub fn protocol(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_protocol(self.envoy_ptr, &mut buffer)
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn protocol(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_protocol)
   }
 
   /// Get timing information.
@@ -373,42 +438,13 @@ impl LogContext {
   }
 
   /// Get the route name.
-  pub fn route_name(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_route_name(self.envoy_ptr, &mut buffer)
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn route_name(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_route_name)
   }
 
   /// Get the virtual cluster name.
-  pub fn virtual_cluster_name(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn virtual_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name)
   }
 
   /// Check if this is a health check request.
@@ -417,45 +453,13 @@ impl LogContext {
   }
 
   /// Get the upstream cluster name.
-  pub fn upstream_cluster(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn upstream_cluster(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_cluster)
   }
 
   /// Get the upstream host hostname.
-  pub fn upstream_host(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_host(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn upstream_host(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_host)
   }
 
   /// Get the connection ID, or 0 if not available.
@@ -469,24 +473,9 @@ impl LogContext {
   }
 
   /// Get the requested server name (SNI).
-  pub fn requested_server_name(&self) -> Option<&str> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_requested_server_name(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
-    } else {
-      None
-    }
+  pub fn requested_server_name(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_requested_server_name)
   }
 
   /// Check if the request was sampled for tracing.
@@ -498,7 +487,7 @@ impl LogContext {
   ///
   /// For headers with multiple values, use `index` to access subsequent values.
   /// Returns the total count of values in `total_count` if provided.
-  pub fn get_request_header(&self, key: &str) -> Option<&[u8]> {
+  pub fn get_request_header(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value(
       abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
       key,
@@ -507,7 +496,7 @@ impl LogContext {
   }
 
   /// Get a response header value by key.
-  pub fn get_response_header(&self, key: &str) -> Option<&[u8]> {
+  pub fn get_response_header(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value(
       abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
       key,
@@ -521,7 +510,7 @@ impl LogContext {
     header_type: abi::envoy_dynamic_module_type_http_header_type,
     key: &str,
     index: usize,
-  ) -> Option<&[u8]> {
+  ) -> Option<EnvoyBuffer<'_>> {
     let key_buf = abi::envoy_dynamic_module_type_module_buffer {
       ptr: key.as_ptr() as *const _,
       length: key.len(),
@@ -540,12 +529,7 @@ impl LogContext {
         ptr::null_mut(),
       )
     } {
-      unsafe {
-        Some(slice::from_raw_parts(
-          result.ptr as *const u8,
-          result.length,
-        ))
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -554,13 +538,13 @@ impl LogContext {
   /// Get a value from dynamic metadata.
   ///
   /// # Arguments
-  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module")
-  /// * `key` - The key within the filter namespace (e.g., "rbac_policy")
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module").
+  /// * `key` - The key within the filter namespace (e.g., "rbac_policy").
   ///
   /// # Returns
   /// The string value if it exists, None otherwise.
   /// Note: Only string values are currently supported.
-  pub fn get_dynamic_metadata(&self, filter_name: &str, key: &str) -> Option<&str> {
+  pub fn get_dynamic_metadata(&self, filter_name: &str, key: &str) -> Option<EnvoyBuffer<'_>> {
     let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
       ptr: filter_name.as_ptr() as *const _,
       length: filter_name.len(),
@@ -581,36 +565,15 @@ impl LogContext {
         &mut result,
       )
     } {
-      unsafe {
-        let slice = slice::from_raw_parts(result.ptr as *const u8, result.length);
-        str::from_utf8(slice).ok()
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
   }
 
   /// Get the local reply body (if this was a local response).
-  pub fn local_reply_body(&self) -> Option<&[u8]> {
-    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: ptr::null_mut(),
-      length: 0,
-    };
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_local_reply_body(
-        self.envoy_ptr,
-        &mut buffer,
-      )
-    } {
-      unsafe {
-        Some(slice::from_raw_parts(
-          buffer.ptr as *const u8,
-          buffer.length,
-        ))
-      }
-    } else {
-      None
-    }
+  pub fn local_reply_body(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_local_reply_body)
   }
 
   /// Get the index of the current worker thread.
@@ -643,44 +606,44 @@ impl LogContext {
   }
 
   /// Get the connection termination details.
-  pub fn connection_termination_details(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn connection_termination_details(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_connection_termination_details,
     )
   }
 
-  /// Get the downstream remote address (client) as an IP address string and port.
+  /// Get the downstream remote address (client) as an IP address buffer and port.
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn downstream_remote_address(&self) -> Option<(&str, u32)> {
+  pub fn downstream_remote_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_downstream_remote_address)
   }
 
-  /// Get the downstream local address (Envoy listener) as an IP address string and port.
+  /// Get the downstream local address (Envoy listener) as an IP address buffer and port.
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn downstream_local_address(&self) -> Option<(&str, u32)> {
+  pub fn downstream_local_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_address)
   }
 
-  /// Get the upstream remote address (backend) as an IP address string and port.
+  /// Get the upstream remote address (backend) as an IP address buffer and port.
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn upstream_remote_address(&self) -> Option<(&str, u32)> {
+  pub fn upstream_remote_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_upstream_remote_address)
   }
 
-  /// Get the upstream local address (Envoy outbound) as an IP address string and port.
+  /// Get the upstream local address (Envoy outbound) as an IP address buffer and port.
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn upstream_local_address(&self) -> Option<(&str, u32)> {
+  pub fn upstream_local_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_address)
   }
 
   /// Get the downstream direct remote address (physical peer address before XFF processing).
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn downstream_direct_remote_address(&self) -> Option<(&str, u32)> {
+  pub fn downstream_direct_remote_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address,
     )
@@ -689,13 +652,13 @@ impl LogContext {
   /// Get the downstream direct local address (physical listener address).
   ///
   /// Returns `None` if the address is not available or is not an IP address.
-  pub fn downstream_direct_local_address(&self) -> Option<(&str, u32)> {
+  pub fn downstream_direct_local_address(&self) -> Option<(EnvoyBuffer<'_>, u32)> {
     self.get_address(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address,
     )
   }
 
-  /// Helper to retrieve an address (IP string + port) from an ABI callback.
+  /// Helper to retrieve an address (IP buffer + port) from an ABI callback.
   fn get_address(
     &self,
     callback: unsafe extern "C" fn(
@@ -703,91 +666,139 @@ impl LogContext {
       *mut abi::envoy_dynamic_module_type_envoy_buffer,
       *mut u32,
     ) -> bool,
-  ) -> Option<(&str, u32)> {
+  ) -> Option<(EnvoyBuffer<'_>, u32)> {
     let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: ptr::null_mut(),
       length: 0,
     };
     let mut port: u32 = 0;
     if unsafe { callback(self.envoy_ptr, &mut address, &mut port) } {
-      unsafe {
-        let slice = slice::from_raw_parts(address.ptr as *const u8, address.length);
-        str::from_utf8(slice).ok().map(|s| (s, port))
-      }
+      Some((
+        unsafe { EnvoyBuffer::new_from_raw(address.ptr as *const u8, address.length) },
+        port,
+      ))
     } else {
       None
     }
   }
 
   /// Get the upstream transport failure reason.
-  pub fn upstream_transport_failure_reason(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn upstream_transport_failure_reason(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason,
     )
   }
 
-  /// Get the downstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
-  pub fn downstream_tls_version(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_version,
+  /// Get the JA3 fingerprint hash from the downstream connection.
+  pub fn ja3_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_ja3_hash)
+  }
+
+  /// Get the JA4 fingerprint hash from the downstream connection.
+  pub fn ja4_hash(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_ja4_hash)
+  }
+
+  /// Get the downstream transport failure reason.
+  pub fn downstream_transport_failure_reason(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
+      abi::envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason,
     )
   }
 
+  /// Get the byte size of request headers (uncompressed).
+  pub fn request_headers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the byte size of response headers (uncompressed).
+  pub fn response_headers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the byte size of response trailers (uncompressed).
+  pub fn response_trailers_bytes(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(self.envoy_ptr)
+    }
+  }
+
+  /// Get the upstream protocol (e.g., "HTTP/1.1", "HTTP/2").
+  pub fn upstream_protocol(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_protocol)
+  }
+
+  /// Get the upstream connection pool ready duration in nanoseconds, or -1 if not available.
+  pub fn upstream_connection_pool_ready_duration_ns(&self) -> i64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(
+        self.envoy_ptr,
+      )
+    }
+  }
+
+  /// Get the downstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+  pub fn downstream_tls_version(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_version)
+  }
+
   /// Get the downstream peer certificate subject (e.g., "CN=client").
-  pub fn downstream_peer_subject(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn downstream_peer_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject,
     )
   }
 
   /// Get the downstream peer certificate SHA-256 digest.
-  pub fn downstream_peer_cert_digest(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn downstream_peer_cert_digest(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest,
     )
   }
 
   /// Get the downstream TLS cipher suite.
   ///
-  /// The returned string uses thread-local storage and is valid until the next call to
+  /// The returned buffer uses thread-local storage and is valid until the next call to
   /// this method or [`upstream_tls_cipher`](Self::upstream_tls_cipher) on the same thread.
-  pub fn downstream_tls_cipher(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher,
-    )
+  pub fn downstream_tls_cipher(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher)
   }
 
   /// Get the downstream TLS session ID.
-  pub fn downstream_tls_session_id(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn downstream_tls_session_id(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id,
     )
   }
 
   /// Get the downstream peer certificate issuer.
-  pub fn downstream_peer_issuer(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer,
-    )
+  pub fn downstream_peer_issuer(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer)
   }
 
   /// Get the downstream peer certificate serial number.
-  pub fn downstream_peer_serial(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial,
-    )
+  pub fn downstream_peer_serial(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial)
   }
 
   /// Get the downstream peer certificate SHA-1 fingerprint.
-  pub fn downstream_peer_fingerprint_1(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn downstream_peer_fingerprint_1(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1,
     )
   }
 
   /// Get the downstream local certificate subject (Envoy's own certificate).
-  pub fn downstream_local_subject(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn downstream_local_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_subject,
     )
   }
@@ -833,7 +844,7 @@ impl LogContext {
   }
 
   /// Get the URI Subject Alternative Names from the downstream peer certificate.
-  pub fn downstream_peer_uri_san(&self) -> Vec<&str> {
+  pub fn downstream_peer_uri_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san,
@@ -841,7 +852,7 @@ impl LogContext {
   }
 
   /// Get the URI Subject Alternative Names from the downstream local certificate.
-  pub fn downstream_local_uri_san(&self) -> Vec<&str> {
+  pub fn downstream_local_uri_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san,
@@ -849,7 +860,7 @@ impl LogContext {
   }
 
   /// Get the DNS Subject Alternative Names from the downstream peer certificate.
-  pub fn downstream_peer_dns_san(&self) -> Vec<&str> {
+  pub fn downstream_peer_dns_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san,
@@ -857,7 +868,7 @@ impl LogContext {
   }
 
   /// Get the DNS Subject Alternative Names from the downstream local certificate.
-  pub fn downstream_local_dns_san(&self) -> Vec<&str> {
+  pub fn downstream_local_dns_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san,
@@ -872,54 +883,46 @@ impl LogContext {
   }
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
-  pub fn upstream_tls_version(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_version,
-    )
+  pub fn upstream_tls_version(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_version)
   }
 
   /// Get the upstream TLS cipher suite.
   ///
-  /// The returned string uses thread-local storage and is valid until the next call to
+  /// The returned buffer uses thread-local storage and is valid until the next call to
   /// this method or [`downstream_tls_cipher`](Self::downstream_tls_cipher) on the same thread.
-  pub fn upstream_tls_cipher(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher,
-    )
+  pub fn upstream_tls_cipher(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher)
   }
 
   /// Get the upstream TLS session ID.
-  pub fn upstream_tls_session_id(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn upstream_tls_session_id(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id,
     )
   }
 
   /// Get the upstream peer certificate subject.
-  pub fn upstream_peer_subject(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject,
-    )
+  pub fn upstream_peer_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject)
   }
 
   /// Get the upstream peer certificate issuer.
-  pub fn upstream_peer_issuer(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer,
-    )
+  pub fn upstream_peer_issuer(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer)
   }
 
   /// Get the upstream local certificate subject (Envoy's own certificate for the upstream
   /// connection).
-  pub fn upstream_local_subject(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_subject,
-    )
+  pub fn upstream_local_subject(&self) -> Option<EnvoyBuffer<'_>> {
+    self
+      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_subject)
   }
 
   /// Get the upstream peer certificate SHA-256 digest.
-  pub fn upstream_peer_cert_digest(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(
+  pub fn upstream_peer_cert_digest(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest,
     )
   }
@@ -945,7 +948,7 @@ impl LogContext {
   }
 
   /// Get the URI Subject Alternative Names from the upstream peer certificate.
-  pub fn upstream_peer_uri_san(&self) -> Vec<&str> {
+  pub fn upstream_peer_uri_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san,
@@ -953,7 +956,7 @@ impl LogContext {
   }
 
   /// Get the URI Subject Alternative Names from the upstream local certificate.
-  pub fn upstream_local_uri_san(&self) -> Vec<&str> {
+  pub fn upstream_local_uri_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san,
@@ -961,7 +964,7 @@ impl LogContext {
   }
 
   /// Get the DNS Subject Alternative Names from the upstream peer certificate.
-  pub fn upstream_peer_dns_san(&self) -> Vec<&str> {
+  pub fn upstream_peer_dns_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san,
@@ -969,7 +972,7 @@ impl LogContext {
   }
 
   /// Get the DNS Subject Alternative Names from the upstream local certificate.
-  pub fn upstream_local_dns_san(&self) -> Vec<&str> {
+  pub fn upstream_local_dns_san(&self) -> Vec<EnvoyBuffer<'_>> {
     self.get_san_list(
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size,
       abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san,
@@ -977,12 +980,12 @@ impl LogContext {
   }
 
   /// Get the request ID (stream ID).
-  pub fn request_id(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_request_id)
+  pub fn request_id(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_request_id)
   }
 
   /// Get a response trailer value by key.
-  pub fn get_response_trailer(&self, key: &str) -> Option<&[u8]> {
+  pub fn get_response_trailer(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value(
       abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
       key,
@@ -995,7 +998,7 @@ impl LogContext {
   /// Note: This is not currently supported and always returns `None`.
   /// Filter state serialization requires allocation which is incompatible
   /// with the zero-copy ABI design.
-  pub fn get_filter_state(&self, key: &str) -> Option<&str> {
+  pub fn get_filter_state(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     let key_buf = abi::envoy_dynamic_module_type_module_buffer {
       ptr: key.as_ptr() as *const _,
       length: key.len(),
@@ -1011,10 +1014,7 @@ impl LogContext {
         &mut result,
       )
     } {
-      unsafe {
-        let slice = slice::from_raw_parts(result.ptr as *const u8, result.length);
-        str::from_utf8(slice).ok()
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
@@ -1025,8 +1025,8 @@ impl LogContext {
   /// Note: This is not currently supported and always returns `None`.
   /// The tracing span interface does not expose trace IDs in a way that
   /// allows zero-copy access.
-  pub fn get_trace_id(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_trace_id)
+  pub fn get_trace_id(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_trace_id)
   }
 
   /// Get the span ID.
@@ -1034,8 +1034,8 @@ impl LogContext {
   /// Note: This is not currently supported and always returns `None`.
   /// The tracing span interface does not expose span IDs in a way that
   /// allows zero-copy access.
-  pub fn get_span_id(&self) -> Option<&str> {
-    self.get_envoy_buffer_string(abi::envoy_dynamic_module_callback_access_logger_get_span_id)
+  pub fn get_span_id(&self) -> Option<EnvoyBuffer<'_>> {
+    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_span_id)
   }
 
   /// Get the number of headers of the specified type.
@@ -1050,14 +1050,14 @@ impl LogContext {
     }
   }
 
-  /// Get all headers of the specified type as key-value byte slice pairs.
+  /// Get all headers of the specified type as key-value `EnvoyBuffer` pairs.
   ///
   /// The supported header types are `RequestHeader`, `ResponseHeader`, and `ResponseTrailer`.
   /// Returns an empty vector if the header map is not available.
   pub fn get_all_headers(
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Vec<(&[u8], &[u8])> {
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let count = self.get_headers_count(header_type);
     if count == 0 {
       return Vec::new();
@@ -1089,36 +1089,33 @@ impl LogContext {
       .iter()
       .map(|h| unsafe {
         (
-          slice::from_raw_parts(h.key_ptr as *const u8, h.key_length),
-          slice::from_raw_parts(h.value_ptr as *const u8, h.value_length),
+          EnvoyBuffer::new_from_raw(h.key_ptr as *const u8, h.key_length),
+          EnvoyBuffer::new_from_raw(h.value_ptr as *const u8, h.value_length),
         )
       })
       .collect()
   }
 
-  /// Helper to retrieve a string value from an ABI callback that returns a buffer.
-  fn get_envoy_buffer_string(
+  /// Helper to retrieve an `EnvoyBuffer` from an ABI callback.
+  fn get_envoy_buffer(
     &self,
     callback: unsafe extern "C" fn(
       *mut c_void,
       *mut abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> bool,
-  ) -> Option<&str> {
+  ) -> Option<EnvoyBuffer<'_>> {
     let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: ptr::null_mut(),
       length: 0,
     };
     if unsafe { callback(self.envoy_ptr, &mut buffer) } {
-      unsafe {
-        let slice = slice::from_raw_parts(buffer.ptr as *const u8, buffer.length);
-        str::from_utf8(slice).ok()
-      }
+      Some(unsafe { EnvoyBuffer::new_from_raw(buffer.ptr as *const u8, buffer.length) })
     } else {
       None
     }
   }
 
-  /// Helper to retrieve a list of SAN strings from size + data ABI callbacks.
+  /// Helper to retrieve a list of SAN buffers from size + data ABI callbacks.
   fn get_san_list(
     &self,
     size_cb: unsafe extern "C" fn(*mut c_void) -> usize,
@@ -1126,7 +1123,7 @@ impl LogContext {
       *mut c_void,
       *mut abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> bool,
-  ) -> Vec<&str> {
+  ) -> Vec<EnvoyBuffer<'_>> {
     let count = unsafe { size_cb(self.envoy_ptr) };
     if count == 0 {
       return Vec::new();
@@ -1150,10 +1147,7 @@ impl LogContext {
         if buf.ptr.is_null() || buf.length == 0 {
           None
         } else {
-          unsafe {
-            let s = slice::from_raw_parts(buf.ptr as *const u8, buf.length);
-            str::from_utf8(s).ok()
-          }
+          Some(unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const u8, buf.length) })
         }
       })
       .collect()
@@ -1282,10 +1276,11 @@ macro_rules! declare_access_logger {
     pub extern "C" fn envoy_dynamic_module_on_access_logger_log(
       envoy_ptr: *mut ::std::ffi::c_void,
       logger_ptr: *mut ::std::ffi::c_void,
-      _log_type: $crate::abi::envoy_dynamic_module_type_access_log_type,
+      log_type: $crate::abi::envoy_dynamic_module_type_access_log_type,
     ) {
       let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn $crate::access_log::AccessLogger>) };
-      let ctx = $crate::access_log::LogContext::new(envoy_ptr);
+      let access_log_type = $crate::access_log::AccessLogType::from_abi(log_type);
+      let ctx = $crate::access_log::LogContext::new(envoy_ptr, access_log_type);
       logger.log(&ctx);
     }
 

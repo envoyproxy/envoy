@@ -62,6 +62,7 @@ envoy_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -84,6 +85,7 @@ envoy_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -120,8 +122,11 @@ envoy_cc_test(
     },
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/extensions/dynamic_modules:util",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test_static",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],

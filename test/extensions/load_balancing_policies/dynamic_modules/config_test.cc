@@ -1,5 +1,6 @@
 #include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.h"
 
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/config.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -877,6 +878,361 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksHeaderOutOfBounds) {
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
       context_ptr, key, &result, 999, nullptr));
+}
+
+// =============================================================================
+// Per-Host Data Storage Tests
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, PerHostDataSetAndGet) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  // Set data on host 0.
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_set_host_data(lb_ptr, 0, 0, 42));
+
+  // Get data from host 0.
+  uintptr_t data = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 0, 0, &data));
+  EXPECT_EQ(data, 42);
+
+  // Get data from host with no data stored.
+  uintptr_t data2 = 99;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 0, 1, &data2));
+  EXPECT_EQ(data2, 0);
+
+  // Clear data by setting to 0.
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_set_host_data(lb_ptr, 0, 0, 0));
+  uintptr_t data3 = 99;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 0, 0, &data3));
+  EXPECT_EQ(data3, 0);
+
+  // Invalid priority.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_set_host_data(lb_ptr, 999, 0, 42));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 999, 0, &data));
+
+  // Invalid host index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_set_host_data(lb_ptr, 0, 999, 42));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 0, 999, &data));
+
+  // Null pointer handling.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_set_host_data(nullptr, 0, 0, 42));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_data(nullptr, 0, 0, &data));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_data(lb_ptr, 0, 0, nullptr));
+}
+
+// =============================================================================
+// Host Metadata Tests
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, HostMetadataTypedAccessSuccess) {
+  // Set up metadata on host1 with string, number, and bool values.
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  auto& filter_metadata = (*metadata->mutable_filter_metadata())["envoy.lb"];
+  (*filter_metadata.mutable_fields())["version"].set_string_value("v1.0");
+  (*filter_metadata.mutable_fields())["weight_factor"].set_number_value(1.5);
+  (*filter_metadata.mutable_fields())["enabled"].set_bool_value(true);
+  ON_CALL(*host1_, metadata()).WillByDefault(Return(metadata));
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+
+  // Test string value lookup.
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                        key, &result));
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(absl::string_view(result.ptr, result.length), "v1.0");
+
+  // Test number value lookup.
+  envoy_dynamic_module_type_module_buffer num_key = {"weight_factor", 13};
+  double num_result = 0.0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_number(lb_ptr, 0, 0, filter_name,
+                                                                        num_key, &num_result));
+  EXPECT_DOUBLE_EQ(num_result, 1.5);
+
+  // Test bool value lookup.
+  envoy_dynamic_module_type_module_buffer bool_key = {"enabled", 7};
+  bool bool_result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_get_host_metadata_bool(lb_ptr, 0, 0, filter_name,
+                                                                      bool_key, &bool_result));
+  EXPECT_TRUE(bool_result);
+
+  // Test type mismatch: string key with number accessor returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_number(lb_ptr, 0, 0, filter_name,
+                                                                         key, &num_result));
+
+  // Test type mismatch: number key with string accessor returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         num_key, &result));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, HostMetadataNotFound) {
+  // Set up metadata without the requested key.
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  auto& filter_metadata = (*metadata->mutable_filter_metadata())["envoy.lb"];
+  (*filter_metadata.mutable_fields())["other_key"].set_string_value("other_value");
+  ON_CALL(*host1_, metadata()).WillByDefault(Return(metadata));
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"version", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+
+  // Non-existent filter name.
+  envoy_dynamic_module_type_module_buffer bad_filter = {"nonexistent", 11};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, bad_filter,
+                                                                         key, &result));
+
+  // Non-existent key.
+  envoy_dynamic_module_type_module_buffer bad_key = {"nonexistent", 11};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         bad_key, &result));
+
+  // Null metadata on host.
+  ON_CALL(*host1_, metadata()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(lb_ptr, 0, 0, filter_name,
+                                                                         key, &result));
+
+  // Null pointer handling.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(nullptr, 0, 0, filter_name,
+                                                                         key, &result));
+  double num = 0.0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_number(nullptr, 0, 0, filter_name,
+                                                                         key, &num));
+  bool b = false;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_host_metadata_bool(nullptr, 0, 0, filter_name, key, &b));
+
+  // Invalid priority/index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(
+      lb_ptr, 999, 0, filter_name, key, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_metadata_string(
+      lb_ptr, 0, 999, filter_name, key, &result));
+}
+
+// =============================================================================
+// Locality Hosts & Weights Tests
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksSuccess) {
+  // Set up hosts per locality on the host set.
+  auto* mock_host_set = priority_set_.getMockHostSet(0);
+
+  // Create locality buckets with hosts.
+  Upstream::HostVector locality0_hosts = {host1_};
+  Upstream::HostVector locality1_hosts = {host2_};
+  std::vector<Upstream::HostVector> hosts_per_locality = {locality0_hosts, locality1_hosts};
+
+  auto hosts_per_locality_ptr =
+      std::make_shared<Upstream::HostsPerLocalityImpl>(std::move(hosts_per_locality), false);
+  ON_CALL(*mock_host_set, healthyHostsPerLocality())
+      .WillByDefault(ReturnRef(*hosts_per_locality_ptr));
+
+  // Set up locality weights.
+  auto locality_weights =
+      std::make_shared<Upstream::LocalityWeights>(Upstream::LocalityWeights{70, 30});
+  ON_CALL(*mock_host_set, localityWeights()).WillByDefault(Return(locality_weights));
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  // Test locality count.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_count(lb_ptr, 0), 2);
+
+  // Test hosts per locality.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_host_count(lb_ptr, 0, 0), 1);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_host_count(lb_ptr, 0, 1), 1);
+
+  // Test host address in locality.
+  envoy_dynamic_module_type_envoy_buffer addr_result = {nullptr, 0};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(lb_ptr, 0, 0, 0, &addr_result));
+  EXPECT_NE(addr_result.ptr, nullptr);
+  EXPECT_GT(addr_result.length, 0);
+
+  // Test locality weights.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 0), 70);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 1), 30);
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksEdgeCases) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  // Null pointer handling.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_count(nullptr, 0), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_host_count(nullptr, 0, 0), 0);
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(nullptr, 0, 0, 0, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0), 0);
+
+  // Invalid priority.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_count(lb_ptr, 999), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_host_count(lb_ptr, 999, 0), 0);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(lb_ptr, 999, 0, 0, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 999, 0), 0);
+
+  // Invalid locality index.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_host_count(lb_ptr, 0, 999), 0);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(lb_ptr, 0, 999, 0, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 999), 0);
+
+  // Null locality weights.
+  auto* mock_host_set = priority_set_.getMockHostSet(0);
+  ON_CALL(*mock_host_set, localityWeights()).WillByDefault(Return(nullptr));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 0), 0);
+}
+
+// =============================================================================
+// Callbacks Test Module Integration Test
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks) {
+  // Set up metadata on host1 so the callbacks_test module can test metadata access.
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  auto& filter_metadata = (*metadata->mutable_filter_metadata())["envoy.lb"];
+  (*filter_metadata.mutable_fields())["version"].set_string_value("v1.0");
+  ON_CALL(*host1_, metadata()).WillByDefault(Return(metadata));
+
+  // Set up locality hosts for the callbacks_test module.
+  auto* mock_host_set = priority_set_.getMockHostSet(0);
+  Upstream::HostVector locality0_hosts = {host1_, host2_};
+  std::vector<Upstream::HostVector> hosts_per_locality = {locality0_hosts};
+  auto hosts_per_locality_ptr =
+      std::make_shared<Upstream::HostsPerLocalityImpl>(std::move(hosts_per_locality), false);
+  ON_CALL(*mock_host_set, healthyHostsPerLocality())
+      .WillByDefault(ReturnRef(*hosts_per_locality_ptr));
+
+  auto locality_weights =
+      std::make_shared<Upstream::LocalityWeights>(Upstream::LocalityWeights{100});
+  ON_CALL(*mock_host_set, localityWeights()).WillByDefault(Return(locality_weights));
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_callbacks_test");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  // Exercise the module with context.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test-header", "test-value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+
+  auto response = lb->chooseHost(&context);
+  EXPECT_NE(response.host, nullptr);
 }
 
 } // namespace
