@@ -17,9 +17,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Router {
 
-MockDirectResponseEntry::MockDirectResponseEntry() {
-  ON_CALL(*this, responseContentType()).WillByDefault(Return(absl::string_view{}));
-}
+MockDirectResponseEntry::MockDirectResponseEntry() = default;
 
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 

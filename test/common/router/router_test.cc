@@ -5987,6 +5987,7 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return(absl::string_view{}));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
@@ -6007,6 +6008,7 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return(absl::string_view{}));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
