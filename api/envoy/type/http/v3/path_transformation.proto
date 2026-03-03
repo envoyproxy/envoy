@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.type.http.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -44,6 +46,7 @@ message PathTransformation {
 
     oneof operation_specifier {
       option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Enable path normalization per RFC 3986.
       NormalizePathRFC3986 normalize_path_rfc_3986 = 2;

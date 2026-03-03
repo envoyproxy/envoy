@@ -1,0 +1,13 @@
+diff --git a/REPO.bazel b/REPO.bazel
+index 843a403..1c23345 100644
+--- a/REPO.bazel
++++ b/REPO.bazel
+@@ -11,8 +11,3 @@
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+-
+-ignore_directories([
+-    ".build*",
+-    "cmake-build-*",
+-])

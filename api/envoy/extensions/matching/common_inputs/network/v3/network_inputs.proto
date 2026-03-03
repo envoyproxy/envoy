@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.matching.common_inputs.network.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -119,7 +121,8 @@ message ApplicationProtocolInput {
 //
 // [#extension: envoy.matching.inputs.filter_state]
 message FilterStateInput {
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   // Optional field name to retrieve from the filter state object.
   // When set and the filter state object supports field access, the value of this specific
@@ -159,17 +162,21 @@ message DynamicMetadataInput {
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_len: 1}];
+      string key = 1
+          [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
     }
   }
 
   // The filter name to retrieve the Struct from the Metadata.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  string filter = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   // The path to retrieve the Value from the Struct.
-  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated PathSegment path = 2
+      [(validate.rules).repeated = {min_items: 1}, (buf.validate.field).repeated = {min_items: 1}];
 }
 
 // Input that matches by the network namespace of the listener address.

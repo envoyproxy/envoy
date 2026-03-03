@@ -7,6 +7,8 @@ import "envoy/api/v2/discovery.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
+import "buf/validate/validate.proto";
+
 import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -48,7 +50,8 @@ message RtdsDummy {
 message Runtime {
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1
+      [(validate.rules).string = {min_bytes: 1}, (buf.validate.field).string = {min_len: 1}];
 
   google.protobuf.Struct layer = 2;
 }

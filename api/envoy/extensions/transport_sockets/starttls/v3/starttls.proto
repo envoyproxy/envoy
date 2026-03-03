@@ -5,6 +5,8 @@ package envoy.extensions.transport_sockets.starttls.v3;
 import "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -35,7 +37,7 @@ message StartTlsConfig {
 
   // Configuration for a downstream TLS socket.
   transport_sockets.tls.v3.DownstreamTlsContext tls_socket_config = 2
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 // Configuration for an upstream StartTls transport socket.
@@ -48,5 +50,5 @@ message UpstreamStartTlsConfig {
 
   // Configuration for an upstream TLS socket.
   transport_sockets.tls.v3.UpstreamTlsContext tls_socket_config = 2
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }

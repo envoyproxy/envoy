@@ -5,6 +5,8 @@ package envoy.config.trace.v2alpha;
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -23,7 +25,8 @@ message XRayConfig {
   api.v2.core.SocketAddress daemon_endpoint = 1;
 
   // The name of the X-Ray segment.
-  string segment_name = 2 [(validate.rules).string = {min_len: 1}];
+  string segment_name = 2
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   // The location of a local custom sampling rules JSON file.
   // For an example of the sampling rules see:

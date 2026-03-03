@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.resource_monitors.cpu_utilization.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -24,5 +26,8 @@ message CpuUtilizationConfig {
     CONTAINER = 1;
   }
 
-  UtilizationComputeStrategy mode = 1 [(validate.rules).enum = {defined_only: true}];
+  UtilizationComputeStrategy mode = 1 [
+    (validate.rules).enum = {defined_only: true},
+    (buf.validate.field).enum = {defined_only: true}
+  ];
 }

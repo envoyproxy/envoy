@@ -1,0 +1,55 @@
+diff --git a/REPO.bazel b/REPO.bazel
+index 843a403..1c23345 100644
+--- a/REPO.bazel
++++ b/REPO.bazel
+@@ -11,8 +11,3 @@
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+-
+-ignore_directories([
+-    ".build*",
+-    "cmake-build-*",
+-])
+diff --git a/buf/validate/internal/validation_rules.h b/buf/validate/internal/validation_rules.h
+index e6befaf..9b8136f 100644
+--- a/buf/validate/internal/validation_rules.h
++++ b/buf/validate/internal/validation_rules.h
+@@ -61,32 +61,32 @@ struct RuleContext {
+   }
+ 
+   void appendFieldPathElement(const FieldPathElement& element, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       *violations[i].proto_.mutable_field()->mutable_elements()->Add() = element;
+     }
+   }
+ 
+   void appendRulePathElement(std::initializer_list<FieldPathElement> suffix, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       auto* elements = violations[i].proto_.mutable_rule()->mutable_elements();
+       std::copy(suffix.begin(), suffix.end(), RepeatedPtrFieldBackInserter(elements));
+     }
+   }
+ 
+   void setFieldValue(ProtoField field, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].fieldValue_ = field;
+     }
+   }
+ 
+   void setRuleValue(ProtoField rule, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].ruleValue_ = rule;
+     }
+   }
+ 
+   void setForKey(int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].proto_.set_for_key(true);
+     }
+   }

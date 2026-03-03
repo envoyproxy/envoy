@@ -17,6 +17,7 @@ from tools.proto_format.data import data
 # These .proto import direct path prefixes are already handled by
 # api_proto_package() as implicit dependencies.
 API_BUILD_SYSTEM_IMPORT_PREFIXES = [
+    "buf/validate/validate.proto",
     'google/api/annotations.proto',
     'google/protobuf/',
     'google/rpc/status.proto',

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.router.cluster_specifiers.matcher.v3;
 
+import "buf/validate/validate.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
@@ -19,7 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ClusterAction {
   // Indicates the upstream cluster to which the request should be routed
   // to.
-  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 }
 
 message MatcherClusterSpecifier {
@@ -71,5 +73,6 @@ message MatcherClusterSpecifier {
   //         '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
   //         cluster: "default-cluster"
   //
-  xds.type.matcher.v3.Matcher cluster_matcher = 1 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher cluster_matcher = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }

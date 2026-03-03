@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.type;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -22,6 +24,7 @@ message HashPolicy {
 
   oneof policy_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SourceIp source_ip = 1;
   }

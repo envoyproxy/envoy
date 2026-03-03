@@ -5,6 +5,8 @@ package envoy.service.tap.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/data/tap/v2alpha/wrapper.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -31,7 +33,8 @@ service TapSinkService {
 message StreamTapsRequest {
   message Identifier {
     // The node sending taps over the stream.
-    api.v2.core.Node node = 1 [(validate.rules).message = {required: true}];
+    api.v2.core.Node node = 1
+        [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
     // The opaque identifier that was set in the :ref:`output config
     // <envoy_api_field_service.tap.v2alpha.StreamingGrpcSink.tap_id>`.

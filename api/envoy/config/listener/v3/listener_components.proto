@@ -11,6 +11,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -34,7 +36,8 @@ message Filter {
   reserved "config";
 
   // The name of the filter configuration.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   oneof config_type {
     // Filter specific configuration which depends on the filter being
@@ -112,7 +115,10 @@ message FilterChainMatch {
 
   // Optional destination port to consider when use_original_dst is set on the
   // listener in determining a filter chain match.
-  google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {lte: 65535 gte: 1}];
+  google.protobuf.UInt32Value destination_port = 8 [
+    (validate.rules).uint32 = {lte: 65535 gte: 1},
+    (buf.validate.field).uint32 = {lte: 65535 gte: 1}
+  ];
 
   // If non-empty, an IP address and prefix length to match addresses when the
   // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
@@ -132,7 +138,10 @@ message FilterChainMatch {
   repeated core.v3.CidrRange direct_source_prefix_ranges = 13;
 
   // Specifies the connection source IP match type. Can be any, local or external network.
-  ConnectionSourceType source_type = 12 [(validate.rules).enum = {defined_only: true}];
+  ConnectionSourceType source_type = 12 [
+    (validate.rules).enum = {defined_only: true},
+    (buf.validate.field).enum = {defined_only: true}
+  ];
 
   // The criteria is satisfied if the source IP address of the downstream
   // connection is contained in at least one of the specified subnets. If the
@@ -143,8 +152,10 @@ message FilterChainMatch {
   // The criteria is satisfied if the source port of the downstream connection
   // is contained in at least one of the specified ports. If the parameter is
   // not specified, the source port is ignored.
-  repeated uint32 source_ports = 7
-      [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
+  repeated uint32 source_ports = 7 [
+    (validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}},
+    (buf.validate.field).repeated = {items {uint32 {lte: 65535 gte: 1}}}
+  ];
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
   // a filter chain match. Those values will be compared against the server names of a new
@@ -295,12 +306,15 @@ message ListenerFilterChainMatchPredicate {
         "envoy.api.v2.listener.ListenerFilterChainMatchPredicate.MatchSet";
 
     // The list of rules that make up the set.
-    repeated ListenerFilterChainMatchPredicate rules = 1
-        [(validate.rules).repeated = {min_items: 2}];
+    repeated ListenerFilterChainMatchPredicate rules = 1 [
+      (validate.rules).repeated = {min_items: 2},
+      (buf.validate.field).repeated = {min_items: 2}
+    ];
   }
 
   oneof rule {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.
@@ -314,7 +328,8 @@ message ListenerFilterChainMatchPredicate {
     ListenerFilterChainMatchPredicate not_match = 3;
 
     // The match configuration will always match.
-    bool any_match = 4 [(validate.rules).bool = {const: true}];
+    bool any_match = 4
+        [(validate.rules).bool = {const: true}, (buf.validate.field).bool = {const: true}];
 
     // Match destination port. Particularly, the match evaluation must use the recovered local port if
     // the owning listener filter is after :ref:`an original_dst listener filter <config_listener_filters_original_dst>`.
@@ -332,7 +347,8 @@ message ListenerFilter {
   reserved "config";
 
   // The name of the filter configuration.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   oneof config_type {
     // Filter specific configuration which depends on the filter being

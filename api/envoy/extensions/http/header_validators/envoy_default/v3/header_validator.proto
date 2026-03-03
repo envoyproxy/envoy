@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.http.header_validators.envoy_default.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -158,8 +160,10 @@ message HeaderValidatorConfig {
     //
     // The handling of escaped slashes is important for security as these sequences can be used
     // in path confusion attacks to bypass access controls.
-    PathWithEscapedSlashesAction path_with_escaped_slashes_action = 3
-        [(validate.rules).enum = {defined_only: true}];
+    PathWithEscapedSlashesAction path_with_escaped_slashes_action = 3 [
+      (validate.rules).enum = {defined_only: true},
+      (buf.validate.field).enum = {defined_only: true}
+    ];
   }
 
   // HTTP/1 protocol specific options for header validation.

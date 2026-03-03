@@ -8,6 +8,8 @@ import "envoy/type/http_status.proto";
 
 import "google/rpc/status.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -40,7 +42,8 @@ message CheckRequest {
 message DeniedHttpResponse {
   // This field allows the authorization service to send a HTTP response status
   // code to the downstream client other than 403 (Forbidden).
-  type.HttpStatus status = 1 [(validate.rules).message = {required: true}];
+  type.HttpStatus status = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
   // This field allows the authorization service to send HTTP response headers
   // to the downstream client. Note that the `append` field in `HeaderValueOption` defaults to

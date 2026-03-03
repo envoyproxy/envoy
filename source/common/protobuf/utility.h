@@ -13,6 +13,7 @@
 #include "source/common/common/stl_helpers.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/status/status.h"
@@ -312,6 +313,15 @@ public:
   static void recursivePgvCheck(const Protobuf::Message& message);
 
   /**
+   * Perform a protovalidate check on a given protobuf message.
+   * @param message message to validate.
+   * @param recurse_into_any whether to recurse into Any messages during validation.
+   * @throw EnvoyException if the message does not satisfy its protovalidate constraints.
+   */
+  static void validateWithProtovalidate(const Protobuf::Message& message,
+                                        bool recurse_into_any = false);
+
+  /**
    * Validate protoc-gen-validate constraints on a given protobuf as well as performing
    * unexpected field validation.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
@@ -334,6 +344,12 @@ public:
       checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
 
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_protovalidate")) {
+#ifdef ENVOY_ENABLE_PROTOVALIDATE
+      validateWithProtovalidate(message, recurse_into_any);
+      return;
+#endif
+    }
     // Throw an exception if the config has an invalid Duration field. This is needed
     // because Envoy validates the duration in a strict way that is not supported by PGV.
     validateDurationFields(message, recurse_into_any);

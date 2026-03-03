@@ -6,6 +6,8 @@ import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/range.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -42,10 +44,12 @@ message RouteConfiguration {
 
 message Route {
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  RouteMatch match = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
   // Route request to some upstream cluster.
-  RouteAction route = 2 [(validate.rules).message = {required: true}];
+  RouteAction route = 2
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
 
 message RouteMatch {
@@ -62,6 +66,7 @@ message RouteMatch {
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates the upstream cluster to which the request should be routed.
     string cluster = 1;

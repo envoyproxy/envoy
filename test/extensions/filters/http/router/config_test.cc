@@ -286,8 +286,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   RouterFilterConfig factory;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(router_config, "stats.", context).value(),
-      ProtoValidationException,
-      "Proto constraint validation failed \\(RouterValidationError.StrictCheckHeaders");
+      ProtoValidationException, "strict_check_headers: value must be in list");
 }
 
 TEST(RouterFilterConfigTest, RouterV2Filter) {

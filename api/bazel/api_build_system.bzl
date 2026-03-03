@@ -39,6 +39,7 @@ _COMMON_PROTO_DEPS = [
     "@com_google_googleapis//google/api:httpbody_proto",
     "@com_google_googleapis//google/api:annotations_proto",
     "@com_google_googleapis//google/rpc:status_proto",
+    "@protovalidate//proto/protovalidate/buf/validate:validate_proto",
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
@@ -166,6 +167,7 @@ def api_proto_package(
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
         [
+            "@protovalidate_go_gen//buf/validate",
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@org_golang_google_genproto_googleapis_api//annotations:annotations",
             "@org_golang_google_genproto_googleapis_rpc//status:status",

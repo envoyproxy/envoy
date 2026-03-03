@@ -2,6 +2,7 @@
 
 #include "source/extensions/common/tap/tap.h"
 
+#include "contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.pb.h"
 #include "contrib/tap_sinks/udp_sink/source/udp_sink_impl.h"
 
 namespace Envoy {

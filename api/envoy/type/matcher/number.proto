@@ -4,6 +4,8 @@ package envoy.type.matcher;
 
 import "envoy/type/range.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 message DoubleMatcher {
   oneof match_pattern {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, the input double value must be in the range specified here.
     // Note: The range is using half-open interval semantics [start, end).
