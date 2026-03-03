@@ -296,6 +296,93 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeFetchFailure) {
   cb_or_error.value()(filter_callback);
 }
 
+TEST_F(DynamicModuleFilterConfigTest, RemoteWithEmptySHA256) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("SHA256 hash is required"));
+}
+
+TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingSHA256Mismatch) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  // Use an incorrect SHA256 hash that won't match the actual module bytes.
+  const std::string wrong_sha256 =
+      "0000000000000000000000000000000000000000000000000000000000000000";
+
+  // Set num_retries: 0 so RemoteAsyncDataProvider won't try to use the retry timer.
+  const std::string yaml = absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        retry_policy:
+          num_retries: 0
+        sha256: )EOF",
+                                        wrong_sha256, R"EOF(
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(module_bytes);
+            callbacks.onSuccess(request, std::move(response));
+            return &request;
+          }));
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
+
+  EXPECT_CALL(init_watcher_, ready());
+  init_manager_.initialize(init_watcher_);
+  EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initialized);
+
+  // RemoteDataFetcher rejects the SHA256 mismatch, so filter_config stays null (fail-open).
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(0);
+  cb_or_error.value()(filter_callback);
+}
+
 TEST_F(DynamicModuleFilterConfigTest, EmptyLocalModuleData) {
   const std::string empty_file = TestEnvironment::temporaryPath("empty_module.so");
   { std::ofstream f(empty_file); }

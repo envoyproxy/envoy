@@ -39,11 +39,6 @@ public:
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                       Init::Manager* init_manager = nullptr);
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromAsyncDataSource(const FilterConfig& proto_config,
-                                         Server::Configuration::ServerFactoryContext& context,
-                                         Stats::Scope& scope, Init::Manager* init_manager);
-
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
                                        Server::Configuration::ServerFactoryContext&,
@@ -55,6 +50,12 @@ public:
                                     Server::Configuration::ServerFactoryContext&) override {
     return proto_config.terminal_filter();
   }
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromAsyncDataSource(const FilterConfig& proto_config,
+                                         Server::Configuration::ServerFactoryContext& context,
+                                         Stats::Scope& scope, Init::Manager* init_manager);
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 

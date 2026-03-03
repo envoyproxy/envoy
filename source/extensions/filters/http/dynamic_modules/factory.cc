@@ -165,7 +165,10 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       return filter_config.status();
     }
 
-    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+      context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+    }
     return createFilterFactoryCallback(filter_config.value());
   }
 
@@ -219,12 +222,17 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
             return;
           }
           state->filter_config = filter_config.value();
-          context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+            context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+          }
         });
 
-    // If the fetch failed, filter_config will be null and we silently skip (fail-open).
+    // If the fetch failed, filter_config will be null and we skip (fail-open).
     return [state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       if (!state->filter_config) {
+        ENVOY_LOG_MISC(warn,
+                       "Dynamic module filter skipped: remote module was not loaded (fail-open)");
         return;
       }
       createFilterFactoryCallback(state->filter_config)(callbacks);
