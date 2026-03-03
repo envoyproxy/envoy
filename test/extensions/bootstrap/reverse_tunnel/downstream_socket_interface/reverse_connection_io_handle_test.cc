@@ -2472,17 +2472,12 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupClosesEstablishedConnections) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 }
 
-// Test that cleanup() resets file events before closing trigger pipe FDs.
-// This is critical to prevent a busy loop bug where closing the write FD causes
-// EOF on the read FD, which triggers the file event callback, which calls accept(),
-// which reads EOF, creating an infinite loop.
+// Test that cleanup() resets file events before closing trigger pipe FDs to prevent busy loop.
 TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Set up trigger pipe and initialize file events.
-  // This creates a file event that monitors the trigger pipe read FD.
   int callback_call_count = 0;
   Event::FileReadyCb mock_callback = [&callback_call_count](uint32_t) -> absl::Status {
     callback_call_count++;
@@ -2491,37 +2486,19 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) 
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
 
-  // Verify trigger pipe is ready and file events are registered.
   EXPECT_TRUE(isTriggerPipeReady());
-  int pipe_read_fd = getTriggerPipeReadFd();
-  int pipe_write_fd = getTriggerPipeWriteFd();
-  EXPECT_GE(pipe_read_fd, 0);
-  EXPECT_GE(pipe_write_fd, 0);
+  EXPECT_GE(getTriggerPipeReadFd(), 0);
+  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
 
-  // Verify that the monitored FD is the pipe read FD.
-  EXPECT_EQ(io_handle_->fdDoNotUse(), pipe_read_fd);
-
-  // Call cleanup() - this should:
-  // 1. Call resetFileEvents() first (which resets the file event)
-  // 2. Close trigger_pipe_write_fd_
-  // 3. Close trigger_pipe_read_fd_
-  // If resetFileEvents() is NOT called first, closing the write FD would cause
-  // EOF on the read FD, triggering the file event callback and creating a busy loop.
   cleanup();
 
-  // Verify that trigger pipe FDs are closed (cleanup completed successfully).
   EXPECT_FALSE(isTriggerPipeReady());
   EXPECT_EQ(getTriggerPipeReadFd(), -1);
   EXPECT_EQ(getTriggerPipeWriteFd(), -1);
 
-  // Run the dispatcher briefly to verify that the file event callback is NOT called.
-  // If resetFileEvents() wasn't called before closing the pipe, the callback would
-  // be triggered repeatedly (busy loop). Since resetFileEvents() was called,
-  // the callback should not be invoked.
+  // Verify the file event callback is not triggered after cleanup (no busy loop).
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-
-  // Verify callback was not called after cleanup().
-  // This confirms that resetFileEvents() was called before closing the pipe FDs.
   EXPECT_EQ(callback_call_count, 0);
 }
 
