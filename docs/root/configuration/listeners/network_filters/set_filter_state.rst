@@ -17,6 +17,7 @@ The filter can apply values at different points in the connection lifecycle:
 * ``on_downstream_tls_handshake``: applied when the downstream TLS handshake is complete. For
   non-TLS downstream connections (where there is no TLS handshake), this list is applied when the
   new connection is accepted.
+* ``on_downstream_data``: applied when data is first received from the downstream connection.
 
 .. warning::
     This filter allows overriding the behavior of other extensions and
