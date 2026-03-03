@@ -51,6 +51,10 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
+  // Reset file events before closing trigger pipe.
+  ENVOY_LOG_MISC(trace, "reverse_tunnel: resetting file events before closing trigger pipe.");
+  resetFileEvents();
+
   // Clean up pipe trigger mechanism first to prevent use-after-free.
   ENVOY_LOG_MISC(trace,
                  "reverse_tunnel: cleaning up trigger pipe; "
