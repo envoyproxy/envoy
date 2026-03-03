@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.certificate_providers.local.v3;
+
+import "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.certificate_providers.local.v3";
+option java_outer_classname = "LocalCertificateProviderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/certificate_providers/local/v3;local_certificate_providerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Local Certificate Provider bootstrap extension]
+// [#extension: envoy.bootstrap.certificate_providers.local]
+message LocalCertificateProvider {
+  // The provider instance id used by consumers such as on_demand_secret.
+  string provider_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Local signer settings used by this provider instance.
+  envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.LocalSigner
+      local_signer = 2 [(validate.rules).message = {required: true}];
+}

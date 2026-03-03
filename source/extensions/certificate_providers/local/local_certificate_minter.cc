@@ -1,4 +1,4 @@
-#include "source/common/ssl/local_certificate_minter.h"
+#include "source/extensions/certificate_providers/local/local_certificate_minter.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"

@@ -3,7 +3,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/common/callback_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/ssl/local_certificate_minter.h"
+#include "source/extensions/certificate_providers/local/local_certificate_minter.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
@@ -219,6 +219,7 @@ struct LocalSignerOptions {
 
 class LocalSignerCertificateProvider
     : public Secret::TlsCertificateConfigProvider,
+      public std::enable_shared_from_this<LocalSignerCertificateProvider>,
       protected Logger::Loggable<Logger::Id::secret> {
 public:
   LocalSignerCertificateProvider(std::string secret_name,
@@ -228,6 +229,14 @@ public:
       : secret_name_(std::move(secret_name)), factory_context_(factory_context), options_(options),
         minter_(std::move(minter)) {
     ASSERT(minter_ != nullptr);
+  }
+
+  ~LocalSignerCertificateProvider() override {
+    for (auto& [_, thread] : mint_threads_) {
+      if (thread != nullptr) {
+        thread->join();
+      }
+    }
   }
 
   const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
@@ -254,6 +263,9 @@ public:
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addRemoveCallback(std::function<absl::Status()> callback) override {
+    if (terminal_failure_) {
+      THROW_IF_NOT_OK(callback());
+    }
     return remove_callback_manager_.add(callback);
   }
 
@@ -264,15 +276,22 @@ public:
     if (tls_certificate_ != nullptr) {
       return absl::OkStatus();
     }
-    return updateCertificate();
+    if (mint_in_flight_) {
+      return absl::OkStatus();
+    }
+    return scheduleMint();
   }
 
   absl::Status refresh() {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (tls_certificate_ == nullptr) {
+      return ensureReady();
+    }
+    if (mint_in_flight_) {
+      refresh_requested_ = true;
       return absl::OkStatus();
     }
-    return updateCertificate();
+    return scheduleMint();
   }
 
 private:
@@ -375,7 +394,7 @@ private:
     return absl::OkStatus();
   }
 
-  absl::Status updateCertificate() {
+  absl::StatusOr<Ssl::LocalCertificateMinter::MintRequest> buildMintRequest() {
     auto hostname_or = secretNameToHostname();
     if (!hostname_or) {
       return absl::InvalidArgumentError(
@@ -499,17 +518,91 @@ private:
     mint_request.key_usages = std::move(minter_key_usages);
     mint_request.extended_key_usages = std::move(minter_extended_key_usages);
     mint_request.basic_constraints_ca = options_.basic_constraints_ca;
-    auto minted_or = minter_->mint(mint_request);
-    RETURN_IF_NOT_OK(minted_or.status());
+    return mint_request;
+  }
 
+  absl::Status applyMintedCertificate(const Ssl::LocalCertificateMinter::MintedCertificate& minted) {
     auto tls_certificate =
         std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
-    tls_certificate->mutable_certificate_chain()->set_inline_bytes(minted_or->certificate_pem);
-    tls_certificate->mutable_private_key()->set_inline_bytes(minted_or->private_key_pem);
+    tls_certificate->mutable_certificate_chain()->set_inline_bytes(minted.certificate_pem);
+    tls_certificate->mutable_private_key()->set_inline_bytes(minted.private_key_pem);
 
     tls_certificate_ = std::move(tls_certificate);
+    terminal_failure_ = false;
     RETURN_IF_NOT_OK(update_callback_manager_.runCallbacks());
     return absl::OkStatus();
+  }
+
+  absl::Status scheduleMint() {
+    auto mint_request_or = buildMintRequest();
+    RETURN_IF_NOT_OK(mint_request_or.status());
+    mint_in_flight_ = true;
+    const uint64_t mint_id = next_mint_id_++;
+    auto weak_this = weak_from_this();
+    Event::Dispatcher* main_dispatcher = &factory_context_.mainThreadDispatcher();
+    auto minter = minter_;
+    auto mint_request = std::make_shared<Ssl::LocalCertificateMinter::MintRequest>(
+        std::move(mint_request_or.value()));
+    mint_threads_[mint_id] = factory_context_.api().threadFactory().createThread(
+        [weak_this, main_dispatcher, minter, mint_request, mint_id]() {
+          using MintResult = absl::StatusOr<Ssl::LocalCertificateMinter::MintedCertificate>;
+          auto result = std::make_shared<MintResult>(minter->mint(*mint_request));
+          if (weak_this.expired()) {
+            return;
+          }
+          main_dispatcher->post([weak_this, result, mint_id]() {
+            if (auto self = weak_this.lock(); self) {
+              self->onMintFinished(mint_id, *result);
+            }
+          });
+        });
+    return absl::OkStatus();
+  }
+
+  void onMintFinished(uint64_t mint_id,
+                      const absl::StatusOr<Ssl::LocalCertificateMinter::MintedCertificate>& result) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (auto it = mint_threads_.find(mint_id); it != mint_threads_.end()) {
+      if (it->second != nullptr) {
+        it->second->join();
+      }
+      mint_threads_.erase(it);
+    }
+    mint_in_flight_ = false;
+    const bool should_refresh = refresh_requested_;
+    refresh_requested_ = false;
+
+    if (!result.ok()) {
+      ENVOY_LOG(error, "on-demand local signer mint failed for '{}': {}", secret_name_,
+                result.status().message());
+      if (tls_certificate_ == nullptr) {
+        terminal_failure_ = true;
+        if (const absl::Status status = remove_callback_manager_.runCallbacks(); !status.ok()) {
+          ENVOY_LOG(error, "on-demand local signer remove callback failed for '{}': {}", secret_name_,
+                    status.message());
+        }
+      }
+    } else {
+      if (const absl::Status status = applyMintedCertificate(result.value()); !status.ok()) {
+        ENVOY_LOG(error, "on-demand local signer certificate apply failed for '{}': {}",
+                  secret_name_, status.message());
+      }
+    }
+
+    if (should_refresh && !mint_in_flight_) {
+      auto status = scheduleMint();
+      if (!status.ok() && tls_certificate_ == nullptr) {
+        terminal_failure_ = true;
+        if (const absl::Status remove_status = remove_callback_manager_.runCallbacks();
+            !remove_status.ok()) {
+          ENVOY_LOG(error, "on-demand local signer remove callback failed for '{}': {}",
+                    secret_name_, remove_status.message());
+        }
+      } else if (!status.ok()) {
+        ENVOY_LOG(error, "on-demand local signer refresh scheduling failed for '{}': {}",
+                  secret_name_, status.message());
+      }
+    }
   }
 
   struct LocalCaMaterial {
@@ -531,6 +624,11 @@ private:
       validation_callback_manager_;
   Common::CallbackManager<absl::Status> update_callback_manager_;
   Common::CallbackManager<absl::Status> remove_callback_manager_;
+  bool mint_in_flight_{false};
+  bool refresh_requested_{false};
+  bool terminal_failure_{false};
+  uint64_t next_mint_id_{1};
+  absl::flat_hash_map<uint64_t, Thread::ThreadPtr> mint_threads_;
 };
 
 class LocalSignerCertificateProviderStore {
@@ -586,7 +684,57 @@ private:
   absl::flat_hash_map<std::string, std::weak_ptr<Secret::TlsCertificateConfigProvider>> providers_;
 };
 
+LocalSignerOptions localSignerOptionsFromConfig(const ConfigProto::LocalSigner& local) {
+  LocalSignerOptions options;
+  options.key = local.SerializeAsString();
+  options.ca_cert_path = local.ca_cert_path();
+  options.ca_key_path = local.ca_key_path();
+  options.cert_ttl_days = local.cert_ttl_days() > 0 ? local.cert_ttl_days() : DefaultLocalCertTtlDays;
+  options.subject_organization = !local.subject_organization().empty()
+                                     ? local.subject_organization()
+                                     : DefaultLocalSubjectOrganization;
+  options.key_type = local.key_type();
+  options.rsa_key_bits = local.rsa_key_bits() > 0 ? local.rsa_key_bits() : DefaultRsaKeyBits;
+  options.ecdsa_curve = local.ecdsa_curve();
+  options.signature_hash = local.signature_hash();
+  options.not_before_backdate_seconds = local.not_before_backdate_seconds() > 0
+                                            ? local.not_before_backdate_seconds()
+                                            : DefaultNotBeforeBackdateSeconds;
+  options.hostname_validation = local.hostname_validation();
+  options.runtime_key_prefix = !local.runtime_key_prefix().empty() ? local.runtime_key_prefix()
+                                                                    : DefaultLocalRuntimeKeyPrefix;
+  options.ca_reload_failure_policy = local.ca_reload_failure_policy();
+  options.include_primary_dns_san =
+      local.has_include_primary_dns_san() ? local.include_primary_dns_san().value() : true;
+  options.additional_dns_sans =
+      std::vector<std::string>(local.additional_dns_sans().begin(), local.additional_dns_sans().end());
+  options.key_usages = toKeyUsageVector(local.key_usages());
+  options.extended_key_usages = toExtendedKeyUsageVector(local.extended_key_usages());
+  options.basic_constraints_ca = local.has_basic_constraints_ca()
+                                     ? absl::optional<bool>(local.basic_constraints_ca().value())
+                                     : absl::nullopt;
+  options.subject_common_name = local.subject_common_name();
+  options.subject_organizational_unit = local.subject_organizational_unit();
+  options.subject_country = local.subject_country();
+  options.subject_state_or_province = local.subject_state_or_province();
+  options.subject_locality = local.subject_locality();
+  return options;
+}
+
 } // namespace
+
+absl::StatusOr<Secret::TlsCertificateConfigProviderSharedPtr>
+findOrCreateLocalSignerCertificateProvider(
+    absl::string_view secret_name, Server::Configuration::ServerFactoryContext& factory_context,
+    const ConfigProto::LocalSigner& local_signer_config) {
+  return LocalSignerCertificateProviderStore::instance().findOrCreate(
+      secret_name, factory_context, localSignerOptionsFromConfig(local_signer_config));
+}
+
+absl::Status
+refreshLocalSignerCertificateProviders(const ConfigProto::LocalSigner& local_signer_config) {
+  return LocalSignerCertificateProviderStore::instance().refreshAll(local_signer_config.SerializeAsString());
+}
 
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        Server::Configuration::ServerFactoryContext& factory_context,
@@ -599,6 +747,18 @@ AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
               config_source, std::string(cert_name), factory_context, init_manager, false),
           update_cb, remove_cb) {}
 
+AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
+                                       Server::Configuration::ServerFactoryContext& factory_context,
+                                       absl::string_view provider_name,
+                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb,
+                                       RemoveCb remove_cb)
+    : AsyncContextConfig(
+          cert_name, factory_context,
+          factory_context.secretManager().findOrCreateTlsCertificateProvider(
+              std::string(provider_name), std::string(cert_name), factory_context,
+              init_manager),
+          update_cb, remove_cb) {}
+
 AsyncContextConfig::AsyncContextConfig(
     absl::string_view cert_name, Server::Configuration::ServerFactoryContext& factory_context,
     Secret::TlsCertificateConfigProviderSharedPtr cert_provider, UpdateCb update_cb,
@@ -606,12 +766,20 @@ AsyncContextConfig::AsyncContextConfig(
     : factory_context_(factory_context), cert_name_(cert_name),
       cert_provider_(std::move(cert_provider)),
       update_cb_(update_cb),
-      update_cb_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })),
-      remove_cb_(remove_cb), remove_cb_handle_(cert_provider_->addRemoveCallback(
-                                 [this]() { return remove_cb_(cert_name_); })) {}
+      update_cb_handle_(cert_provider_ ? cert_provider_->addUpdateCallback(
+                                            [this]() { return loadCert(); })
+                                       : nullptr),
+      remove_cb_(remove_cb),
+      remove_cb_handle_(cert_provider_ ? cert_provider_->addRemoveCallback(
+                                            [this]() { return remove_cb_(cert_name_); })
+                                       : nullptr) {}
 
 absl::Status AsyncContextConfig::loadCert() {
   // Called on main, possibly during the constructor.
+  if (cert_provider_ == nullptr) {
+    return absl::NotFoundError(
+        absl::StrCat("certificate provider not found for certificate '", cert_name_, "'"));
+  }
   auto* secret = cert_provider_->secret();
   if (secret != nullptr) {
     Server::GenericFactoryContextImpl generic_context(factory_context_,
@@ -659,81 +827,27 @@ SecretManager::SecretManager(const ConfigProto& config,
       factory_context_(factory_context.serverFactoryContext()),
       config_source_(config.config_source()), context_factory_(std::move(context_factory)),
       local_signer_enabled_(config.has_local_signer()),
-      local_signer_key_(config.has_local_signer() ? config.local_signer().SerializeAsString() : ""),
-      local_ca_cert_path_(config.has_local_signer() ? config.local_signer().ca_cert_path() : ""),
-      local_ca_key_path_(config.has_local_signer() ? config.local_signer().ca_key_path() : ""),
-      local_cert_ttl_days_(config.has_local_signer() && config.local_signer().cert_ttl_days() > 0
-                               ? config.local_signer().cert_ttl_days()
-                               : DefaultLocalCertTtlDays),
-      local_subject_organization_(config.has_local_signer() &&
-                                          !config.local_signer().subject_organization().empty()
-                                      ? config.local_signer().subject_organization()
-                                      : DefaultLocalSubjectOrganization),
-      local_key_type_(config.has_local_signer() ? config.local_signer().key_type()
-                                                : ConfigProto::LocalSigner::KEY_TYPE_UNSPECIFIED),
-      local_rsa_key_bits_(config.has_local_signer() && config.local_signer().rsa_key_bits() > 0
-                              ? config.local_signer().rsa_key_bits()
-                              : DefaultRsaKeyBits),
-      local_ecdsa_curve_(config.has_local_signer()
-                             ? config.local_signer().ecdsa_curve()
-                             : ConfigProto::LocalSigner::ECDSA_CURVE_UNSPECIFIED),
-      local_signature_hash_(config.has_local_signer()
-                                ? config.local_signer().signature_hash()
-                                : ConfigProto::LocalSigner::SIGNATURE_HASH_UNSPECIFIED),
-      local_not_before_backdate_seconds_(
-          config.has_local_signer() && config.local_signer().not_before_backdate_seconds() > 0
-              ? config.local_signer().not_before_backdate_seconds()
-              : DefaultNotBeforeBackdateSeconds),
-      local_hostname_validation_(
-          config.has_local_signer()
-              ? config.local_signer().hostname_validation()
-              : ConfigProto::LocalSigner::HOSTNAME_VALIDATION_UNSPECIFIED),
-      local_runtime_key_prefix_(
-          config.has_local_signer() && !config.local_signer().runtime_key_prefix().empty()
-              ? config.local_signer().runtime_key_prefix()
-              : DefaultLocalRuntimeKeyPrefix),
-      local_ca_reload_failure_policy_(
-          config.has_local_signer()
-              ? config.local_signer().ca_reload_failure_policy()
-              : ConfigProto::LocalSigner::CA_RELOAD_FAILURE_POLICY_UNSPECIFIED),
-      local_include_primary_dns_san_(
-          !config.has_local_signer() || !config.local_signer().has_include_primary_dns_san()
-              ? true
-              : config.local_signer().include_primary_dns_san().value()),
-      local_additional_dns_sans_(config.has_local_signer()
-                                     ? std::vector<std::string>(
-                                           config.local_signer().additional_dns_sans().begin(),
-                                           config.local_signer().additional_dns_sans().end())
-                                     : std::vector<std::string>{}),
-      local_key_usages_(config.has_local_signer()
-                            ? toKeyUsageVector(config.local_signer().key_usages())
-                            : std::vector<ConfigProto::LocalSigner::KeyUsage>{}),
-      local_extended_key_usages_(
-          config.has_local_signer()
-              ? toExtendedKeyUsageVector(config.local_signer().extended_key_usages())
-              : std::vector<ConfigProto::LocalSigner::ExtendedKeyUsage>{}),
-      local_basic_constraints_ca_(
-          config.has_local_signer() && config.local_signer().has_basic_constraints_ca()
-              ? absl::optional<bool>(config.local_signer().basic_constraints_ca().value())
-              : absl::nullopt),
-      local_subject_common_name_(
-          config.has_local_signer() ? config.local_signer().subject_common_name() : ""),
-      local_subject_organizational_unit_(
-          config.has_local_signer() ? config.local_signer().subject_organizational_unit() : ""),
-      local_subject_country_(config.has_local_signer() ? config.local_signer().subject_country()
-                                                       : ""),
-      local_subject_state_or_province_(
-          config.has_local_signer() ? config.local_signer().subject_state_or_province() : ""),
-      local_subject_locality_(config.has_local_signer() ? config.local_signer().subject_locality()
-                                                        : ""),
+      local_signer_config_(config.has_local_signer() ? config.local_signer()
+                                                     : ConfigProto::LocalSigner()),
+      certificate_provider_enabled_(config.has_certificate_provider()),
+      certificate_provider_name_(config.has_certificate_provider()
+                                     ? config.certificate_provider().provider_name()
+                                     : ""),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   if (local_signer_enabled_) {
-    ENVOY_LOG(info, "on-demand selector using local signer (cert_ttl_days={})", local_cert_ttl_days_);
+    const uint32_t cert_ttl_days = local_signer_config_.cert_ttl_days() > 0
+                                       ? local_signer_config_.cert_ttl_days()
+                                       : DefaultLocalCertTtlDays;
+    ENVOY_LOG(info, "on-demand selector using local signer (cert_ttl_days={})", cert_ttl_days);
+  } else if (certificate_provider_enabled_) {
+    ENVOY_LOG(info, "on-demand selector using certificate provider '{}'",
+              certificate_provider_name_);
   }
   for (const auto& name : config.prefetch_secret_names()) {
     const OptRef<Init::Manager> init_manager =
-        local_signer_enabled_ ? OptRef<Init::Manager>() : factory_context.initManager();
+        (local_signer_enabled_ || certificate_provider_enabled_) ? OptRef<Init::Manager>()
+                                                                 : factory_context.initManager();
     addCertificateConfig(name, nullptr, init_manager);
   }
 }
@@ -778,6 +892,29 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
       }
       return;
     }
+    if (certificate_provider_enabled_) {
+      entry.cert_config_ = std::make_unique<AsyncContextConfig>(
+          secret_name, factory_context_, certificate_provider_name_, init_manager,
+          [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
+              -> absl::Status { return updateCertificate(secret_name, cert_config); },
+          [this](absl::string_view secret_name) -> absl::Status {
+            return removeCertificateConfig(secret_name);
+          });
+      if (!entry.cert_config_->hasProvider()) {
+        ENVOY_LOG(error,
+                  "failed to resolve certificate provider '{}', certificate '{}'",
+                  certificate_provider_name_, secret_name);
+        for (auto fetch_handle : entry.callbacks_) {
+          if (auto cb_handle = fetch_handle.lock(); cb_handle) {
+            cb_handle->notify(nullptr);
+          }
+        }
+        entry.callbacks_.clear();
+        cache_.erase(std::string(secret_name));
+        stats_->cert_active_.dec();
+      }
+      return;
+    }
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
@@ -816,7 +953,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
 absl::Status SecretManager::updateAll() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (local_signer_enabled_) {
-    return LocalSignerCertificateProviderStore::instance().refreshAll(local_signer_key_);
+    return refreshLocalSignerCertificateProviders(local_signer_config_);
   }
   for (auto& [secret_name, entry] : cache_) {
     const auto& cert_config = entry.cert_config_->certConfig();
@@ -835,32 +972,8 @@ absl::Status SecretManager::updateAll() {
 Secret::TlsCertificateConfigProviderSharedPtr
 SecretManager::createLocalCertificateProvider(absl::string_view secret_name) const {
   ASSERT(local_signer_enabled_);
-  LocalSignerOptions options;
-  options.key = local_signer_key_;
-  options.ca_cert_path = local_ca_cert_path_;
-  options.ca_key_path = local_ca_key_path_;
-  options.cert_ttl_days = local_cert_ttl_days_;
-  options.subject_organization = local_subject_organization_;
-  options.key_type = local_key_type_;
-  options.rsa_key_bits = local_rsa_key_bits_;
-  options.ecdsa_curve = local_ecdsa_curve_;
-  options.signature_hash = local_signature_hash_;
-  options.not_before_backdate_seconds = local_not_before_backdate_seconds_;
-  options.hostname_validation = local_hostname_validation_;
-  options.runtime_key_prefix = local_runtime_key_prefix_;
-  options.ca_reload_failure_policy = local_ca_reload_failure_policy_;
-  options.include_primary_dns_san = local_include_primary_dns_san_;
-  options.additional_dns_sans = local_additional_dns_sans_;
-  options.key_usages = local_key_usages_;
-  options.extended_key_usages = local_extended_key_usages_;
-  options.basic_constraints_ca = local_basic_constraints_ca_;
-  options.subject_common_name = local_subject_common_name_;
-  options.subject_organizational_unit = local_subject_organizational_unit_;
-  options.subject_country = local_subject_country_;
-  options.subject_state_or_province = local_subject_state_or_province_;
-  options.subject_locality = local_subject_locality_;
-  auto provider_or_error = LocalSignerCertificateProviderStore::instance().findOrCreate(
-      secret_name, factory_context_, options);
+  auto provider_or_error =
+      findOrCreateLocalSignerCertificateProvider(secret_name, factory_context_, local_signer_config_);
   if (!provider_or_error.ok()) {
     ENVOY_LOG(error, "failed to create local signer provider for '{}': {}", secret_name,
               provider_or_error.status().message());
@@ -1008,8 +1121,17 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
-  if (!config.has_local_signer() && !config.has_config_source()) {
-    return absl::InvalidArgumentError("either config_source or local_signer must be configured");
+  uint32_t mode_count = 0;
+  mode_count += config.has_config_source() ? 1 : 0;
+  mode_count += config.has_local_signer() ? 1 : 0;
+  mode_count += config.has_certificate_provider() ? 1 : 0;
+  if (mode_count == 0) {
+    return absl::InvalidArgumentError(
+        "one of config_source, local_signer, or certificate_provider must be configured");
+  }
+  if (mode_count > 1) {
+    return absl::InvalidArgumentError(
+        "config_source, local_signer, and certificate_provider are mutually exclusive");
   }
   if (config.has_local_signer()) {
     if (config.local_signer().ca_cert_path().empty() || config.local_signer().ca_key_path().empty()) {
@@ -1084,6 +1206,9 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
         return absl::InvalidArgumentError("unsupported local_signer.extended_key_usages value");
       }
     }
+  }
+  if (config.has_certificate_provider() && config.certificate_provider().provider_name().empty()) {
+    return absl::InvalidArgumentError("certificate_provider.provider_name must be set");
   }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());

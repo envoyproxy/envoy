@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
 message Config {
   // Defines the configuration source of the secrets.
-  // If ``local_signer`` is set, this field is ignored.
+  // If ``local_signer`` or ``certificate_provider`` is set, this field is ignored.
   config.core.v3.ConfigSource config_source = 1;
 
   // Extension point to specify a function to compute the secret name. The extension is called
@@ -180,4 +180,15 @@ message Config {
 
   // Optional local certificate signer configuration.
   LocalSigner local_signer = 4;
+
+  // Optional named certificate provider configuration.
+  // When set, Envoy resolves mapped certificate names through the registered provider instance
+  // instead of SDS.
+  message CertificateProvider {
+    // Name of the registered certificate provider instance.
+    string provider_name = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Optional named certificate provider mode.
+  CertificateProvider certificate_provider = 5;
 }

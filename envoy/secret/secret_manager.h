@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -15,6 +16,9 @@ class ServerFactoryContext;
 } // namespace Server
 
 namespace Secret {
+
+using TlsCertificateProviderFactoryCb = std::function<TlsCertificateConfigProviderSharedPtr(
+    const std::string& certificate_name, Server::Configuration::ServerFactoryContext&)>;
 
 /**
  * A manager for static and dynamic secrets.
@@ -114,6 +118,23 @@ public:
                                      const std::string& config_name,
                                      Server::Configuration::ServerFactoryContext& server_context,
                                      OptRef<Init::Manager> init_manager, bool warm) PURE;
+
+  /**
+   * Registers a named TLS certificate provider factory.
+   * Factory instances are looked up by name and used by
+   * findOrCreateTlsCertificateProvider(provider_name, certificate_name, ...).
+   */
+  virtual absl::Status registerTlsCertificateProviderFactory(
+      const std::string& provider_name, TlsCertificateProviderFactoryCb provider_factory) PURE;
+
+  /**
+   * Finds and returns a TLS certificate provider from a named provider factory.
+   * Creates it on first use per (provider_name, certificate_name) pair.
+   */
+  virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
+      const std::string& provider_name, const std::string& certificate_name,
+      Server::Configuration::ServerFactoryContext& server_context,
+      OptRef<Init::Manager> init_manager) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create

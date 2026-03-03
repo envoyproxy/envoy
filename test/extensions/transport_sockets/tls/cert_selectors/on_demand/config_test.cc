@@ -86,6 +86,18 @@ protected:
     )EOF";
   }
 
+  std::string certificateProviderConfig() const {
+    return R"EOF(
+      certificate_provider:
+        provider_name: local_cert_minter
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF";
+  }
+
 protected:
   bool disable_stateless_resumption_{true};
   bool disable_stateful_resumption_{true};
@@ -94,6 +106,10 @@ protected:
 TEST_F(OnDemandTest, BasicLoadTest) { EXPECT_OK(create(defaultConfig())); }
 
 TEST_F(OnDemandTest, BasicLoadTestLocalSigner) { EXPECT_OK(create(localSignerConfig())); }
+
+TEST_F(OnDemandTest, BasicLoadTestCertificateProvider) {
+  EXPECT_OK(create(certificateProviderConfig()));
+}
 
 TEST_F(OnDemandTest, BasicLoadTestQuic) {
   EXPECT_THAT(create(defaultConfig(), true), StatusIs(absl::StatusCode::kInvalidArgument));
@@ -109,8 +125,36 @@ TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
   EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(OnDemandTest, MustConfigureSourceOrLocalSigner) {
+TEST_F(OnDemandTest, MustConfigureSourceOrLocalSignerOrCertificateProvider) {
   EXPECT_THAT(create(R"EOF(
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, SourceModesAreMutuallyExclusive) {
+  EXPECT_THAT(create(R"EOF(
+      config_source:
+        ads: {}
+      certificate_provider:
+        provider_name: local_cert_minter
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(create(R"EOF(
+      local_signer:
+        ca_cert_path: /etc/envoy/mitm/ca.crt
+        ca_key_path: /etc/envoy/mitm/ca.key
+      certificate_provider:
+        provider_name: local_cert_minter
       certificate_mapper:
         name: static-name
         typed_config:
