@@ -159,6 +159,105 @@ TEST(RequestSplitterTest, EmptyMetrics) {
   ASSERT_EQ(0, requests.size());
 }
 
+TEST(RequestSplitterTest, GaugeSplit) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
+  auto* rm = resource_metrics.Add();
+  rm->mutable_resource()->add_attributes()->set_key("rm_gauge");
+  auto* m1 = rm->add_scope_metrics()->add_metrics();
+  m1->set_name("m_gauge");
+  m1->set_description("gauge description");
+  m1->set_unit("1");
+  m1->mutable_gauge()->add_data_points()->set_as_int(1);
+  m1->mutable_gauge()->add_data_points()->set_as_int(2);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+    requests.push_back(std::move(req));
+  });
+
+  ASSERT_EQ(2, requests.size());
+  for (int i = 0; i < 2; i++) {
+    auto& metric = requests[i]->resource_metrics(0).scope_metrics(0).metrics(0);
+    EXPECT_EQ("m_gauge", metric.name());
+    EXPECT_EQ("gauge description", metric.description());
+    EXPECT_EQ("1", metric.unit());
+    EXPECT_TRUE(metric.has_gauge());
+    EXPECT_EQ(1, metric.gauge().data_points_size());
+    EXPECT_EQ(i + 1, metric.gauge().data_points(0).as_int());
+  }
+}
+
+TEST(RequestSplitterTest, SumSplit) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
+  auto* rm = resource_metrics.Add();
+  rm->mutable_resource()->add_attributes()->set_key("rm_sum");
+  auto* m1 = rm->add_scope_metrics()->add_metrics();
+  m1->set_name("m_sum");
+  m1->set_description("sum description");
+  m1->set_unit("1");
+  m1->mutable_sum()->set_aggregation_temporality(
+      opentelemetry::proto::metrics::v1::AggregationTemporality::
+          AGGREGATION_TEMPORALITY_CUMULATIVE);
+  m1->mutable_sum()->set_is_monotonic(true);
+
+  m1->mutable_sum()->add_data_points()->set_as_int(1);
+  m1->mutable_sum()->add_data_points()->set_as_int(2);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+    requests.push_back(std::move(req));
+  });
+
+  ASSERT_EQ(2, requests.size());
+  for (int i = 0; i < 2; i++) {
+    auto& metric = requests[i]->resource_metrics(0).scope_metrics(0).metrics(0);
+    EXPECT_EQ("m_sum", metric.name());
+    EXPECT_EQ("sum description", metric.description());
+    EXPECT_EQ("1", metric.unit());
+    EXPECT_TRUE(metric.has_sum());
+    EXPECT_EQ(opentelemetry::proto::metrics::v1::AggregationTemporality::
+                  AGGREGATION_TEMPORALITY_CUMULATIVE,
+              metric.sum().aggregation_temporality());
+    EXPECT_TRUE(metric.sum().is_monotonic());
+    EXPECT_EQ(1, metric.sum().data_points_size());
+    EXPECT_EQ(i + 1, metric.sum().data_points(0).as_int());
+  }
+}
+
+TEST(RequestSplitterTest, HistogramSplit) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
+  auto* rm = resource_metrics.Add();
+  rm->mutable_resource()->add_attributes()->set_key("rm_histogram");
+  auto* m1 = rm->add_scope_metrics()->add_metrics();
+  m1->set_name("m_histogram");
+  m1->set_description("histogram description");
+  m1->set_unit("ms");
+  m1->mutable_histogram()->set_aggregation_temporality(
+      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
+
+  m1->mutable_histogram()->add_data_points()->set_count(1);
+  m1->mutable_histogram()->add_data_points()->set_count(2);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+    requests.push_back(std::move(req));
+  });
+
+  ASSERT_EQ(2, requests.size());
+  for (int i = 0; i < 2; i++) {
+    auto& metric = requests[i]->resource_metrics(0).scope_metrics(0).metrics(0);
+    EXPECT_EQ("m_histogram", metric.name());
+    EXPECT_EQ("histogram description", metric.description());
+    EXPECT_EQ("ms", metric.unit());
+    EXPECT_TRUE(metric.has_histogram());
+    EXPECT_EQ(
+        opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
+        metric.histogram().aggregation_temporality());
+    EXPECT_EQ(1, metric.histogram().data_points_size());
+    EXPECT_EQ(i + 1, metric.histogram().data_points(0).count());
+  }
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace StatSinks

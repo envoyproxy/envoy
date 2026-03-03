@@ -36,10 +36,18 @@ private:
                   const std::function<void(MetricsExportRequestPtr)>& send_callback);
 
   void submitRequestIfNeeded();
+
+  // Signal the start of processing a new ResourceMetrics.
   void beginResourceMetric();
+  // Signal the start of processing a new ScopeMetrics.
   void beginScopeMetric();
+  // Signal the start of processing a new Metric.
   void beginMetric();
 
+  // Appends a single data point to the current request.
+  // This validates the max data points limit first, then recursively ensures that
+  // current_rm_, current_sm_, and current_metric_ are properly initialized within
+  // the current request limit constraints before calling datapoint_callback.
   template <typename DataPointCallback>
   void appendDataPoint(const opentelemetry::proto::metrics::v1::ResourceMetrics& rm,
                        const opentelemetry::proto::metrics::v1::ScopeMetrics& sm,
@@ -95,13 +103,22 @@ private:
   void finish();
 
 private:
+  // Maximum number of data points per export request.
   uint32_t max_dp_;
+  // Maximum number of resource metrics per export request.
   uint32_t max_rm_;
+  // Callback invoked to send a constructed export request.
   std::function<void(MetricsExportRequestPtr)> send_callback_;
+
+  // The current export request being built.
   MetricsExportRequestPtr current_request_;
+  // Number of data points accumulated in the current request.
   uint32_t current_dp_count_{0};
+  // Number of resource metrics accumulated in the current request.
   uint32_t current_rm_count_{0};
 
+  // Pointers to the active mutable structures in the current request being built.
+  // These are used to append nested metrics and data points without repeatedly looking them up.
   opentelemetry::proto::metrics::v1::ResourceMetrics* current_rm_{nullptr};
   opentelemetry::proto::metrics::v1::ScopeMetrics* current_sm_{nullptr};
   opentelemetry::proto::metrics::v1::Metric* current_metric_{nullptr};
