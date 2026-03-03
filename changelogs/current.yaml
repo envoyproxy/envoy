@@ -96,6 +96,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: hot_restart
+  change: |
+    Fixed hot restart for listeners with a network namespace in the address. Previously, socket
+    hand-off didn't work cleanly because the namespace was not included in the ``PassListenSocket``
+    request, causing the parent to always fall back to binding a new socket.
 - area: dynamic_modules
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
@@ -103,6 +108,9 @@ bug_fixes:
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
+- area: http
+  change: |
+    Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
 - area: load_report
   change: |
     Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
@@ -126,6 +134,12 @@ bug_fixes:
 - area: drop_overload
   change: |
     Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
+- area: scoped_rds
+  change: |
+    Fixed a bug where SRDS subscriptions would never start when a listener with scoped routes was
+    added after server initialization completed. The ``SrdsFactory`` interface
+    was incorrectly using the server-level init manager instead of the listener-level init manager,
+    causing the SRDS init target to be silently discarded.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -139,10 +153,23 @@ bug_fixes:
 - area: oauth2
   change: |
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: watch-dog
+  change: |
+    Fixed a bug where the worker-threads' watch-dogs were configured using the main-thread's configuration.
+    This change can be reverted by setting the runtime guard ``envoy.restart_features.worker_threads_watchdog_fix``
+    to ``false``.
 - area: ext_proc
   change: |
     Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
     the runtime guard ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed message-valued CEL attribute serialization (for example
+    ``xds.virtual_host_metadata``) to use protobuf text format instead of debug string output.
+    This restores ext_proc compatibility with protobuf 30+ where debug-string output is
+    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
+    be reverted by setting runtime guard
+    ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
@@ -184,11 +211,22 @@ bug_fixes:
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
     headers. Previously this caused a spurious 500 error.
+- area: upstream
+  change: |
+    Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
+    due to eagerly calling refresh() before the deferred priority state resize.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: golang
+  change: |
+    Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
+    providing access to SSL/TLS connection information for the downstream connection. This includes
+    peer certificate details (subject, issuer, serial number, SANs, validity), TLS version, cipher
+    suite, and PEM-encoded certificates. This achieves feature parity with the Lua filter's
+    ``downstreamSslConnection()`` functionality.
 - area: outlier_detection
   change: |
     Added :ref:`detect_degraded_hosts <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
@@ -440,6 +478,13 @@ new_features:
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
     They can either be logged in their original form or decoded.
+- area: formatter
+  change: |
+    Added new access log formatters for tracking upstream hosts and connection IDs attempted during
+    request processing: ``%UPSTREAM_HOSTS_ATTEMPTED%``, ``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``,
+    ``%UPSTREAM_HOST_NAMES_ATTEMPTED%``, ``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``, and
+    ``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``. These are useful for debugging retry behavior and
+    understanding which hosts were tried before a successful connection or final failure.
 - area: dynamic_modules
   change: |
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target
@@ -493,7 +538,11 @@ new_features:
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
-
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP session negotiation, including ``initialize`` and
+    ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
+    recommended for production use.
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header
