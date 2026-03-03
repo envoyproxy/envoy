@@ -570,7 +570,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
     direct_response_body_formatter_ = std::move(formatter_or_error.value());
     // Capture the content_type from body_format, using the same defaulting logic as
-    // local_reply.cc BodyFormatter: explicit content_type > JSON format default > empty (text/plain).
+    // local_reply.cc BodyFormatter: explicit content_type > JSON format default > empty
+    // (text/plain).
     const auto& body_format = route.direct_response().body_format();
     if (!body_format.content_type().empty()) {
       direct_response_content_type_ = body_format.content_type();
