@@ -46,6 +46,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
+    "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
@@ -237,6 +238,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     );
     let worker_index = envoy_filter.get_worker_index();
     assert_eq!(worker_index, 0);
+
+    // ConnectionMtls is a bool attribute; without TLS it should return None.
+    let mtls =
+      envoy_filter.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+    assert!(mtls.is_none());
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
@@ -600,6 +606,77 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "key",
     );
     assert!(ns_res_body.is_none());
+
+    // Test bool metadata.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", true);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(true));
+    // Set false.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", false);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(false));
+    // Try getting bool as string (should fail).
+    let bool_as_string = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_string.is_none());
+    // Try getting bool as number (should fail).
+    let bool_as_number = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_number.is_none());
+
+    // Test get_metadata_keys.
+    envoy_filter.set_dynamic_metadata_string("ns_keys_test", "k1", "v1");
+    envoy_filter.set_dynamic_metadata_number("ns_keys_test", "k2", 2.0);
+    envoy_filter.set_dynamic_metadata_bool("ns_keys_test", "k3", true);
+    let keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_keys_test",
+    );
+    assert!(keys.is_some());
+    let keys = keys.unwrap();
+    assert_eq!(keys.len(), 3);
+    let key_strs: Vec<&str> = keys
+      .iter()
+      .map(|k| std::str::from_utf8(k.as_slice()).unwrap())
+      .collect();
+    assert!(key_strs.contains(&"k1"));
+    assert!(key_strs.contains(&"k2"));
+    assert!(key_strs.contains(&"k3"));
+
+    // Non-existing namespace returns None.
+    let no_keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "non_existing_ns",
+    );
+    assert!(no_keys.is_none());
+
+    // Test get_metadata_namespaces.
+    let namespaces =
+      envoy_filter.get_metadata_namespaces(abi::envoy_dynamic_module_type_metadata_source::Dynamic);
+    assert!(namespaces.is_some());
+    let namespaces = namespaces.unwrap();
+    assert!(!namespaces.is_empty());
+    let ns_strs: Vec<&str> = namespaces
+      .iter()
+      .map(|ns| std::str::from_utf8(ns.as_slice()).unwrap())
+      .collect();
+    assert!(ns_strs.contains(&"ns_keys_test"));
+    assert!(ns_strs.contains(&"ns_res_body_bool"));
+
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }
@@ -708,6 +785,49 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     assert_eq!(filter_state.unwrap().as_slice(), b"stream_complete_value");
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the typed filter state
+/// related callbacks.
+struct TypedFilterStateCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TypedFilterStateCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(TypedFilterStateCallbacksFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`] to test the
+/// typed filter state callbacks.
+struct TypedFilterStateCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TypedFilterStateCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Set typed filter state using the registered test factory key.
+    let ok =
+      envoy_filter.set_filter_state_typed(b"envoy.test.http_typed_object_for_rust", b"typed_value");
+    assert!(ok);
+
+    // Read it back via the typed getter.
+    let result = envoy_filter.get_filter_state_typed(b"envoy.test.http_typed_object_for_rust");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().as_slice(), b"typed_value");
+
+    // Non-existing key should return None.
+    let result = envoy_filter.get_filter_state_typed(b"nonexistent_key");
+    assert!(result.is_none());
+
+    // Setting with a key that has no registered factory should fail.
+    let ok = envoy_filter.set_filter_state_typed(b"no.such.factory", b"value");
+    assert!(!ok);
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 

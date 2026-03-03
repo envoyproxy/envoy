@@ -1601,6 +1601,8 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
 // by sending back an immediate_response message, which should be
 // returned directly to the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  initializeLogConfig(access_log_path);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -1629,6 +1631,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.ext_proc.immediate_responses_sent")->value());
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_imm_resp = json_log->getString("received_immediate_response_field");
+  EXPECT_EQ(*field_imm_resp, "1");
 }
 
 // Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
@@ -3946,6 +3952,59 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_request_attributes()->Add("xds.virtual_host_metadata");
+
+  config_helper_.addConfigModifier([](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* metadata = vh->mutable_metadata();
+
+    Protobuf::Struct struct_val;
+    (*struct_val.mutable_fields())["apiIdentifier"].set_string_value("test-api");
+    (*struct_val.mutable_fields())["extHost"].set_string_value("test-host");
+    (*metadata->mutable_filter_metadata())["someKey"] = struct_val;
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true,
+      [](const ProcessingRequest& req, ProcessingResponse& resp) -> bool {
+        // Send a valid request-headers response for this request-headers processing step.
+        resp.mutable_request_headers();
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_TRUE(proto_struct.fields().contains("xds.virtual_host_metadata"));
+        const auto& metadata_textproto =
+            proto_struct.fields().at("xds.virtual_host_metadata").string_value();
+        envoy::config::core::v3::Metadata parsed_metadata;
+        const bool parsed =
+            Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
+        EXPECT_TRUE(parsed);
+        EXPECT_TRUE(parsed_metadata.filter_metadata().contains("someKey"));
+        EXPECT_EQ(parsed_metadata.filter_metadata()
+                      .at("someKey")
+                      .fields()
+                      .at("apiIdentifier")
+                      .string_value(),
+                  "test-api");
+        EXPECT_EQ(
+            parsed_metadata.filter_metadata().at("someKey").fields().at("extHost").string_value(),
+            "test-host");
+        return true;
+      });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
@@ -5195,7 +5254,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsBufferedMode) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5273,7 +5331,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutationsStreamed) {
   verifyDownstreamResponse(*response, 200);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result << "\n";
   auto json_log = Json::Factory::loadFromString(log_result).value();
 
   // 0: NONE, 1: MUTATION_APPLIED
@@ -5313,7 +5370,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoContinueAndReplace) {
   // Ensure that we replaced and did not append to the request.
   EXPECT_EQ(upstream_request_->body().toString(), "Hello, Server!");
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   // No header mutations but a body replacement happened due to continue & replace.
   // Test that the request_body_effect shows mutation applied
@@ -5348,7 +5404,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoFailedMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Failed mutation request
@@ -5379,7 +5434,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request
@@ -5427,7 +5481,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoPartialMutationApplied) {
   verifyDownstreamResponse(*response, 500);
 
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  std::cout << log_result;
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_effect = json_log->getString("field_request_header_effect");
   // Invalid mutation request

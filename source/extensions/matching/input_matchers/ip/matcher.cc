@@ -1,5 +1,7 @@
 #include "source/extensions/matching/input_matchers/ip/matcher.h"
 
+#include "envoy/matcher/matcher.h"
+
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -9,6 +11,7 @@ namespace InputMatchers {
 namespace IP {
 
 namespace {
+using ::Envoy::Matcher::MatchResult;
 
 MatcherStats generateStats(absl::string_view prefix, Stats::Scope& scope) {
   return MatcherStats{IP_MATCHER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
@@ -25,21 +28,24 @@ Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
       // store any associated data.
       trie_({{true, ranges}}), stats_(generateStats(stat_prefix, stat_scope)) {}
 
-bool Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
+MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
   if (absl::holds_alternative<absl::monostate>(input)) {
-    return false;
+    return MatchResult::NoMatch;
   }
   const std::string& ip_str = absl::get<std::string>(input);
   if (ip_str.empty()) {
-    return false;
+    return MatchResult::NoMatch;
   }
   const auto ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
     ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
-    return false;
+    return MatchResult::NoMatch;
   }
-  return !trie_.getData(ip).empty();
+  if (!trie_.getData(ip).empty()) {
+    return MatchResult::Matched;
+  }
+  return MatchResult::NoMatch;
 }
 
 } // namespace IP

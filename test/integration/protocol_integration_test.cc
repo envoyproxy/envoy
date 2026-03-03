@@ -154,6 +154,10 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
 }
 
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
+  OsSysCallsWithMockedDns mock_os_sys_calls;
+  mock_os_sys_calls.setIpVersion(GetParam().version);
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&mock_os_sys_calls};
+
   if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
     return;
@@ -182,9 +186,15 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ProtocolIntegrationTest, StrictDns) {
+  OsSysCallsWithMockedDns mock_os_sys_calls;
+  mock_os_sys_calls.setIpVersion(GetParam().version);
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&mock_os_sys_calls};
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -203,6 +213,8 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_.reset();
+  cleanupUpstreamAndDownstream();
 }
 
 // Change the default route to be restrictive, and send a request to an alternate route.
@@ -5480,12 +5492,12 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
       ASSERT_TRUE(response->waitForReset());
     } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
       // Unlike H/2, H/3 client codec only stops sending request upon STOP_SENDING frame but still
-      // attempts to finish receiving response. So resume reading in order to fully close the
-      // stream after receiving both STOP_SENDING and end stream.
+      // attempts to finish receiving response. Resume reading so the response can complete.
+      // The stream may terminate via end_stream (response fully received) and/or via reset
+      // (STOP_SENDING). The ordering between these two events is non-deterministic, so use
+      // waitForAnyTermination() to handle either case.
       request_encoder_->getStream().readDisable(false);
-      ASSERT_TRUE(response->waitForEndStream());
-      // Following STOP_SENDING will be propagated via reset callback.
-      ASSERT_TRUE(response->waitForReset());
+      ASSERT_TRUE(response->waitForAnyTermination());
     }
   } else if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2 ||
              fake_upstreams_[0]->httpType() == Http::CodecType::HTTP3) {

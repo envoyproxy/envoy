@@ -10,6 +10,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -172,10 +173,13 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
           returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
       address_list.emplace_back(address);
     }
-    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-      // All addresses must by IP addresses.
-      if (!address->ip()) {
-        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses")) {
+      for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+        // All addresses must by IP addresses.
+        if (!address->ip()) {
+          throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+        }
       }
     }
   }
@@ -246,7 +250,6 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   // Pause LEDS messages until the EDS config is finished processing.
-  Config::ScopedResume maybe_resume_leds;
   const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
   Config::ScopedResume resume_leds =
       transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
@@ -305,10 +308,10 @@ void EdsClusterImpl::update(
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
           leds_config, edsServiceName(), *transport_factory_context_, info_->statsScope(),
-          [&, used_load_assignment]() {
-            // Called upon an update to the locality.
+          [this]() {
             if (validateAllLedsUpdated()) {
-              BatchUpdateHelper helper(*this, *used_load_assignment);
+              ASSERT(cluster_load_assignment_ != nullptr);
+              BatchUpdateHelper helper(*this, *cluster_load_assignment_);
               priority_set_.batchHostUpdate(helper);
             }
           });

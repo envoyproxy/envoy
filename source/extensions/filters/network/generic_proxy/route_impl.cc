@@ -88,7 +88,7 @@ VirtualHostImpl::VirtualHostImpl(const ProtoVirtualHost& virtual_host_config,
 }
 
 RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) const {
-  Matcher::MatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
+  Matcher::ActionMatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
 
   if (match_result.isMatch()) {
     Matcher::ActionConstSharedPtr action = match_result.actionByMove();
