@@ -35,6 +35,10 @@ bug_fixes:
 - area: release
   change: |
     Published contrib binaries now include the ``-contrib`` suffix in their version string.
+- area: access_log
+  change: |
+    Fixed a crash on listener removal with a process-level access log rate limiter
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
