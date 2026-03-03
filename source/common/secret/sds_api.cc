@@ -208,7 +208,7 @@ void SdsApi::initialize(bool warm) {
   }
 }
 
-SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
+const SdsApi::SecretData& SdsApi::secretData() const { return secret_data_; }
 
 SdsApi::FileContentMap SdsApi::loadFiles() {
   FileContentMap files;

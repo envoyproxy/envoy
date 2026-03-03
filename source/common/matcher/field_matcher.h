@@ -3,38 +3,9 @@
 #include "envoy/matcher/matcher.h"
 
 #include "absl/strings/str_join.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Matcher {
-
-/**
- * The result of a field match.
- */
-class FieldMatchResult {
-private:
-  // The match could not be completed, e.g. due to the required data
-  // not being available.
-  struct InsufficientData {};
-  // The match comparison was completed, and there was no match.
-  struct NoMatch {};
-  // The match comparison was completed, and there was a match.
-  struct Matched {};
-  using ResultType = absl::variant<InsufficientData, NoMatch, Matched>;
-  ResultType result_;
-  explicit FieldMatchResult(ResultType r) : result_(r) {}
-
-public:
-  inline bool operator==(const FieldMatchResult& other) const {
-    return result_.index() == other.result_.index();
-  }
-  static FieldMatchResult insufficientData() { return FieldMatchResult{InsufficientData{}}; }
-  static FieldMatchResult matched() { return FieldMatchResult{Matched{}}; }
-  static FieldMatchResult noMatch() { return FieldMatchResult{NoMatch{}}; }
-  bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
-  bool isMatched() const { return absl::holds_alternative<Matched>(result_); }
-  bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
-};
 
 /**
  * Base class for matching against a single input.
@@ -46,7 +17,7 @@ public:
   /**
    * Attempts to match against the provided data.
    */
-  virtual FieldMatchResult match(const DataType& data) PURE;
+  virtual MatchResult match(const DataType& data) PURE;
 };
 template <class DataType> using FieldMatcherPtr = std::unique_ptr<FieldMatcher<DataType>>;
 
@@ -61,22 +32,22 @@ public:
   explicit AllFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
       : matchers_(std::move(matchers)) {}
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     for (const auto& matcher : matchers_) {
-      const FieldMatchResult result = matcher->match(data);
+      const MatchResult result = matcher->match(data);
 
       // If we are unable to decide on a match at this point, propagate this up to defer
       // the match result until we have the requisite data.
-      if (result.isInsufficientData()) {
+      if (result == MatchResult::InsufficientData) {
         return result;
       }
 
-      if (result.isNoMatch()) {
+      if (result == MatchResult::NoMatch) {
         return result;
       }
     }
 
-    return FieldMatchResult::matched();
+    return MatchResult::Matched;
   }
 
 private:
@@ -95,17 +66,17 @@ public:
   explicit AnyFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
       : matchers_(std::move(matchers)) {}
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     bool unable_to_match_some_matchers = false;
     for (const auto& matcher : matchers_) {
-      const FieldMatchResult result = matcher->match(data);
+      const MatchResult result = matcher->match(data);
 
-      if (result.isInsufficientData()) {
+      if (result == MatchResult::InsufficientData) {
         unable_to_match_some_matchers = true;
         continue;
       }
 
-      if (result.isMatched()) {
+      if (result == MatchResult::Matched) {
         return result;
       }
     }
@@ -113,10 +84,10 @@ public:
     // If we didn't find a successful match but not all matchers could be evaluated,
     // return InsufficientData to defer the match result.
     if (unable_to_match_some_matchers) {
-      return FieldMatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
-    return FieldMatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
 private:
@@ -130,12 +101,12 @@ template <class DataType> class NotFieldMatcher : public FieldMatcher<DataType> 
 public:
   explicit NotFieldMatcher(FieldMatcherPtr<DataType> matcher) : matcher_(std::move(matcher)) {}
 
-  FieldMatchResult match(const DataType& data) override {
-    const FieldMatchResult result = matcher_->match(data);
-    if (result.isInsufficientData()) {
+  MatchResult match(const DataType& data) override {
+    const MatchResult result = matcher_->match(data);
+    if (result == MatchResult::InsufficientData) {
       return result;
     }
-    return result.isMatched() ? FieldMatchResult::noMatch() : FieldMatchResult::matched();
+    return (result == MatchResult::Matched) ? MatchResult::NoMatch : MatchResult::Matched;
   }
 
 private:
@@ -167,20 +138,21 @@ public:
         new SingleFieldMatcher<DataType>(std::move(data_input), std::move(input_matcher))};
   }
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return FieldMatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
-    bool current_match = input_matcher_->match(input.data_);
-    if (!current_match && input.data_availability_ ==
-                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      return FieldMatchResult::insufficientData();
+    MatchResult current_match = input_matcher_->match(input.data_);
+    if (current_match != MatchResult::Matched &&
+        input.data_availability_ ==
+            DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+      return MatchResult::InsufficientData;
     }
 
-    return current_match ? FieldMatchResult::matched() : FieldMatchResult::noMatch();
+    return current_match;
   }
 
 private:

@@ -125,6 +125,62 @@ established. This is to protect the early buffer from overflowing.
   When using the explicit configuration method (``max_early_data_bytes``), the filter state approach
   is ignored. The two methods are mutually exclusive, with the explicit configuration taking precedence.
 
+.. _config_network_filters_tcp_proxy_proxy_protocol_tlvs:
+
+PROXY Protocol TLV Configuration
+--------------------------------
+
+The TCP proxy filter supports adding custom TLVs (Type-Length-Value extensions) to upstream
+``PROXY`` protocol headers when used with the
+:ref:`upstream proxy protocol transport socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
+
+Static and Dynamic TLVs
+^^^^^^^^^^^^^^^^^^^^^^^
+
+TLVs can be configured using :ref:`proxy_protocol_tlvs
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>`.
+Each TLV entry specifies a type (0x00-0xFF) and either a static value or a dynamic value using
+:ref:`substitution format strings <config_access_log_format>`.
+
+Example configuration with static and dynamic TLVs:
+
+.. code-block:: yaml
+
+  name: envoy.filters.network.tcp_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+    stat_prefix: tcp
+    cluster: upstream_cluster
+    proxy_protocol_tlvs:
+      - type: 0xE0
+        value: "static_value"
+      - type: 0xE1
+        format_string:
+          text_format_source:
+            inline_string: "%DYNAMIC_METADATA(envoy.some_filter:some_key)%"
+
+Merging TLVs with Existing PROXY Protocol State
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When PROXY protocol state already exists (e.g., parsed by a
+:ref:`proxy protocol listener filter <config_listener_filters_proxy_protocol>`), the
+``proxy_protocol_tlvs`` configured in the TCP proxy filter are ignored by default.
+
+To control how configured TLVs interact with existing state, use
+:ref:`proxy_protocol_tlv_merge_policy
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy>`.
+See :ref:`ProxyProtocolTlvMergePolicy
+<envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`
+for available options.
+
+.. note::
+
+  To ensure the specified TLVs are allowed in the upstream ``PROXY`` protocol header, you must also
+  configure ``pass_all_tlvs: true`` or add the TLV types to ``pass_through_tlvs`` in the
+  :ref:`ProxyProtocolUpstreamTransport
+  <envoy_v3_api_msg_extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport>`
+  configuration.
+
 .. _config_network_filters_tcp_proxy_tunneling_over_http:
 
 Tunneling TCP over HTTP

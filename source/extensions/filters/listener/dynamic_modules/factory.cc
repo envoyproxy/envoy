@@ -47,8 +47,8 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
           proto_config.filter_name(), filter_config_str, metrics_namespace,
-          std::move(dynamic_module.value()), context.listenerScope(),
-          context.serverFactoryContext().mainThreadDispatcher());
+          std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
+          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     throw EnvoyException("Failed to create filter config: " +

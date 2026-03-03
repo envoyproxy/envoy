@@ -43,10 +43,11 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
   return state;
 }
 
-int64_t
-envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
-                                       envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-                                       envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+bool envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index) {
   (void)context_envoy_ptr;
 
   lb_state* state = (lb_state*)lb_module_ptr;
@@ -54,12 +55,14 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
   size_t host_count =
       envoy_dynamic_module_callback_lb_get_healthy_hosts_count(lb_envoy_ptr, 0);
   if (host_count == 0) {
-    return -1;
+    return false;
   }
 
   size_t index = state->next_index % host_count;
   state->next_index++;
-  return (int64_t)index;
+  *result_priority = 0;
+  *result_index = (uint32_t)index;
+  return true;
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

@@ -174,6 +174,54 @@ TEST_F(GeoipFilterTest, OnDataReturnsContinue) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 }
 
+TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
+  initializeProviderFactory();
+  initializeFilter(BasicGeoipConfig);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "dummy-city"},
+                                     {"x-geo-region", "dummy-region"},
+                                     {"x-geo-country", "dummy-country"},
+                                     {"x-geo-asn", "dummy-asn"},
+                                     {"x-geo-asn-org", "dummy-asn-org"},
+                                     {"x-geo-isp", "dummy-isp"},
+                                     {"x-geo-apple-private-relay", "true"},
+                                     {"x-geo-anon", "true"},
+                                     {"x-geo-anon-vpn", "false"},
+                                     {"x-geo-anon-hosting", "true"},
+                                     {"x-geo-anon-tor", "true"},
+                                     {"x-geo-anon-proxy", "true"}});
+      });
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Verify all geo headers were stored in filter state.
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "dummy-city"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-region", "dummy-region"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-country", "dummy-country"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-asn", "dummy-asn"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-asn-org", "dummy-asn-org"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-isp", "dummy-isp"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-apple-private-relay", "true"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-anon", "true"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-anon-vpn", "false"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-anon-hosting", "true"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-anon-tor", "true"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-anon-proxy", "true"));
+
+  const auto* geoip_info =
+      filter_state_->getDataReadOnly<GeoipInfo>(std::string(GeoipFilterStateKey));
+  ASSERT_NE(nullptr, geoip_info);
+  EXPECT_EQ(12, geoip_info->size());
+}
+
 TEST_F(GeoipFilterTest, GeoipInfoSerialization) {
   GeoipInfo info;
   info.setField("x-geo-city", "Seattle");

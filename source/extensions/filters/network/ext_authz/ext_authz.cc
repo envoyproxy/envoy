@@ -28,16 +28,16 @@ void fillMetadataContext(const MetadataProto& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
                          const std::vector<std::string>& typed_metadata_context_namespaces,
                          MetadataProto& metadata_context) {
+  const auto& filter_metadata = source_metadata.filter_metadata();
   for (const auto& context_key : metadata_context_namespaces) {
-    const auto& filter_metadata = source_metadata.filter_metadata();
     if (const auto metadata_it = filter_metadata.find(context_key);
         metadata_it != filter_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
   }
 
+  const auto& typed_filter_metadata = source_metadata.typed_filter_metadata();
   for (const auto& context_key : typed_metadata_context_namespaces) {
-    const auto& typed_filter_metadata = source_metadata.typed_filter_metadata();
     if (const auto metadata_it = typed_filter_metadata.find(context_key);
         metadata_it != typed_filter_metadata.end()) {
       (*metadata_context.mutable_typed_filter_metadata())[metadata_it->first] = metadata_it->second;

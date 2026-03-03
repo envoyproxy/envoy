@@ -81,6 +81,10 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
 
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the end of the current event hook.
+  absl::optional<std::string> last_serialized_filter_state_;
+
   /**
    * Helper to get the correct callbacks.
    */
@@ -260,8 +264,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t id)
-        : filter_(std::move(filter)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t id)
+        : filter_(filter), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
@@ -274,7 +278,7 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    DynamicModuleHttpFilter& filter_;
     const uint64_t callout_id_{};
   };
 
@@ -285,8 +289,8 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t callout_id)
-        : callout_id_(callout_id), filter_(std::move(filter)) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t callout_id)
+        : callout_id_(callout_id), filter_(filter) {}
     ~HttpStreamCalloutCallback() override = default;
 
     // AsyncClient::StreamCallbacks
@@ -314,7 +318,7 @@ private:
     bool cleaned_up_ = false;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    DynamicModuleHttpFilter& filter_;
   };
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }

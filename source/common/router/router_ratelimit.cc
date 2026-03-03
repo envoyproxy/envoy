@@ -342,6 +342,47 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
   return ret;
 }
 
+RemoteAddressMatchAction::RemoteAddressMatchAction(
+    const envoy::config::route::v3::RateLimit::Action::RemoteAddressMatch& action,
+    Server::Configuration::CommonFactoryContext&)
+    : descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
+                                                       : "remote_address_match"),
+      default_value_(action.default_value()),
+      ip_list_(Network::Address::IpList::create(action.address_matcher().ranges()).value()),
+      invert_match_(action.address_matcher().invert_match()),
+      descriptor_formatter_(
+          Formatter::FormatterImpl::create(action.descriptor_value(), true).value()) {}
+
+bool RemoteAddressMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                  const std::string&,
+                                                  const Http::RequestHeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& info) const {
+  // Check if remote address matches the address matcher
+  const Network::Address::InstanceConstSharedPtr& remote_address =
+      info.downstreamAddressProvider().remoteAddress();
+  if (remote_address->type() != Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const bool matches = ip_list_->contains(*remote_address);
+  const bool should_apply = invert_match_ ? !matches : matches;
+  if (!should_apply) {
+    return false;
+  }
+
+  // Format the descriptor value
+  const std::string formatted_value = descriptor_formatter_->format({&headers}, info);
+  if (!formatted_value.empty()) {
+    descriptor_entry = {descriptor_key_, formatted_value};
+  } else if (!default_value_.empty()) {
+    descriptor_entry = {descriptor_key_, default_value_};
+  } else {
+    // If formatting resulted in empty string and no default_value, skip this descriptor
+    return false;
+  }
+  return true;
+}
+
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
@@ -453,8 +494,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     }
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddressMatch:
-      // [#not-implemented-hide:] RemoteAddressMatch is not yet implemented.
-      PANIC("RemoteAddressMatch rate limit action is not yet implemented");
+      actions_.emplace_back(new RemoteAddressMatchAction(action.remote_address_match(), context));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;

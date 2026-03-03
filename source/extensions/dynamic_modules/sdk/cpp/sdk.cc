@@ -27,6 +27,39 @@ HttpFilterHandle::~HttpFilterHandle() = default;
 
 HttpFilterConfigHandle::~HttpFilterConfigHandle() = default;
 
+namespace Utility {
+
+std::string getBodyContent(BodyBuffer& buffered, BodyBuffer& received, bool is_buffered) {
+  const size_t total_size = buffered.getSize() + (is_buffered ? 0 : received.getSize());
+  std::string result;
+  result.reserve(total_size);
+  for (const auto& chunk : buffered.getChunks()) {
+    result.append(chunk.data(), chunk.size());
+  }
+
+  // If the received body is the same as the buffered body (a previous filter did StopAndBuffer
+  // and resumed), skip the received body to avoid duplicating data.
+  if (is_buffered) {
+    return result;
+  }
+
+  for (const auto& chunk : received.getChunks()) {
+    result.append(chunk.data(), chunk.size());
+  }
+  return result;
+}
+
+std::string readWholeRequestBody(HttpFilterHandle& handle) {
+  return getBodyContent(handle.bufferedRequestBody(), handle.receivedRequestBody(),
+                        handle.receivedBufferedRequestBody());
+}
+
+std::string readWholeResponseBody(HttpFilterHandle& handle) {
+  return getBodyContent(handle.bufferedResponseBody(), handle.receivedResponseBody(),
+                        handle.receivedBufferedResponseBody());
+}
+} // namespace Utility
+
 HttpFilterConfigFactoryRegister::HttpFilterConfigFactoryRegister(absl::string_view name,
                                                                  HttpFilterConfigFactoryPtr factory)
     : name_(name) {

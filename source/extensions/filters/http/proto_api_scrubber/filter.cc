@@ -122,7 +122,8 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
 
   auto match_result = method_matcher->match(matching_data);
 
-  // 'Envoy::Matcher::MatchResult' is the struct type, 'MatchState::UnableToMatch' is the value.
+  // 'Envoy::Matcher::ActionMatchResult' is the struct type, 'MatchState::UnableToMatch' is the
+  // value.
   if (match_result.isInsufficientData()) {
     ENVOY_STREAM_LOG(warn,
                      "Method-level matcher evaluation for {} was not complete. Allowing request.",

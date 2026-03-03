@@ -19,6 +19,7 @@ JsonRpcFieldExtractor::JsonRpcFieldExtractor(Protobuf::Struct& metadata,
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::StartObject(absl::string_view name) {
+  checkValidJsonRpc(name);
   if (array_depth_ > 0 || can_stop_parsing_) {
     return this;
   }
@@ -92,6 +93,9 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::StartList(absl::string_view name) 
     array_depth_++;
     return this;
   }
+
+  checkValidJsonRpc(name);
+
   if (can_stop_parsing_) {
     return this;
   }
@@ -157,28 +161,12 @@ std::string JsonRpcFieldExtractor::buildFullPath(absl::string_view name) const {
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderString(absl::string_view name,
                                                            absl::string_view value) {
+  checkValidJsonRpc(name, value);
   if (array_depth_ > 0 || can_stop_parsing_) {
     return this;
   }
   std::string full_path = buildFullPath(name);
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
-
-  // Check top-level fields for method detection
-  if (depth_ == 1) {
-    if (name == jsonRpcField() && value == jsonRpcVersion()) {
-      has_jsonrpc_ = true;
-      if (has_method_) {
-        is_valid_jsonrpc_ = true;
-      }
-    } else if (name == methodField()) {
-      has_method_ = true;
-      if (has_jsonrpc_) {
-        is_valid_jsonrpc_ = true;
-      }
-      method_ = std::string(value);
-      is_notification_ = isNotification(method_);
-    }
-  }
 
   // Store in temp storage
   Protobuf::Value proto_value;
@@ -191,6 +179,7 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderString(absl::string_view nam
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderBool(absl::string_view name, bool value) {
+  checkValidJsonRpc(name);
   if (array_depth_ > 0) {
     return this;
   }
@@ -217,6 +206,7 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderUint32(absl::string_view nam
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderInt64(absl::string_view name, int64_t value) {
+  checkValidJsonRpc(name);
   if (array_depth_ > 0) {
     return this;
   }
@@ -235,6 +225,7 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderInt64(absl::string_view name
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderUint64(absl::string_view name, uint64_t value) {
+  checkValidJsonRpc(name);
   if (array_depth_ > 0) {
     return this;
   }
@@ -253,6 +244,8 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderUint64(absl::string_view nam
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderDouble(absl::string_view name, double value) {
+  checkValidJsonRpc(name);
+
   if (array_depth_ > 0) {
     return this;
   }
@@ -275,6 +268,7 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderFloat(absl::string_view name
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderNull(absl::string_view name) {
+  checkValidJsonRpc(name);
   if (array_depth_ > 0) {
     return this;
   }
@@ -364,17 +358,32 @@ void JsonRpcFieldExtractor::checkEarlyStop() {
 }
 
 void JsonRpcFieldExtractor::finalizeExtraction() {
-  if (!has_jsonrpc_ || !has_method_) {
+  // Valid JSON-RPC message must have jsonrpc and either:
+  // - method (for requests)
+  // - result or error (for responses)
+  if (!has_jsonrpc_ || (!has_method_ && !has_result_ && !has_error_)) {
     ENVOY_LOG(debug, "not a valid {} message", protocolName());
     is_valid_jsonrpc_ = false;
     return;
   }
+  is_valid_jsonrpc_ = true;
 
-  // Copy selected fields from temp to final
-  copySelectedFields();
-
-  // Validate required fields
-  validateRequiredFields();
+  if (has_method_) {
+    // Copy selected fields from temp to final
+    copySelectedFields();
+    // Validate required fields
+    validateRequiredFields();
+  } else if (has_result_ || has_error_) {
+    // response: copy jsonrpc, id, result and/or error
+    copyFieldByPath("jsonrpc");
+    copyFieldByPath("id");
+    if (has_result_) {
+      copyFieldByPath("result");
+    }
+    if (has_error_) {
+      copyFieldByPath("error");
+    }
+  }
 }
 
 void JsonRpcFieldExtractor::copySelectedFields() {
@@ -445,6 +454,38 @@ void JsonRpcFieldExtractor::validateRequiredFields() {
     if (extracted_fields_.count(field.path) == 0) {
       missing_required_fields_.push_back(field.path);
       ENVOY_LOG(debug, "missing required field for {}: {}", method_, field.path);
+    }
+  }
+}
+
+void JsonRpcFieldExtractor::checkValidJsonRpc(absl::string_view name,
+                                              absl::optional<absl::string_view> value) {
+  if (depth_ == 1) {
+    if (name == jsonRpcField()) {
+      if (value.has_value() && value.value() == jsonRpcVersion()) {
+        has_jsonrpc_ = true;
+      } else {
+        // Early stop if it is not a valid JSON-RPC version.
+        can_stop_parsing_ = true;
+      }
+    } else if (name == methodField()) {
+      if (value.has_value()) {
+        has_method_ = true;
+        method_ = std::string(value.value());
+        is_notification_ = isNotification(method_);
+      } else {
+        // Early stop if method value is not a valid JSON-RPC method.
+        can_stop_parsing_ = true;
+      }
+      // JSON-RPC 2.0 response.
+    } else if (name == "result") {
+      has_result_ = true;
+    } else if (name == "error") {
+      has_error_ = true;
+    }
+
+    if (has_jsonrpc_ && (has_method_ || has_result_ || has_error_)) {
+      is_valid_jsonrpc_ = true;
     }
   }
 }

@@ -13,7 +13,7 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
-void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
+void WasmServiceExtension::onServerInitialized(Server::Instance&) { createWasm(context_); }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   plugin_config_ = std::make_unique<Common::Wasm::PluginConfig>(

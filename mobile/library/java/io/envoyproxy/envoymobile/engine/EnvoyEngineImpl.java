@@ -59,6 +59,12 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     return JniLibrary.dumpStats(engineHandle);
   }
 
+  @Override
+  public long getEngineHandle() {
+    checkIsTerminated();
+    return engineHandle;
+  }
+
   /**
    * Performs various JNI registration prior to engine running.
    *

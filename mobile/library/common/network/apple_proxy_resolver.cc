@@ -24,7 +24,7 @@ AppleProxyResolver::~AppleProxyResolver() {
 SystemProxySettingsReadCallback AppleProxyResolver::proxySettingsUpdater() {
   return SystemProxySettingsReadCallback(
       [this](absl::optional<SystemProxySettings> proxy_settings) {
-        absl::MutexLock l(&mutex_);
+        absl::MutexLock l(mutex_);
         proxy_settings_ = std::move(proxy_settings);
       });
 }
@@ -45,7 +45,7 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
 
   std::string pac_file_url;
   {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     if (!proxy_settings_.has_value()) {
       return ProxyResolutionResult::NoProxyConfigured;
     }

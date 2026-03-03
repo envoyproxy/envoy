@@ -2406,7 +2406,6 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_crypto_handshake_lib",
     srcs = [
         "quiche/quic/core/crypto/cert_compressor.cc",
-        "quiche/quic/core/crypto/channel_id.cc",
         "quiche/quic/core/crypto/crypto_framer.cc",
         "quiche/quic/core/crypto/crypto_handshake.cc",
         "quiche/quic/core/crypto/crypto_handshake_message.cc",
@@ -2420,7 +2419,6 @@ envoy_quic_cc_library(
     ],
     hdrs = [
         "quiche/quic/core/crypto/cert_compressor.h",
-        "quiche/quic/core/crypto/channel_id.h",
         "quiche/quic/core/crypto/crypto_framer.h",
         "quiche/quic/core/crypto/crypto_handshake.h",
         "quiche/quic/core/crypto/crypto_handshake_message.h",
@@ -2987,7 +2985,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
-    hdrs = ["quiche/common/quiche_stream.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [

@@ -29,13 +29,13 @@ namespace {
 
 using ::Envoy::Matcher::ActionConstSharedPtr;
 using ::Envoy::Matcher::ActionFactory;
+using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 using ::Envoy::Matcher::IsStringAction;
-using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;
@@ -60,7 +60,7 @@ public:
     TestUtility::validate(matcher_);
   }
 
-  MatchResult doMatch() {
+  ActionMatchResult doMatch() {
     MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
     return match_tree->match(TestData(), skipped_match_cb_);
   }
@@ -658,7 +658,7 @@ matcher_tree:
   envoy::config::core::v3::Metadata metadata;
   Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
-  const MatchResult result = match_tree()->match(data);
+  const ActionMatchResult result = match_tree()->match(data);
   EXPECT_THAT(result, HasStringAction("foo"));
 }
 
@@ -701,7 +701,7 @@ matcher_tree:
   const Network::Address::Ipv4Instance address("192.168.0.1", 8080);
   Network::Matching::UdpMatchingDataImpl data(address, address);
 
-  const MatchResult result = match_tree()->match(data);
+  const ActionMatchResult result = match_tree()->match(data);
   EXPECT_THAT(result, HasStringAction("foo"));
 }
 
@@ -748,7 +748,7 @@ matcher_tree:
 
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
-  const MatchResult result = match_tree()->match(data);
+  const ActionMatchResult result = match_tree()->match(data);
   EXPECT_THAT(result, HasStringAction("foo"));
 }
 

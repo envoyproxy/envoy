@@ -23,9 +23,11 @@ namespace Sse {
  * - Partial events split across chunks
  * - End-of-stream handling
  *
- * Example usage:
- *   std::string buffer_;
- *   absl::string_view buffer_view(buffer_);
+ * Example usage with Envoy's Buffer::OwnedImpl:
+ *   Buffer::OwnedImpl buffer_;
+ *   // ... append incoming data with buffer_.add(data) ...
+ *   const uint64_t length = buffer_.length();
+ *   absl::string_view buffer_view(static_cast<const char*>(buffer_.linearize(length)), length);
  *   while (!buffer_view.empty()) {
  *     auto result = findEventEnd(buffer_view, end_stream);
  *     if (result.event_start == absl::string_view::npos) break;
@@ -36,7 +38,7 @@ namespace Sse {
  *     }
  *     buffer_view = buffer_view.substr(result.next_start);
  *   }
- *   buffer_.erase(0, buffer_.size() - buffer_view.size());
+ *   buffer_.drain(length - buffer_view.size());
  */
 class SseParser {
 public:

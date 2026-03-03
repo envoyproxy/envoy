@@ -12,6 +12,7 @@ Extensions
   accesslog/accesslog
   certificate_mappers/certificate_mappers
   certificate_selectors/certificate_selectors
+  certificate_validators/certificate_validators
   cluster/cluster
   common/common
   compression/compression

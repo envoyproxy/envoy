@@ -85,6 +85,7 @@ public:
   // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  std::size_t metadataHash() const override { return logical_host_->metadataHash(); }
   const MetadataConstSharedPtr localityMetadata() const override {
     return logical_host_->localityMetadata();
   }

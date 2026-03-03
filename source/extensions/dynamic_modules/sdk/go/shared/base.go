@@ -1,13 +1,63 @@
 //go:generate mockgen -source=base.go -destination=mocks/mock_base.go -package=mocks
 package shared
 
+import (
+	"strings"
+	"unsafe"
+)
+
+// UnsafeEnvoyBuffer is a struct that represents a buffer of data from Envoy.
+// It contains a pointer to the data and its length. The memory of the data is managed by Envoy.
+type UnsafeEnvoyBuffer struct {
+	// Pointer to the start of the buffer data.
+	Ptr *byte
+	// Length of the buffer data in bytes.
+	Len uint64
+}
+
+func (b UnsafeEnvoyBuffer) ToUnsafeBytes() []byte {
+	if b.Ptr == nil || b.Len == 0 {
+		return nil
+	}
+	// Use unsafe to create a byte slice that points to the buffer data without copying.
+	return unsafe.Slice(b.Ptr, b.Len)
+}
+
+// ToBytes converts the UnsafeEnvoyBuffer to a byte slice. It creates a copy of the data in Go memory.
+func (b UnsafeEnvoyBuffer) ToBytes() []byte {
+	if b.Ptr == nil || b.Len == 0 {
+		return nil
+	}
+	// Create a byte slice that copys the data from the buffer.
+	owned := make([]byte, b.Len)
+	// Use unsafe to copy the data from the buffer to the byte slice.
+	src := unsafe.Slice(b.Ptr, b.Len)
+	copy(owned, src)
+	return owned
+}
+
+func (b UnsafeEnvoyBuffer) ToUnsafeString() string {
+	if b.Ptr == nil || b.Len == 0 {
+		return ""
+	}
+	// Use unsafe to create a string that points to the buffer data without copying.
+	return unsafe.String(b.Ptr, b.Len)
+}
+
+func (b UnsafeEnvoyBuffer) ToString() string {
+	if b.Ptr == nil || b.Len == 0 {
+		return ""
+	}
+	return strings.Clone(b.ToUnsafeString())
+}
+
 // BodyBuffer is an interface that provides access to the request and response body.
 // This should be implemented by the SDK or runtime.
 type BodyBuffer interface {
-	// GetChunks retrieves the body content as a list of byte slices.
+	// GetChunks retrieves the body content as a list of UnsafeEnvoyBuffer chunks.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetChunks() [][]byte
+	GetChunks() []UnsafeEnvoyBuffer
 
 	// GetSize retrieves the total size of the body buffer.
 	GetSize() uint64
@@ -28,20 +78,20 @@ type HeaderMap interface {
 	// nil will be returned.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	Get(key string) []string
+	Get(key string) []UnsafeEnvoyBuffer
 
 	// GetOne retrieves a single header value for a given key.
 	// If there are multiple values for the key, the first one will be returned.
-	// If the key does not exist, an empty string will be returned.
+	// If the key does not exist, an empty UnsafeEnvoyBuffer will be returned.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetOne(key string) string
+	GetOne(key string) UnsafeEnvoyBuffer
 
-	// GetAll retrieves all header values. You should not mutate the returned map
+	// GetAll retrieves all header values. You should not mutate the returned slice
 	// directly.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
-	GetAll() [][2]string
+	GetAll() [][2]UnsafeEnvoyBuffer
 
 	// Set sets the header value for a given key.
 	Set(key string, value string)
@@ -234,7 +284,7 @@ const (
 
 type HttpCalloutCallback interface {
 	OnHttpCalloutDone(calloutID uint64, result HttpCalloutResult,
-		headers [][2]string, body [][]byte)
+		headers [][2]UnsafeEnvoyBuffer, body []UnsafeEnvoyBuffer)
 }
 
 type HttpStreamResetReason uint32
@@ -251,9 +301,9 @@ const (
 )
 
 type HttpStreamCallback interface {
-	OnHttpStreamHeaders(streamID uint64, headers [][2]string, endStream bool)
-	OnHttpStreamData(streamID uint64, body [][]byte, endStream bool)
-	OnHttpStreamTrailers(streamID uint64, trailers [][2]string)
+	OnHttpStreamHeaders(streamID uint64, headers [][2]UnsafeEnvoyBuffer, endStream bool)
+	OnHttpStreamData(streamID uint64, body []UnsafeEnvoyBuffer, endStream bool)
+	OnHttpStreamTrailers(streamID uint64, trailers [][2]UnsafeEnvoyBuffer)
 	OnHttpStreamComplete(streamID uint64)
 	OnHttpStreamReset(streamID uint64, reason HttpStreamResetReason)
 }
@@ -281,8 +331,8 @@ type HttpFilterHandle interface {
 	// @Param source the metadata source type.
 	// @Param metadataNamespace the metadata namespace.
 	// @Param key the metadata key.
-	// @Return the metadata value if found, otherwise nil.
-	GetMetadataString(source MetadataSourceType, metadataNamespace, key string) (string, bool)
+	// @Return the metadata value if found, otherwise an empty UnsafeEnvoyBuffer.
+	GetMetadataString(source MetadataSourceType, metadataNamespace, key string) (UnsafeEnvoyBuffer, bool)
 
 	// GetMetadataNumber retrieves the dynamic metadata number value of the stream.
 	// @Param source the metadata source type.
@@ -291,16 +341,40 @@ type HttpFilterHandle interface {
 	// @Return the metadata value if found, otherwise nil.
 	GetMetadataNumber(source MetadataSourceType, metadataNamespace, key string) (float64, bool)
 
+	// GetMetadataBool retrieves the dynamic metadata bool value of the stream.
+	// @Param source the metadata source type.
+	// @Param metadataNamespace the metadata namespace.
+	// @Param key the metadata key.
+	// @Return the metadata value and true if found, otherwise false.
+	GetMetadataBool(source MetadataSourceType, metadataNamespace, key string) (bool, bool)
+
 	// SetMetadata sets the dynamic metadata value of the stream.
 	// @Param metadataNamespace the metadata namespace.
 	// @Param key the metadata key.
-	// @Param value the metadata value. Only string/int/float are supported.
+	// @Param value the metadata value. Only string/int/float/bool are supported.
 	SetMetadata(metadataNamespace, key string, value any)
+
+	// GetMetadataKeys retrieves all keys in the given metadata namespace.
+	// @Param source the metadata source type.
+	// @Param metadataNamespace the metadata namespace.
+	// @Return the list of keys in the namespace, or nil if the namespace does not exist.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetMetadataKeys(source MetadataSourceType, metadataNamespace string) []UnsafeEnvoyBuffer
+
+	// GetMetadataNamespaces retrieves all namespace names in the metadata.
+	// @Param source the metadata source type.
+	// @Return the list of namespace names, or nil if no namespaces exist.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetMetadataNamespaces(source MetadataSourceType) []UnsafeEnvoyBuffer
 
 	// GetFilterState retrieves the serialized filter state value of the stream.
 	// @Param key the filter state key.
-	// @Return the filter state value if found, otherwise nil.
-	GetFilterState(key string) ([]byte, bool)
+	// @Return the filter state value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetFilterState(key string) (UnsafeEnvoyBuffer, bool)
 
 	// SetFilterState sets the serialized filter state value of the stream.
 	// @Param key the filter state key.
@@ -308,14 +382,21 @@ type HttpFilterHandle interface {
 	SetFilterState(key string, value []byte)
 
 	// GetAttributeString retrieves the string attribute value of the stream.
-	// @Param key the attribute key.
-	// @Return the attribute value if found, otherwise nil.
-	GetAttributeString(attributeID AttributeID) (string, bool)
+	// @Param attributeID the attribute ID.
+	// @Return the attribute value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetAttributeString(attributeID AttributeID) (UnsafeEnvoyBuffer, bool)
 
 	// GetAttributeNumber retrieves the float attribute value of the stream.
 	// @Param key the attribute key.
 	// @Return the attribute value if found, otherwise nil.
 	GetAttributeNumber(attributeID AttributeID) (float64, bool)
+
+	// GetAttributeBool retrieves the bool attribute value of the stream.
+	// @Param attributeID the attribute ID.
+	// @Return the attribute value and true if found, otherwise false.
+	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
@@ -387,6 +468,12 @@ type HttpFilterHandle interface {
 	// @Return the buffered request body.
 	BufferedRequestBody() BodyBuffer
 
+	// ReceivedRequestBody retrieves the latest received request body chunk in the OnRequestBody callback.
+	// NOTE: This is only valid in the OnRequestBody callback, and it retrieves the latest received
+	// body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+	// should use BufferedRequestBody to get the currently buffered body in the chain.
+	ReceivedRequestBody() BodyBuffer
+
 	// RequestTrailers retrieves the request trailers.
 	// @Return the request trailers.
 	RequestTrailers() HeaderMap
@@ -403,6 +490,26 @@ type HttpFilterHandle interface {
 	// called, the full request body is received.
 	// @Return the buffered response body.
 	BufferedResponseBody() BodyBuffer
+
+	// ReceivedResponseBody retrieves the latest received response body chunk in the OnResponseBody callback.
+	// NOTE: This is only valid in the OnResponseBody callback, and it retrieves the latest received
+	// body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+	// should use BufferedResponseBody to get the currently buffered body in the chain.
+	ReceivedResponseBody() BodyBuffer
+
+	// ReceivedBufferedRequestBody returns true if the latest received request body is the
+	// previously buffered request body. This is true when a previous filter in the chain stopped
+	// and buffered the request body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnRequestBody callback.
+	ReceivedBufferedRequestBody() bool
+
+	// ReceivedBufferedResponseBody returns true if the latest received response body is the
+	// previously buffered response body. This is true when a previous filter in the chain stopped
+	// and buffered the response body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnResponseBody callback.
+	ReceivedBufferedResponseBody() bool
 
 	// ResponseTrailers retrieves the response trailers.
 	// @Return the response trailers.
@@ -567,4 +674,47 @@ type HttpFilterConfigHandle interface {
 	// @Return the counter metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineCounter(name string, tagKeys ...string) (MetricID, MetricsResult)
+
+	// HttpCallout performs an HTTP call to an external service from the config context.
+	// The call is asynchronous, and the response will be delivered via the provided callback.
+	// This is similar to HttpFilterHandle.HttpCallout but runs on the main thread rather than
+	// the worker thread.
+	// @Param cluster the cluster (target) name to which the HTTP call will be made.
+	// @Param headers the HTTP headers to be sent with the request.
+	// @Param body the HTTP body to be sent with the request.
+	// @Param timeoutMs the timeout in milliseconds for the HTTP call.
+	// @Param callback the callback function to be invoked when the response is received.
+	// @Return the result of the HTTP callout initialization and the callout ID.
+	HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64,
+		cb HttpCalloutCallback) (HttpCalloutInitResult, uint64)
+
+	// StartHttpStream starts a new HTTP stream to an external service from the config context.
+	// The stream is asynchronous, and the response will be delivered via the provided callback.
+	// This is similar to HttpFilterHandle.StartHttpStream but runs on the main thread.
+	// @Param cluster the cluster (target) name.
+	// @Param headers the initial HTTP headers.
+	// @Param body the initial HTTP body.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Param timeoutMs the timeout in milliseconds.
+	// @Param callback the callback interface to handle the stream events.
+	// @Return the result of the HTTP stream initialization and the stream ID.
+	StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool,
+		timeoutMs uint64, cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
+
+	// SendHttpStreamData sends data on an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	// @Param body the HTTP body to be sent.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return whether the data was successfully sent.
+	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
+
+	// SendHttpStreamTrailers sends trailers on an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	// @Param trailers the HTTP trailers to be sent.
+	// @Return whether the trailers were successfully sent.
+	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
+
+	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	ResetHttpStream(streamID uint64)
 }
