@@ -52,12 +52,6 @@ public:
   }
 
 private:
-  // Creates a filter and installs it on the filter chain. Shared by both the sync and async
-  // (remote) factory paths.
-  static void installFilter(
-      const Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr& config,
-      Http::FilterChainFactoryCallbacks& callbacks);
-
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromRemoteSource(const FilterConfig& proto_config,
                                       Server::Configuration::ServerFactoryContext& context,
