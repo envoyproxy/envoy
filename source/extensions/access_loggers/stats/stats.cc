@@ -304,13 +304,12 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
         if (const auto* action = dynamic_cast<
                 const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
                 result.action().get())) {
-          const auto action_result = action->apply(tag_value);
-          if (action_result ==
-              Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropStat) {
+          switch (action->apply(tag_value)) {
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Keep:
+            break;
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropStat:
             return {{}, {}, true};
-          }
-          if (action_result ==
-              Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropTag) {
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropTag:
             continue;
           }
         }

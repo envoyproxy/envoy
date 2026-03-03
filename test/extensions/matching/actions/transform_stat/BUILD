@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "transform_stat_test",
     srcs = ["transform_stat_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",

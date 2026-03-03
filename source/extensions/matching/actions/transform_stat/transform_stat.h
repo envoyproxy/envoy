@@ -53,7 +53,7 @@ public:
 
 class UpdateTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit UpdateTag(std::string tag_value);
+  explicit UpdateTag(const std::string& tag_value);
 
   Result apply(std::string& tag_value) const override;
 

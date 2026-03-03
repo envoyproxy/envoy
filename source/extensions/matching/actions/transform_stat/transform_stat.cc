@@ -8,7 +8,7 @@ namespace TransformStat {
 
 TransformStatAction::Result DropStat::apply(std::string&) const { return Result::DropStat; }
 
-UpdateTag::UpdateTag(std::string tag_value) : tag_value_(std::move(tag_value)) {}
+UpdateTag::UpdateTag(const std::string& tag_value) : tag_value_(tag_value) {}
 
 TransformStatAction::Result UpdateTag::apply(std::string& tag_value) const {
   tag_value = tag_value_;
