@@ -7,11 +7,12 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/strings/str_cat.h"
-#include "openssl/sha.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -158,10 +159,10 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view mod
     return absl::InvalidArgumentError("Module bytes cannot be empty");
   }
 
-  // Compute SHA256 hash of the module bytes directly without copying into a Buffer.
-  uint8_t digest[SHA256_DIGEST_LENGTH];
-  SHA256(reinterpret_cast<const uint8_t*>(module_bytes.data()), module_bytes.size(), digest);
-  const std::string computed_hash = Hex::encode(digest, SHA256_DIGEST_LENGTH);
+  // Compute SHA256 hash of the module bytes.
+  Buffer::OwnedImpl buffer(module_bytes);
+  const std::string computed_hash =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer));
 
   // Verify SHA256 hash if provided.
   if (!sha256_hash.empty() && computed_hash != sha256_hash) {

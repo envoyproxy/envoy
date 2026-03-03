@@ -68,27 +68,37 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(filter_config.status().message()));
   }
 
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
     context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const std::string& worker_name = callbacks.dispatcher().name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-    uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
-    }
-    auto filter =
-        std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config, config->stats_scope_->symbolTable(), worker_index);
-    callbacks.addStreamFilter(filter);
-    // addStreamFilter() sets decoder/encoder filter callbacks. Initialize the in-module filter
-    // after so it can access all necessary context during creation.
-    filter->initializeInModuleFilter();
+    installFilter(config, callbacks);
   };
+}
+
+void DynamicModuleConfigFactory::installFilter(
+    const Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr& config,
+    Http::FilterChainFactoryCallbacks& callbacks) {
+  const std::string& worker_name = callbacks.dispatcher().name();
+  auto pos = worker_name.find_first_of('_');
+  ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+  uint32_t worker_index;
+  if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+    IS_ENVOY_BUG("failed to parse worker index from name");
+  }
+  auto filter =
+      std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
+          config, config->stats_scope_->symbolTable(), worker_index);
+  // The addStreamFilter() will call the setDecoderFilterCallbacks first then
+  // setEncoderFilterCallbacks. We initialize the in-module filter after we have both callbacks
+  // to ensure the in-module filter can access all the necessary information during creation.
+  callbacks.addStreamFilter(filter);
+  filter->initializeInModuleFilter();
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
@@ -176,6 +186,9 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
           return;
         }
         state->filter_config = filter_config.value();
+        // When the runtime guard is enabled, register the metrics namespace as a custom stat
+        // namespace. This causes the namespace prefix to be stripped from prometheus output and
+        // no envoy_ prefix is added. This is the legacy behavior for backward compatibility.
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
           context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
@@ -189,21 +202,7 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
                      "Dynamic module filter skipped: remote module was not loaded (fail-open)");
       return;
     }
-    const auto& config = state->filter_config;
-    const std::string& worker_name = callbacks.dispatcher().name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-    uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
-    }
-    auto filter =
-        std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config, config->stats_scope_->symbolTable(), worker_index);
-    callbacks.addStreamFilter(filter);
-    // addStreamFilter() sets decoder/encoder filter callbacks. Initialize the in-module filter
-    // after so it can access all necessary context during creation.
-    filter->initializeInModuleFilter();
+    installFilter(state->filter_config, callbacks);
   };
 }
 
