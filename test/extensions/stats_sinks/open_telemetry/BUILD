@@ -12,12 +12,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "request_chunker_test",
-    srcs = ["request_chunker_test.cc"],
+    name = "request_splitter_test",
+    srcs = ["request_splitter_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/stat_sinks/open_telemetry:request_chunker_lib",
+        "//source/extensions/stat_sinks/open_telemetry:request_splitter_lib",
         "//test/test_common:utility_lib",
     ],
 )

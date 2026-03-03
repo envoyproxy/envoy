@@ -1,7 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
 #include "source/common/tracing/null_span_impl.h"
-#include "source/extensions/stat_sinks/open_telemetry/request_chunker.h"
+#include "source/extensions/stat_sinks/open_telemetry/request_splitter.h"
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
 namespace Envoy {
@@ -329,9 +329,9 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
   return attributes;
 }
 
-std::vector<MetricsExportRequestPtr>
-OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
-                              int64_t cumulative_start_time_ns) const {
+void OtlpMetricsFlusherImpl::flush(
+    Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
+    const std::function<void(MetricsExportRequestPtr)>& send_callback) const {
   MetricAggregator aggregator =
       MetricAggregator(config_->enableMetricAggregation(),
                        std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -418,8 +418,8 @@ OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot, int64_t delta_sta
     }
   }
   auto resource_metrics = aggregator.getResourceMetrics(config_->resource_attributes());
-  return RequestChunker::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
-                                       config_->maxResourceMetricsPerRequest());
+  RequestSplitter::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
+                                 config_->maxResourceMetricsPerRequest(), send_callback);
 }
 } // namespace OpenTelemetry
 } // namespace StatSinks

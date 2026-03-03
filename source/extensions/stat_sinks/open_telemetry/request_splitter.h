@@ -17,31 +17,34 @@ using MetricsExportRequest =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
 using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
 
-class RequestChunker {
+class RequestSplitter {
 public:
-  RequestChunker(uint32_t max_dp, uint32_t max_rm);
-
   /**
-   * Splits the given resource metrics into multiple export requests.
+   * Splits the given resource metrics into multiple export requests based on configured limits.
    * When max_dp is reached, the subsequent datapoints are split into a new request.
    * When max_rm is reached, the subsequent resource metrics are split into a new request.
-   * If max_dp or max_rm is 0, the corresponding limit is disabled.
+   * If max_dp and max_rm are both 0, the corresponding limit is disabled.
    */
-  static std::vector<MetricsExportRequestPtr> chunkRequests(
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>&
-          resource_metrics,
-      const uint32_t max_dp, const uint32_t max_rm);
+  static void
+  chunkRequests(Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>&
+                    resource_metrics,
+                const uint32_t max_dp, const uint32_t max_rm,
+                const std::function<void(MetricsExportRequestPtr)>& send_callback);
+
+private:
+  RequestSplitter(uint32_t max_dp, uint32_t max_rm,
+                  const std::function<void(MetricsExportRequestPtr)>& send_callback);
 
   void submitRequestIfNeeded();
   void beginResourceMetric();
   void beginScopeMetric();
   void beginMetric();
 
-  template <typename Callback>
+  template <typename DataPointCallback>
   void appendDataPoint(const opentelemetry::proto::metrics::v1::ResourceMetrics& rm,
                        const opentelemetry::proto::metrics::v1::ScopeMetrics& sm,
                        const opentelemetry::proto::metrics::v1::Metric& metric,
-                       Callback datapoint_callback) {
+                       DataPointCallback datapoint_callback) {
     if (max_dp_ > 0 && current_dp_count_ >= max_dp_) {
       submitRequestIfNeeded();
       current_rm_ = nullptr;
@@ -49,6 +52,9 @@ public:
       current_metric_ = nullptr;
     }
 
+    // If we're starting a new resource metric (e.g. after a submit or passing from another rm),
+    // ensure we don't exceed the max resource metrics per request. If we do, submit and start
+    // fresh.
     if (current_rm_ == nullptr) {
       if (max_rm_ > 0 && current_rm_count_ >= max_rm_) {
         submitRequestIfNeeded();
@@ -59,12 +65,14 @@ public:
       current_rm_count_++;
     }
 
+    // If this is the start of a new scope metric, initialize it inside the current resource metric.
     if (current_sm_ == nullptr) {
       current_sm_ = current_rm_->add_scope_metrics();
       current_sm_->mutable_scope()->CopyFrom(sm.scope());
       current_sm_->mutable_schema_url()->assign(sm.schema_url());
     }
 
+    // If this is the start of a new metric, copy its definition into the current scope metric.
     if (current_metric_ == nullptr) {
       current_metric_ = current_sm_->add_metrics();
       current_metric_->set_name(metric.name());
@@ -77,9 +85,6 @@ public:
       } else if (metric.has_histogram()) {
         current_metric_->mutable_histogram()->set_aggregation_temporality(
             metric.histogram().aggregation_temporality());
-      } else if (metric.has_exponential_histogram()) {
-        current_metric_->mutable_exponential_histogram()->set_aggregation_temporality(
-            metric.exponential_histogram().aggregation_temporality());
       }
     }
 
@@ -87,12 +92,12 @@ public:
     current_dp_count_++;
   }
 
-  std::vector<MetricsExportRequestPtr> finish();
+  void finish();
 
 private:
   uint32_t max_dp_;
   uint32_t max_rm_;
-  std::vector<MetricsExportRequestPtr> requests_;
+  std::function<void(MetricsExportRequestPtr)> send_callback_;
   MetricsExportRequestPtr current_request_;
   uint32_t current_dp_count_{0};
   uint32_t current_rm_count_{0};

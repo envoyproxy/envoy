@@ -23,9 +23,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "request_chunker_lib",
-    srcs = ["request_chunker.cc"],
-    hdrs = ["request_chunker.h"],
+    name = "request_splitter_lib",
+    srcs = ["request_splitter.cc"],
+    hdrs = ["request_splitter.h"],
     deps = [
         "//source/common/protobuf",
         "@opentelemetry-proto//:metrics_proto_cc",
@@ -38,7 +38,7 @@ envoy_cc_library(
     srcs = ["open_telemetry_impl.cc"],
     hdrs = ["open_telemetry_impl.h"],
     deps = [
-        ":request_chunker_lib",
+        ":request_splitter_lib",
         ":stat_match_action_lib",
         "//envoy/grpc:async_client_interface",
         "//envoy/singleton:instance_interface",

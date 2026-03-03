@@ -186,10 +186,13 @@ public:
   /**
    * Creates an OTLP export request from metric snapshot.
    * @param snapshot supplies the metrics snapshot to send.
+   * @param delta_start_time_ns supplies the start time for the delta aggregation.
+   * @param cumulative_start_time_ns supplies the start time for the cumulative aggregation.
+   * @param send_callback supplies the callback to invoke to send a single metrics export request.
    */
-  virtual std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot,
-                                                     int64_t delta_start_time_ns,
-                                                     int64_t cumulative_start_time_ns) const PURE;
+  virtual void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
+                     int64_t cumulative_start_time_ns,
+                     const std::function<void(MetricsExportRequestPtr)>& send_callback) const PURE;
 };
 
 using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
@@ -205,9 +208,9 @@ public:
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate) {}
 
-  std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot,
-                                             int64_t delta_start_time_ns,
-                                             int64_t cumulative_start_time_ns) const override;
+  void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
+             int64_t cumulative_start_time_ns,
+             const std::function<void(MetricsExportRequestPtr)>& send_callback) const override;
 
 private:
   struct MetricConfig {
@@ -322,10 +325,9 @@ public:
     const int64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                         snapshot.snapshotTime().time_since_epoch())
                                         .count();
-    auto requests = metrics_flusher_->flush(snapshot, last_flush_time_ns_, proxy_start_time_ns_);
-    for (auto& request : requests) {
-      metrics_exporter_->send(std::move(request));
-    }
+    metrics_flusher_->flush(
+        snapshot, last_flush_time_ns_, proxy_start_time_ns_,
+        [this](MetricsExportRequestPtr request) { metrics_exporter_->send(std::move(request)); });
     last_flush_time_ns_ = current_time_ns;
   }
 
