@@ -55,16 +55,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "module_cache_test",
-    srcs = ["module_cache_test.cc"],
-    deps = [
-        "//source/extensions/dynamic_modules:module_cache_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "util",
     srcs = ["util.cc"],

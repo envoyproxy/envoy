@@ -42,7 +42,6 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
-        "//source/extensions/dynamic_modules:module_cache_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],

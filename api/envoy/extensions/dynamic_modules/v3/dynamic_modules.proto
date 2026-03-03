@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the
 // ABI.
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message DynamicModuleConfig {
   // The name of the dynamic module.
   //
@@ -88,23 +88,8 @@ message DynamicModuleConfig {
   // The dynamic module binary to load. Supports local file paths (via ``local.filename``),
   // inline bytes (via ``local.inline_bytes``), or remote HTTP URLs (via ``remote``).
   //
-  // For remote sources, the ``sha256`` field is required and is used both for integrity
-  // verification and as the cache key. Fetched modules are cached in-memory for 24 hours;
-  // failed fetches are negatively cached for 10 seconds to avoid retry storms.
+  // For remote sources, the ``sha256`` field is required for integrity verification.
   //
   // When both ``name`` and ``module`` are set, ``module`` takes precedence.
   config.core.v3.AsyncDataSource module = 6;
-
-  // Controls how a cache miss for a remote module is handled.
-  //
-  // When true (NACK mode), a cache miss causes an immediate NACK of the xDS config update.
-  // A background fetch is started and the module will be available on the next config push.
-  //
-  // When false (warming mode), the server blocks during initialization until the fetch
-  // completes or exhausts retries.
-  //
-  // Only applies to remote data sources via the ``module`` field.
-  //
-  // Defaults to ``false``.
-  bool nack_on_module_cache_miss = 7;
 }
