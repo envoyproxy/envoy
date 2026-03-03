@@ -96,8 +96,12 @@ message SinkConfig {
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 
   // Maximum number of datapoints per request. If this is 0 or unassigned, there is no limit.
+  // When the maximum number of datapoints is reached, the remaining datapoints will be split
+  // into a new request.
   uint32 max_datapoints_per_request = 10;
 
   // Maximum number of ResourceMetrics per request. If this is 0 or unassigned, there is no limit.
+  // When the maximum number of ResourceMetrics is reached, the remaining ResourceMetrics will be
+  // split into a new request.
   uint32 max_resource_metrics_per_request = 11;
 }

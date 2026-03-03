@@ -626,37 +626,32 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
                   getTagExtractedName("test_histogram2"), true);
 }
 
-TEST_F(OtlpMetricsFlusherTests, StaticChunkRequestsMaxDatapoints) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
-  auto* rm = resource_metrics.Add();
-  auto* sm = rm->add_scope_metrics();
-  auto* m1 = sm->add_metrics();
-  m1->mutable_gauge()->add_data_points();
-  m1->mutable_gauge()->add_data_points();
-  
-  auto* m2 = sm->add_metrics();
-  m2->mutable_gauge()->add_data_points();
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsAndResourceMetricsPerRequest) {
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_datapoints_per_request(2);
+  Tracers::OpenTelemetry::Resource resource;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  OtlpMetricsFlusherImpl flusher(options);
 
-  // Total 3 datapoints. Max = 2 -> 2 requests
-  auto requests = OtlpMetricsFlusherImpl::chunkRequests(resource_metrics, 2, 0);
-  ASSERT_EQ(2, requests.size());
-  EXPECT_EQ(1, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
-  EXPECT_EQ(2, requests[0]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points_size());
+  addCounterToSnapshot("counter1", 1, 1);
+  addCounterToSnapshot("counter2", 1, 1);
+  addCounterToSnapshot("counter3", 1, 1);
+
+  std::vector<MetricsExportRequestPtr> requests =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+
+  // 3 counters, max 2 datapoints per request -> 2 requests (2 dp + 1 dp)
+  EXPECT_EQ(requests.size(), 2);
+
+  // Request 1 should have 2 metrics
+  EXPECT_EQ(1, requests[0]->resource_metrics_size());
+  EXPECT_EQ(1, requests[0]->resource_metrics(0).scope_metrics_size());
+  EXPECT_EQ(2, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
+
+  // Request 2 should have 1 metric
+  EXPECT_EQ(1, requests[1]->resource_metrics_size());
+  EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics_size());
   EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics(0).metrics_size());
-  EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points_size());
-}
-
-TEST_F(OtlpMetricsFlusherTests, StaticChunkRequestsMaxResourceMetrics) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
-  auto* rm1 = resource_metrics.Add();
-  rm1->add_scope_metrics()->add_metrics()->mutable_gauge()->add_data_points();
-  
-  auto* rm2 = resource_metrics.Add();
-  rm2->add_scope_metrics()->add_metrics()->mutable_gauge()->add_data_points();
-
-  // Total 2 resource metrics. Max = 1 -> 2 requests
-  auto requests = OtlpMetricsFlusherImpl::chunkRequests(resource_metrics, 0, 1);
-  ASSERT_EQ(2, requests.size());
 }
 
 TEST_F(OtlpMetricsFlusherTests, TrafficSplitResourceMetrics) {
@@ -1299,8 +1294,8 @@ public:
 
 class MockOtlpMetricsFlusher : public OtlpMetricsFlusher {
 public:
-  MOCK_METHOD(std::vector<MetricsExportRequestPtr>, flush, (Stats::MetricSnapshot&, int64_t, int64_t),
-              (const, override));
+  MOCK_METHOD(std::vector<MetricsExportRequestPtr>, flush,
+              (Stats::MetricSnapshot&, int64_t, int64_t), (const, override));
 };
 
 class OpenTelemetrySinkTests : public OpenTelemetryStatsSinkTests {
@@ -1321,7 +1316,11 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/1000,
                                /*cumulative_start_time_ns=*/1000))
-      .WillOnce([&]() { std::vector<MetricsExportRequestPtr> reqs; reqs.push_back(std::move(request1)); return reqs; });
+      .WillOnce([&]() {
+        std::vector<MetricsExportRequestPtr> reqs;
+        reqs.push_back(std::move(request1));
+        return reqs;
+      });
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 
@@ -1330,7 +1329,11 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   MetricsExportRequestPtr request2 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/expected_time_ns_,
                                /*cumulative_start_time_ns=*/1000))
-      .WillOnce([&]() { std::vector<MetricsExportRequestPtr> reqs; reqs.push_back(std::move(request2)); return reqs; });
+      .WillOnce([&]() {
+        std::vector<MetricsExportRequestPtr> reqs;
+        reqs.push_back(std::move(request2));
+        return reqs;
+      });
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 }

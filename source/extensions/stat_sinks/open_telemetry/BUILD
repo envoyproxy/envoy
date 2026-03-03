@@ -23,10 +23,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "request_chunker_lib",
+    srcs = ["request_chunker.cc"],
+    hdrs = ["request_chunker.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@opentelemetry-proto//:metrics_proto_cc",
+        "@opentelemetry-proto//:metrics_service_proto_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "open_telemetry_lib",
     srcs = ["open_telemetry_impl.cc"],
     hdrs = ["open_telemetry_impl.h"],
     deps = [
+        ":request_chunker_lib",
         ":stat_match_action_lib",
         "//envoy/grpc:async_client_interface",
         "//envoy/singleton:instance_interface",

@@ -161,12 +161,8 @@ public:
   }
   bool enableMetricAggregation() const { return enable_metric_aggregation_; }
 
-  uint32_t maxDatapointsPerRequest() const {
-    return max_datapoints_per_request_;
-  }
-  uint32_t maxResourceMetricsPerRequest() const {
-    return max_resource_metrics_per_request_;
-  }
+  uint32_t maxDatapointsPerRequest() const { return max_datapoints_per_request_; }
+  uint32_t maxResourceMetricsPerRequest() const { return max_resource_metrics_per_request_; }
 
 private:
   const bool report_counters_as_deltas_;
@@ -192,8 +188,8 @@ public:
    * @param snapshot supplies the metrics snapshot to send.
    */
   virtual std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot,
-                                        int64_t delta_start_time_ns,
-                                        int64_t cumulative_start_time_ns) const PURE;
+                                                     int64_t delta_start_time_ns,
+                                                     int64_t cumulative_start_time_ns) const PURE;
 };
 
 using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
@@ -209,12 +205,9 @@ public:
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate) {}
 
-  std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
-                                int64_t cumulative_start_time_ns) const override;
-
-  static std::vector<MetricsExportRequestPtr> chunkRequests(
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& resource_metrics,
-      const uint32_t max_dp, const uint32_t max_rm);
+  std::vector<MetricsExportRequestPtr> flush(Stats::MetricSnapshot& snapshot,
+                                             int64_t delta_start_time_ns,
+                                             int64_t cumulative_start_time_ns) const override;
 
 private:
   struct MetricConfig {
