@@ -111,31 +111,6 @@ convertUnitEnum(envoy::extensions::access_loggers::stats::v3::Config::Histogram:
   }
 }
 
-absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
-                                        const Formatter::Context& context,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        bool is_percent) {
-  Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
-  double value;
-  if (computed_value.has_number_value()) {
-    value = computed_value.number_value();
-  } else if (computed_value.has_string_value()) {
-    if (!absl::SimpleAtod(computed_value.string_value(), &value)) {
-      ENVOY_LOG_MISC(error, "Stats access logger formatted a string that isn't a number: {}",
-                     computed_value.string_value());
-      return absl::nullopt;
-    }
-  } else {
-    ENVOY_LOG_MISC(error, "Stats access logger computed non-number value: {}",
-                   computed_value.DebugString());
-    return absl::nullopt;
-  }
-  if (is_percent) {
-    value *= Stats::Histogram::PercentScale;
-  }
-  return value;
-}
-
 struct StatTagMetric : public Stats::StatTagMatchingData {
   StatTagMetric(absl::string_view value) : value_(value) {}
   absl::string_view value() const override { return value_; }
@@ -331,6 +306,36 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
 
   return {std::move(tags), std::move(dynamic_storage), false};
 }
+
+namespace {
+absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& formatter,
+                                        const Formatter::Context& context,
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        bool is_percent) {
+  Protobuf::Value computed_value = formatter.formatValue(context, stream_info);
+  double value;
+  if (computed_value.has_number_value()) {
+    value = computed_value.number_value();
+  } else if (computed_value.has_string_value()) {
+    if (!absl::SimpleAtod(computed_value.string_value(), &value)) {
+      ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                              "Stats access logger formatted a string that isn't a number: {}",
+                              computed_value.string_value());
+      return absl::nullopt;
+    }
+  } else {
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                            "Stats access logger computed non-number value: {}",
+                            computed_value.DebugString());
+    return absl::nullopt;
+  }
+
+  if (is_percent) {
+    value *= Stats::Histogram::PercentScale;
+  }
+  return value;
+}
+} // namespace
 
 void StatsAccessLog::emitLog(const Formatter::Context& context,
                              const StreamInfo::StreamInfo& stream_info) {
