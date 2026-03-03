@@ -250,7 +250,6 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   }
 
   // Pause LEDS messages until the EDS config is finished processing.
-  Config::ScopedResume maybe_resume_leds;
   const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
   Config::ScopedResume resume_leds =
       transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
