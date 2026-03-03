@@ -126,6 +126,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/extensions/dynamic_modules:util",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test_static",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
-#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h"
+#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h" // IWYU pragma: keep
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
@@ -23,7 +23,13 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      const std::string&, Server::Configuration::FactoryContext&) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace McpJsonRestBridge
