@@ -265,7 +265,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 }
 
 void EdsClusterImpl::update(
-    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment) {
   // Drop overload configuration parsing.
   THROW_IF_NOT_OK(parseDropOverloadConfig(cluster_load_assignment));
 
