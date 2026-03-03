@@ -257,11 +257,30 @@ getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope
   };
 }
 
+// Mutex to serialize Wasm VM cloning across worker threads. V8's Isolate creation
+// has a race condition in InitializeBuiltinJSDispatchTable() when multiple Isolates
+// are created concurrently. This occurs during dynamic WASM module loading (e.g. via
+// xDS) when all worker threads attempt to clone the base VM simultaneously via TLS
+// slot initialization. At startup this is not an issue because workers are not yet
+// running when TLS callbacks are posted, so they execute sequentially.
+// See https://github.com/Kuadrant/wasm-shim/issues/314
+// See https://github.com/networking-incubator/coraza-proxy-wasm/issues/3
+static std::mutex wasm_clone_mutex;
+static std::function<void()> clone_factory_interceptor_for_testing;
+
+void setCloneFactoryInterceptorForTesting(std::function<void()> interceptor) {
+  clone_factory_interceptor_for_testing = std::move(interceptor);
+}
+
 static proxy_wasm::WasmHandleCloneFactory
 getWasmHandleCloneFactory(Event::Dispatcher& dispatcher,
                           CreateContextFn create_root_context_for_testing) {
   return [&dispatcher, create_root_context_for_testing](
              WasmHandleBaseSharedPtr base_wasm) -> std::shared_ptr<WasmHandleBase> {
+    std::lock_guard<std::mutex> lock(wasm_clone_mutex);
+    if (clone_factory_interceptor_for_testing) {
+      clone_factory_interceptor_for_testing();
+    }
     auto wasm = std::make_shared<Wasm>(std::static_pointer_cast<WasmHandle>(base_wasm), dispatcher);
     wasm->setCreateContextForTesting(nullptr, create_root_context_for_testing);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));

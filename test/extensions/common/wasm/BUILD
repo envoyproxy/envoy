@@ -63,6 +63,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
+        "@abseil-cpp//absl/synchronization:synchronization",
         "@abseil-cpp//absl/types:optional",
     ],
 )

@@ -1,3 +1,7 @@
+#include <atomic>
+#include <thread>
+#include <vector>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -20,6 +24,7 @@
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"
 
+#include "absl/synchronization/barrier.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -645,6 +650,103 @@ TEST_P(WasmCommonTest, VmCache) {
   plugin.reset();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->clearDeferredDeleteList();
+
+  proxy_wasm::clearWasmCachesForTesting();
+}
+
+// Test that the wasm_clone_mutex in getWasmHandleCloneFactory serializes
+// concurrent VM cloning. V8's Isolate creation has a race in
+// InitializeBuiltinJSDispatchTable() when multiple Isolates are created
+// concurrently. This occurs during dynamic WASM module loading (e.g. via xDS)
+// when all worker threads clone the base VM simultaneously via TLS slot init.
+// See https://github.com/Kuadrant/wasm-shim/issues/314
+// See https://github.com/networking-incubator/coraza-proxy-wasm/issues/3
+TEST_P(WasmCommonTest, ConcurrentCloneSerialization) {
+  NiceMock<Init::MockManager> init_manager;
+  auto vm_configuration = "vm_cache";
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto runtime = std::get<0>(GetParam());
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", runtime);
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
+  Protobuf::StringValue vm_configuration_string;
+  vm_configuration_string.set_value(vm_configuration);
+  vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+  std::string code;
+  if (runtime != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
+
+  // Create the base wasm handle on the main thread.
+  WasmHandleSharedPtr wasm_handle;
+  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, remote_data_provider_,
+             [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+  EXPECT_NE(wasm_handle, nullptr);
+
+  // Install a test interceptor inside the production clone factory. The
+  // interceptor runs inside the wasm_clone_mutex lock, so it can track whether
+  // the mutex actually serializes access. A sleep widens the window so that
+  // without a mutex, threads would overlap inside the factory.
+  std::atomic<int> concurrent_clones{0};
+  std::atomic<int> max_concurrent_clones{0};
+  setCloneFactoryInterceptorForTesting([&]() {
+    int current = ++concurrent_clones;
+    int prev_max = max_concurrent_clones.load();
+    while (current > prev_max && !max_concurrent_clones.compare_exchange_weak(prev_max, current)) {
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    --concurrent_clones;
+  });
+
+  // Spawn multiple threads that concurrently clone the base VM via the
+  // production code path (getOrCreateThreadLocalPlugin -> clone factory).
+  constexpr int kNumThreads = 8;
+  std::vector<std::thread> threads;
+  auto barrier = std::make_unique<absl::Barrier>(kNumThreads);
+  std::atomic<int> success_count{0};
+
+  for (int i = 0; i < kNumThreads; i++) {
+    threads.emplace_back([&, i]() {
+      Stats::IsolatedStoreImpl thread_stats_store;
+      auto thread_api = Api::createApiForTest(thread_stats_store);
+      auto thread_dispatcher = thread_api->allocateDispatcher(absl::StrCat("wasm_clone_test_", i));
+
+      // Synchronize all threads to maximize contention on the clone factory.
+      if (barrier->Block()) {
+        barrier.reset();
+      }
+
+      auto plugin_handle = getOrCreateThreadLocalPlugin(wasm_handle, plugin, *thread_dispatcher);
+      if (plugin_handle != nullptr) {
+        success_count++;
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  setCloneFactoryInterceptorForTesting(nullptr);
+
+  EXPECT_EQ(success_count, kNumThreads);
+  // The wasm_clone_mutex must serialize all clone factory calls, so at most
+  // one thread should be inside the factory at any time. Without the mutex,
+  // the 10ms sleep ensures threads overlap and max_concurrent would be > 1.
+  EXPECT_EQ(max_concurrent_clones.load(), 1)
+      << "wasm_clone_mutex should serialize all clone factory access";
 
   proxy_wasm::clearWasmCachesForTesting();
 }

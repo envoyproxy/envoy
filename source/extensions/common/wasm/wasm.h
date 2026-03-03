@@ -182,6 +182,7 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
+void setCloneFactoryInterceptorForTesting(std::function<void()> interceptor);
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 
 class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
