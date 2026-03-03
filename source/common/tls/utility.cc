@@ -535,12 +535,22 @@ absl::string_view Utility::getErrorDescription(int err) {
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 
+std::string translateX509VerificationErrorCode(int n) {
+  switch (n) {
+  case X509_V_ERR_UNABLE_TO_GET_CRL:
+    return "CRL for certificate was not provided";
+    break;
+  default:
+    return X509_verify_cert_error_string(n);
+  }
+}
+
 std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
   const int n = X509_STORE_CTX_get_error(ctx);
   const int depth = X509_STORE_CTX_get_error_depth(ctx);
   std::string error_details =
       absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
-                   X509_verify_cert_error_string(n));
+                   translateX509VerificationErrorCode(n));
 
   if (n == X509_V_ERR_UNABLE_TO_GET_CRL || n == X509_V_ERR_CRL_NOT_YET_VALID ||
       n == X509_V_ERR_CRL_HAS_EXPIRED || n == X509_V_ERR_CERT_REVOKED) {
