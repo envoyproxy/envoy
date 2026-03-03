@@ -11,6 +11,7 @@ RANDOMKEY
 SLOWLOG
 addrlen
 defragmentation
+dp
 evictable
 flushdb
 itr

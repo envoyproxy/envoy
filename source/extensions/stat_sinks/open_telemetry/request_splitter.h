@@ -21,7 +21,7 @@ class RequestSplitter {
 public:
   /**
    * Splits the given resource metrics into multiple export requests based on configured limits.
-   * When max_dp is reached, the subsequent datapoints are split into a new request.
+   * When max_dp is reached, the subsequent data points are split into a new request.
    * When max_rm is reached, the subsequent resource metrics are split into a new request.
    * If max_dp and max_rm are both 0, the corresponding limit is disabled.
    */

@@ -652,7 +652,7 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsAndResourceMetricsPerRequest) {
   flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
                 [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
 
-  // 3 counters, max 2 datapoints per request -> 2 requests (2 dp + 1 dp)
+  // 3 counters, max 2 data points per request -> 2 requests (2 dp + 1 dp)
   EXPECT_EQ(requests.size(), 2);
 
   // Request 1 should have 2 metrics
