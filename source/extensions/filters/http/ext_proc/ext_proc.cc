@@ -74,6 +74,8 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view HeaderBytesSentField = "header_bytes_sent";
+constexpr absl::string_view HeaderBytesReceivedField = "header_bytes_received";
 constexpr absl::string_view FailedOpenField = "failed_open";
 constexpr absl::string_view ReceivedImmediateResponseField = "received_immediate_response";
 constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
@@ -475,6 +477,10 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[HeaderBytesSentField].set_number_value(
+      static_cast<double>(header_bytes_sent_));
+  (*struct_msg->mutable_fields())[HeaderBytesReceivedField].set_number_value(
+      static_cast<double>(header_bytes_received_));
   (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
   (*struct_msg->mutable_fields())[ReceivedImmediateResponseField].set_bool_value(
       received_immediate_response_);
@@ -614,6 +620,12 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
+  }
+  if (field_name == HeaderBytesSentField) {
+    return static_cast<int64_t>(header_bytes_sent_);
+  }
+  if (field_name == HeaderBytesReceivedField) {
+    return static_cast<int64_t>(header_bytes_received_);
   }
   if (field_name == FailedOpenField) {
     return failed_open_;
@@ -1471,6 +1483,8 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   if (upstream_meter != nullptr) {
     logging_info_->setBytesSent(upstream_meter->wireBytesSent());
     logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+    logging_info_->setHeaderBytesSent(upstream_meter->headerBytesSent());
+    logging_info_->setHeaderBytesReceived(upstream_meter->headerBytesReceived());
   }
   // Only set upstream host in logging info once.
   if (logging_info_->upstreamHost() == nullptr) {
