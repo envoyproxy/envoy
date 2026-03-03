@@ -121,6 +121,9 @@ public:
    * @return std::string the URL-encoded PEM-encoded representation of the full peer certificate
    *         chain including the leaf certificate. Returns "" if there is no peer certificate or
    *         encoding fails.
+   *
+   * @note This is the peer-provided certificate chain, not the validated certificate chain. This
+   *       may include certificates that are not part of the validated chain.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
 
