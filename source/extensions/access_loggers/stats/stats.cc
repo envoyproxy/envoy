@@ -345,6 +345,12 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
 void StatsAccessLog::emitLogConst(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& histogram : histograms_) {
+    auto [tags, storage, dropped] = histogram.stat_.tags(context, stream_info, *scope_);
+
+    if (dropped) {
+      continue;
+    }
+
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
@@ -354,18 +360,18 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto [tags, storage, dropped] = histogram.stat_.tags(context, stream_info, *scope_);
-
-    if (dropped) {
-      continue;
-    }
-
     auto& histogram_stat =
         scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 
   for (const auto& counter : counters_) {
+    auto [tags, storage, dropped] = counter.stat_.tags(context, stream_info, *scope_);
+
+    if (dropped) {
+      continue;
+    }
+
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =
@@ -377,12 +383,6 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = *computed_value_opt;
     } else {
       value = counter.value_fixed_;
-    }
-
-    auto [tags, storage, dropped] = counter.stat_.tags(context, stream_info, *scope_);
-
-    if (dropped) {
-      continue;
     }
 
     auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
@@ -402,6 +402,11 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     return;
   }
 
+  auto [tags, storage, dropped] = gauge.stat_.tags(context, stream_info, *scope_);
+  if (dropped) {
+    return;
+  }
+
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
     absl::optional<uint64_t> computed_value_opt =
@@ -416,11 +421,6 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   }
 
   Gauge::OperationType op = it->second;
-
-  auto [tags, storage, dropped] = gauge.stat_.tags(context, stream_info, *scope_);
-  if (dropped) {
-    return;
-  }
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
