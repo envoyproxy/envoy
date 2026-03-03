@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
-#include "source/common/config/datasource.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -69,6 +68,39 @@ Http::FilterFactoryCb createFilterFactoryCallback(
   };
 }
 
+// Creates a filter factory callback from an already-loaded dynamic module. Shared by the
+// legacy name-based path and the local file path.
+absl::StatusOr<Http::FilterFactoryCb>
+createFilterFactoryFromModule(Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                              const FilterConfig& proto_config, const std::string& metrics_namespace,
+                              Server::Configuration::ServerFactoryContext& context,
+                              Stats::Scope& scope) {
+  std::string config;
+  if (proto_config.has_filter_config()) {
+    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    if (!config_or_error.ok()) {
+      return config_or_error.status();
+    }
+    config = std::move(config_or_error.value());
+  }
+
+  auto filter_config =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
+          std::move(dynamic_module), scope, context);
+  if (!filter_config.ok()) {
+    return absl::InvalidArgumentError("Failed to create filter config: " +
+                                      std::string(filter_config.status().message()));
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
+
+  return createFilterFactoryCallback(filter_config.value());
+}
+
 } // namespace
 
 absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
@@ -95,40 +127,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(dynamic_module.status().message()));
   }
 
-  std::string config;
-  if (proto_config.has_filter_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
-    RETURN_IF_NOT_OK_REF(config_or_error.status());
-    config = std::move(config_or_error.value());
-  }
-
-  // Use configured metrics namespace or fall back to the default.
   const std::string metrics_namespace =
       module_config.metrics_namespace().empty()
           ? std::string(Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace)
           : module_config.metrics_namespace();
 
-  absl::StatusOr<
-      Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
-      filter_config =
-          Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
-              std::move(dynamic_module.value()), scope, context);
-
-  if (!filter_config.ok()) {
-    return absl::InvalidArgumentError("Failed to create filter config: " +
-                                      std::string(filter_config.status().message()));
-  }
-
-  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
-  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
-  // is added. This is the legacy behavior for backward compatibility.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
-  }
-
-  return createFilterFactoryCallback(filter_config.value());
+  return createFilterFactoryFromModule(std::move(dynamic_module.value()), proto_config,
+                                       metrics_namespace, context, scope);
 }
 
 // Handles the AsyncDataSource-based module loading path (local files and remote HTTP).
@@ -148,36 +153,22 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
           : module_config.metrics_namespace();
 
   if (async_source.has_local()) {
-    // Only local.filename is supported. Inline bytes/strings are not a good practice
-    // for binary module data.
+    // Only local.filename is supported for module sources.
     if (!async_source.local().has_filename()) {
-      return absl::InvalidArgumentError(
-          "Only local.filename is supported for module sources; "
-          "inline_bytes and inline_string are not supported");
+      return absl::InvalidArgumentError("Only local.filename is supported for module sources; "
+                                        "inline_bytes and inline_string are not supported");
     }
 
-    auto data_or_error = Config::DataSource::read(async_source.local(), true, context.api());
-    if (!data_or_error.ok()) {
-      return absl::InvalidArgumentError("Failed to read module data: " +
-                                        std::string(data_or_error.status().message()));
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        async_source.local().filename(), module_config.do_not_close(),
+        module_config.load_globally());
+    if (!dynamic_module.ok()) {
+      return absl::InvalidArgumentError("Failed to load dynamic module: " +
+                                        std::string(dynamic_module.status().message()));
     }
 
-    const std::string& module_bytes = data_or_error.value();
-    if (module_bytes.empty()) {
-      return absl::InvalidArgumentError("Module data is empty");
-    }
-
-    auto filter_config =
-        createFilterConfigFromBytes(module_bytes, "", proto_config, context, scope);
-    if (!filter_config.ok()) {
-      return filter_config.status();
-    }
-
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-      context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
-    }
-    return createFilterFactoryCallback(filter_config.value());
+    return createFilterFactoryFromModule(std::move(dynamic_module.value()), proto_config,
+                                         metrics_namespace, context, scope);
   }
 
   if (async_source.has_remote()) {
@@ -213,11 +204,11 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
         context.api().randomGenerator(), false,
         [weak_state, sha256_hash, proto_config_copy = proto_config, &context, &scope,
          metrics_namespace](const std::string& data) {
-          auto state = weak_state.lock();
           if (data.empty()) {
             ENVOY_LOG_MISC(warn, "Remote dynamic module fetch failed for SHA256 {}", sha256_hash);
             return;
           }
+          auto state = weak_state.lock();
           if (!state) {
             return;
           }

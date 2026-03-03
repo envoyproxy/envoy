@@ -288,6 +288,34 @@ TEST(CreateDynamicModulesFromBytes, InvalidModuleBytes) {
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
+// Verify the temp file is created at expected path with restrictive permissions.
+TEST(CreateDynamicModulesFromBytes, TempFilePermissions) {
+  std::string module_path = testSharedObjectPath("no_op", "c");
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  auto& crypto_util = Common::Crypto::UtilitySingleton::get();
+  Buffer::OwnedImpl buffer(module_bytes);
+  std::string expected_hash = Hex::encode(crypto_util.getSha256Digest(buffer));
+
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, expected_hash, false, false);
+  EXPECT_TRUE(module.ok()) << module.status().message();
+
+  const std::filesystem::path temp_file =
+      std::filesystem::temp_directory_path() /
+      fmt::format("envoy_dynmod_{}.so", expected_hash);
+  EXPECT_TRUE(std::filesystem::exists(temp_file));
+
+  // Verify 0600 permissions (no group/other access).
+  auto perms = std::filesystem::status(temp_file).permissions();
+  EXPECT_EQ(perms & std::filesystem::perms::group_all, std::filesystem::perms::none);
+  EXPECT_EQ(perms & std::filesystem::perms::others_all, std::filesystem::perms::none);
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

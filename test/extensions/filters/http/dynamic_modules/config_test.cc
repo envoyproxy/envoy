@@ -161,7 +161,7 @@ TEST_F(DynamicModuleFilterConfigTest, InvalidLocalFile) {
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_FALSE(cb_or_error.ok());
-  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("Failed to read module data"));
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("Failed to load dynamic module"));
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeSuccess) {
@@ -218,6 +218,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeSuccess) {
   EXPECT_CALL(init_watcher_, ready());
   init_manager_.initialize(init_watcher_);
   EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initialized);
+
+  // Exercise the returned factory callback to verify the filter is actually installed.
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  const std::string worker_name = "worker_0";
+  NiceMock<Event::MockDispatcher> worker_dispatcher(worker_name);
+  ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(worker_dispatcher));
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(1);
+  cb_or_error.value()(filter_callback);
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeFetchFailure) {
@@ -370,29 +378,6 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingSHA256Mismatch) {
   cb_or_error.value()(filter_callback);
 }
 
-TEST_F(DynamicModuleFilterConfigTest, EmptyLocalModuleData) {
-  const std::string empty_file = TestEnvironment::temporaryPath("empty_module.so");
-  { std::ofstream f(empty_file); }
-
-  const std::string yaml = absl::StrCat(R"EOF(
-  dynamic_module_config:
-    module:
-      local:
-        filename: ")EOF",
-                                        empty_file, R"EOF("
-    do_not_close: true
-  filter_name: "test_filter"
-  )EOF");
-
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  DynamicModuleConfigFactory factory;
-  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_FALSE(cb_or_error.ok());
-  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("Module data is empty"));
-}
-
 TEST_F(DynamicModuleFilterConfigTest, ServerContextFactory) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
@@ -488,6 +473,89 @@ TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigInvalidModule) {
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_THAT(config_or_error.status().message(),
               testing::HasSubstr("Failed to load dynamic module"));
+}
+
+// Verify that a successful fetch with invalid (non-.so) module bytes fails gracefully.
+TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingInvalidModuleBytes) {
+  const std::string invalid_bytes = "this is not a valid shared object binary";
+
+  const std::string sha256 = Hex::encode(
+      Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(invalid_bytes)));
+
+  const std::string yaml = absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        retry_policy:
+          num_retries: 0
+        sha256: )EOF",
+                                        sha256, R"EOF(
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(invalid_bytes);
+            callbacks.onSuccess(request, std::move(response));
+            return &request;
+          }));
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
+
+  EXPECT_CALL(init_watcher_, ready());
+  init_manager_.initialize(init_watcher_);
+  EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initialized);
+
+  // Fetch succeeded but dlopen fails on invalid bytes, so filter_config stays null.
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(0);
+  cb_or_error.value()(filter_callback);
+}
+
+// Verify that when both name and module are set, module takes precedence.
+TEST_F(DynamicModuleFilterConfigTest, ModulePrecedenceOverName) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    name: "nonexistent_module_should_be_ignored"
+    module:
+      local:
+        filename: ")EOF",
+                                                                    module_path, R"EOF("
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  // If name were used, this would fail because "nonexistent_module_should_be_ignored" doesn't exist.
+  // Since module takes precedence, it should succeed with the local file.
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
 }
 
 } // namespace Configuration
