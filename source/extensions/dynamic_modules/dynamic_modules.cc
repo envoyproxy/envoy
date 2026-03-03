@@ -195,11 +195,9 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view mod
     }
     ofs.close();
 
-    // Set file permissions to 0600 (owner read/write only).
+    // Set file permissions to 0700 (owner only). dlopen requires read+exec.
     std::error_code ec;
-    std::filesystem::permissions(
-        temp_file_writing, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
-        ec);
+    std::filesystem::permissions(temp_file_writing, std::filesystem::perms::owner_all, ec);
     if (ec) {
       std::filesystem::remove(temp_file_writing);
       return absl::InternalError(

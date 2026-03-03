@@ -309,10 +309,9 @@ TEST(CreateDynamicModulesFromBytes, TempFilePermissions) {
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynmod_{}.so", expected_hash);
   EXPECT_TRUE(std::filesystem::exists(temp_file));
 
-  // Verify 0600 permissions (no group/other access).
+  // Verify 0700 permissions (owner only, no group/other access).
   auto perms = std::filesystem::status(temp_file).permissions();
-  EXPECT_EQ(perms & std::filesystem::perms::group_all, std::filesystem::perms::none);
-  EXPECT_EQ(perms & std::filesystem::perms::others_all, std::filesystem::perms::none);
+  EXPECT_EQ(perms, std::filesystem::perms::owner_all);
 }
 
 } // namespace DynamicModules
