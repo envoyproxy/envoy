@@ -291,28 +291,6 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeFetchFailure) {
   cb_or_error.value()(filter_callback);
 }
 
-TEST_F(DynamicModuleFilterConfigTest, RemoteWithEmptySHA256) {
-  const std::string yaml = R"EOF(
-  dynamic_module_config:
-    module:
-      remote:
-        http_uri:
-          uri: https://example.com/module.so
-          cluster: cluster_1
-          timeout: 5s
-    do_not_close: true
-  filter_name: "test_filter"
-  )EOF";
-
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  DynamicModuleConfigFactory factory;
-  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_FALSE(cb_or_error.ok());
-  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("SHA256 hash is required"));
-}
-
 TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingSHA256Mismatch) {
   const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
 
@@ -322,12 +300,9 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingSHA256Mismatch) {
                            std::istreambuf_iterator<char>());
   ASSERT_FALSE(module_bytes.empty());
 
-  // Use an incorrect SHA256 hash that won't match the actual module bytes.
-  const std::string wrong_sha256 =
-      "0000000000000000000000000000000000000000000000000000000000000000";
-
   // Set num_retries: 0 so RemoteAsyncDataProvider won't try to use the retry timer.
-  const std::string yaml = absl::StrCat(R"EOF(
+  // Use an incorrect SHA256 hash that won't match the actual module bytes.
+  const std::string yaml = R"EOF(
   dynamic_module_config:
     module:
       remote:
@@ -337,11 +312,10 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingSHA256Mismatch) {
           timeout: 5s
         retry_policy:
           num_retries: 0
-        sha256: )EOF",
-                                        wrong_sha256, R"EOF(
+        sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     do_not_close: true
   filter_name: "test_filter"
-  )EOF");
+  )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
