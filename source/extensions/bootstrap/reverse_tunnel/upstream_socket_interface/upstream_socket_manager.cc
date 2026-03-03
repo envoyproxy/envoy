@@ -25,7 +25,6 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
     : dispatcher_(dispatcher), random_generator_(std::make_unique<Random::RandomGeneratorImpl>()),
       extension_(extension) {
   ENVOY_LOG(debug, "reverse_tunnel: creating socket manager with stats integration.");
-  ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 
   // Register this socket manager instance for rebalancing.
   absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
@@ -128,13 +127,11 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
 
   fd_to_node_map_[fd] = node_id;
   fd_to_cluster_map_[fd] = cluster_id;
-  // Initialize the ping timer before adding the socket to accepted_reverse_connections_.
-  // This is to prevent a race condition between pingConnections() and addConnectionSocket().
-  // where the timer is not initialized when pingConnections() tries to enable it.
+  node_to_active_fd_count_[node_id]++;
+
+  // Create per-connection timeout timer for ping responses.
   fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { onPingTimeout(fd); });
 
-  // If local Envoy is responding to reverse connections, add the socket to.
-  // accepted_reverse_connections_. Thereafter, initiate ping keepalives on the socket.
   accepted_reverse_connections_[node_id].push_back(std::move(socket));
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
 
@@ -156,8 +153,19 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
-  // Initiate ping keepalives on the socket.
-  tryEnablePingTimer(std::chrono::seconds(ping_interval.count()));
+  // Store ping_interval_ if not yet set.
+  if (ping_interval_ == std::chrono::seconds::zero()) {
+    ping_interval_ = ping_interval;
+  }
+
+  // Create per-connection send timer with initial jitter spread across the full interval
+  // to distribute pings from burst-added connections across time.
+  fd_to_ping_send_timer_map_[fd] = dispatcher_.createTimer(
+      [this, fd]() { sendPingForConnection(fd); });
+  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  uint64_t jitter_ms = random_generator_->random() % std::max<uint64_t>(1, interval_ms);
+  fd_to_ping_send_timer_map_[fd]->enableTimer(
+      std::chrono::milliseconds(interval_ms + jitter_ms));
 
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             node_id, connectionKey, fd);
@@ -204,6 +212,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
+  fd_to_ping_send_timer_map_.erase(fd);
 
   return socket;
 }
@@ -233,21 +242,8 @@ std::string UpstreamSocketManager::getNodeWithSocket(const std::string& key) {
 }
 
 bool UpstreamSocketManager::hasAnySocketsForNode(const std::string& node_id) {
-  // Check idle sockets first via map lookup O(1) instead of iterating fd_to_node_map_ O(n).
-  // Note: fd_to_node_map_ contains all FDs (idle + used), but this is faster for the common case.
-  auto idle_it = accepted_reverse_connections_.find(node_id);
-  if (idle_it != accepted_reverse_connections_.end() && !idle_it->second.empty()) {
-    return true;
-  }
-
-  // Check if node has any used sockets.
-  for (const auto& [fd, n_id] : fd_to_node_map_) {
-    if (n_id == node_id) {
-      return true;
-    }
-  }
-
-  return false;
+  auto it = node_to_active_fd_count_.find(node_id);
+  return it != node_to_active_fd_count_.end() && it->second > 0;
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd) {
@@ -283,6 +279,17 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   fd_to_node_map_.erase(fd);
   fd_to_cluster_map_.erase(fd);
 
+  // Decrement the active FD counter for the node.
+  auto count_it = node_to_active_fd_count_.find(node_id);
+  if (count_it != node_to_active_fd_count_.end()) {
+    if (count_it->second > 0) {
+      count_it->second--;
+    }
+    if (count_it->second == 0) {
+      node_to_active_fd_count_.erase(count_it);
+    }
+  }
+
   // Determine if this is an idle or used socket by searching for the FD in the idle pool.
   auto& sockets = accepted_reverse_connections_[node_id];
   bool is_idle_socket = false;
@@ -298,6 +305,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
 
       fd_to_event_map_.erase(fd);
       fd_to_timer_map_.erase(fd);
+      fd_to_ping_send_timer_map_.erase(fd);
       break;
     }
   }
@@ -332,16 +340,6 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   }
 }
 
-void UpstreamSocketManager::tryEnablePingTimer(const std::chrono::seconds& ping_interval) {
-  ENVOY_LOG(debug, "reverse_tunnel: trying to enable ping timer, ping interval: {}",
-            ping_interval.count());
-  if (ping_interval_ != std::chrono::seconds::zero()) {
-    return;
-  }
-  ENVOY_LOG(debug, "reverse_tunnel: enabling ping timer, ping interval: {}", ping_interval.count());
-  ping_interval_ = ping_interval;
-  ping_timer_->enableTimer(ping_interval_);
-}
 
 void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
   // Clean the given node ID if there are no active sockets.
@@ -422,70 +420,63 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   fd_to_timer_map_[fd]->disableTimer();
   // Reset miss counter on success.
   fd_to_miss_count_.erase(fd);
+
+  // Re-arm the per-connection send timer with 15% jitter (matching HTTP/2 keepalive pattern).
+  auto send_it = fd_to_ping_send_timer_map_.find(fd);
+  if (send_it != fd_to_ping_send_timer_map_.end()) {
+    uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+    constexpr uint64_t jitter_percent = 15;
+    uint64_t jitter_mod = jitter_percent * interval_ms / 100;
+    if (jitter_mod > 0) {
+      interval_ms += random_generator_->random() % jitter_mod;
+    }
+    send_it->second->enableTimer(std::chrono::milliseconds(interval_ms));
+  }
 }
 
-void UpstreamSocketManager::pingConnections(const std::string& node_id) {
-  ENVOY_LOG(trace, "reverse_tunnel: pinging connections for node {}.", node_id);
+void UpstreamSocketManager::sendPingForConnection(int fd) {
+  auto node_it = fd_to_node_map_.find(fd);
+  if (node_it == fd_to_node_map_.end()) {
+    ENVOY_LOG(debug, "reverse_tunnel: sendPingForConnection: fd {} not found in fd_to_node_map_.",
+              fd);
+    return;
+  }
+  const std::string& node_id = node_it->second;
+
   auto& sockets = accepted_reverse_connections_[node_id];
-  ENVOY_LOG(trace, "reverse_tunnel: number of sockets for node {} is {}.", node_id, sockets.size());
-
-  auto itr = sockets.begin();
-  while (itr != sockets.end()) {
-    int fd = itr->get()->ioHandle().fdDoNotUse();
-    auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
-        createPingResponse();
-
-    auto ping_response_timeout = ping_interval_ / 2;
-    fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
-
-    // Use a flag to signal whether the socket needs to be marked dead. If the socket is marked
-    // dead. in markSocketDead(), it is erased from the list, and the iterator becomes invalid. We
-    // need to. break out of the loop to avoid a use after free error.
-    bool socket_dead = false;
-    while (buffer->length() > 0) {
-      Api::IoCallUint64Result result = itr->get()->ioHandle().write(*buffer);
-      ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping request. return_value: {}",
-                node_id, fd, result.return_value_);
-      if (result.return_value_ == 0) {
-        ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping rc {}, error - ", node_id, fd,
-                  result.return_value_, result.err_->getErrorDetails());
-        if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-          ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
-          markSocketDead(fd);
-          socket_dead = true;
-          break;
-        }
-      }
-    }
-
-    if (buffer->length() > 0) {
-      // Move to next socket if current one could not be fully written.
-      ++itr;
-      continue;
-    }
-
-    if (socket_dead) {
-      // Socket was marked dead; the iterator is now invalid. Break out of the loop.
+  Network::ConnectionSocket* socket_ptr = nullptr;
+  for (auto& s : sockets) {
+    if (s->ioHandle().fdDoNotUse() == fd) {
+      socket_ptr = s.get();
       break;
     }
-
-    // Move to next socket.
-    ++itr;
   }
-}
 
-void UpstreamSocketManager::pingConnections() {
-  ENVOY_LOG(trace, "reverse_tunnel: pinging connections.");
-  // If the last socket for a node errors out the map entry is cleared. So we cant use normal for
-  // loops.
-  for (auto itr = accepted_reverse_connections_.begin();
-       itr != accepted_reverse_connections_.end();) {
-    auto next = std::next(itr);
-
-    pingConnections(itr->first);
-    itr = next;
+  if (socket_ptr == nullptr) {
+    ENVOY_LOG(debug, "reverse_tunnel: sendPingForConnection: fd {} not found in idle pool.", fd);
+    return;
   }
-  ping_timer_->enableTimer(ping_interval_);
+
+  auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+      createPingResponse();
+
+  auto ping_response_timeout = ping_interval_ / 2;
+  fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
+
+  while (buffer->length() > 0) {
+    Api::IoCallUint64Result result = socket_ptr->ioHandle().write(*buffer);
+    ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping request. return_value: {}",
+              node_id, fd, result.return_value_);
+    if (result.return_value_ == 0) {
+      ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping rc {}, error - {}", node_id,
+                fd, result.return_value_, result.err_->getErrorDetails());
+      if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+        ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
+        markSocketDead(fd);
+        return;
+      }
+    }
+  }
 }
 
 void UpstreamSocketManager::onPingTimeout(const int fd) {
@@ -498,6 +489,18 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
               miss_threshold_);
     fd_to_miss_count_.erase(fd);
     markSocketDead(fd);
+  } else {
+    // Below threshold: re-arm send timer for the next ping cycle.
+    auto send_it = fd_to_ping_send_timer_map_.find(fd);
+    if (send_it != fd_to_ping_send_timer_map_.end()) {
+      uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+      constexpr uint64_t jitter_percent = 15;
+      uint64_t jitter_mod = jitter_percent * interval_ms / 100;
+      if (jitter_mod > 0) {
+        interval_ms += random_generator_->random() % jitter_mod;
+      }
+      send_it->second->enableTimer(std::chrono::milliseconds(interval_ms));
+    }
   }
 }
 
@@ -512,10 +515,16 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   fd_to_event_map_.clear();
 
   for (auto& [fd, timer] : fd_to_timer_map_) {
-    ENVOY_LOG(trace, "reverse_tunnel: cleaning up timer. fd: {}.", fd);
-    timer.reset(); // This will cancel the timer.
+    ENVOY_LOG(trace, "reverse_tunnel: cleaning up timeout timer. fd: {}.", fd);
+    timer.reset();
   }
   fd_to_timer_map_.clear();
+
+  for (auto& [fd, timer] : fd_to_ping_send_timer_map_) {
+    ENVOY_LOG(trace, "reverse_tunnel: cleaning up send timer. fd: {}.", fd);
+    timer.reset();
+  }
+  fd_to_ping_send_timer_map_.clear();
 
   // Now mark all sockets as dead.
   std::vector<int> fds_to_cleanup;
@@ -525,18 +534,12 @@ UpstreamSocketManager::~UpstreamSocketManager() {
 
   for (int fd : fds_to_cleanup) {
     ENVOY_LOG(trace, "reverse_tunnel: marking socket dead in destructor. fd: {}.", fd);
-    markSocketDead(fd); // false = not used, just cleanup.
+    markSocketDead(fd);
   }
 
   // Clear any remaining fd mappings.
   fd_to_node_map_.clear();
   fd_to_cluster_map_.clear();
-
-  // Clear the ping timer.
-  if (ping_timer_) {
-    ping_timer_->disableTimer();
-    ping_timer_.reset();
-  }
 
   // Remove this instance from the global socket managers list.
   absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
