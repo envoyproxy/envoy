@@ -102,6 +102,9 @@ public:
   }
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
+  void setClientCertRequested(bool requested) override { client_cert_requested_ = requested; }
+  bool clientCertRequested() const override { return client_cert_requested_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
@@ -125,6 +128,8 @@ private:
   std::string cert_validation_error_;
   // Stores additional per-connection data needed by the certificate selector.
   Ssl::SelectionHandleConstSharedPtr cert_selection_handle_;
+  // True if the server sent a CertificateRequest during the handshake.
+  bool client_cert_requested_{false};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

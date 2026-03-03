@@ -1741,15 +1741,17 @@ TEST_P(SslSocketTest, NoClientCertificateOnUpstream) {
   testUtil(test_options.setNotExpectedClientStats("ssl.client_certificate_presented"));
 }
 
-TEST_P(SslSocketTest, ClientCertificatePresentedOnUpstream) {
+// Client has a cert configured but the server does NOT request one (no CertificateRequest).
+// This is plain TLS, not mTLS — the stat should NOT increment.
+TEST_P(SslSocketTest, ClientCertConfiguredButNotRequestedOnUpstream) {
   const std::string client_ctx_yaml = R"EOF(
-    common_tls_context:
-      tls_certificates:
-        certificate_chain:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
-  )EOF";
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
 
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -1761,7 +1763,35 @@ TEST_P(SslSocketTest, ClientCertificatePresentedOnUpstream) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectedClientStats("ssl.client_certificate_presented"));
+  testUtil(test_options.setNotExpectedClientStats("ssl.client_certificate_presented"));
+}
+
+TEST_P(SslSocketTest, ClientCertificatePresentedOnUpstream) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedClientStats("ssl.client_certificate_presented"));
 }
 
 TEST_P(SslSocketTest, NoLocalCert) {

@@ -131,6 +131,17 @@ public:
    * @return the detailed certificate validation error message, or empty if none.
    */
   virtual absl::string_view certificateValidationError() const PURE;
+
+  /**
+   * Set whether the server requested a client certificate during the TLS handshake.
+   * This is set from the SSL_CTX_set_cert_cb callback.
+   */
+  virtual void setClientCertRequested(bool requested) PURE;
+
+  /**
+   * @return true if the server requested a client certificate during the TLS handshake.
+   */
+  virtual bool clientCertRequested() const PURE;
 };
 
 } // namespace Ssl
