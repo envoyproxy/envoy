@@ -497,6 +497,20 @@ type HttpFilterHandle interface {
 	// should use BufferedResponseBody to get the currently buffered body in the chain.
 	ReceivedResponseBody() BodyBuffer
 
+	// ReceivedBufferedRequestBody returns true if the latest received request body is the
+	// previously buffered request body. This is true when a previous filter in the chain stopped
+	// and buffered the request body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnRequestBody callback.
+	ReceivedBufferedRequestBody() bool
+
+	// ReceivedBufferedResponseBody returns true if the latest received response body is the
+	// previously buffered response body. This is true when a previous filter in the chain stopped
+	// and buffered the response body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnResponseBody callback.
+	ReceivedBufferedResponseBody() bool
+
 	// ResponseTrailers retrieves the response trailers.
 	// @Return the response trailers.
 	ResponseTrailers() HeaderMap

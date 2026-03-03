@@ -39,6 +39,7 @@ envoy_cc_test(
         ":util",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
     ],
 )
 
