@@ -464,6 +464,12 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added support for loading dynamic module binaries from local file paths via the new
+    :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
+    field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
+    via ``module.local.filename`` as an alternative to the name-based search path.
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts
