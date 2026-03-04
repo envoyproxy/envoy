@@ -27,6 +27,7 @@ envoy_cc_library(
     srcs = ["request_splitter.cc"],
     hdrs = ["request_splitter.h"],
     deps = [
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "@opentelemetry-proto//:metrics_proto_cc",
         "@opentelemetry-proto//:metrics_service_proto_cc",
