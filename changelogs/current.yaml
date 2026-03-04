@@ -305,6 +305,14 @@ new_features:
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
     configured via metadata.
+- area: compressor
+  change: |
+    Added :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
+    ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
+    instead of removed when compression is applied, allowing caches and conditional requests to
+    work while indicating the body was modified by compression.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
