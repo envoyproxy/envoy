@@ -1,0 +1,14 @@
+# This file can be modified manually to add or remove on-call overrides.
+# After modifying, run
+# bazel tool tools/oncall:rotation
+# to update the ical file.
+#
+# Format: start
+# overrides:
+# - start: 2026-03-01
+#   duration_days: 3
+#   oncall: $USERNAME
+overrides:
+- start: 2026-08-04
+  duration_days: 3
+  oncall: ravenblackx

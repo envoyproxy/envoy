@@ -1,0 +1,27 @@
+# In general, modify this through options to bazel run tools/oncall:rotation
+start_date: 2026-03-01
+updated: 2026-03-03
+rotation:
+- ggreenway
+- agrawroh
+- paul-r-gall
+- wbpcode
+- adisuissa
+- tonya11en
+- phlax
+- mathetake
+- ravenblackx
+- zuercher
+- kyessenov
+- tyxia
+- mattklein123
+- nezdolik
+- KBaichoo
+- yanavlasov
+- botengyao
+- RyanTheOptimist
+- danzh2010
+- jwendell
+- krinkinmu
+- keith
+- yanjunxiang-google
