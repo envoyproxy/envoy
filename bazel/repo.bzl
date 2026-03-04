@@ -93,7 +93,19 @@ def _envoy_repo_impl(repository_ctx):
     llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
     local_llvm = "True" if llvm_path else "False"
 
-    repository_ctx.file("compiler.bzl", "LLVM_PATH = '%s'" % (llvm_path))
+    # By default, even when local toolchain is used, we still use the hermetic
+    # sysroot, when it's undesirable, you can set this environment variable to True
+    # to fallback to the host libc.
+    #
+    # NOTE: The cleanest way to provide this environment variable would be via Bazel's
+    # repo_env flag. It's particularly important when using remote build execution (aka
+    # RBE), as host environment variables are not directly passed to remote workers.
+    local_sysroot = repository_ctx.os.environ.get("BAZEL_USE_HOST_SYSROOT", "False")
+
+    repository_ctx.file("compiler.bzl", """
+LLVM_PATH = '%s'
+USE_LOCAL_SYSROOT = %s
+""" % (llvm_path, local_sysroot))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -114,6 +126,34 @@ config_setting(
     name = "use_local_llvm",
     flag_values = {
         ":use_local_llvm_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "use_local_sysroot_flag",
+    build_setting_default = %s,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_local_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_hermetic_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "False",
     },
     constraint_values = [
         "@platforms//os:linux",
@@ -253,7 +293,7 @@ py_console_script_binary(
     data = [":envoy_repo.py"],
 )
 
-''' % local_llvm)
+''' % (local_llvm, local_sysroot))
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
