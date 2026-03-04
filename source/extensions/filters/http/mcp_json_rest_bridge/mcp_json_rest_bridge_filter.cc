@@ -237,8 +237,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
 
   std::string request_body = http_request->body.is_null() ? "" : http_request->body.dump();
-  ENVOY_LOG(info, "Mapping MCP tool to HTTP request url: {} method: {} body: {}", http_request->url,
-            http_request->method, request_body);
+  ENVOY_LOG(debug, "Mapping MCP tool to HTTP request url: {} method: {} body: {}",
+            http_request->url, http_request->method, request_body);
 
   auto request_headers = decoder_callbacks_->requestHeaders();
   request_headers->setPath(http_request->url);

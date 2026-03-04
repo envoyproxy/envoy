@@ -44,8 +44,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     if (!template_value_json.ok()) {
       return template_value_json.status();
     }
-    std::string value_str =
-        Http::Utility::PercentEncoding::encode(jsonValueToString(*template_value_json));
+    std::string value_str = jsonValueToString(*template_value_json);
     std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
     RE2::GlobalReplace(&base_url, var_pattern, value_str);
   }
@@ -75,27 +74,29 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params,
   }
 
   if (arguments.is_object()) {
-    absl::Status status;
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-      status.Update(constructQueryParams(query_params, body_rule, it.value(), templates,
-                                         path.empty() ? it.key() : path + "." + it.key()));
+      absl::Status status = constructQueryParams(query_params, body_rule, it.value(), templates,
+                                                 path.empty() ? it.key() : path + "." + it.key());
+      if (!status.ok()) {
+        return status;
+      }
     }
-    return status;
+    return absl::OkStatus();
   }
   if (arguments.is_array()) {
-    absl::Status status;
     for (auto& array_item : arguments) {
-      status.Update(constructQueryParams(query_params, body_rule, array_item, templates, path));
+      absl::Status status =
+          constructQueryParams(query_params, body_rule, array_item, templates, path);
+      if (!status.ok()) {
+        return status;
+      }
     }
-    return status;
+    return absl::OkStatus();
   }
 
-  absl::StatusOr<std::string> value = jsonValueToString(arguments);
-  if (!value.ok()) {
-    return value.status();
-  }
+  const std::string value = jsonValueToString(arguments);
   // Uses Http::Utility::PercentEncoding::urlEncode to escape the value.
-  query_params.push_back({path, Http::Utility::PercentEncoding::urlEncode(*value)});
+  query_params.push_back({path, Http::Utility::PercentEncoding::urlEncode(value)});
   return absl::OkStatus();
 }
 
