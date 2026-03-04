@@ -1,8 +1,10 @@
 #include "source/extensions/filters/http/a2a/a2a_filter.h"
 
 #include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -68,14 +70,13 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
 
   if (isValidA2aPostRequest(headers)) {
     is_json_post_request_ = true;
-    ENVOY_LOG(debug, "valid A2A Post request");
     if (end_stream) {
       is_a2a_request_ = false;
     } else {
       // Need to buffer the body to check for JSON-RPC 2.0
       is_a2a_request_ = true;
 
-      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      // Set the buffer limit
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setDecoderBufferLimit(max_size);
@@ -111,7 +112,8 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
     parser_ = std::make_unique<A2aJsonParser>(config_->parserConfig());
   }
 
-  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", data.length(), bytes_parsed_);
+  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
+            bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
 
@@ -135,7 +137,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                           absl::nullopt, "a2a_filter_not_jsonrpc");
+                                           absl::nullopt, "a2a_filter_not_valid_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
     }
@@ -183,7 +185,7 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
   if (!is_a2a_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "request must be a valid JSON-RPC 2.0 message for A2A",
-                                       nullptr, absl::nullopt, "a2a_filter_not_jsonrpc");
+                                       nullptr, absl::nullopt, "a2a_filter_not_valid_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

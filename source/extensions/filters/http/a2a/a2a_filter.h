@@ -19,10 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 
-namespace MetadataKeys {
-// Core A2A fields
-constexpr absl::string_view FilterName = "a2a_proxy";
-} // namespace MetadataKeys
 /**
  * All A2A filter stats. @see stats_macros.h
  */
