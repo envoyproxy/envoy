@@ -1062,6 +1062,14 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                      .async_stream = &async_stream_});
 }
 
+// A temp test to increase coverage. The test will be modified once the
+// implementation will be added.
+TEST_P(NewGrpcMuxImplTest, LrsCoverageIncrease) {
+  setup();
+  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
 TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
   auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
       "envoy.config_mux.new_grpc_mux_factory");
@@ -1076,7 +1084,7 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt),
+                               absl::nullopt, absl::nullopt, nullptr),
                EnvoyException);
 }
 

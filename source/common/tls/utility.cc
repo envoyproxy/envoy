@@ -1,5 +1,8 @@
 #include "source/common/tls/utility.h"
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include <cstdint>
 #include <vector>
 
@@ -536,8 +539,27 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
   const int n = X509_STORE_CTX_get_error(ctx);
   const int depth = X509_STORE_CTX_get_error_depth(ctx);
   std::string error_details =
-      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
-                   X509_verify_cert_error_string(n));
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ");
+
+  if (n == X509_V_ERR_UNABLE_TO_GET_CRL || n == X509_V_ERR_CRL_NOT_YET_VALID ||
+      n == X509_V_ERR_CRL_HAS_EXPIRED || n == X509_V_ERR_CERT_REVOKED) {
+    const std::string crl_error_msg =
+        fmt::format("certificate revocation check against provided CRLs failed: {}",
+                    X509_verify_cert_error_string(n));
+    absl::StrAppend(&error_details, crl_error_msg);
+    X509* cert = X509_STORE_CTX_get_current_cert(ctx);
+    if (cert != nullptr) {
+      std::vector<std::string> crldps = getCertificateCrlDpsForLogging(cert);
+      if (!crldps.empty()) {
+        const std::string error_msg =
+            fmt::format(", certificate CRL distribution points: [{}]", fmt::join(crldps, ", "));
+        absl::StrAppend(&error_details, error_msg);
+      }
+    }
+  } else {
+    absl::StrAppend(&error_details, X509_verify_cert_error_string(n));
+  }
+
   return error_details;
 }
 
@@ -576,6 +598,25 @@ std::vector<std::string> Utility::getCertificateSansForLogging(X509* cert) {
     }
   }
   return sans;
+}
+
+std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
+  std::vector<std::string> crldps;
+  bssl::UniquePtr<CRL_DIST_POINTS> dist_points(static_cast<CRL_DIST_POINTS*>(
+      X509_get_ext_d2i(cert, NID_crl_distribution_points, nullptr, nullptr)));
+  if (dist_points != nullptr) {
+    for (const DIST_POINT* dp : dist_points.get()) {
+      if (dp->distpoint != nullptr && dp->distpoint->type == 0) {
+        GENERAL_NAMES* names = dp->distpoint->name.fullname;
+        if (names != nullptr) {
+          for (const GENERAL_NAME* general_name : names) {
+            crldps.push_back(Utility::generalNameAsString(general_name));
+          }
+        }
+      }
+    }
+  }
+  return crldps;
 }
 
 } // namespace Tls
