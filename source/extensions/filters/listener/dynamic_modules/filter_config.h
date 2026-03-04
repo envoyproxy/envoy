@@ -134,46 +134,49 @@ public:
     Stats::Histogram& histogram_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;

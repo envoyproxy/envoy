@@ -63,6 +63,7 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
 
   Formatter::FormatterConstSharedPtr node_id_formatter;
   Formatter::FormatterConstSharedPtr cluster_id_formatter;
+  Formatter::FormatterConstSharedPtr tenant_id_formatter;
 
   // Create formatters for validation if configured.
   if (proto_config.has_validation()) {
@@ -100,16 +101,33 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
       }
       cluster_id_formatter = std::move(formatter_or_error.value());
     }
+
+    // Create tenant_id formatter if configured.
+    if (!validation.tenant_id_format().empty()) {
+      envoy::config::core::v3::SubstitutionFormatString tenant_id_format_config;
+      tenant_id_format_config.mutable_text_format_source()->set_inline_string(
+          validation.tenant_id_format());
+
+      auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+          tenant_id_format_config, generic_context);
+      if (!formatter_or_error.ok()) {
+        return absl::InvalidArgumentError(fmt::format("Failed to parse tenant_id_format: {}",
+                                                      formatter_or_error.status().message()));
+      }
+      tenant_id_formatter = std::move(formatter_or_error.value());
+    }
   }
 
   return std::shared_ptr<ReverseTunnelFilterConfig>(new ReverseTunnelFilterConfig(
-      proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter)));
+      proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter),
+      std::move(tenant_id_formatter)));
 }
 
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Formatter::FormatterConstSharedPtr node_id_formatter,
-    Formatter::FormatterConstSharedPtr cluster_id_formatter)
+    Formatter::FormatterConstSharedPtr cluster_id_formatter,
+    Formatter::FormatterConstSharedPtr tenant_id_formatter)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -130,6 +148,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       }()),
       node_id_formatter_(std::move(node_id_formatter)),
       cluster_id_formatter_(std::move(cluster_id_formatter)),
+      tenant_id_formatter_(std::move(tenant_id_formatter)),
       emit_dynamic_metadata_(proto_config.has_validation() &&
                              proto_config.validation().emit_dynamic_metadata()),
       dynamic_metadata_namespace_(
@@ -140,11 +159,11 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       required_cluster_name_(proto_config.required_cluster_name()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
-    absl::string_view node_id, absl::string_view cluster_id,
+    absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
     const StreamInfo::StreamInfo& stream_info) const {
 
   // If no validation configured, pass validation.
-  if (!node_id_formatter_ && !cluster_id_formatter_) {
+  if (!node_id_formatter_ && !cluster_id_formatter_ && !tenant_id_formatter_) {
     return true;
   }
 
@@ -168,11 +187,22 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     }
   }
 
+  // Validate tenant_id if formatter is configured.
+  if (tenant_id_formatter_) {
+    const std::string expected_tenant_id = tenant_id_formatter_->format({}, stream_info);
+    if (!expected_tenant_id.empty() && expected_tenant_id != tenant_id) {
+      ENVOY_LOG(debug, "reverse_tunnel: tenant_id validation failed. Expected: '{}', Actual: '{}'",
+                expected_tenant_id, tenant_id);
+      return false;
+    }
+  }
+
   return true;
 }
 
 void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id,
                                                        absl::string_view cluster_id,
+                                                       absl::string_view tenant_id,
                                                        bool validation_passed,
                                                        StreamInfo::StreamInfo& stream_info) const {
   if (!emit_dynamic_metadata_) {
@@ -185,6 +215,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
   // Emit actual identifiers.
   fields["node_id"].set_string_value(std::string(node_id));
   fields["cluster_id"].set_string_value(std::string(cluster_id));
+  fields["tenant_id"].set_string_value(std::string(tenant_id));
 
   // Emit validation result.
   fields["validation_result"].set_string_value(validation_passed ? "allowed" : "denied");
@@ -194,8 +225,8 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
 
   ENVOY_LOG(trace,
             "reverse_tunnel: emitted dynamic metadata to namespace '{}': node_id={}, "
-            "cluster_id={}, validation_result={}",
-            dynamic_metadata_namespace_, node_id, cluster_id,
+            "cluster_id={}, tenant_id={}, validation_result={}",
+            dynamic_metadata_namespace_, node_id, cluster_id, tenant_id,
             validation_passed ? "allowed" : "denied");
 }
 
@@ -402,19 +433,20 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     }
   }
 
-  // Validate node_id and cluster_id if validation is configured.
+  // Validate node_id, cluster_id, and tenant_id if validation is configured.
   auto& connection = parent_.read_callbacks_->connection();
   const bool validation_passed =
-      parent_.config_->validateIdentifiers(node_id, cluster_id, connection.streamInfo());
+      parent_.config_->validateIdentifiers(node_id, cluster_id, tenant_id, connection.streamInfo());
 
   // Emit validation metadata if configured.
-  parent_.config_->emitValidationMetadata(node_id, cluster_id, validation_passed,
+  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_passed,
                                           connection.streamInfo());
 
   if (!validation_passed) {
     parent_.stats_.validation_failed_.inc();
-    ENVOY_CONN_LOG(debug, "reverse_tunnel: validation failed for node '{}', cluster '{}'",
-                   parent_.read_callbacks_->connection(), node_id, cluster_id);
+    ENVOY_CONN_LOG(debug,
+                   "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
+                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id);
     sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, absl::nullopt,
                    "reverse_tunnel_validation_failed");
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

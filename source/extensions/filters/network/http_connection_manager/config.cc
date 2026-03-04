@@ -467,6 +467,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       config.stream_error_on_invalid_http_message());
   SET_AND_RETURN_IF_NOT_OK(options_or_error.status(), creation_status);
   http2_options_ = options_or_error.value();
+
+  if (http2_options_.has_max_header_field_size_kb() &&
+      http2_options_.max_header_field_size_kb().value() > max_request_headers_kb_) {
+    creation_status = absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_request_headers_kb");
+    return;
+  }
+
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -595,9 +603,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
       return;
     }
-    scoped_routes_config_provider_ =
-        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
-                                           *scoped_routes_config_provider_manager_);
+    scoped_routes_config_provider_ = srds_factory->createConfigProvider(
+        config, context_.serverFactoryContext(), context_.initManager(), stats_prefix_,
+        *scoped_routes_config_provider_manager_);
     scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

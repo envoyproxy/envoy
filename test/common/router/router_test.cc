@@ -1198,6 +1198,101 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
+// Test that x-envoy-degraded header causes ExtOriginRequestDegraded to be reported
+TEST_F(RouterTest, OutlierDetectionDegradedHeaderWithSuccessResponse) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Response with 200 status and x-envoy-degraded header
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_headers->setEnvoyDegraded("");
+
+  // Should report degraded, not success
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded,
+                        absl::optional<uint64_t>(200)));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Test that 5xx error takes priority over degraded header
+TEST_F(RouterTest, OutlierDetectionFivexxTakesPriorityOverDegraded) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Response with 503 status and x-envoy-degraded header
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  response_headers->setEnvoyDegraded("");
+
+  // Should report failed, not degraded (5xx takes priority)
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503)));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Test that response without degraded header reports success
+TEST_F(RouterTest, OutlierDetectionSuccessResponseWithoutDegradedHeader) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Response with 200 status and no x-envoy-degraded header
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+
+  // Should report success
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, absl::optional<uint64_t>(200)));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Test that 4xx response with degraded header reports degraded
+TEST_F(RouterTest, OutlierDetectionFourxxWithDegradedHeader) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Response with 404 status and x-envoy-degraded header
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "404"}});
+  response_headers->setEnvoyDegraded("");
+
+  // Should report degraded (4xx is not an ejection-level error)
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded,
+                        absl::optional<uint64_t>(404)));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 // Validate that x-envoy-attempt-count is added to request headers when the option is true.
 TEST_F(RouterTest, EnvoyAttemptCountInRequest) {
   verifyAttemptCountInRequestBasic(

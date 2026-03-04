@@ -77,6 +77,8 @@ public:
     handle_.recordHistogramValue(test_histogram_vec_, 1, {{local_var}});
   }
 
+  void onDestroy() override {}
+
 private:
   HttpFilterHandle& handle_;
   MetricID streams_total_;
@@ -167,6 +169,7 @@ public:
   BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
   BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   void testHeaders(HeaderMap& headers) {
@@ -254,6 +257,7 @@ public:
   BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
   TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -421,6 +425,7 @@ public:
   TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
   TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -482,6 +487,8 @@ public:
   void onStreamComplete() override {
     testFilterState("stream_complete_key", "stream_complete_value");
   }
+
+  void onDestroy() override {}
 
 private:
   void testFilterState(absl::string_view key, absl::string_view value) {
@@ -574,6 +581,7 @@ public:
   HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
   TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;

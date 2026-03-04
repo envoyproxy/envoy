@@ -92,6 +92,30 @@ bool envoy_dynamic_module_on_lb_choose_host(
     (void)health;
   }
 
+  // Test O(1) host health lookup by address.
+  if (host_count > 0) {
+    // Get the address of the first host to use for the by-address lookup.
+    envoy_dynamic_module_type_envoy_buffer first_host_addr = {NULL, 0};
+    envoy_dynamic_module_callback_lb_get_host_address(lb_envoy_ptr, 0, 0, &first_host_addr);
+    if (first_host_addr.ptr != NULL && first_host_addr.length > 0) {
+      envoy_dynamic_module_type_host_health health_by_addr =
+          envoy_dynamic_module_type_host_health_Unhealthy;
+      envoy_dynamic_module_type_module_buffer addr_buf = {first_host_addr.ptr,
+                                                          first_host_addr.length};
+      bool found_by_addr = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+          lb_envoy_ptr, addr_buf, &health_by_addr);
+      (void)found_by_addr;
+    }
+
+    // Test with a non-existent address.
+    envoy_dynamic_module_type_host_health not_found_health =
+        envoy_dynamic_module_type_host_health_Unhealthy;
+    envoy_dynamic_module_type_module_buffer bad_addr = {"1.2.3.4:9999", 12};
+    bool not_found = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+        lb_envoy_ptr, bad_addr, &not_found_health);
+    (void)not_found;
+  }
+
   // Test all-hosts callbacks (address, weight, active requests, connections, locality).
   if (host_count > 0) {
     envoy_dynamic_module_type_envoy_buffer host_address_result = {NULL, 0};
@@ -117,6 +141,52 @@ bool envoy_dynamic_module_on_lb_choose_host(
     bool locality_found = envoy_dynamic_module_callback_lb_get_host_locality(
         lb_envoy_ptr, 0, 0, &region, &zone, &sub_zone);
     (void)locality_found;
+
+    // Test per-host data storage.
+    uintptr_t test_data = 42;
+    bool set_ok = envoy_dynamic_module_callback_lb_set_host_data(
+        lb_envoy_ptr, 0, 0, test_data);
+    (void)set_ok;
+    uintptr_t retrieved_data = 0;
+    bool get_ok = envoy_dynamic_module_callback_lb_get_host_data(
+        lb_envoy_ptr, 0, 0, &retrieved_data);
+    (void)get_ok;
+
+    // Test host metadata (string, number, bool).
+    envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+    envoy_dynamic_module_type_module_buffer meta_key = {"version", 7};
+    envoy_dynamic_module_type_envoy_buffer meta_result = {NULL, 0};
+    bool meta_found = envoy_dynamic_module_callback_lb_get_host_metadata_string(
+        lb_envoy_ptr, 0, 0, filter_name, meta_key, &meta_result);
+    (void)meta_found;
+
+    envoy_dynamic_module_type_module_buffer num_key = {"weight_factor", 13};
+    double num_val = 0.0;
+    bool num_found = envoy_dynamic_module_callback_lb_get_host_metadata_number(
+        lb_envoy_ptr, 0, 0, filter_name, num_key, &num_val);
+    (void)num_found;
+
+    envoy_dynamic_module_type_module_buffer bool_key = {"enabled", 7};
+    bool bool_val = false;
+    bool bool_found = envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+        lb_envoy_ptr, 0, 0, filter_name, bool_key, &bool_val);
+    (void)bool_found;
+  }
+
+  // Test locality-related callbacks.
+  size_t locality_count = envoy_dynamic_module_callback_lb_get_locality_count(lb_envoy_ptr, 0);
+  if (locality_count > 0) {
+    size_t loc_host_count =
+        envoy_dynamic_module_callback_lb_get_locality_host_count(lb_envoy_ptr, 0, 0);
+    (void)loc_host_count;
+    if (loc_host_count > 0) {
+      envoy_dynamic_module_type_envoy_buffer loc_addr = {NULL, 0};
+      bool loc_found = envoy_dynamic_module_callback_lb_get_locality_host_address(
+          lb_envoy_ptr, 0, 0, 0, &loc_addr);
+      (void)loc_found;
+    }
+    uint32_t loc_weight = envoy_dynamic_module_callback_lb_get_locality_weight(lb_envoy_ptr, 0, 0);
+    (void)loc_weight;
   }
 
   // Test context callbacks if context is available.

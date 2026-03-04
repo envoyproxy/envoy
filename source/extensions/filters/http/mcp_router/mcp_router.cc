@@ -1282,7 +1282,11 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
                       absl::StrJoin(all_tools, ","), "]}}");
 }
 
-std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendResponse>& responses) {
+// Shared aggregation for resources/list and resources/templates/list.
+std::string
+McpRouterFilter::aggregateResourceItems(const std::vector<BackendResponse>& responses,
+                                        const std::string& result_key, const std::string& uri_field,
+                                        const std::vector<std::string>& optional_fields) {
   const bool is_multiplexing = config_->isMultiplexing();
 
   std::string output;
@@ -1296,16 +1300,16 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
     root->addKey("result");
     {
       auto result_map = root->addMap();
-      result_map->addKey("resources");
+      result_map->addKey(result_key);
       {
-        auto resources_array = result_map->addArray();
+        auto items_array = result_map->addArray();
 
         for (const auto& resp : responses) {
           if (!resp.success) {
             continue;
           }
           std::string json_body = extractJsonRpcFromResponse(resp);
-          ENVOY_LOG(debug, "Aggregating resources list from backend '{}': {}", resp.backend_name,
+          ENVOY_LOG(debug, "Aggregating {} from backend '{}': {}", result_key, resp.backend_name,
                     json_body);
           auto parsed_or = Json::Factory::loadFromString(json_body);
           if (!parsed_or.ok()) {
@@ -1321,58 +1325,45 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
             continue;
           }
 
-          auto resources_or = (*result_or)->getObjectArray("resources");
-          if (!resources_or.ok()) {
+          auto items_or = (*result_or)->getObjectArray(result_key);
+          if (!items_or.ok()) {
             continue;
           }
 
-          for (const auto& resource : *resources_or) {
-            if (!resource || !resource->isObject()) {
+          for (const auto& item : *items_or) {
+            if (!item || !item->isObject()) {
               continue;
             }
 
-            auto uri_or = resource->getString("uri");
+            auto uri_or = item->getString(uri_field);
             if (!uri_or.ok()) {
               continue;
             }
 
-            auto resource_map = resources_array->addMap();
+            auto item_map = items_array->addMap();
 
-            // Prefix URI with backend name in multiplexing mode using format: backend+scheme://path
-            // Example: "file://path" -> "time+file://path" (for backend "time").
-            resource_map->addKey("uri");
+            // Prefix URI: "file://path" -> "backend+file://path".
+            item_map->addKey(uri_field);
             if (is_multiplexing) {
               std::string original_uri = *uri_or;
               size_t scheme_end = original_uri.find("://");
               if (scheme_end != std::string::npos) {
-                // Insert backend name before the scheme.
                 std::string scheme = original_uri.substr(0, scheme_end);
-                std::string rest = original_uri.substr(scheme_end); // Includes "://path"
-                resource_map->addString(absl::StrCat(resp.backend_name, "+", scheme, rest));
+                std::string rest = original_uri.substr(scheme_end);
+                item_map->addString(absl::StrCat(resp.backend_name, "+", scheme, rest));
               } else {
-                // No scheme, use backend name with empty scheme.
-                resource_map->addString(absl::StrCat(resp.backend_name, "+://", original_uri));
+                item_map->addString(absl::StrCat(resp.backend_name, "+://", original_uri));
               }
             } else {
-              resource_map->addString(*uri_or);
+              item_map->addString(*uri_or);
             }
 
-            auto name_or = resource->getString("name", "");
-            if (name_or.ok() && !name_or->empty()) {
-              resource_map->addKey("name");
-              resource_map->addString(*name_or);
-            }
-
-            auto desc_or = resource->getString("description", "");
-            if (desc_or.ok() && !desc_or->empty()) {
-              resource_map->addKey("description");
-              resource_map->addString(*desc_or);
-            }
-
-            auto mime_or = resource->getString("mimeType", "");
-            if (mime_or.ok() && !mime_or->empty()) {
-              resource_map->addKey("mimeType");
-              resource_map->addString(*mime_or);
+            for (const auto& field : optional_fields) {
+              auto val_or = item->getString(field, "");
+              if (val_or.ok() && !val_or->empty()) {
+                item_map->addKey(field);
+                item_map->addString(*val_or);
+              }
             }
           }
         }
@@ -1383,115 +1374,14 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
   return output;
 }
 
+std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendResponse>& responses) {
+  return aggregateResourceItems(responses, "resources", "uri", {"name", "description", "mimeType"});
+}
+
 std::string
 McpRouterFilter::aggregateResourcesTemplatesList(const std::vector<BackendResponse>& responses) {
-  const bool is_multiplexing = config_->isMultiplexing();
-
-  std::string output;
-  Json::StringStreamer streamer(output);
-  {
-    auto root = streamer.makeRootMap();
-    root->addKey("jsonrpc");
-    root->addString("2.0");
-    root->addKey("id");
-    root->addNumber(request_id_);
-    root->addKey("result");
-    {
-      auto result_map = root->addMap();
-      result_map->addKey("resourceTemplates");
-      {
-        auto templates_array = result_map->addArray();
-
-        for (const auto& resp : responses) {
-          if (!resp.success) {
-            continue;
-          }
-          std::string json_body = extractJsonRpcFromResponse(resp);
-          ENVOY_LOG(debug, "Aggregating resource templates from backend '{}': {}",
-                    resp.backend_name, json_body);
-          auto parsed_or = Json::Factory::loadFromString(json_body);
-          if (!parsed_or.ok()) {
-            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
-                      parsed_or.status().message());
-            continue;
-          }
-
-          Json::ObjectSharedPtr parsed_body = *parsed_or;
-
-          auto result_or = parsed_body->getObject("result");
-          if (!result_or.ok() || !(*result_or)) {
-            continue;
-          }
-
-          auto templates_or = (*result_or)->getObjectArray("resourceTemplates");
-          if (!templates_or.ok()) {
-            continue;
-          }
-
-          for (const auto& tmpl : *templates_or) {
-            if (!tmpl || !tmpl->isObject()) {
-              continue;
-            }
-
-            auto uri_template_or = tmpl->getString("uriTemplate");
-            if (!uri_template_or.ok()) {
-              continue;
-            }
-
-            auto template_map = templates_array->addMap();
-
-            // Prefix URI template with backend name in multiplexing mode.
-            // Example: "file:///{path}" -> "time+file:///{path}" (for backend "time").
-            template_map->addKey("uriTemplate");
-            if (is_multiplexing) {
-              std::string original_uri = *uri_template_or;
-              size_t scheme_end = original_uri.find("://");
-              if (scheme_end != std::string::npos) {
-                std::string scheme = original_uri.substr(0, scheme_end);
-                std::string rest = original_uri.substr(scheme_end);
-                template_map->addString(absl::StrCat(resp.backend_name, "+", scheme, rest));
-              } else {
-                template_map->addString(absl::StrCat(resp.backend_name, "+://", original_uri));
-              }
-            } else {
-              template_map->addString(*uri_template_or);
-            }
-
-            // Prefix name with backend name in multiplexing mode.
-            auto name_or = tmpl->getString("name", "");
-            if (name_or.ok() && !name_or->empty()) {
-              template_map->addKey("name");
-              if (is_multiplexing) {
-                template_map->addString(absl::StrCat(resp.backend_name, kNameDelimiter, *name_or));
-              } else {
-                template_map->addString(*name_or);
-              }
-            }
-
-            auto desc_or = tmpl->getString("description", "");
-            if (desc_or.ok() && !desc_or->empty()) {
-              template_map->addKey("description");
-              template_map->addString(*desc_or);
-            }
-
-            auto title_or = tmpl->getString("title", "");
-            if (title_or.ok() && !title_or->empty()) {
-              template_map->addKey("title");
-              template_map->addString(*title_or);
-            }
-
-            auto mime_or = tmpl->getString("mimeType", "");
-            if (mime_or.ok() && !mime_or->empty()) {
-              template_map->addKey("mimeType");
-              template_map->addString(*mime_or);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return output;
+  return aggregateResourceItems(responses, "resourceTemplates", "uriTemplate",
+                                {"name", "description", "title", "mimeType"});
 }
 
 std::string McpRouterFilter::aggregatePromptsList(const std::vector<BackendResponse>& responses) {
