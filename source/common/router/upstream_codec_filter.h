@@ -38,6 +38,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
 
   // UpstreamCallbacks
+  void onHostSelected(Upstream::HostDescriptionConstSharedPtr) override {}
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
