@@ -5,6 +5,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
+#include "source/common/tls/context_impl.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -21,6 +22,51 @@ namespace {
 // There must be an version of this function for each type possible in variant `CachedValue`.
 bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
 bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
+
+// Returns the direct issuer CA cert from the peer-supplied chain without re-running CA store
+// verification. Since the TLS handshake already ran doVerifyCertChain(), we confirm that the
+// chain is already Validated via SslExtendedSocketInfo, then identify the issuer cert using:
+//   1. AKI/SKI pre-filter (cheap byte comparison, encoding-independent) — eliminates non-issuers
+//      without a crypto op. We deliberately avoid X509_check_issued() because its name comparison
+//      uses a strict byte-level DER match that can fail on semantically equivalent names encoded
+//      with different ASN.1 string types (e.g. PrintableString vs UTF8String).
+//   2. X509_verify (expensive, authoritative) — only called when AKI/SKI match or are absent.
+// Returns nullptr if the chain was not validated yet, no issuer is present, or no match is found.
+X509* getIssuerFromValidatedChain(SSL* ssl) {
+  auto* extended_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+  if (!extended_info || extended_info->certificateValidationStatus() !=
+                          Envoy::Ssl::ClientValidationStatus::Validated) {
+    return nullptr;
+  }
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (!cert_chain) {
+    return nullptr;
+  }
+  const size_t chain_len = sk_X509_num(cert_chain);
+  if (chain_len < 2) {
+    return nullptr;
+  }
+  X509* leaf = sk_X509_value(cert_chain, 0);
+  const ASN1_OCTET_STRING* leaf_aki = X509_get0_authority_key_id(leaf);
+  for (size_t i = 1; i < chain_len; ++i) {
+    X509* candidate = sk_X509_value(cert_chain, i);
+    if (leaf_aki != nullptr) {
+      const ASN1_OCTET_STRING* candidate_ski = X509_get0_subject_key_id(candidate);
+      if (candidate_ski != nullptr &&
+          ASN1_OCTET_STRING_cmp(leaf_aki, candidate_ski) != 0) {
+        continue;
+      }
+    }
+
+    EVP_PKEY* pubkey = X509_get0_pubkey(candidate);
+    if (pubkey != nullptr && X509_verify(leaf, pubkey) == 1) {
+      return candidate;
+    }
+  }
+  return nullptr;
+}
+
 bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
 bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
   return ptr == nullptr;
@@ -395,25 +441,25 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificateHash() const {
-  return getCachedValueOrCreate<std::string>(CachedValueTag::IssuerPeerCertificateHash, [](SSL* ssl) {
-    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-    if (!cert) {
-      return std::string{};
-    }
-
-    return Utility::getSha256DigestFromCertificate(*cert);
-  });
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::IssuerPeerCertificateHash, [](SSL* ssl) -> std::string {
+        X509* issuer = getIssuerFromValidatedChain(ssl);
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSha256DigestFromCertificate(*issuer);
+      });
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificateSerial() const {
-  return getCachedValueOrCreate<std::string>(CachedValueTag::IssuerPeerCertificateSerial, [](SSL* ssl) {
-    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-    if (!cert) {
-      return std::string{};
-    }
-
-    return Utility::getSerialNumberFromCertificate(*cert);
-  });
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::IssuerPeerCertificateSerial, [](SSL* ssl) -> std::string {
+        X509* issuer = getIssuerFromValidatedChain(ssl);
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSerialNumberFromCertificate(*issuer);
+      });
 }
 
 const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {

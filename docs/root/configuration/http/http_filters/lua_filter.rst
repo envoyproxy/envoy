@@ -1473,8 +1473,11 @@ peer certificate, or no issuer.
   downstreamSslConnection:issuerPeerCertificateHash()
 
 Returns the hex-encoded SHA256 fingerprint of the direct issuer (CA) certificate from the peer
-certificate chain. The issuer certificate is the second certificate in the chain (index 1).
-Returns ``""`` if there is no peer certificate chain or no issuer certificate.
+certificate chain. The issuer is identified by searching the chain for a certificate whose public
+key cryptographically signs the peer leaf certificate. Requires the peer certificate chain to have
+been successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or no
+issuer certificate can be found.
 
 ``issuerPeerCertificateSerial()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1484,8 +1487,10 @@ Returns ``""`` if there is no peer certificate chain or no issuer certificate.
   downstreamSslConnection:issuerPeerCertificateSerial()
 
 Returns the serial number of the direct issuer (CA) certificate from the peer certificate chain.
-The issuer certificate is the second certificate in the chain (index 1).
-Returns ``""`` if there is no peer certificate chain or no issuer certificate.
+The issuer is identified by searching the chain for a certificate whose public key cryptographically
+signs the peer leaf certificate. Requires the peer certificate chain to have been successfully
+validated (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``).
+Returns ``""`` if there is no validated peer certificate chain or no issuer certificate can be found.
 
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1398,9 +1398,9 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_chain.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -1412,7 +1412,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
