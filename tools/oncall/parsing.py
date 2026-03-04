@@ -145,11 +145,10 @@ def overrides_from_yaml() -> list[Override]:
 
 
 def who_would_be_oncall(d: date, start_date: date, rotation: list[str],
-                        overrides: list[object]) -> str:
+                        overrides: list[Override]) -> str:
     for override in overrides:
-        if override.start <= d and override.start + timedelta(
-                days=override['duration_days']) > d:
-            return override['oncall']
+        if override.start <= d and override.end > d:
+            return override.oncall
     seats = len(rotation)
     offset_days = (d - start_date).days
     offset_weeks = offset_days // 7
