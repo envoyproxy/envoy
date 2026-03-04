@@ -27,8 +27,8 @@ public:
   const std::string& serialNumberPeerCertificate() const override;
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
-  const std::string& issuerPeerCertificateHash() const override;
-  const std::string& issuerPeerCertificateSerial() const override;
+  const std::string& sha256PeerCertificateIssuerDigest() const override;
+  const std::string& serialNumberPeerCertificateIssuer() const override;
   const std::string& subjectPeerCertificate() const override;
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
@@ -75,8 +75,8 @@ private:
     SerialNumberPeerCertificate,
     SerialNumbersPeerCertificates,
     IssuerPeerCertificate,
-    IssuerPeerCertificateHash,
-    IssuerPeerCertificateSerial,
+    Sha256PeerCertificateIssuerDigest,
+    SerialNumberPeerCertificateIssuer,
     SubjectPeerCertificate,
     ParsedSubjectPeerCertificate,
     SubjectLocalCertificate,

@@ -1465,12 +1465,12 @@ certificate, or no serial number.
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
-``issuerPeerCertificateHash()``
+``sha256PeerCertificateIssuerDigest()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  downstreamSslConnection:issuerPeerCertificateHash()
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
 
 Returns the hex-encoded SHA256 fingerprint of the direct issuer (CA) certificate from the peer
 certificate chain. The issuer is identified by searching the chain for a certificate whose public
@@ -1479,12 +1479,12 @@ been successfully validated (e.g., mTLS with ``require_client_certificate: true`
 ``validation_context``). Returns ``""`` if there is no validated peer certificate chain or no
 issuer certificate can be found.
 
-``issuerPeerCertificateSerial()``
+``serialNumberPeerCertificateIssuer()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  downstreamSslConnection:issuerPeerCertificateSerial()
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
 
 Returns the serial number of the direct issuer (CA) certificate from the peer certificate chain.
 The issuer is identified by searching the chain for a certificate whose public key cryptographically

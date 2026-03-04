@@ -2042,7 +2042,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.issuerPeerCertificateHash();
+                                       return connection_info.sha256PeerCertificateIssuerDigest();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_ISSUER_SERIAL",
@@ -2051,7 +2051,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.issuerPeerCertificateSerial();
+                                       return connection_info.serialNumberPeerCertificateIssuer();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_CERT",

@@ -267,21 +267,21 @@ public:
 
   const std::string& expectedPeerIssuer() const { return expected_peer_issuer_; }
 
-  TestUtilOptions& setExpectedIssuerPeerCertificateHash(const std::string& expected_issuer_hash) {
+  TestUtilOptions& setExpectedSha256PeerCertificateIssuerDigest(const std::string& expected_issuer_hash) {
     expected_issuer_peer_certificate_hash_ = expected_issuer_hash;
     return *this;
   }
 
-  const std::string& expectedIssuerPeerCertificateHash() const {
+  const std::string& expectedSha256PeerCertificateIssuerDigest() const {
     return expected_issuer_peer_certificate_hash_;
   }
 
-  TestUtilOptions& setExpectedIssuerPeerCertificateSerial(const std::string& expected_issuer_serial) {
+  TestUtilOptions& setExpectedSerialNumberPeerCertificateIssuer(const std::string& expected_issuer_serial) {
     expected_issuer_peer_certificate_serial_ = expected_issuer_serial;
     return *this;
   }
 
-  const std::string& expectedIssuerPeerCertificateSerial() const {
+  const std::string& expectedSerialNumberPeerCertificateIssuer() const {
     return expected_issuer_peer_certificate_serial_;
   }
 
@@ -649,19 +649,19 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
       }
-      if (!options.expectedIssuerPeerCertificateHash().empty()) {
+      if (!options.expectedSha256PeerCertificateIssuerDigest().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
-        EXPECT_EQ(options.expectedIssuerPeerCertificateHash(),
-                  server_connection->ssl()->issuerPeerCertificateHash());
-        EXPECT_EQ(options.expectedIssuerPeerCertificateHash(),
-                  server_connection->ssl()->issuerPeerCertificateHash());
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
       }
-      if (!options.expectedIssuerPeerCertificateSerial().empty()) {
+      if (!options.expectedSerialNumberPeerCertificateIssuer().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
-        EXPECT_EQ(options.expectedIssuerPeerCertificateSerial(),
-                  server_connection->ssl()->issuerPeerCertificateSerial());
-        EXPECT_EQ(options.expectedIssuerPeerCertificateSerial(),
-                  server_connection->ssl()->issuerPeerCertificateSerial());
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
       }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
@@ -1417,8 +1417,8 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options
-               .setExpectedIssuerPeerCertificateHash(TEST_INTERMEDIATE_CA_CERT_256_HASH)
-               .setExpectedIssuerPeerCertificateSerial(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {

@@ -440,9 +440,9 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
   });
 }
 
-const std::string& ConnectionInfoImplBase::issuerPeerCertificateHash() const {
+const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::IssuerPeerCertificateHash, [](SSL* ssl) -> std::string {
+      CachedValueTag::Sha256PeerCertificateIssuerDigest, [](SSL* ssl) -> std::string {
         X509* issuer = getIssuerFromValidatedChain(ssl);
         if (!issuer) {
           return std::string{};
@@ -451,9 +451,9 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificateHash() const {
       });
 }
 
-const std::string& ConnectionInfoImplBase::issuerPeerCertificateSerial() const {
+const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::IssuerPeerCertificateSerial, [](SSL* ssl) -> std::string {
+      CachedValueTag::SerialNumberPeerCertificateIssuer, [](SSL* ssl) -> std::string {
         X509* issuer = getIssuerFromValidatedChain(ssl);
         if (!issuer) {
           return std::string{};

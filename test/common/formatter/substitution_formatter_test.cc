@@ -2253,7 +2253,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string issuer_hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-    EXPECT_CALL(*connection_info, issuerPeerCertificateHash()).WillRepeatedly(ReturnRef(issuer_hash));
+    EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest()).WillRepeatedly(ReturnRef(issuer_hash));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
               upstream_format.format({}, stream_info));
@@ -2262,7 +2262,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, issuerPeerCertificateHash()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
@@ -2279,7 +2279,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string issuer_serial = "0123456789ABCDEF";
-    EXPECT_CALL(*connection_info, issuerPeerCertificateSerial()).WillRepeatedly(ReturnRef(issuer_serial));
+    EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer()).WillRepeatedly(ReturnRef(issuer_serial));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ("0123456789ABCDEF", upstream_format.format({}, stream_info));
   }
@@ -2287,7 +2287,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, issuerPeerCertificateSerial()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
