@@ -52,13 +52,12 @@ fi
 FORMAT_ARGS+=(
     --namespace_check_excluded_paths
     ./envoy ./examples/ ./library/java/ ./library/kotlin
-    ./library/objective-c ./test/java ./test/java
-    ./test/objective-c ./test/swift ./experimental/swift
+    ./library/objective-c ./library/python/ ./test/java ./test/java
+    ./test/objective-c ./test/python ./test/swift ./experimental/swift
     --build_fixer_check_excluded_paths
     ./envoy ./BUILD ./dist)
 
 export ENVOY_BAZEL_PREFIX="@envoy" && _bazel run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
-
 KTFMT="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"/ktfmt.sh
 KOTLIN_DIRS=(
   "library/kotlin"
@@ -70,6 +69,27 @@ if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
 else
   NEEDS_FORMAT=$("${KTFMT}" --dry-run "${KOTLIN_DIRS[@]}")
   if [[ -n "${NEEDS_FORMAT}" ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
+    exit 1
+  fi
+fi
+
+
+_bazel build //tools:black
+BLACK_BIN=$(_bazel info bazel-bin)/tools/black
+PYTHON_DIRS=(
+  "library/python"
+  "test/python"
+  "examples/python"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  "${BLACK_BIN}" --config pyproject.toml "${PYTHON_DIRS[@]}"
+else
+  NEEDS_FORMAT=$("${BLACK_BIN}" --config pyproject.toml --check "${PYTHON_DIRS[@]}" 2>&1 || echo "black failed, exit code=$?")
+  # If black reports that files need to be reformatted, it will exit with code 1, so "black failed, exit code=1" will be added to NEEDS_FORMAT;
+  # otherswise, NEEDS_FORMAT will just contain the black output.
+  if [[ -n "${NEEDS_FORMAT}" ]] && [[ "${NEEDS_FORMAT}" == *"black failed, exit code="* ]]; then
     echo "ERROR: Run 'tools/check_format.sh fix' to fix"
     echo "${NEEDS_FORMAT}"
     exit 1

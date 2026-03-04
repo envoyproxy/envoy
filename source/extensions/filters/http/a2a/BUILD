@@ -22,7 +22,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings",
     ],
 )
-
 envoy_cc_library(
     name = "a2a_filter_lib",
     srcs = ["a2a_filter.cc"],
@@ -53,3 +52,4 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/http/a2a/v3:pkg_cc_proto",
     ],
 )
+
