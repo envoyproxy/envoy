@@ -562,6 +562,16 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
+  // Client (upstream): increment when the server requested a client cert and Envoy provided one.
+  if (!SSL_is_server(ssl)) {
+    auto* extended_info = static_cast<Ssl::SslExtendedSocketInfo*>(
+        SSL_get_ex_data(ssl, sslExtendedSocketInfoIndex()));
+    if (extended_info != nullptr && extended_info->clientCertRequested() &&
+        SSL_get_certificate(ssl) != nullptr) {
+      stats_.client_certificate_presented_.inc();
+    }
+  }
+
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.

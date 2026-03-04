@@ -290,6 +290,10 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: tls
+  change: |
+    Added a new stat ``client_certificate_presented`` to track upstream TLS connections where Envoy
+    presented a client certificate (mTLS).
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules

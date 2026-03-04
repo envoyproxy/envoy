@@ -107,15 +107,31 @@ ClientContextImpl::ClientContextImpl(
   if (add_selector) {
     if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
       tls_certificate_selector_ = factory->createUpstreamTlsCertificateSelector(*this);
-      SSL_CTX_set_cert_cb(
-          tls_contexts_[0].ssl_ctx_.get(),
-          [](SSL* ssl, void*) -> int {
-            return static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
-                ->selectTlsContext(ssl);
-          },
-          nullptr);
     }
   }
+
+  // Always set the cert callback: it records that the server requested a client certificate
+  // (for mTLS stat tracking). If a cert selector is also configured, delegate to it.
+  SSL_CTX_set_cert_cb(
+      tls_contexts_[0].ssl_ctx_.get(),
+      [](SSL* ssl, void*) -> int {
+        auto* context_impl =
+            static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+
+        // Record that the server requested a client certificate.
+        auto* extended_info = static_cast<Ssl::SslExtendedSocketInfo*>(
+            SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+        if (extended_info != nullptr) {
+          extended_info->setClientCertRequested(true);
+        }
+
+        // Delegate to the cert selector if one exists.
+        if (context_impl->tls_certificate_selector_ != nullptr) {
+          return context_impl->selectTlsContext(ssl);
+        }
+        return 1;
+      },
+      nullptr);
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>

@@ -5,7 +5,7 @@
    connection_error, Counter, Total TLS connection errors not including failed certificate verifications
    handshake, Counter, Total successful TLS connection handshakes
    session_reused, Counter, Total successful TLS session resumptions
-   no_certificate, Counter, Total successful TLS connections with no client certificate
+   no_certificate, Counter, Total successful TLS connections with no peer certificate
    fail_verify_no_cert, Counter, Total TLS connections that failed because of missing client certificate
    fail_verify_error, Counter, Total TLS connections that failed CA verification
    fail_verify_san, Counter, Total TLS connections that failed SAN verification

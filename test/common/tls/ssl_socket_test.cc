@@ -375,6 +375,12 @@ public:
     return expected_transport_failure_reason_contains_;
   }
 
+  TestUtilOptions& setExpectedClientStats(const std::string& stat) {
+    expected_client_stats_ = stat;
+    return *this;
+  }
+  const std::string& expectedClientStats() const { return expected_client_stats_; }
+
   TestUtilOptions& setNotExpectedClientStats(const std::string& stat) {
     not_expected_client_stats_ = stat;
     return *this;
@@ -428,6 +434,7 @@ private:
   std::string expected_ocsp_response_;
   bool ocsp_stapling_enabled_{false};
   std::string expected_transport_failure_reason_contains_;
+  std::string expected_client_stats_;
   std::string not_expected_client_stats_;
   int expected_verify_error_code_{-1};
   std::string expected_sni_;
@@ -771,6 +778,10 @@ void testUtil(const TestUtilOptions& options) {
 
   if (!options.expectedServerStats().empty()) {
     EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+  }
+
+  if (!options.expectedClientStats().empty()) {
+    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
   }
 
   if (!options.notExpectedClientStats().empty()) {
@@ -1710,6 +1721,77 @@ TEST_P(SslSocketTest, NoCert) {
   testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
                .setExpectNoCert()
                .setExpectNoCertChain());
+}
+
+TEST_P(SslSocketTest, NoClientCertificateOnUpstream) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setNotExpectedClientStats("ssl.client_certificate_presented"));
+}
+
+// Client has a cert configured but the server does NOT request one (no CertificateRequest).
+// This is plain TLS, not mTLS — the stat should NOT increment.
+TEST_P(SslSocketTest, ClientCertConfiguredButNotRequestedOnUpstream) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setNotExpectedClientStats("ssl.client_certificate_presented"));
+}
+
+TEST_P(SslSocketTest, ClientCertificatePresentedOnUpstream) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedClientStats("ssl.client_certificate_presented"));
 }
 
 TEST_P(SslSocketTest, NoLocalCert) {
