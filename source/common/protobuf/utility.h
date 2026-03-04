@@ -434,6 +434,8 @@ public:
     return bytesToString(any.value());
   };
 
+#ifdef ENVOY_ENABLE_YAML
+
   /**
    * Convert from google.protobuf.Any to bytes as std::string, with additional support for
    * google.protobuf.Struct which is serialized to JSON.
@@ -459,6 +461,8 @@ public:
     }
     return bytesToString(any.value());
   };
+
+#endif
 
   /**
    * Convert from google.protobuf.Any to a typed message.
