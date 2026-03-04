@@ -36,16 +36,16 @@ bool A2aFilter::isValidA2aPostRequest(const Http::RequestHeaderMap& headers) con
 
   // Extract Content-Type
   const absl::string_view content_type = headers.getContentTypeValue();
-  const absl::string_view json_ct = Envoy::Http::Headers::get().ContentTypeValues.Json;
+  const absl::string_view json_content_type = Envoy::Http::Headers::get().ContentTypeValues.Json;
+  constexpr absl::string_view a2a_IANA_media_type = "application/a2a+json";
 
-  // We check if it is exactly "application/json" or starts with "application/json;" /
-  // "application/json "
-  const bool is_json_content_type =
-      absl::StartsWith(content_type, json_ct) &&
-      (content_type.size() == json_ct.size() || content_type[json_ct.size()] == ';' ||
-       content_type[json_ct.size()] == ' ');
+  const auto is_content_type_valid = [&](absl::string_view valid_ct) {
+    return absl::StartsWith(content_type, valid_ct) &&
+           (content_type.size() == valid_ct.size() || content_type[valid_ct.size()] == ';' ||
+            content_type[valid_ct.size()] == ' ');
+  };
 
-  return is_json_content_type;
+  return is_content_type_valid(json_content_type) || is_content_type_valid(a2a_IANA_media_type);
 }
 
 bool A2aFilter::shouldRejectRequest() const {
