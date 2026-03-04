@@ -75,8 +75,9 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf
   // Create the load balancer configuration.
   std::string config_bytes;
   if (typed_config.has_lb_policy_config()) {
-    config_bytes = THROW_OR_RETURN_VALUE(
-        MessageUtil::knownAnyToBytes(typed_config.lb_policy_config()), std::string);
+    auto config_or_error = MessageUtil::knownAnyToBytes(typed_config.lb_policy_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    config_bytes = std::move(config_or_error.value());
   }
   auto lb_config_or_error = DynamicModuleLbConfig::create(
       typed_config.lb_policy_name(), config_bytes, std::move(module_or_error.value()));

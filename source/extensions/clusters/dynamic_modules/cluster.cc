@@ -334,8 +334,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   // Extract cluster_config from the Any field.
   std::string cluster_config_bytes;
   if (proto_config.has_cluster_config()) {
-    cluster_config_bytes = THROW_OR_RETURN_VALUE(
-        MessageUtil::knownAnyToBytes(proto_config.cluster_config()), std::string);
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.cluster_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    cluster_config_bytes = std::move(config_or_error.value());
   }
 
   // Load the dynamic module.
