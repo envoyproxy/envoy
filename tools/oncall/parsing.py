@@ -104,7 +104,7 @@ def overrides_to_yaml(overrides: list[Override]) -> None:
         file.write(
             """# This file can be modified manually to add or remove on-call overrides.
 # After modifying, run
-# bazel tool tools/oncall:rotation
+# bazel run //tools/oncall:rotation
 # to update the ical file.
 #
 # Format: start
