@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.type.v3";
+option java_outer_classname = "ScopeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Scope]
+
+// Settings for limiting the number of stats in a scope.
+message ScopeSettings {
+  // Max number of counters allowed in this scope. 0 means no limit
+  uint32 max_counters = 1;
+
+  // Max number of gauges allowed in this scope. 0 means no limit.
+  uint32 max_gauges = 2;
+
+  // Max number of histograms allowed in this scope. 0 means no limit.
+  uint32 max_histograms = 3;
+
+  // Whether the scope and its stats can be evicted from the store caches.
+  bool evictable = 4;
+}
+
+// Stats scope configuration.
+message Scope {
+  // The name of the scope.
+  string name = 1;
+
+  // The scope settings.
+  ScopeSettings settings = 2;
+}

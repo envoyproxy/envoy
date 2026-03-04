@@ -1415,6 +1415,7 @@ stdev
 stdin
 stdout
 stmt
+storages
 str
 streambuf
 strerr

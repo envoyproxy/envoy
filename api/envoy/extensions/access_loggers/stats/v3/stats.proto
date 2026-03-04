@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
-import "envoy/config/metrics/v3/scope.proto";
 import "envoy/data/accesslog/v3/accesslog.proto";
+import "envoy/type/v3/scope.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -159,6 +159,10 @@ message Config {
   // The gauges this logger will emit.
   repeated Gauge gauges = 5;
 
-  // The dynamic scope configuration for the stats logger.
-  config.metrics.v3.DynamicScope dynamic_scope = 6;
+  // The scope configuration for the stats logger.
+  // If not configured, the default scope limits will be applied.
+  // This scope is shared globally with other stats access loggers across the process.
+  // The key for sharing is the hash of the config, so if multiple instances share the same
+  // config, they will also share the same scope.
+  type.v3.Scope stats_scope = 6;
 }

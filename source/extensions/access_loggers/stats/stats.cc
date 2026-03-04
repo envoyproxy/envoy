@@ -113,13 +113,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
-      scope_wrapper_(config.has_dynamic_scope()
-                         ? Stats::ScopeProviderSingleton::getScopeWrapper(
-                               context, config.dynamic_scope().resource_name(),
-                               config.dynamic_scope().config_source())
-                         : nullptr),
-      scope_(scope_wrapper_
-                 ? nullptr
+      scope_(config.has_stats_scope()
+                 ? Stats::ScopeProviderSingleton::getScope(context, config.stats_scope())
                  : context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
       stat_name_pool_(context.statsScope().symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
