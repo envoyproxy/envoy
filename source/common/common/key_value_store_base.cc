@@ -111,11 +111,11 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
   ValueWithTtl value_with_ttl(std::move(value), std::move(absolute_ttl));
-  if (!store_.emplace(key, value_with_ttl).second) {
-    store_.erase(key);
-    store_.emplace(key, value_with_ttl);
+  if (const auto it = store_.find(key); it != store_.end()) {
+    store_.erase(it);
     ttl_manager_.clear(key);
   }
+  store_.emplace(key, std::move(value_with_ttl));
   if (ttl) {
     ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
   }
