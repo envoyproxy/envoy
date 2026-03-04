@@ -350,13 +350,10 @@ TEST_F(Http3ConnPoolImplTest, LifetimeCallbackOpenAndGoAwayDraining) {
   EXPECT_EQ(1u, clients.size());
   auto* client = static_cast<MultiplexedActiveClientBase*>(clients.front().get());
 
-  // Connected event fires onConnectionOpen.
+  // ConnectedZeroRtt event fires onConnectionOpen.
   EXPECT_CALL(lifetime_callbacks,
               onConnectionOpen(testing::Ref(*pool_), testing::ContainerEq(hash_key), testing::_));
-  EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
-    cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  }));
-  client->onEvent(Network::ConnectionEvent::Connected);
+  client->onEvent(Network::ConnectionEvent::ConnectedZeroRtt);
 
   // GOAWAY on idle connection -> closes -> LocalClose -> onConnectionDraining.
   EXPECT_CALL(lifetime_callbacks, onConnectionDraining(testing::Ref(*pool_),
