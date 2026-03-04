@@ -54,7 +54,7 @@ TEST_F(DynamicModuleFilterConfigTest, LocalFileLoading) {
   )EOF"));
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -76,7 +76,7 @@ TEST_F(DynamicModuleFilterConfigTest, InlineBytesRejected) {
   )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -93,7 +93,7 @@ TEST_F(DynamicModuleFilterConfigTest, NoModuleOrName) {
   )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -117,7 +117,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRejected) {
   )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -137,7 +137,7 @@ TEST_F(DynamicModuleFilterConfigTest, InvalidLocalFile) {
   )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -161,7 +161,7 @@ TEST_F(DynamicModuleFilterConfigTest, ModulePrecedenceOverName) {
   )EOF"));
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   DynamicModuleConfigFactory factory;
   // If name were used, this would fail because "nonexistent_module_should_be_ignored" doesn't
