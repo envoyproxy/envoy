@@ -708,9 +708,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
         # TODO(zhxie): Update to the next release version when it is released.
         version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
-        sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
-        strip_prefix = "colm-{version}",
-        urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
+        sha256 = "f11e62f0e7fd8b26f75a9034af43fd4622a0829b29a7cfb70c0742959bd9cfec",
+        strip_prefix = "colm-suite-{version}",
+        urls = ["https://github.com/adrian-thurston/colm-suite/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.matching.input_matchers.hyperscan",
@@ -719,7 +719,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-12-28",
         cpe = "N/A",
         license = "MIT",
-        license_url = "https://github.com/adrian-thurston/colm/blob/{version}/COPYING",
+        license_url = "https://github.com/adrian-thurston/colm-suite/blob/{version}/COPYING",
     ),
     net_colm_open_source_ragel = dict(
         project_name = "Ragel",
