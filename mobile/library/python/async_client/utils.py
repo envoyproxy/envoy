@@ -67,3 +67,45 @@ def normalize_timeout_to_ms(timeout: Timeout) -> NormalTimeout:
     elif isinstance(timeout, timedelta):
         return int(1000 * timeout.total_seconds())
     raise TypeError("unsupported timeout type")
+
+
+def normalize_request(
+    method: str,
+    url: str,
+    data: Data = None,
+    headers: Headers = None,
+    timeout: Timeout = None,
+) -> Tuple[Dict[str, Union[str, List[str]]], bytes]:
+    """Normalize HTTP request parameters into Envoy-compatible format.
+
+    Args:
+        method: HTTP method (e.g., "GET", "POST").
+        url: Request URL.
+        data: Request body data (optional).
+        headers: Request headers dict (optional).
+        timeout: Request timeout (optional).
+
+    Returns:
+        A tuple of (normalized_headers_dict, request_body_bytes).
+        The headers dict contains pseudo-headers (:method, :scheme, :authority, :path)
+        and user-provided headers. The body is the request data as bytes.
+    """
+    # normalize pieces that go into the header map
+    norm_method = normalize_method(method)
+    norm_data, data_headers = normalize_data(data)
+    norm_headers = {**data_headers, **normalize_headers(headers)}
+    norm_timeout_ms = normalize_timeout_to_ms(timeout)
+
+    parsed = urlparse(url)
+    header_dict: Dict[str, Union[str, List[str]]] = {
+        ":method": norm_method,
+        ":scheme": parsed.scheme,
+        ":authority": parsed.netloc,
+        ":path": parsed.path,
+    }
+    if norm_timeout_ms > 0:
+        header_dict["x-envoy-upstream-rq-timeout-ms"] = str(norm_timeout_ms)
+    for key, values in norm_headers.items():
+        header_dict[key] = values if len(values) > 1 else values[0]
+
+    return header_dict, norm_data

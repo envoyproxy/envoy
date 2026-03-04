@@ -2,7 +2,6 @@
 
 import asyncio
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urlparse
 
 import library.python.envoy_engine as envoy_engine
 from library.python.envoy_engine import EngineBuilder
@@ -10,10 +9,7 @@ from library.python.envoy_engine import EngineBuilder
 from .executor import AsyncioExecutor, Executor
 from .response import Response
 from .utils import (
-    normalize_data,
-    normalize_headers,
-    normalize_method,
-    normalize_timeout_to_ms,
+    normalize_request,
 )
 
 
@@ -106,43 +102,40 @@ class AsyncClient:
     ``request()`` method returns a :class:`Response` object once the stream
     has completed; the operation itself is fully non-blocking thanks to the
     underlying ``asyncio`` event loop and the ``AsyncioExecutor``.
+
+    Use as an async context manager: ``async with AsyncClient(engine_builder) as client:``
     """
 
-    def __init__(
-        self, engine_builder: EngineBuilder, *, _loop: Optional[asyncio.AbstractEventLoop] = None
-    ) -> None:
+    def __init__(self, engine_builder: EngineBuilder) -> None:
         """Construct a new AsyncClient.
-
-        This constructor is intentionally guarded: callers should prefer the
-        async factory ``AsyncClient.create(...)`` which guarantees construction
-        from within a running asyncio event loop. Direct synchronous
-        construction will raise a helpful error.
 
         Args:
             engine_builder: A pre-configured EngineBuilder to finalize and build.
-            _loop: Internal/testing: the event loop to use. If omitted,
-                   construction will fail to force usage of ``create``.
         """
-        if _loop is None:
-            raise RuntimeError(
-                "AsyncClient must be created via `await AsyncClient.create(engine_builder)` "
-                "so that it can capture the running asyncio event loop."
-            )
+        self._engine_builder = engine_builder
+        self._engine = None
+        self._executor = None
+        self._engine_running = None
 
+    async def __aenter__(self) -> "AsyncClient":
+        """Enter the async context manager, initialize the engine."""
         self._engine_running = asyncio.Event()
-        self._executor = AsyncioExecutor(loop=_loop)
+        self._executor = AsyncioExecutor(loop=asyncio.get_running_loop())
 
         # Finalize the engine builder with the engine-running callback and build
-        self._engine = engine_builder.set_on_engine_running(
+        self._engine = self._engine_builder.set_on_engine_running(
             self._executor.wrap(self._engine_running.set)
         ).build()
 
-    @classmethod
-    async def create(cls, engine_builder: EngineBuilder) -> "AsyncClient":
-        """Async factory that constructs an AsyncClient inside the running loop."""
-        loop = asyncio.get_running_loop()
-        # call the guarded constructor with the running loop
-        return cls(engine_builder, _loop=loop)
+        # Wait for the engine to be running
+        await self._engine_running.wait()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit the async context manager, terminate the engine."""
+        if self._engine is not None:
+            self._engine.terminate()
+            self._engine = None
 
     def __del__(self) -> None:
         """Clean up the engine on destruction."""
@@ -158,13 +151,7 @@ class AsyncClient:
         headers: Dict[str, Union[str, List[str]]] = None,
         timeout: Optional[Union[int, float]] = None,
     ) -> Response:
-        """Send a single request and wait for the response.
-
-        Waits for the engine to be running before proceeding.
-        """
-        # Wait for engine to be ready at the very beginning
-        await self._engine_running.wait()
-
+        """Send a single request and wait for the response."""
         response = Response()
         stream_complete = asyncio.Event()
 
@@ -184,28 +171,14 @@ class AsyncClient:
         headers: Dict[str, Union[str, List[str]]] = None,
         timeout: Optional[Union[int, float]] = None,
     ) -> None:
-        # normalize pieces that go into the header map
-        norm_method = normalize_method(method)
-        norm_data, data_headers = normalize_data(data)
-        norm_headers = {**data_headers, **normalize_headers(headers)}
-        norm_timeout_ms = normalize_timeout_to_ms(timeout)
+        # Normalize the request and get headers and body
+        header_dict, body = normalize_request(method, url, data=data, headers=headers, timeout=timeout)
 
-        parsed = urlparse(url)
-        header_dict: Dict[str, Union[str, List[str]]] = {
-            ":method": norm_method,
-            ":scheme": parsed.scheme,
-            ":authority": parsed.netloc,
-            ":path": parsed.path,
-        }
-        if norm_timeout_ms > 0:
-            header_dict["x-envoy-upstream-rq-timeout-ms"] = str(norm_timeout_ms)
-        for key, values in norm_headers.items():
-            header_dict[key] = values if len(values) > 1 else values[0]
-
-        has_data = len(norm_data) > 0
+        # Send headers with end_stream flag based on whether we have a body
+        has_data = len(body) > 0
         stream.send_headers(header_dict, not has_data)
         if has_data:
-            stream.close(norm_data)
+            stream.close(body)
 
     # convenience helpers for HTTP verbs
     async def delete(self, url: str, **kwargs) -> Response:  # type: ignore[no-untyped-def]
