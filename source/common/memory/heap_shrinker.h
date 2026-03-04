@@ -27,7 +27,7 @@ private:
   Envoy::Stats::Counter* shrink_counter_;
   Envoy::Event::TimerPtr timer_;
   std::chrono::milliseconds timer_interval_;
-  uint64_t max_unfreed_memory_bytes_;
+  uint64_t max_unfreed_memory_bytes_{};
 };
 
 } // namespace Memory
