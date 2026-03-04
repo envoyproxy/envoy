@@ -467,6 +467,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       config.stream_error_on_invalid_http_message());
   SET_AND_RETURN_IF_NOT_OK(options_or_error.status(), creation_status);
   http2_options_ = options_or_error.value();
+
+  if (http2_options_.has_max_header_field_size_kb() &&
+      http2_options_.max_header_field_size_kb().value() > max_request_headers_kb_) {
+    creation_status = absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_request_headers_kb");
+    return;
+  }
+
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {

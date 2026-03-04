@@ -350,8 +350,10 @@ message HttpProtocolOptions {
   //
   //   Currently some protocol codecs impose limits on the maximum size of a single header.
   //
-  //   * HTTP/2 (when using ``nghttp2``) limits a single header to around ``100kb``.
-  //   * HTTP/3 limits a single header to around ``1024kb``.
+  //   * HTTP/2 (when using nghttp2) limits a single header to around 100 KB by default. This can be
+  //     adjusted via :ref:`max_header_field_size_kb
+  //     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>`.
+  //   * HTTP/3 limits a single header to around 1024 KB.
   //
   google.protobuf.UInt32Value max_response_headers_kb = 7
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
@@ -539,7 +541,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -736,6 +738,42 @@ message Http2ProtocolOptions {
   // worth the network bandwidth saved e.g. for localhost.
   // If unset, uses the data plane's default value.
   google.protobuf.BoolValue enable_huffman_encoding = 18;
+
+  // Configures the maximum wire-encoded size in KB of an individual header field (name or value)
+  // that the ``nghttp2`` HPACK inflater will accept. This limit applies to the HPACK-compressed
+  // length on the wire, not the decoded length. If not specified, defaults to ``64`` KB
+  // which is the ``nghttp2`` default.
+  //
+  // This limit applies to headers received by the codec. When configured on the downstream
+  // HTTP Connection Manager, it limits individual request header fields. When configured on an
+  // upstream cluster, it limits individual response header fields.
+  //
+  // Due to Huffman encoding, the decoded header size that passes a given wire limit depends
+  // on the compression ratio of the content. For example, at the default ``64`` KB wire
+  // limit, highly compressible header values can be approximately ``100`` KB when decoded.
+  // Increasing this limit allows accepting larger individual headers at the cost of increased
+  // memory usage during HPACK decompression.
+  //
+  // This option only applies when using ``nghttp2``. It is a no-op for ``oghttp2``. The configured
+  // value of this field sets the per-header field size limit, which must not exceed the
+  // applicable aggregate total header size limit. Since a single header field cannot be larger
+  // than the total size allowed for all headers combined, this value is validated against
+  // :ref:`max_request_headers_kb <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`
+  // when configured on the downstream HTTP Connection Manager, and against
+  // :ref:`max_response_headers_kb <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>`
+  // when configured on an upstream cluster.
+  //
+  // Since ``Http2ProtocolOptions`` is configured independently for downstream and upstream,
+  // different per-header field limits can be set for each direction without requiring separate
+  // request and response fields.
+  //
+  // .. note::
+  //
+  //   When increasing this limit, ensure that upstream services and other proxies in the request
+  //   path can also handle the larger individual header sizes. Mismatched limits may result in
+  //   request failures.
+  google.protobuf.UInt32Value max_header_field_size_kb = 19
+      [(validate.rules).uint32 = {lte: 256 gte: 64}];
 }
 
 // [#not-implemented-hide:]
