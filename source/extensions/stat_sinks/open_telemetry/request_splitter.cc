@@ -1,5 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/request_splitter.h"
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -87,6 +89,10 @@ void RequestSplitter::chunkRequests(
             *m->mutable_histogram()->add_data_points() = std::move(dp);
           });
         }
+        break;
+      case opentelemetry::proto::metrics::v1::Metric::DataCase::kExponentialHistogram:
+      case opentelemetry::proto::metrics::v1::Metric::DataCase::kSummary:
+        ENVOY_BUG(false, "ExponentialHistogram and Summary metric types are not supported");
         break;
       default:
         break;

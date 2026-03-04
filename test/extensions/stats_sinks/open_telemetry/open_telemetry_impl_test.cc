@@ -637,7 +637,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
                   getTagExtractedName("test_histogram2"), true);
 }
 
-TEST_F(OtlpMetricsFlusherTests, MaxDatapointsAndResourceMetricsPerRequest) {
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequest) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
   sink_config.set_max_datapoints_per_request(2);
   Tracers::OpenTelemetry::Resource resource;

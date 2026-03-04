@@ -227,10 +227,8 @@ new_features:
 - area: stat_sinks
   change: |
     Added :ref:`max_datapoints_per_request
-    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_datapoints_per_request>` and
-    :ref:`max_resource_metrics_per_request
-    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_resource_metrics_per_request>`
-    configurations to the OpenTelemetry stat sink to chunk metric export requests.
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_datapoints_per_request>`
+    configuration to the OpenTelemetry stat sink to chunk metric export requests.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
