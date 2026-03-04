@@ -1404,6 +1404,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
   common_tls_context:
     tls_certificates:
       certificate_chain:
@@ -1417,6 +1418,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options
+               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
                .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
