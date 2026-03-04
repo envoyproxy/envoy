@@ -26,6 +26,11 @@ A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3
       parser_config_(A2aParserConfig::createDefault()), stats_(generateStats(stats_prefix, scope)) {
 }
 
+// A2A support three discovery strategies with GET requests: 1) Well-Known URI 2) Curated Registries
+// 3) Private Discovery
+// Well-Known URI is recommended for public agents or agents intended for broad discovery
+// within a specific domain
+// See: https://a2a-protocol.org/latest/topics/agent-discovery/#discovery-strategies
 bool A2aFilter::isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const {
   return headers.getMethodValue() == Http::Headers::get().MethodValues.Get;
 }
