@@ -1457,6 +1457,43 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
 }
 
+// Verify that getIssuerFromValidatedChain correctly skips a decoy CA via AKI/SKI pre-filter
+// (Path 1) when the client sends: leaf + incorrect CA (AKI mismatch) + correct CA (AKI match).
+//
+// Chain layout:
+//   [0] leaf (san_dns3)         — AKI = Intermediate CA's SKI
+//   [1] Root CA  (incorrect)    — SKI ≠ leaf AKI  → skipped by ASN1_OCTET_STRING_cmp()
+//   [2] Intermediate CA (correct) — SKI == leaf AKI  → X509_verify() confirms → returned
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_with_decoy_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options
+               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
