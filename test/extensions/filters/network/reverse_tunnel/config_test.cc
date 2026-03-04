@@ -311,6 +311,53 @@ validation:
   cb(filter_manager);
 }
 
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyTenantIdValidation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  tenant_id_format: "expected-tenant"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithInvalidTenantIdFormatter) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "valid-node"
+  cluster_id_format: "valid-cluster"
+  tenant_id_format: "%INVALID_FORMATTER_COMMAND()%"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse tenant_id_format"));
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters

@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
@@ -43,6 +44,9 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
+// TODO(adisuissa): enable once the LRS server-self-ads support is fully
+// implemented, and tested.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with

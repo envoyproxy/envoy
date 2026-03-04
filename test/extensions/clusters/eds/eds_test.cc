@@ -2992,6 +2992,66 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
+class EdsWithLedsTest : public EdsTest {
+public:
+  EdsWithLedsTest() {
+    ON_CALL(server_context_.cluster_manager_.subscription_factory_,
+            collectionSubscriptionFromUrl(_, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](const xds::core::v3::ResourceLocator&,
+                   const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Envoy::Config::SubscriptionCallbacks& callbacks,
+                   Envoy::Config::OpaqueResourceDecoderSharedPtr) -> Config::SubscriptionPtr {
+              auto ret = std::make_unique<NiceMock<Config::MockSubscription>>();
+              leds_callbacks_ = &callbacks;
+              return ret;
+            }));
+  }
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  makeLedsClusterLoadAssignment(const std::string& cluster_name) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(cluster_name);
+    auto* endpoints = cla.add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("us-east-1");
+    locality->set_zone("us-east-1a");
+    auto* leds_conf = endpoints->mutable_leds_cluster_locality_config();
+    leds_conf->set_leds_collection_name(
+        "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/*");
+    auto* leds_config_source = leds_conf->mutable_leds_config()->mutable_api_config_source();
+    leds_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    leds_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+    return cla;
+  }
+
+  Config::SubscriptionCallbacks* leds_callbacks_{};
+};
+
+// Regression test: a LEDS callback firing after a subsequent EDS update must
+// not dereference the stale cluster_load_assignment_ pointer.
+TEST_F(EdsWithLedsTest, LedsCallbackAfterSubsequentEdsUpdateNoCrash) {
+  initialize();
+
+  auto cla = makeLedsClusterLoadAssignment("fare");
+
+  // First EDS update creates the LEDS subscription (not yet updated).
+  doOnConfigUpdateVerifyNoThrow(cla);
+  ASSERT_NE(nullptr, leds_callbacks_);
+
+  // Second EDS update destroys the old cluster_load_assignment_ but keeps
+  // the existing LEDS subscription.
+  doOnConfigUpdateVerifyNoThrow(cla);
+
+  // LEDS failure triggers the callback; would segfault on the dangling pointer
+  // without the fix.
+  leds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                        nullptr);
+
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
 class EdsCachedAssignmentTest : public testing::Test {
 public:
   EdsCachedAssignmentTest() { resetCluster(); }

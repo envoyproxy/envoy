@@ -8,9 +8,9 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-func TestReadWholeRequestBody_SameChunks(t *testing.T) {
-	// When received body and buffered body point to the same underlying memory,
-	// the data should only appear once in the result.
+func TestReadWholeRequestBody_ReceivedIsBuffered(t *testing.T) {
+	// When ReceivedBufferedRequestBody() returns true (previous filter did StopAndBuffer and
+	// resumed), only the buffered body should be read to avoid duplicating data.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -19,7 +19,8 @@ func TestReadWholeRequestBody_SameChunks(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedRequestBody().Return(buf)
-	handle.EXPECT().ReceivedRequestBody().Return(buf) // same pointer → same chunks
+	handle.EXPECT().ReceivedRequestBody().Return(buf)
+	handle.EXPECT().ReceivedBufferedRequestBody().Return(true)
 
 	result := ReadWholeRequestBody(handle)
 	if string(result) != "hello world" {
@@ -28,7 +29,7 @@ func TestReadWholeRequestBody_SameChunks(t *testing.T) {
 }
 
 func TestReadWholeRequestBody_DifferentChunks(t *testing.T) {
-	// When buffered and received body point to different memory, both are combined.
+	// When ReceivedBufferedRequestBody() returns false, both buffered and received are combined.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -37,6 +38,7 @@ func TestReadWholeRequestBody_DifferentChunks(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedRequestBody().Return(buffered)
+	handle.EXPECT().ReceivedBufferedRequestBody().Return(false)
 	handle.EXPECT().ReceivedRequestBody().Return(received)
 
 	result := ReadWholeRequestBody(handle)
@@ -46,7 +48,7 @@ func TestReadWholeRequestBody_DifferentChunks(t *testing.T) {
 }
 
 func TestReadWholeRequestBody_EmptyBuffered(t *testing.T) {
-	// When buffered body is empty, result equals the received body.
+	// When buffered body is empty and received is not the buffered body, result equals received.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -55,6 +57,7 @@ func TestReadWholeRequestBody_EmptyBuffered(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedRequestBody().Return(buffered)
+	handle.EXPECT().ReceivedBufferedRequestBody().Return(false)
 	handle.EXPECT().ReceivedRequestBody().Return(received)
 
 	result := ReadWholeRequestBody(handle)
@@ -63,9 +66,8 @@ func TestReadWholeRequestBody_EmptyBuffered(t *testing.T) {
 	}
 }
 
-func TestReadWholeResponseBody_SameChunks(t *testing.T) {
-	// When received body and buffered body point to the same underlying memory,
-	// the data should only appear once in the result.
+func TestReadWholeResponseBody_ReceivedIsBuffered(t *testing.T) {
+	// When ReceivedBufferedResponseBody() returns true, only the buffered body should be read.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -74,7 +76,8 @@ func TestReadWholeResponseBody_SameChunks(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedResponseBody().Return(buf)
-	handle.EXPECT().ReceivedResponseBody().Return(buf) // same pointer → same chunks
+	handle.EXPECT().ReceivedResponseBody().Return(buf)
+	handle.EXPECT().ReceivedBufferedResponseBody().Return(true)
 
 	result := ReadWholeResponseBody(handle)
 	if string(result) != "hello world" {
@@ -83,7 +86,7 @@ func TestReadWholeResponseBody_SameChunks(t *testing.T) {
 }
 
 func TestReadWholeResponseBody_DifferentChunks(t *testing.T) {
-	// When buffered and received body point to different memory, both are combined.
+	// When ReceivedBufferedResponseBody() returns false, both buffered and received are combined.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -92,6 +95,7 @@ func TestReadWholeResponseBody_DifferentChunks(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedResponseBody().Return(buffered)
+	handle.EXPECT().ReceivedBufferedResponseBody().Return(false)
 	handle.EXPECT().ReceivedResponseBody().Return(received)
 
 	result := ReadWholeResponseBody(handle)
@@ -101,7 +105,7 @@ func TestReadWholeResponseBody_DifferentChunks(t *testing.T) {
 }
 
 func TestReadWholeResponseBody_EmptyBuffered(t *testing.T) {
-	// When buffered body is empty, result equals the received body.
+	// When buffered body is empty and received is not the buffered body, result equals received.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -110,6 +114,7 @@ func TestReadWholeResponseBody_EmptyBuffered(t *testing.T) {
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().BufferedResponseBody().Return(buffered)
+	handle.EXPECT().ReceivedBufferedResponseBody().Return(false)
 	handle.EXPECT().ReceivedResponseBody().Return(received)
 
 	result := ReadWholeResponseBody(handle)
