@@ -551,6 +551,21 @@ TEST(CommonAbiImplTest, LbGetHostHealthEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_get_host_health_by_address triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbGetHostHealthByAddressEnvoyBug) {
+  envoy_dynamic_module_type_host_health health = envoy_dynamic_module_type_host_health_Unhealthy;
+  envoy_dynamic_module_type_module_buffer addr = {"10.0.0.1:8080", 13};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_get_host_health_by_address(nullptr, addr, &health);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+  EXPECT_EQ(health, envoy_dynamic_module_type_host_health_Unhealthy);
+}
+
 // Test that the weak symbol stub for lb_get_host_address triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};

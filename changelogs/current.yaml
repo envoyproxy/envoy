@@ -428,6 +428,10 @@ new_features:
     Added :ref:`load balancing policies
     <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
     support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added ``get_host_health_by_address`` ABI callback for dynamic module load balancers, providing O(1)
+    host health lookup by address string using the cross-priority host map.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
