@@ -10,6 +10,7 @@ PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
+datapoint
 defragmentation
 dp
 evictable
@@ -1388,6 +1389,7 @@ sim
 sinked
 sint
 sizeof
+sm
 smatch
 snapshotted
 sockaddr
