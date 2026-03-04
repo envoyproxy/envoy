@@ -37,7 +37,10 @@ ScopeProviderSingleton::getScope(Server::Configuration::GenericFactoryContext& f
   size_t hash = MessageUtil::hash(config);
   auto it = provider->scopes_.find(hash);
   if (it != provider->scopes_.end()) {
-    return it->second;
+    Stats::ScopeSharedPtr scope = it->second.lock();
+    if (scope != nullptr) {
+      return scope;
+    }
   }
 
   auto scope_config = convertProtoToScopeStatsLimitSettings(config.settings());
@@ -45,8 +48,16 @@ ScopeProviderSingleton::getScope(Server::Configuration::GenericFactoryContext& f
   Stats::ScopeSharedPtr scope = factory_context.scope().createScope(
       config.name(), scope_config.evictable, scope_config.limits);
 
-  provider->scopes_.emplace(hash, scope);
-  return scope;
+  // We wrap the created scope in another shared_ptr with a custom deleter.
+  // This custom deleter will automatically remove the corresponding entry
+  // from the scopes_ map in the ScopeProviderSingleton whenever the last
+  // reference to the scope is dropped. It also captures the provider instance
+  // to keep the singleton and its map alive as long as any scopes are in use.
+  Stats::ScopeSharedPtr wrapper(
+      scope.get(), [scope, hash, provider](Stats::Scope*) { provider->scopes_.erase(hash); });
+
+  provider->scopes_[hash] = wrapper;
+  return wrapper;
 }
 
 } // namespace Stats

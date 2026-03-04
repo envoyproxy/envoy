@@ -59,9 +59,6 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
       }));
 
   auto returned_scope1 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_settings1);
-  provider_ =
-      factory_context_.server_context_.singletonManager().getTyped<Stats::ScopeProviderSingleton>(
-          "scope_provider_singleton_name");
   EXPECT_EQ(returned_scope1, newly_created_scope);
   EXPECT_NE(returned_scope1, nullptr);
 
@@ -97,6 +94,55 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
   auto returned_scope3 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_settings3);
   EXPECT_EQ(returned_scope3, newly_created_scope3);
   EXPECT_NE(returned_scope3, returned_scope1);
+}
+
+TEST_F(ScopeProviderSingletonTest, AutoDeletesFromMapWhenScopeIsDestroyed) {
+  envoy::type::v3::Scope scope_settings;
+  scope_settings.set_name("my_dynamic_scope");
+  scope_settings.mutable_settings()->set_max_counters(10);
+  scope_settings.mutable_settings()->set_max_gauges(20);
+  scope_settings.mutable_settings()->set_max_histograms(30);
+
+  EXPECT_CALL(factory_context_.server_context_, scope())
+      .WillRepeatedly(ReturnRef(mock_store_.mockScope()));
+  EXPECT_CALL(factory_context_, scope()).WillRepeatedly(ReturnRef(mock_store_.mockScope()));
+
+  // First request should trigger createScope_
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+      .Times(1)
+      .WillOnce(Invoke([&](const std::string& name) {
+        auto scope_name_storage =
+            std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
+        return std::make_shared<NiceMock<Stats::MockScope>>(scope_name_storage->statName(),
+                                                            mock_store_);
+      }));
+
+  auto returned_scope = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_settings);
+  EXPECT_NE(returned_scope, nullptr);
+
+  // While returned_scope is alive, requesting again should not trigger createScope_
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_)).Times(0);
+  auto returned_scope2 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_settings);
+  EXPECT_EQ(returned_scope, returned_scope2);
+
+  testing::Mock::VerifyAndClearExpectations(&mock_store_.mockScope());
+
+  // Destroy the scope holders. Custom deleter should erase it from the map.
+  returned_scope.reset();
+  returned_scope2.reset();
+
+  // Next request should trigger a new createScope_ because it was deleted
+  EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
+      .Times(1)
+      .WillOnce(Invoke([&](const std::string& name) {
+        auto scope_name_storage =
+            std::make_unique<Stats::StatNameDynamicStorage>(name, mock_store_.symbolTable());
+        return std::make_shared<NiceMock<Stats::MockScope>>(scope_name_storage->statName(),
+                                                            mock_store_);
+      }));
+
+  auto returned_scope3 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_settings);
+  EXPECT_NE(returned_scope3, nullptr);
 }
 
 } // namespace

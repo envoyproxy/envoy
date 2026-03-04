@@ -28,7 +28,7 @@ public:
   ScopeProviderSingleton() = default;
 
 private:
-  absl::flat_hash_map<size_t, Stats::ScopeSharedPtr> scopes_;
+  absl::flat_hash_map<size_t, std::weak_ptr<Stats::Scope>> scopes_;
 };
 
 } // namespace Stats
