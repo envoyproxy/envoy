@@ -162,7 +162,6 @@ public:
   bool enableMetricAggregation() const { return enable_metric_aggregation_; }
 
   uint32_t maxDatapointsPerRequest() const { return max_datapoints_per_request_; }
-  uint32_t maxResourceMetricsPerRequest() const { return max_resource_metrics_per_request_; }
 
 private:
   const bool report_counters_as_deltas_;
@@ -174,7 +173,6 @@ private:
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
   const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
   const uint32_t max_datapoints_per_request_;
-  const uint32_t max_resource_metrics_per_request_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;

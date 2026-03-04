@@ -29,7 +29,7 @@ TEST(RequestSplitterTest, MaxDatapointsPerRequest) {
 
   // Total 4 data points. Max = 2 -> 2 requests
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 2, 0, [&requests](MetricsExportRequestPtr req) {
+  RequestSplitter::chunkRequests(resource_metrics[0], 2, [&requests](MetricsExportRequestPtr req) {
     requests.push_back(std::move(req));
   });
   ASSERT_EQ(2, requests.size());
@@ -60,90 +60,13 @@ TEST(RequestSplitterTest, MaxDatapointsPerRequest) {
       requests[1]->resource_metrics(0).scope_metrics(1).metrics(0).histogram().data_points_size());
 }
 
-TEST(RequestSplitterTest, MaxResourceMetricsPerRequest) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
-  for (int i = 0; i < 3; ++i) {
-    auto* rm = resource_metrics.Add();
-    rm->mutable_resource()->add_attributes()->set_key("rm" + std::to_string(i));
-    rm->add_scope_metrics()->add_metrics()->mutable_gauge()->add_data_points();
-  }
-
-  // Total 3 resource metrics. Max = 2 -> 2 requests
-  std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 0, 2, [&requests](MetricsExportRequestPtr req) {
-    requests.push_back(std::move(req));
-  });
-  ASSERT_EQ(2, requests.size());
-
-  EXPECT_EQ(2, requests[0]->resource_metrics_size());
-  EXPECT_EQ("rm0", requests[0]->resource_metrics(0).resource().attributes(0).key());
-  EXPECT_EQ("rm1", requests[0]->resource_metrics(1).resource().attributes(0).key());
-
-  EXPECT_EQ(1, requests[1]->resource_metrics_size());
-  EXPECT_EQ("rm2", requests[1]->resource_metrics(0).resource().attributes(0).key());
-}
-
-TEST(RequestSplitterTest, BothLimits) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
-
-  // RM1: 3 data points
-  auto* rm1 = resource_metrics.Add();
-  rm1->mutable_resource()->add_attributes()->set_key("rm1");
-  auto* m1 = rm1->add_scope_metrics()->add_metrics();
-  m1->mutable_gauge()->add_data_points();
-  m1->mutable_gauge()->add_data_points();
-  m1->mutable_gauge()->add_data_points();
-
-  // RM2: 1 data point
-  auto* rm2 = resource_metrics.Add();
-  rm2->mutable_resource()->add_attributes()->set_key("rm2");
-  rm2->add_scope_metrics()->add_metrics()->mutable_gauge()->add_data_points();
-
-  // RM3: 2 data points
-  auto* rm3 = resource_metrics.Add();
-  rm3->mutable_resource()->add_attributes()->set_key("rm3");
-  auto* m3 = rm3->add_scope_metrics()->add_metrics();
-  m3->mutable_gauge()->add_data_points();
-  m3->mutable_gauge()->add_data_points();
-
-  // Max dp = 2, Max rm = 2
-  std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 2, 2, [&requests](MetricsExportRequestPtr req) {
-    requests.push_back(std::move(req));
-  });
-
-  // Expected behaviour:
-  // DP1-1 + DP1-2 -> Request 0 (DP limit reached)
-  // DP1-3 + DP2-1 -> Request 1 (DP & RM limit reached, since RM1 + RM2 = 2 RMs)
-  // DP3-1 + DP3-2 -> Request 2 (Finished)
-  ASSERT_EQ(3, requests.size());
-
-  EXPECT_EQ(1, requests[0]->resource_metrics_size());
-  EXPECT_EQ("rm1", requests[0]->resource_metrics(0).resource().attributes(0).key());
-  EXPECT_EQ(
-      2, requests[0]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points_size());
-
-  EXPECT_EQ(2, requests[1]->resource_metrics_size());
-  EXPECT_EQ("rm1", requests[1]->resource_metrics(0).resource().attributes(0).key());
-  EXPECT_EQ(
-      1, requests[1]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points_size());
-  EXPECT_EQ("rm2", requests[1]->resource_metrics(1).resource().attributes(0).key());
-  EXPECT_EQ(
-      1, requests[1]->resource_metrics(1).scope_metrics(0).metrics(0).gauge().data_points_size());
-
-  EXPECT_EQ(1, requests[2]->resource_metrics_size());
-  EXPECT_EQ("rm3", requests[2]->resource_metrics(0).resource().attributes(0).key());
-  EXPECT_EQ(
-      2, requests[2]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points_size());
-}
-
 TEST(RequestSplitterTest, NoLimits) {
   Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
   auto* rm = resource_metrics.Add();
   rm->add_scope_metrics()->add_metrics()->mutable_gauge()->add_data_points();
 
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 0, 0, [&requests](MetricsExportRequestPtr req) {
+  RequestSplitter::chunkRequests(resource_metrics[0], 0, [&requests](MetricsExportRequestPtr req) {
     requests.push_back(std::move(req));
   });
   ASSERT_EQ(1, requests.size());
@@ -151,11 +74,11 @@ TEST(RequestSplitterTest, NoLimits) {
 }
 
 TEST(RequestSplitterTest, EmptyMetrics) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
+  opentelemetry::proto::metrics::v1::ResourceMetrics empty_rm;
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(
-      resource_metrics, 10, 10,
-      [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  RequestSplitter::chunkRequests(empty_rm, 10, [&requests](MetricsExportRequestPtr req) {
+    requests.push_back(std::move(req));
+  });
   ASSERT_EQ(0, requests.size());
 }
 
@@ -171,7 +94,7 @@ TEST(RequestSplitterTest, GaugeSplit) {
   m1->mutable_gauge()->add_data_points()->set_as_int(2);
 
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+  RequestSplitter::chunkRequests(resource_metrics[0], 1, [&requests](MetricsExportRequestPtr req) {
     requests.push_back(std::move(req));
   });
 
@@ -204,7 +127,7 @@ TEST(RequestSplitterTest, SumSplit) {
   m1->mutable_sum()->add_data_points()->set_as_int(2);
 
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+  RequestSplitter::chunkRequests(resource_metrics[0], 1, [&requests](MetricsExportRequestPtr req) {
     requests.push_back(std::move(req));
   });
 
@@ -239,7 +162,7 @@ TEST(RequestSplitterTest, HistogramSplit) {
   m1->mutable_histogram()->add_data_points()->set_count(2);
 
   std::vector<MetricsExportRequestPtr> requests;
-  RequestSplitter::chunkRequests(resource_metrics, 1, 10, [&requests](MetricsExportRequestPtr req) {
+  RequestSplitter::chunkRequests(resource_metrics[0], 1, [&requests](MetricsExportRequestPtr req) {
     requests.push_back(std::move(req));
   });
 

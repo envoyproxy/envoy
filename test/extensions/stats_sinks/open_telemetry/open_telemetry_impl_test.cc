@@ -666,22 +666,6 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsAndResourceMetricsPerRequest) {
   EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics(0).metrics_size());
 }
 
-TEST_F(OtlpMetricsFlusherTests, TrafficSplitResourceMetrics) {
-  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-  sink_config.set_max_resource_metrics_per_request(1);
-  Tracers::OpenTelemetry::Resource resource;
-  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
-  OtlpMetricsFlusherImpl flusher(options);
-
-  addGaugeToSnapshot("test_gauge1", 1);
-
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-
-  ASSERT_EQ(1, requests.size());
-}
-
 using OtlpMetricsFlusherAggregationTests = OtlpMetricsFlusherTests;
 
 TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) {

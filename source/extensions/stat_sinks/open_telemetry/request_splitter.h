@@ -22,17 +22,14 @@ public:
   /**
    * Splits the given resource metrics into multiple export requests based on configured limits.
    * When max_dp is reached, the subsequent data points are split into a new request.
-   * When max_rm is reached, the subsequent resource metrics are split into a new request.
-   * If max_dp and max_rm are both 0, the corresponding limit is disabled.
+   * If max_dp is 0, the corresponding limit is disabled.
    */
-  static void
-  chunkRequests(Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>&
-                    resource_metrics,
-                const uint32_t max_dp, const uint32_t max_rm,
-                const std::function<void(MetricsExportRequestPtr)>& send_callback);
+  static void chunkRequests(opentelemetry::proto::metrics::v1::ResourceMetrics& rm,
+                            const uint32_t max_dp,
+                            const std::function<void(MetricsExportRequestPtr)>& send_callback);
 
 private:
-  RequestSplitter(uint32_t max_dp, uint32_t max_rm,
+  RequestSplitter(uint32_t max_dp,
                   const std::function<void(MetricsExportRequestPtr)>& send_callback);
 
   void submitRequestIfNeeded();
@@ -68,7 +65,6 @@ private:
       current_rm_ = current_request_->add_resource_metrics();
       current_rm_->mutable_resource()->CopyFrom(rm.resource());
       current_rm_->mutable_schema_url()->assign(rm.schema_url());
-      current_rm_count_++;
     }
 
     // If this is the start of a new scope metric, initialize it inside the current resource metric.
@@ -103,8 +99,6 @@ private:
 private:
   // Maximum number of data points per export request.
   uint32_t max_dp_;
-  // Maximum number of resource metrics per export request.
-  uint32_t max_rm_;
   // Callback invoked to send a constructed export request.
   std::function<void(MetricsExportRequestPtr)> send_callback_;
 
@@ -112,8 +106,6 @@ private:
   MetricsExportRequestPtr current_request_;
   // Number of data points accumulated in the current request.
   uint32_t current_dp_count_{0};
-  // Number of resource metrics accumulated in the current request.
-  uint32_t current_rm_count_{0};
 
   // Pointers to the active mutable structures in the current request being built.
   // These are used to append nested metrics and data points without repeatedly looking them up.

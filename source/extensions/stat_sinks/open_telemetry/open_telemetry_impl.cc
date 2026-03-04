@@ -241,8 +241,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
       resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
-      max_datapoints_per_request_(sink_config.max_datapoints_per_request()),
-      max_resource_metrics_per_request_(sink_config.max_resource_metrics_per_request()) {}
+      max_datapoints_per_request_(sink_config.max_datapoints_per_request()) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -417,10 +416,18 @@ void OtlpMetricsFlusherImpl::flush(
                               histogram_temporality, attributes);
     }
   }
+
   auto resource_metrics = aggregator.getResourceMetrics(config_->resource_attributes());
-  RequestSplitter::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
-                                 config_->maxResourceMetricsPerRequest(), send_callback);
+  if (resource_metrics.empty()) {
+    return;
+  }
+  ENVOY_BUG(resource_metrics.size() == 1,
+            "MetricAggregator should only produce a single ResourceMetrics object.");
+  for (auto& rm : resource_metrics) {
+    RequestSplitter::chunkRequests(rm, config_->maxDatapointsPerRequest(), send_callback);
+  }
 }
+
 } // namespace OpenTelemetry
 } // namespace StatSinks
 } // namespace Extensions
