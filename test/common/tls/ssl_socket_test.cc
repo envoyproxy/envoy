@@ -1423,6 +1423,40 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
 
+// Verify that getIssuerFromValidatedChain falls back to the trust store (Path 2) when the
+// client sends only a leaf certificate with no intermediate chain. The issuer should be found
+// directly in the trusted CA store configured on the server.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
+  // no_san_cert.pem contains a single leaf cert signed directly by ca_cert.pem (Root CA).
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
+}
+
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:

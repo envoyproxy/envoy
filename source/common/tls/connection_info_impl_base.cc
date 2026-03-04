@@ -23,16 +23,23 @@ namespace {
 bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
 bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
 
-// Returns the direct issuer CA cert from the peer-supplied chain without re-running CA store
-// verification. Since the TLS handshake already ran doVerifyCertChain(), we confirm that the
-// chain is already Validated via SslExtendedSocketInfo, then identify the issuer cert using:
-//   1. AKI/SKI pre-filter (cheap byte comparison, encoding-independent) — eliminates non-issuers
+// Returns the direct issuer CA cert of the peer leaf certificate, searching:
+//   1. The peer-supplied chain (SSL_get_peer_full_cert_chain) — used when the client sends
+//      intermediate CA certs alongside the leaf.
+//   2. The trusted CA store (SSL_CTX_get_cert_store) — fallback when the client sends only the
+//      leaf certificate (chain_len == 1). This covers the common case where the issuer is the
+//      immediate trust anchor already loaded by Envoy's validation_context.
+//
+// In both paths, the issuer is identified using:
+//   a. AKI/SKI pre-filter (cheap byte comparison, encoding-independent) — eliminates non-issuers
 //      without a crypto op. We deliberately avoid X509_check_issued() because its name comparison
 //      uses a strict byte-level DER match that can fail on semantically equivalent names encoded
 //      with different ASN.1 string types (e.g. PrintableString vs UTF8String).
-//   2. X509_verify (expensive, authoritative) — only called when AKI/SKI match or are absent.
+//   b. X509_verify (expensive, authoritative) — only called when AKI/SKI match or are absent.
+//
 // Returns nullptr if the chain was not validated yet, no issuer is present, or no match is found.
-X509* getIssuerFromValidatedChain(SSL* ssl) {
+// The returned UniquePtr holds a reference that must be released by the caller.
+bssl::UniquePtr<X509> getIssuerFromValidatedChain(SSL* ssl) {
   auto* extended_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
       SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
   if (!extended_info || extended_info->certificateValidationStatus() !=
@@ -44,11 +51,13 @@ X509* getIssuerFromValidatedChain(SSL* ssl) {
     return nullptr;
   }
   const size_t chain_len = sk_X509_num(cert_chain);
-  if (chain_len < 2) {
+  if (chain_len == 0) {
     return nullptr;
   }
   X509* leaf = sk_X509_value(cert_chain, 0);
   const ASN1_OCTET_STRING* leaf_aki = X509_get0_authority_key_id(leaf);
+
+  // --- Path 1: search the peer-supplied chain ---
   for (size_t i = 1; i < chain_len; ++i) {
     X509* candidate = sk_X509_value(cert_chain, i);
     if (leaf_aki != nullptr) {
@@ -58,13 +67,35 @@ X509* getIssuerFromValidatedChain(SSL* ssl) {
         continue;
       }
     }
-
     EVP_PKEY* pubkey = X509_get0_pubkey(candidate);
     if (pubkey != nullptr && X509_verify(leaf, pubkey) == 1) {
-      return candidate;
+      X509_up_ref(candidate);
+      return bssl::UniquePtr<X509>(candidate);
     }
   }
-  return nullptr;
+
+  // --- Path 2: client sent leaf only — look up issuer in the trust store ---
+  // X509_STORE_CTX_get1_issuer performs an AKI/subject-DN lookup in the store and returns
+  // a new reference (caller must free). We then confirm with X509_verify for consistency.
+  X509_STORE* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(ssl));
+  if (store == nullptr) {
+    return nullptr;
+  }
+  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+  if (!store_ctx || !X509_STORE_CTX_init(store_ctx.get(), store, leaf, nullptr)) {
+    return nullptr;
+  }
+  X509* store_issuer = nullptr;
+  if (X509_STORE_CTX_get1_issuer(&store_issuer, store_ctx.get(), leaf) != 1) {
+    return nullptr;
+  }
+  bssl::UniquePtr<X509> issuer_ptr(store_issuer);
+  // Final crypto confirmation.
+  EVP_PKEY* pubkey = X509_get0_pubkey(issuer_ptr.get());
+  if (pubkey == nullptr || X509_verify(leaf, pubkey) != 1) {
+    return nullptr;
+  }
+  return issuer_ptr;
 }
 
 bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
@@ -443,7 +474,7 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::Sha256PeerCertificateIssuerDigest, [](SSL* ssl) -> std::string {
-        X509* issuer = getIssuerFromValidatedChain(ssl);
+        auto issuer = getIssuerFromValidatedChain(ssl);
         if (!issuer) {
           return std::string{};
         }
@@ -454,7 +485,7 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() c
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::SerialNumberPeerCertificateIssuer, [](SSL* ssl) -> std::string {
-        X509* issuer = getIssuerFromValidatedChain(ssl);
+        auto issuer = getIssuerFromValidatedChain(ssl);
         if (!issuer) {
           return std::string{};
         }
