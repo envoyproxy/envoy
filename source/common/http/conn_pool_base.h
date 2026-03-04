@@ -98,6 +98,13 @@ public:
   virtual absl::optional<HttpServerPropertiesCache::Origin>& origin() { return origin_; }
   virtual Http::HttpServerPropertiesCacheSharedPtr cache() { return nullptr; }
 
+  void setLifetimeCallbacks(OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+                            std::vector<uint8_t> hash_key) override;
+
+  void onConnectionOpen(const Network::Connection& connection);
+
+  void onConnectionDraining(const Network::Connection& connection);
+
 protected:
   friend class ActiveClient;
 
@@ -107,6 +114,8 @@ protected:
 
 private:
   absl::optional<HttpServerPropertiesCache::Origin> origin_;
+  OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks_;
+  std::vector<uint8_t> hash_key_;
 };
 
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
@@ -243,19 +252,7 @@ public:
   void onSettings(ReceivedSettings& settings) override;
 
   // Override to provide the lifetimeCallbacks.
-  void onEvent(Network::ConnectionEvent event) override {
-    if (event == Network::ConnectionEvent::Connected ||
-        event == Network::ConnectionEvent::ConnectedZeroRtt) {
-      parent().onConnectionOpen(codec_client_->connection());
-    } else if (event == Network::ConnectionEvent::LocalClose ||
-               event == Network::ConnectionEvent::RemoteClose) {
-      // Makes sense semantically for the load balancers to process closes as drains.
-      // They just have to know that they cannot route to that connection anymore.
-      parent().onConnectionDraining(codec_client_->connection());
-    }
-
-    ActiveClient::onEvent(event);
-  }
+  void onEvent(Network::ConnectionEvent event) override;
 
 private:
   bool closed_with_active_rq_{};
