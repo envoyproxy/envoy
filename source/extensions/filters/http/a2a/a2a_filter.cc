@@ -62,7 +62,7 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
                                                    bool end_stream) {
   if (isValidA2aGetRequest(headers)) {
     is_a2a_request_ = true;
-    ENVOY_LOG(debug, "valid A2A GET/DELETE request, passing through");
+    ENVOY_LOG(debug, "valid A2A GET request, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -86,7 +86,6 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
     }
   }
 
-  ENVOY_LOG(debug, "after the post check");
   if (!is_a2a_request_ && shouldRejectRequest()) {
     ENVOY_LOG(debug, "rejecting non-A2A traffic");
     config_->stats().requests_rejected_.inc();
@@ -188,20 +187,6 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  // Set dynamic metadata
-  // const auto& metadata = parser_->metadata();
-  // if (!metadata.fields().empty()) {
-  //   decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-  //                                                       metadata);
-  //   ENVOY_LOG(debug, "A2A filter set dynamic metadata: {}", metadata.DebugString());
-
-  //   if (config_->clearRouteCache()) {
-  //     if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
-  //       cb->clearRouteCache();
-  //       ENVOY_LOG(debug, "A2A filter cleared route cache for metadata-based routing");
-  //     }
-  //   }
-  // }
   return Http::FilterDataStatus::Continue;
 }
 
