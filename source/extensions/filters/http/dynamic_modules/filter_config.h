@@ -53,6 +53,18 @@ using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
 using OnHttpFilterLocalReplyType = decltype(&envoy_dynamic_module_on_http_filter_local_reply);
 using OnHttpFilterConfigScheduled = decltype(&envoy_dynamic_module_on_http_filter_config_scheduled);
+using OnHttpFilterConfigHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_callout_done);
+using OnHttpFilterConfigHttpStreamHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_headers);
+using OnHttpFilterConfigHttpStreamDataType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_data);
+using OnHttpFilterConfigHttpStreamTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_trailers);
+using OnHttpFilterConfigHttpStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_complete);
+using OnHttpFilterConfigHttpStreamResetType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_reset);
 
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
@@ -108,6 +120,12 @@ public:
       on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
   OnHttpFilterLocalReplyType on_http_filter_local_reply_ = nullptr;
   OnHttpFilterConfigScheduled on_http_filter_config_scheduled_ = nullptr;
+  OnHttpFilterConfigHttpCalloutDoneType on_http_filter_config_http_callout_done_ = nullptr;
+  OnHttpFilterConfigHttpStreamHeadersType on_http_filter_config_http_stream_headers_ = nullptr;
+  OnHttpFilterConfigHttpStreamDataType on_http_filter_config_http_stream_data_ = nullptr;
+  OnHttpFilterConfigHttpStreamTrailersType on_http_filter_config_http_stream_trailers_ = nullptr;
+  OnHttpFilterConfigHttpStreamCompleteType on_http_filter_config_http_stream_complete_ = nullptr;
+  OnHttpFilterConfigHttpStreamResetType on_http_filter_config_http_stream_reset_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& main_thread_dispatcher_;
@@ -321,6 +339,102 @@ public:
    * This is called when an event is scheduled via DynamicModuleHttpFilterConfigScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
+
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
+  /**
+   * Starts a streamable HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, bool end_stream,
+                  uint64_t timeout_milliseconds);
+
+  /**
+   * Resets an ongoing streamable HTTP callout stream.
+   */
+  void resetHttpStream(uint64_t stream_id);
+
+  /**
+   * Sends data on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamData(uint64_t stream_id, Buffer::Instance& data, bool end_stream);
+
+  /**
+   * Sends trailers on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
+
+private:
+  /**
+   * Callback for one-shot HTTP callouts initiated from an HTTP filter config.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
+        : config_(config), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+    // Used to cancel the callout if the config is destroyed before completion.
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    DynamicModuleHttpFilterConfig& config_;
+    const uint64_t callout_id_{};
+  };
+
+  /**
+   * Callback for streaming HTTP callouts initiated from an HTTP filter config.
+   */
+  class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
+                                    public Event::DeferredDeletable {
+  public:
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
+        : callout_id_(callout_id), config_(config) {}
+    ~HttpStreamCalloutCallback() override = default;
+
+    void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void onData(Buffer::Instance& data, bool end_stream) override;
+    void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+    void onComplete() override;
+    void onReset() override;
+
+    Http::AsyncClient::Stream* stream_ = nullptr;
+    Http::RequestMessagePtr request_message_ = nullptr;
+    Http::RequestTrailerMapPtr request_trailers_ = nullptr;
+    const uint64_t callout_id_{};
+    bool cleaned_up_ = false;
+
+  private:
+    DynamicModuleHttpFilterConfig& config_;
+  };
+
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilterConfig::HttpCalloutCallback>>
+      http_callouts_;
+  absl::flat_hash_map<uint64_t,
+                      std::unique_ptr<DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback>>
+      http_stream_callouts_;
 };
 
 class DynamicModuleHttpFilterConfigScheduler {

@@ -17,7 +17,9 @@ class HotRestartNopImpl : public Server::HotRestart {
 public:
   // Server::HotRestart
   void drainParentListeners() override {}
-  int duplicateParentListenSocket(const std::string&, uint32_t) override { return -1; }
+  int duplicateParentListenSocket(const std::string&, uint32_t, absl::string_view) override {
+    return -1;
+  }
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr,
                                      std::shared_ptr<Network::UdpListenerConfig>) override {}
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override {
