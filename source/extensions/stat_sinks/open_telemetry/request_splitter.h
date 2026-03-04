@@ -53,6 +53,8 @@ private:
                        const opentelemetry::proto::metrics::v1::ScopeMetrics& sm,
                        const opentelemetry::proto::metrics::v1::Metric& metric,
                        DataPointCallback datapoint_callback) {
+    // If the maximum data point limit is reached, submit the current request
+    // and clear all context pointers so they can be reconstructed in the new request.
     if (max_dp_ > 0 && current_dp_count_ >= max_dp_) {
       submitRequestIfNeeded();
       current_rm_ = nullptr;
@@ -61,12 +63,8 @@ private:
     }
 
     // If we're starting a new resource metric (e.g. after a submit or passing from another rm),
-    // ensure we don't exceed the max resource metrics per request. If we do, submit and start
-    // fresh.
+    // ensure we reconstruct it in the current request.
     if (current_rm_ == nullptr) {
-      if (max_rm_ > 0 && current_rm_count_ >= max_rm_) {
-        submitRequestIfNeeded();
-      }
       current_rm_ = current_request_->add_resource_metrics();
       current_rm_->mutable_resource()->CopyFrom(rm.resource());
       current_rm_->mutable_schema_url()->assign(rm.schema_url());

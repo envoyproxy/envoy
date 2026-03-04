@@ -49,12 +49,36 @@ void RequestSplitter::chunkRequests(
 
   RequestSplitter chunker(max_dp, max_rm, send_callback);
 
+  // OTLP metrics structure can be visualized as a tree:
+  // ResourceMetrics -> ScopeMetrics -> Metric -> DataPoint
+  // The 'max_dp' limit applies to the leaves (DataPoints) across all branches,
+  // while the 'max_rm' limit applies to the top level (ResourceMetrics).
+  //
+  // To split the request without losing the hierarchical context of each data point,
+  // we iterate through every data point using nested loops. The 'chunker' serves as
+  // a state machine that keeps track of the currently active Resource, Scope, and Metric.
+  // NOTE: To cleanly manage limits and reconstruct the payload context in new requests,
+  // request submissions (submitRequestIfNeeded) are strictly triggered from only two
+  // places: `beginResourceMetric` (when max_rm is reached) and `appendDataPoint`
+  // (when max_dp is reached).
   for (auto& rm : resource_metrics) {
+    // Signals the chunker that we are starting a new ResourceMetrics.
+    // The chunker will check the max_rm limit, potentially submit a built request,
+    // and clear its internal pointer for the current ResourceMetrics.
     chunker.beginResourceMetric();
     for (auto& sm : *rm.mutable_scope_metrics()) {
+      // Clears the chunker's internal pointer to the current ScopeMetrics.
       chunker.beginScopeMetric();
       for (auto& metric : *sm.mutable_metrics()) {
+        // Clears the chunker's internal pointer to the current Metric.
         chunker.beginMetric();
+
+        // For each DataPoint, `appendDataPoint` does the heavy lifting:
+        // 1. If max_dp is reached, it submits the request and clears all context pointers.
+        // 2. If the context pointers are null (either due to a new scope/metric or due to a
+        //    request being submitted), it dynamically reconstructs the necessary parents
+        //    (ResourceMetrics, ScopeMetrics, Metric) inside the new/current request.
+        // 3. Finally, it invokes the callback to add the specific data point to the metric.
         switch (metric.data_case()) {
         case opentelemetry::proto::metrics::v1::Metric::DataCase::kGauge:
           for (auto& dp : *metric.mutable_gauge()->mutable_data_points()) {
