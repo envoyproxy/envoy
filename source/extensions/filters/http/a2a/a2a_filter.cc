@@ -60,7 +60,7 @@ uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBo
 
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
-  if (isValidA2aGetOrDeleteRequest(headers)) {
+  if (isValidA2aGetRequest(headers)) {
     is_a2a_request_ = true;
     ENVOY_LOG(debug, "valid A2A GET/DELETE request, passing through");
     return Http::FilterHeadersStatus::Continue;
@@ -98,7 +98,6 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
   ENVOY_LOG(debug, "A2A filter passing through during decoding headers");
   return Http::FilterHeadersStatus::Continue;
 }
-
 
 Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (!is_json_post_request_ || !is_a2a_request_) {
@@ -146,7 +145,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       break;
   }
 
-    // If we are here, we haven't collected all fields yet.
+  // If we are here, we haven't collected all fields yet.
   bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();

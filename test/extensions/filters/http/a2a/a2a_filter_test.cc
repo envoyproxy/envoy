@@ -47,14 +47,12 @@ TEST_F(A2aFilterTest, ValidDeleteRequest) {
 }
 
 TEST_F(A2aFilterTest, ValidPostRequest) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 TEST_F(A2aFilterTest, InvalidPostRequestNoJson) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "text/plain"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
 
   // PASS_THROUGH mode
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -67,16 +65,14 @@ TEST_F(A2aFilterTest, InvalidPostRequestRejectMode) {
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "text/plain"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 TEST_F(A2aFilterTest, DecodeDataValidJson) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string json = R"({
@@ -93,8 +89,7 @@ TEST_F(A2aFilterTest, DecodeDataValidJson) {
 }
 
 TEST_F(A2aFilterTest, DecodeDataInvalidJson) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string json = R"({ invalid json })";
@@ -105,8 +100,7 @@ TEST_F(A2aFilterTest, DecodeDataInvalidJson) {
 }
 
 TEST_F(A2aFilterTest, DecodeDataPartialJson) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string part1 = R"({ "jsonrpc": "2.0", )";
@@ -128,14 +122,14 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLarge) {
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string json = R"({ "jsonrpc": "2.0", "method": "long_method_name_exceeding_limit" })";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
   // Should increment body_too_large stat
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
@@ -150,8 +144,7 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLargePartial) {
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string part1 = R"({ "jsonrpc": "2.0")"; // 17 bytes
@@ -161,14 +154,14 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLargePartial) {
   const std::string part2 = R"(, "method": "foo" })"; // Exceeds limit total
   Buffer::OwnedImpl buffer2(part2);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer2, true));
   EXPECT_EQ(1, config_->stats().body_too_large_.value());
 }
 
 TEST_F(A2aFilterTest, DecodeDataFragmentedBuffer) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   Buffer::OwnedImpl buffer;
@@ -197,8 +190,7 @@ TEST_F(A2aFilterTest, DecodeDataResumesParsing) {
   // try to parse the beginning of the buffer again, which would likely fail
   // or result in incorrect state.
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   // Chunk 1
@@ -217,8 +209,7 @@ TEST_F(A2aFilterTest, DecodeDataResumesParsing) {
 }
 
 TEST_F(A2aFilterTest, DecodeDataIncompleteAtEndStream) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   const std::string json = R"({ "jsonrpc": "2.0" )"; // incomplete
@@ -230,8 +221,7 @@ TEST_F(A2aFilterTest, DecodeDataIncompleteAtEndStream) {
 }
 
 TEST_F(A2aFilterTest, NonJsonOrA2aRequestPassthrough) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "text/plain"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "text/plain"}};
   // is_json_post_request_ = false
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 
@@ -241,12 +231,12 @@ TEST_F(A2aFilterTest, NonJsonOrA2aRequestPassthrough) {
 }
 
 TEST_F(A2aFilterTest, ParsingAlreadyComplete) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   // Use a method with scalar params to ensure early stop works reliably
-  const std::string json = R"({ "jsonrpc": "2.0", "method": "tasks/pushNotificationConfig/delete", "id": "1", "params": {"id": "t1", "pushNotificationConfigId": "c1"} })";
+  const std::string json =
+      R"({ "jsonrpc": "2.0", "method": "tasks/pushNotificationConfig/delete", "id": "1", "params": {"id": "t1", "pushNotificationConfigId": "c1"} })";
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false)); // Complete
@@ -264,8 +254,7 @@ TEST_F(A2aFilterTest, MaxBodySizeZeroMeansUnlimited) {
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   // Large payload
@@ -287,15 +276,16 @@ TEST_F(A2aFilterTest, RejectInvalidA2aRequest) {
   filter_ = std::make_unique<A2aFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   // Valid JSON but invalid A2A (missing jsonrpc version for example)
   const std::string json = R"({ "method": "message/send" })";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "request must be a valid JSON-RPC 2.0 message for A2A", _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "request must be a valid JSON-RPC 2.0 message for A2A", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 

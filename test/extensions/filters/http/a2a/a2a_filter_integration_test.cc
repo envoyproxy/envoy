@@ -7,8 +7,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -94,7 +94,8 @@ TEST_P(A2aFilterIntegrationTest, ValidLargeA2aPostRequest) {
 
   // Create a body around 64KB
   std::string padding(1024 * 64, 'a');
-  const std::string request_body = fmt::format(R"({{"jsonrpc": "2.0", "method": "test", "params": "{}"}})", padding);
+  const std::string request_body =
+      fmt::format(R"({{"jsonrpc": "2.0", "method": "test", "params": "{}"}})", padding);
 
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -121,7 +122,8 @@ TEST_P(A2aFilterIntegrationTest, BodyTooLargeDefaultLimit) {
 
   // Create a body around 16KB, which exceeds the default 8KB limit.
   std::string padding(1024 * 16, 'a');
-  const std::string request_body = fmt::format(R"({{"jsonrpc": "2.0", "method": "test", "params": "{}"}})", padding);
+  const std::string request_body =
+      fmt::format(R"({{"jsonrpc": "2.0", "method": "test", "params": "{}"}})", padding);
 
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -181,7 +183,8 @@ TEST_P(A2aFilterIntegrationTest, MissingJsonRpcFieldRejected) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
-// Test that a POST request with the wrong content type is ignored and passes through (PASS_THROUGH mode).
+// Test that a POST request with the wrong content type is ignored and passes through (PASS_THROUGH
+// mode).
 TEST_P(A2aFilterIntegrationTest, WrongContentTypePostRequestIgnored) {
   initializeFilter();
 
@@ -260,7 +263,8 @@ TEST_P(A2aFilterIntegrationTest, BodyTooLargeRejected) {
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const std::string large_body = R"({"jsonrpc": "2.0", "method": "very_long_method_name"})"; // > 10 bytes
+  const std::string large_body =
+      R"({"jsonrpc": "2.0", "method": "very_long_method_name"})"; // > 10 bytes
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/"},
@@ -330,4 +334,3 @@ TEST_P(A2aFilterIntegrationTest, ChunkedValidA2aPostRequest) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
