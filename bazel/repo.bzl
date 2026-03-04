@@ -303,7 +303,7 @@ _envoy_repo = repository_rule(
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
         "yq": attr.label(default = "@yq"),
     },
-    environ = ["BAZEL_LLVM_PATH"],
+    environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT"],
 )
 
 def envoy_repo():
