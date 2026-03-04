@@ -1,13 +1,9 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.validate.h"
-#include "envoy/init/manager.h"
 #include "envoy/server/filter_config.h"
 
-#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
@@ -27,8 +23,7 @@ public:
   createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
                                     const std::string& stat_prefix, DualInfo dual_info,
                                     Server::Configuration::ServerFactoryContext& context) override {
-    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope,
-                               &dual_info.init_manager);
+    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope);
   }
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
       const FilterConfig& proto_config, const std::string& stat_prefix,
@@ -36,8 +31,7 @@ public:
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
-                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
-                      Init::Manager* init_manager = nullptr);
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
@@ -50,12 +44,6 @@ public:
                                     Server::Configuration::ServerFactoryContext&) override {
     return proto_config.terminal_filter();
   }
-
-private:
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromRemoteSource(const FilterConfig& proto_config,
-                                      Server::Configuration::ServerFactoryContext& context,
-                                      Stats::Scope& scope, Init::Manager* init_manager);
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 
