@@ -4886,6 +4886,9 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
       {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));
@@ -4914,12 +4917,14 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
             "failed");
   EXPECT_FALSE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
 
-  // Verify OAuth cookies were removed
+  // Verify OAuth token and flow cookies were removed
   auto cookies = Http::Utility::parseCookies(request_headers);
   EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
   EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
   EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
   EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthNonce.00000000075bcd15") == cookies.end());
+  EXPECT_TRUE(cookies.find("CodeVerifier.00000000075bcd15") == cookies.end());
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_refreshtoken_failure").value(), 1);
@@ -4948,6 +4953,9 @@ TEST_F(OAuth2Test, AllowFailedWithRefreshTokenClusterNotFound) {
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
       {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));
@@ -4975,12 +4983,14 @@ TEST_F(OAuth2Test, AllowFailedWithRefreshTokenClusterNotFound) {
             "failed");
   EXPECT_FALSE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
 
-  // Verify OAuth cookies were removed
+  // Verify OAuth token and flow cookies were removed
   auto cookies = Http::Utility::parseCookies(request_headers);
   EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
   EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
   EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
   EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthNonce.00000000075bcd15") == cookies.end());
+  EXPECT_TRUE(cookies.find("CodeVerifier.00000000075bcd15") == cookies.end());
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);

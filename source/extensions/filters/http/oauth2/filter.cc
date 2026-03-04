@@ -1448,6 +1448,7 @@ bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) cons
 
 void OAuth2Filter::continueAsUnauthorized(const std::string& failure_reason) {
   removeOAuthTokenCookies(*request_headers_);
+  removeOAuthFlowCookies(*request_headers_);
   request_headers_->setCopy(OAuth2Headers::get().OAuthStatus, "failed");
   request_headers_->setCopy(OAuth2Headers::get().OAuthFailureReason, failure_reason);
   config_->stats().oauth_allow_failed_passthrough_.inc();
