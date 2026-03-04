@@ -410,6 +410,32 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
   return true;
 }
 
+uint32_t envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+  if (context_envoy_ptr == nullptr) {
+    return 0;
+  }
+  return getContext(context_envoy_ptr)->hostSelectionRetryCount();
+}
+
+bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index) {
+  if (lb_envoy_ptr == nullptr || context_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  return getContext(context_envoy_ptr)->shouldSelectAnotherHost(*hosts[index]);
+}
+
 bool envoy_dynamic_module_callback_lb_set_host_data(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     uintptr_t data) {
