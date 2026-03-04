@@ -544,6 +544,22 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstre
   return false;
 }
 
+__attribute__((weak)) uint32_t
+envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_lb_context_envoy_ptr,
+    uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_should_select_another_host: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_set_host_data(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
                                                size_t, uintptr_t) {

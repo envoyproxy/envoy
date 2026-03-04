@@ -8488,6 +8488,35 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
+/**
+ * envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count returns the number
+ * of times host selection should be retried if the chosen host is rejected by
+ * shouldSelectAnotherHost. Built-in load balancers use this value as the upper bound of a
+ * retry loop during host selection.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @return the maximum number of host selection retries, or 0 if the context is null.
+ */
+uint32_t envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries
+ * to avoid selecting hosts that were already attempted. The host is identified by priority
+ * and index within all hosts at that priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return true if the host should be rejected and selection retried, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
 // =============================================================================
 // Matcher Types
 // =============================================================================

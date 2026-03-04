@@ -10439,6 +10439,18 @@ pub trait EnvoyLoadBalancer {
   /// Returns the value and optionally the total number of values for the key.
   /// Only valid during choose_host callback.
   fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
+
+  /// Returns the maximum number of times host selection should be retried if the chosen host
+  /// is rejected by [`context_should_select_another_host`]. Built-in load balancers use this
+  /// value as the upper bound of a retry loop during host selection.
+  /// Only valid during choose_host callback.
+  fn context_get_host_selection_retry_count(&self) -> u32;
+
+  /// Checks whether the load balancer should reject the given host and retry selection.
+  /// This is used during retries to avoid selecting hosts that were already attempted.
+  /// The host is identified by priority and index within all hosts at that priority.
+  /// Only valid during choose_host callback.
+  fn context_should_select_another_host(&self, priority: u32, index: usize) -> bool;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -10964,6 +10976,29 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       }
     } else {
       None
+    }
+  }
+
+  fn context_get_host_selection_retry_count(&self) -> u32 {
+    if self.context_ptr.is_null() {
+      return 0;
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(self.context_ptr)
+    }
+  }
+
+  fn context_should_select_another_host(&self, priority: u32, index: usize) -> bool {
+    if self.context_ptr.is_null() || self.lb_ptr.is_null() {
+      return false;
+    }
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_should_select_another_host(
+        self.lb_ptr,
+        self.context_ptr,
+        priority,
+        index,
+      )
     }
   }
 }

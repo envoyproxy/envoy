@@ -216,6 +216,16 @@ bool envoy_dynamic_module_on_lb_choose_host(
     bool header_found = envoy_dynamic_module_callback_lb_context_get_downstream_header(
         context_envoy_ptr, method_key, &method_result, 0, &method_count);
     (void)header_found;
+
+    // Test host selection retry count.
+    uint32_t retry_count =
+        envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(context_envoy_ptr);
+    (void)retry_count;
+
+    // Test should_select_another_host for the first host.
+    bool should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
+        lb_envoy_ptr, context_envoy_ptr, 0, 0);
+    (void)should_retry;
   }
 
   if (healthy_count == 0) {

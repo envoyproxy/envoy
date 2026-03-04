@@ -670,6 +670,30 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_context_get_host_selection_retry_count triggers an
+// ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbContextGetHostSelectionRetryCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count =
+            envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(nullptr);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_context_should_select_another_host triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbContextShouldSelectAnotherHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
+            nullptr, nullptr, 0, 0);
+        EXPECT_FALSE(should_retry);
+      },
+      "not implemented in this context");
+}
+
 // Test that the weak symbol stub for lb_set_host_data triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, LbSetHostDataEnvoyBug) {
   EXPECT_ENVOY_BUG(
