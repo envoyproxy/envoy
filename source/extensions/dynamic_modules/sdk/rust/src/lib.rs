@@ -10327,6 +10327,16 @@ pub trait EnvoyLoadBalancer {
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health;
 
+  /// Looks up a host by its address string across all priorities and returns its health status.
+  /// This provides O(1) lookup by address using the cross-priority host map, instead of requiring
+  /// iteration through all hosts by index.
+  ///
+  /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
+  fn get_host_health_by_address(
+    &self,
+    address: &str,
+  ) -> Option<abi::envoy_dynamic_module_type_host_health>;
+
   /// Returns the address of a host by index within all hosts at a given priority.
   fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
 
@@ -10526,6 +10536,30 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     index: usize,
   ) -> abi::envoy_dynamic_module_type_host_health {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_host_health(self.lb_ptr, priority, index) }
+  }
+
+  fn get_host_health_by_address(
+    &self,
+    address: &str,
+  ) -> Option<abi::envoy_dynamic_module_type_host_health> {
+    let address_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: address.as_ptr() as *const _,
+      length: address.len(),
+    };
+    let mut health: abi::envoy_dynamic_module_type_host_health =
+      abi::envoy_dynamic_module_type_host_health::Unhealthy;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_health_by_address(
+        self.lb_ptr,
+        address_buf,
+        &mut health,
+      )
+    };
+    if found {
+      Some(health)
+    } else {
+      None
+    }
   }
 
   fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {

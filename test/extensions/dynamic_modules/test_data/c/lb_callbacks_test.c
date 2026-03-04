@@ -92,6 +92,30 @@ bool envoy_dynamic_module_on_lb_choose_host(
     (void)health;
   }
 
+  // Test O(1) host health lookup by address.
+  if (host_count > 0) {
+    // Get the address of the first host to use for the by-address lookup.
+    envoy_dynamic_module_type_envoy_buffer first_host_addr = {NULL, 0};
+    envoy_dynamic_module_callback_lb_get_host_address(lb_envoy_ptr, 0, 0, &first_host_addr);
+    if (first_host_addr.ptr != NULL && first_host_addr.length > 0) {
+      envoy_dynamic_module_type_host_health health_by_addr =
+          envoy_dynamic_module_type_host_health_Unhealthy;
+      envoy_dynamic_module_type_module_buffer addr_buf = {first_host_addr.ptr,
+                                                          first_host_addr.length};
+      bool found_by_addr = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+          lb_envoy_ptr, addr_buf, &health_by_addr);
+      (void)found_by_addr;
+    }
+
+    // Test with a non-existent address.
+    envoy_dynamic_module_type_host_health not_found_health =
+        envoy_dynamic_module_type_host_health_Unhealthy;
+    envoy_dynamic_module_type_module_buffer bad_addr = {"1.2.3.4:9999", 12};
+    bool not_found = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+        lb_envoy_ptr, bad_addr, &not_found_health);
+    (void)not_found;
+  }
+
   // Test all-hosts callbacks (address, weight, active requests, connections, locality).
   if (host_count > 0) {
     envoy_dynamic_module_type_envoy_buffer host_address_result = {NULL, 0};

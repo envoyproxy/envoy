@@ -462,6 +462,17 @@ envoy_dynamic_module_callback_lb_get_host_health(envoy_dynamic_module_type_lb_en
   return envoy_dynamic_module_type_host_health_Unhealthy;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_host_health* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_health_by_address: "
+               "not implemented in this context");
+  if (result != nullptr) {
+    *result = envoy_dynamic_module_type_host_health_Unhealthy;
+  }
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
                                                   size_t,
