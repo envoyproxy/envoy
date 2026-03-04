@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from tools.oncall.parsing import rotation_from_yaml, overrides_from_yaml
+from tools.oncall.parsing import rotation_from_yaml, overrides_from_yaml, Override
 
 _HEADER = """BEGIN:VCALENDAR
 PRODID:-//Envoy//On call rotation generator script//EN
@@ -29,7 +29,7 @@ def _date_intersects(seats: int, start_date: date, d: date) -> bool:
     return diff_in_weeks % seats == 0
 
 
-def _override_days(overrides: list[object]) -> list[date]:
+def _override_days(overrides: list[Override]) -> list[date]:
     dates: list[date] = []
     for override in overrides:
         d = override.start
