@@ -239,83 +239,83 @@ public:
     Stats::Histogram::Unit unit_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
-    size_t id = counter_vecs_.size();
     counter_vecs_.push_back(std::move(counter_vec));
-    return id;
+    return counter_vecs_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
-    size_t id = gauge_vecs_.size();
     gauge_vecs_.push_back(std::move(gauge_vec));
-    return id;
+    return gauge_vecs_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
-    size_t id = histogram_vecs_.size();
     histogram_vecs_.push_back(std::move(histogram_vec));
-    return id;
+    return histogram_vecs_.size();
   }
 
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
-    if (id >= counter_vecs_.size()) {
+    if (id == 0 || id > counter_vecs_.size()) {
       return {};
     }
-    return counter_vecs_[id];
+    return counter_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
-    if (id >= gauge_vecs_.size()) {
+    if (id == 0 || id > gauge_vecs_.size()) {
       return {};
     }
-    return gauge_vecs_[id];
+    return gauge_vecs_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
-    if (id >= histogram_vecs_.size()) {
+    if (id == 0 || id > histogram_vecs_.size()) {
       return {};
     }
-    return histogram_vecs_[id];
+    return histogram_vecs_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;

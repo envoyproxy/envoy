@@ -94,6 +94,11 @@ checks:
     required: true
     on-run:
     - mobile-perf
+  mobile-python:
+    name: Mobile/Python
+    required: true
+    on-run:
+    - mobile-python
   mobile-release-validation:
     name: Mobile/Release validation
     required: true
@@ -316,6 +321,18 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-python:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - .github/workflows/mobile-python.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
