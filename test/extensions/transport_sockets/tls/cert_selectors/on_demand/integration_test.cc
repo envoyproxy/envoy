@@ -6,6 +6,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/bootstrap/certificate_providers/local/v3/local_certificate_provider.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
@@ -80,12 +81,16 @@ public:
     const std::string on_demand_config = config.empty() ? defaultConfig() : config;
     config_helper_.addConfigModifier([this, on_demand_config](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config
+          on_demand;
+      TestUtility::loadFromYaml(on_demand_config, on_demand);
       bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
           bootstrap.static_resources().clusters(0));
       auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       sds_cluster->set_name("sds_cluster");
       sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
+      addBootstrapExtensions(bootstrap, on_demand);
       if (upstream_selector_) {
         bootstrap.mutable_static_resources()
             ->mutable_listeners(0)
@@ -95,7 +100,7 @@ public:
         auto* transport_socket = backend->mutable_transport_socket();
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand);
         transport_socket->mutable_typed_config()->PackFrom(tls_context);
         if (!filter_state_value_.empty()) {
           const std::string set_filter_state = fmt::format(R"EOF(
@@ -124,7 +129,7 @@ public:
         auto* transport_socket = filter_chain->mutable_transport_socket();
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand);
         tls_context.set_disable_stateless_session_resumption(true);
         tls_context.set_disable_stateful_session_resumption(true);
         tls_context.mutable_require_client_certificate()->set_value(mtls_);
@@ -181,9 +186,42 @@ public:
                        ca_cert_path, ca_key_path, ca_reload_failure_policy);
   }
 
+  std::string certificateProviderConfig(absl::string_view mapped_name) const {
+    return fmt::format(R"EOF(
+      certificate_provider:
+        provider_name: local_cert_minter
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: {}
+      )EOF",
+                       mapped_name);
+  }
+
+  void addBootstrapExtensions(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      const envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config&
+          on_demand) {
+    if (!on_demand.has_certificate_provider()) {
+      return;
+    }
+
+    auto* extension = bootstrap.add_bootstrap_extensions();
+    extension->set_name("envoy.bootstrap.certificate_providers.local");
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalCertificateProvider
+        provider;
+    provider.set_provider_name(on_demand.certificate_provider().provider_name());
+    auto* signer = provider.mutable_local_signer();
+    signer->set_ca_cert_path(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    signer->set_ca_key_path(TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    extension->mutable_typed_config()->PackFrom(provider);
+  }
+
   void configToUseSds(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-      const std::string& on_demand_config) {
+      envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config&
+          on_demand) {
     common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
     if (validation_sds_) {
@@ -202,13 +240,10 @@ public:
       }
     }
 
-    // Parse on-demand TLS cert selector config.
-    envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config
-        on_demand;
-    TestUtility::loadFromYaml(on_demand_config, on_demand);
-
-    // Configure config source
-    setConfigSource(on_demand.mutable_config_source());
+    // Configure config source only in SDS mode.
+    if (!on_demand.has_local_signer() && !on_demand.has_certificate_provider()) {
+      setConfigSource(on_demand.mutable_config_source());
+    }
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
     common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
         on_demand);
@@ -447,6 +482,20 @@ TEST_P(OnDemandIntegrationTest, LocalSignerDefaultPermissiveAllowsUnderscoreName
   }
 
   setup(localSignerConfig("server_name"));
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, BasicSuccessCertificateProvider) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local certificate provider wiring is validated on downstream";
+  }
+
+  setup(certificateProviderConfig("server"));
   auto conn = createClientConnection();
   waitCertsRequested(1);
   conn->waitForUpstreamConnection();

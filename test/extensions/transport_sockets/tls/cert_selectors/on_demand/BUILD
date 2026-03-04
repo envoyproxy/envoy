@@ -39,6 +39,7 @@ envoy_extension_cc_test(
 )
 
 _integration_test_deps = [
+    "//source/extensions/bootstrap/certificate_providers/local:config",
     "//source/extensions/filters/network/tcp_proxy:config",
     "//source/extensions/transport_sockets/tls:config",
     "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
@@ -69,6 +70,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     extension_names = [
+        "envoy.bootstrap.certificate_providers.local",
         "envoy.tls.certificate_selectors.on_demand_secret",
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
@@ -86,6 +88,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     extension_names = [
+        "envoy.bootstrap.certificate_providers.local",
         "envoy.tls.certificate_selectors.on_demand_secret",
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
@@ -93,7 +96,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = _integration_test_deps,
     args = [
-        "--gtest_filter=*LocalSignerDefaultPermissiveAllowsUnderscoreName*:*LocalSignerRuntimeStrictHostnameBlocksUnderscoreName*:*LocalSignerRuntimePermissiveOverridesStrictConfig*:*BasicSuccessMtlsSuccess*:*BasicSuccessMtlsFail*:*ValidationContextUpdate*:*ValidationContextUpdateWithPending*",
+        "--gtest_filter=*LocalSignerDefaultPermissiveAllowsUnderscoreName*:*LocalSignerRuntimeStrictHostnameBlocksUnderscoreName*:*LocalSignerRuntimePermissiveOverridesStrictConfig*:*BasicSuccessCertificateProvider*:*BasicSuccessMtlsSuccess*:*BasicSuccessMtlsFail*:*ValidationContextUpdate*:*ValidationContextUpdateWithPending*",
     ],
 )
 
@@ -103,6 +106,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     extension_names = [
+        "envoy.bootstrap.certificate_providers.local",
         "envoy.tls.certificate_selectors.on_demand_secret",
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
@@ -120,6 +124,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     extension_names = [
+        "envoy.bootstrap.certificate_providers.local",
         "envoy.tls.certificate_selectors.on_demand_secret",
         "envoy.tls.certificate_mappers.static_name",
         "envoy.tls.certificate_mappers.sni",
