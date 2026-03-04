@@ -46,4 +46,3 @@ message A2a {
   // production.
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
 }
-
