@@ -1884,6 +1884,25 @@ TEST_P(ServerInstanceImplTest, DeprecatedRuntimeKeyWarningWhenSkipped) {
       { initialize("test/server/test_data/server/deprecated_runtime_key_bootstrap.yaml"); });
 }
 
+#ifndef WIN32
+
+TEST_P(ServerInstanceImplTest, EventLog) {
+  const std::string fifo_path = TestEnvironment::temporaryPath("event_log");
+  ::mkfifo(fifo_path.c_str(), 0666);
+  Cleanup cleanup{[fifo_path]() { ::unlink(fifo_path.c_str()); }};
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, fifo_path};
+  Filesystem::FilePtr reader_file = Filesystem::fileSystemForTest().createFile(file_info);
+  const Api::IoCallBoolResult open_result = reader_file->open(Filesystem::FlagSet{
+      (1 << Filesystem::File::Operation::Read) | (1 << Filesystem::File::Operation::NonBlock)});
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  options_.config_path_ = TestEnvironment::writeStringToFileForTest(
+      "event_log.yaml",
+      absl::StrCat("application_log_config: {event_log: { pipe_path: '", fifo_path, "'} }"));
+  EXPECT_NO_THROW(initialize(options_.config_path_));
+}
+
+#endif
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

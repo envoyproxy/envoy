@@ -40,8 +40,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
-        "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
         "@com_google_protobuf//:protobuf",
     ],
 )

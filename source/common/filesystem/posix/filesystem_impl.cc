@@ -250,6 +250,10 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
     out |= O_WRONLY;
   }
 
+  if (in.test(File::Operation::NonBlock)) {
+    out |= O_NONBLOCK;
+  }
+
   return {out, mode};
 }
 

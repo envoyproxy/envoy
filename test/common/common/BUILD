@@ -250,6 +250,20 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "logger_delegates_test",
+    srcs = ["logger_delegates_test.cc"],
+    deps = [
+        "//source/common/common:logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "logger_fuzz_test",
     srcs = ["logger_fuzz_test.cc"],

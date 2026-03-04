@@ -117,6 +117,7 @@ InstanceBase::~InstanceBase() {
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
+  event_logger_.reset();
   file_logger_.reset();
 
   // Destruct the ListenerManager explicitly, before InstanceBase's local init_manager_ is
@@ -637,6 +638,15 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
+  // Initialize event log. Must happen prior to starting other threads but may also use the
+  // server context.
+  if (bootstrap_.application_log_config().has_event_log()) {
+    auto logger_or_error = Logger::EventPipeDelegate::create(
+        serverFactoryContext(), bootstrap_.application_log_config().event_log().pipe_path(),
+        bootstrap_.application_log_config().event_log().filter(), Logger::Registry::getSink());
+    RETURN_IF_NOT_OK_REF(logger_or_error.status());
+    event_logger_ = *std::move(logger_or_error);
+  }
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
   if (parent_admin_shutdown_response.has_value()) {

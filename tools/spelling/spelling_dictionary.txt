@@ -1679,4 +1679,5 @@ doublings
 lcalpha
 nblk
 chr
+FIFO
 IWYU

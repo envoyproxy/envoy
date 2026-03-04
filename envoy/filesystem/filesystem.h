@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Filesystem {
 
-using FlagSet = std::bitset<5>;
+using FlagSet = std::bitset<6>;
 
 enum class DestinationType { File, Stderr, Stdout, TmpFile };
 
@@ -60,6 +60,8 @@ public:
     // using pwrite, as the Windows implementation of truncation will interact
     // poorly with pwrite.
     KeepExistingData,
+    // When possible, file is opened in non-blocking mode.
+    NonBlock,
   };
 
   /**
