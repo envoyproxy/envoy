@@ -1,5 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/request_splitter.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -179,6 +181,35 @@ TEST(RequestSplitterTest, HistogramSplit) {
     EXPECT_EQ(1, metric.histogram().data_points_size());
     EXPECT_EQ(i + 1, metric.histogram().data_points(0).count());
   }
+}
+
+TEST(RequestSplitterTest, UnsupportedMetricTypes) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics;
+  auto* rm = resource_metrics.Add();
+  rm->mutable_resource()->add_attributes()->set_key("rm_exponential_histogram");
+  auto* m1 = rm->add_scope_metrics()->add_metrics();
+  m1->set_name("m_exponential_histogram");
+  m1->mutable_exponential_histogram()->add_data_points();
+
+  std::vector<MetricsExportRequestPtr> requests;
+  EXPECT_ENVOY_BUG(RequestSplitter::chunkRequests(resource_metrics[0], 1,
+                                                  [&requests](MetricsExportRequestPtr req) {
+                                                    requests.push_back(std::move(req));
+                                                  }),
+                   "ExponentialHistogram and Summary metric types are not supported");
+
+  Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics2;
+  auto* rm2 = resource_metrics2.Add();
+  rm2->mutable_resource()->add_attributes()->set_key("rm_summary");
+  auto* m2 = rm2->add_scope_metrics()->add_metrics();
+  m2->set_name("m_summary");
+  m2->mutable_summary()->add_data_points();
+
+  EXPECT_ENVOY_BUG(RequestSplitter::chunkRequests(resource_metrics2[0], 1,
+                                                  [&requests](MetricsExportRequestPtr req) {
+                                                    requests.push_back(std::move(req));
+                                                  }),
+                   "ExponentialHistogram and Summary metric types are not supported");
 }
 
 } // namespace
