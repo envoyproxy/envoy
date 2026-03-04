@@ -158,13 +158,11 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
     ping_interval_ = ping_interval;
   }
 
-  // Create per-connection send timer with initial jitter spread across the full interval
-  // to distribute pings from burst-added connections across time.
+  // Create per-connection send timer with jitter (matching HTTP/2 keepalive pattern).
   fd_to_ping_send_timer_map_[fd] =
       dispatcher_.createTimer([this, fd]() { sendPingForConnection(fd); });
-  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
-  uint64_t jitter_ms = random_generator_->random() % std::max<uint64_t>(1, interval_ms);
-  fd_to_ping_send_timer_map_[fd]->enableTimer(std::chrono::milliseconds(interval_ms + jitter_ms));
+  fd_to_ping_send_timer_map_[fd]->enableTimer(
+      std::chrono::milliseconds(pingIntervalWithJitterMs()));
 
   ENVOY_LOG(debug, "reverse_tunnel: added socket to maps. node: {} connection key: {} fd: {}.",
             node_id, connectionKey, fd);
@@ -419,17 +417,8 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   // Reset miss counter on success.
   fd_to_miss_count_.erase(fd);
 
-  // Re-arm the per-connection send timer with 15% jitter (matching HTTP/2 keepalive pattern).
-  auto send_it = fd_to_ping_send_timer_map_.find(fd);
-  if (send_it != fd_to_ping_send_timer_map_.end()) {
-    uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
-    constexpr uint64_t jitter_percent = 15;
-    uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-    if (jitter_mod > 0) {
-      interval_ms += random_generator_->random() % jitter_mod;
-    }
-    send_it->second->enableTimer(std::chrono::milliseconds(interval_ms));
-  }
+  // Re-arm the per-connection send timer with jitter.
+  rearmPingSendTimer(fd);
 }
 
 void UpstreamSocketManager::sendPingForConnection(int fd) {
@@ -489,16 +478,24 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
     markSocketDead(fd);
   } else {
     // Below threshold: re-arm send timer for the next ping cycle.
-    auto send_it = fd_to_ping_send_timer_map_.find(fd);
-    if (send_it != fd_to_ping_send_timer_map_.end()) {
-      uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
-      constexpr uint64_t jitter_percent = 15;
-      uint64_t jitter_mod = jitter_percent * interval_ms / 100;
-      if (jitter_mod > 0) {
-        interval_ms += random_generator_->random() % jitter_mod;
-      }
-      send_it->second->enableTimer(std::chrono::milliseconds(interval_ms));
-    }
+    rearmPingSendTimer(fd);
+  }
+}
+
+uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
+  uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  constexpr uint64_t jitter_percent = 15;
+  uint64_t jitter_mod = jitter_percent * interval_ms / 100;
+  if (jitter_mod > 0) {
+    interval_ms += random_generator_->random() % jitter_mod;
+  }
+  return interval_ms;
+}
+
+void UpstreamSocketManager::rearmPingSendTimer(int fd) {
+  auto send_it = fd_to_ping_send_timer_map_.find(fd);
+  if (send_it != fd_to_ping_send_timer_map_.end()) {
+    send_it->second->enableTimer(std::chrono::milliseconds(pingIntervalWithJitterMs()));
   }
 }
 

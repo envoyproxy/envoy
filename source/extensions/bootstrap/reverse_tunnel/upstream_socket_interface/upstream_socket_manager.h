@@ -79,7 +79,6 @@ public:
 
   /**
    * Send a ping keepalive for a single reverse connection.
-   * Each connection has its own send timer, avoiding O(N) global iteration.
    * @param fd the file descriptor of the connection to ping.
    */
   void sendPingForConnection(int fd);
@@ -144,6 +143,19 @@ private:
    */
   bool hasAnySocketsForNode(const std::string& node_id);
 
+  /**
+   * Compute the ping interval in milliseconds with 15% jitter applied.
+   * @return jittered interval in milliseconds.
+   */
+  uint64_t pingIntervalWithJitterMs();
+
+  /**
+   * Re-arm the per-connection ping send timer for the given fd with jitter.
+   * No-op if the fd has no entry in fd_to_ping_send_timer_map_.
+   * @param fd the file descriptor whose send timer to re-arm.
+   */
+  void rearmPingSendTimer(int fd);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -180,8 +192,7 @@ private:
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
 
-  // Per-connection send timers that schedule individual ping sends with jitter,
-  // replacing the global O(N) ping_timer_.
+  // Per-connection send timers that schedule individual ping sends with jitter.
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_ping_send_timer_map_;
 
   // Track consecutive ping misses per file descriptor.
@@ -192,7 +203,7 @@ private:
 
   std::chrono::seconds ping_interval_{0};
 
-  // O(1) counter for total active FDs per node, replacing the O(N) scan in hasAnySocketsForNode().
+  // Per node counter for total active FDs.
   absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
 
   // Upstream extension for stats integration.
