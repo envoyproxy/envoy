@@ -1398,6 +1398,7 @@ func envoy_dynamic_module_on_http_filter_config_destroy(
 	if factoryWrapper == nil {
 		return
 	}
+	factoryWrapper.configHandle.scheduler = nil
 	factoryWrapper.pluginFactory.OnDestroy()
 	configManager.remove(unsafe.Pointer(configPtr))
 }

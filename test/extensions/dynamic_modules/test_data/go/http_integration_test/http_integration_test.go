@@ -68,6 +68,10 @@ type ConfigSchedulerFilterFactory struct {
 	sharedStatus *atomic.Bool
 }
 
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
+}
+
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
 	return &ConfigSchedulerFilter{sharedStatus: f.sharedStatus}
 }
