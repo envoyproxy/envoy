@@ -62,13 +62,13 @@ message Compressor {
   }
 
   // Configuration for filter behavior on the response direction.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message ResponseDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
     // When this field is ``true``, disables compression when the response contains an ``ETag`` header.
     // When this field is ``false``, the filter will preserve weak ``ETag`` values and remove those that
-    // require strong validation.
+    // require strong validation (unless ``weaken_etag_on_compress`` is set).
     bool disable_on_etag_header = 2;
 
     // When this field is ``true``, removes ``Accept-Encoding`` from the request headers before dispatching
@@ -96,6 +96,14 @@ message Compressor {
     // filter alters the order of the compression eligibility checks to report
     // the most valid reason for skipping the compression.
     bool status_header_enabled = 5;
+
+    // When this field is ``true`` and the filter compresses a response that contains a strong
+    // ``ETag``, the filter will weaken the ETag by prepending ``W/`` to its value instead of
+    // removing it. This allows caching and conditional requests to work while indicating the
+    // response body was modified by compression. When ``false`` (default), strong ETags are
+    // removed when compression is applied. This option has no effect when ``disable_on_etag_header``
+    // is ``true`` (compression is skipped for responses with ETag).
+    bool weaken_etag_on_compress = 6;
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
