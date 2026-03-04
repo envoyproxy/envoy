@@ -215,6 +215,10 @@ bug_fixes:
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
     due to eagerly calling refresh() before the deferred priority state resize.
+- area: access_log
+  change: |
+    Fixed a crash on listener removal with a process-level access log rate limiter
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -233,6 +237,13 @@ new_features:
     to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
     the ``x-envoy-degraded`` header. Degraded hosts are deprioritized in load balancing but remain in rotation (not
     ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to false.
+- area: http2
+  change: |
+    Added :ref:`max_header_field_size_kb
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>` to configure the
+    maximum wire-encoded size in KiB of an individual HPACK-encoded header field that the HTTP/2
+    codec will accept. This allows increasing the default nghttp2 per-header limit of 64 KiB on the
+    wire when larger single headers need to be supported.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
@@ -279,6 +290,9 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: access_log
+  change: |
+    Added customization support on stats in the stats :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
@@ -460,6 +474,12 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added support for loading dynamic module binaries from local file paths via the new
+    :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
+    field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
+    via ``module.local.filename`` as an alternative to the name-based search path.
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts
@@ -548,5 +568,16 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
+    ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include the certificate's CRL Distribution Point (CRLDP) information when CRL
+    validation fails. For errors such as ``CRL for certificate was not provided``, ``CRL has expired``, ``CRL
+    is not yet valid``, or ``certificate revoked``, the error message now includes the certificate's
+    CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: certificate revocation
+    check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
+    [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
+    validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
 
 deprecated:
