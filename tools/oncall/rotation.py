@@ -18,11 +18,11 @@ def update_rotation(add: str | None, remove: str | None, dirty: bool,
         raise ValueError(
             f"Cannot add {add} - that name is not a maintainer in reviewers.yaml"
         )
+    today = date.today()
     if add and remove:
         rotation = [add if v == remove else v for v in rotation]
-        rotation_to_yaml(start_date, rotation)
+        rotation_to_yaml(start_date, today, rotation)
         return
-    today = date.today()
     current = who_would_be_oncall(today, start_date, rotation, [])
     start_of_this_week = today
     # Walk start_of_this_week back to a Sunday. We could do math for this but
@@ -38,7 +38,7 @@ def update_rotation(add: str | None, remove: str | None, dirty: bool,
         while who_would_be_oncall(today, new_start_date, rotation,
                                   []) != current:
             new_start_date -= timedelta(weeks=1)
-        rotation_to_yaml(new_start_date, rotation)
+        rotation_to_yaml(new_start_date, today, rotation)
         return
     # remove
     new_rotation = [*rotation]
@@ -60,7 +60,7 @@ def update_rotation(add: str | None, remove: str | None, dirty: bool,
             weeks=disruption_week) >= CONSIDER_DIRTY_REMOVES_SAFE_AFTER:
         # It is okay to just remove despite disruption, because it's not going to
         # change anything too soon, or the user has selected just do it.
-        rotation_to_yaml(new_start_date, new_rotation)
+        rotation_to_yaml(new_start_date, today, new_rotation)
         return
     if not substitute:
         raise ValueError(
@@ -96,7 +96,7 @@ def update_rotation(add: str | None, remove: str | None, dirty: bool,
                     f"Warning: generated override intersects with pre-existing override:\n{no}\n{oo}"
                 )
     overrides_to_yaml([*old_overrides, *new_overrides])
-    rotation_to_yaml(new_start_date, new_rotation)
+    rotation_to_yaml(new_start_date, today, new_rotation)
 
 
 if __name__ == "__main__":

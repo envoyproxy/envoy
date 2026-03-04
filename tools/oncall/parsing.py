@@ -72,7 +72,8 @@ def _diff_rotation_and_maintainers(rotation: list[str]) -> str:
     return ret
 
 
-def rotation_to_yaml(start_date: date, rotation: list[str]) -> None:
+def rotation_to_yaml(start_date: date, updated: date,
+                     rotation: list[str]) -> None:
     with open(_rotation_path(), 'w') as file:
         file.write(
             "# In general, modify this through options to bazel run tools/oncall:rotation\n"
@@ -80,7 +81,7 @@ def rotation_to_yaml(start_date: date, rotation: list[str]) -> None:
         yaml.dump(
             {
                 "start_date": start_date,
-                "updated": date.today(),
+                "updated": updated,
                 "rotation": rotation,
             },
             file,
