@@ -12,6 +12,7 @@ pub mod utility;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
+use utility::HeaderPairSlice;
 pub use utility::{read_whole_request_body, read_whole_response_body};
 
 #[cfg(test)]
@@ -2460,21 +2461,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
-    // not because of any formal layout guarantees but because:
-    // 1) tuples _in practice_ are laid out packed and in order
-    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
-    //    pointer and length
-    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
-    // array, so it's safe to cast to a pointer)
-    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr,
-        headers.len(),
+        headers_ptr as *mut _,
+        headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -2488,20 +2482,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
-    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
-    // not because of any formal layout guarantees but because:
-    // 1) tuples _in practice_ are laid out packed and in order
-    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
-    //    pointer and length
-    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
-    // array, so it's safe to cast to a pointer)
-    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_headers(
         self.raw_ptr,
-        headers_ptr,
-        headers.len(),
+        headers_ptr as *mut _,
+        headers_len,
         end_stream,
       )
     }
@@ -2518,20 +2505,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
-    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
-    // not because of any formal layout guarantees but because:
-    // 1) tuples _in practice_ are laid out packed and in order
-    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
-    //    pointer and length
-    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
-    // array, so it's safe to cast to a pointer)
-    let trailers_ptr = trailers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_trailers(
         self.raw_ptr,
-        trailers_ptr,
-        trailers.len(),
+        trailers_ptr as *mut _,
+        trailers_len,
       )
     }
   }
@@ -3141,18 +3121,19 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
-    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
-    let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    let (body_ptr, body_length) = body
+      .map(|s| (s.as_ptr(), s.len()))
+      .unwrap_or((std::ptr::null(), 0));
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_http_callout(
         self.raw_ptr,
-        &mut callout_id as *mut _ as *mut _,
+        &mut callout_id as *mut _,
         str_to_module_buffer(cluster_name),
         headers_ptr as *const _ as *mut _,
-        headers.len(),
+        headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -3174,7 +3155,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -3183,7 +3164,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         &mut stream_id as *mut _ as *mut _,
         str_to_module_buffer(cluster_name),
         headers_ptr as *const _ as *mut _,
-        headers.len(),
+        headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -3217,14 +3198,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     stream_handle: u64,
     trailers: Vec<(&'a str, &'a [u8])>,
   ) -> bool {
-    let trailers_ptr =
-      trailers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
     unsafe {
       abi::envoy_dynamic_module_callback_http_stream_send_trailers(
         self.raw_ptr,
         stream_handle,
         trailers_ptr as *const _ as *mut _,
-        trailers.len(),
+        trailers_len,
       )
     }
   }
