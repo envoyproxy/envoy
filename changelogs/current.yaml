@@ -93,6 +93,11 @@ minor_behavior_changes:
     Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
     headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
     collected and can be accesses via method requestProcessingEffect() and failedOpen().
+- area: dynamic_modules
+  change: |
+    Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
+    serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
+    dynamic module side as the configuration.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -105,6 +110,12 @@ bug_fixes:
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
     resolves an error when a dynamic modules network filter closes a connection that has an HTTP filter present.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module extensions do not handle the ``google.protobuf.Struct`` configuration
+    properly as the API definition requires.
+    The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
+    to the dynamic module side as the configuration.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
