@@ -99,11 +99,17 @@ private:
   void shutdownBasic();
   void resumeHandshake();
 
+  void maybeInitMaxWriteChunkSize();
+
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  // Maximum bytes written per SSL_write() call. Defaults to the standard TLS max record size
+  // (16KB) and can be overridden via filter state to work around client bugs (e.g. libpq).
+  uint64_t max_write_chunk_size_{16384};
+  bool max_write_chunk_size_initialized_{false};
 
   SslHandshakerImplSharedPtr info_;
 };

@@ -11,6 +11,11 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "tls_filter_state_keys_lib",
+    hdrs = ["tls_filter_state_keys.h"],
+)
+
+envoy_cc_library(
     name = "connection_info_impl_base_lib",
     srcs = ["connection_info_impl_base.cc"],
     hdrs = ["connection_info_impl_base.h"],
@@ -71,6 +76,7 @@ envoy_cc_library(
         ":context_lib",
         ":io_handle_bio_lib",
         ":ssl_handshaker_lib",
+        ":tls_filter_state_keys_lib",
         ":utility_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
@@ -80,6 +86,7 @@ envoy_cc_library(
         "//envoy/ssl/private_key:private_key_callbacks_interface",
         "//envoy/ssl/private_key:private_key_interface",
         "//envoy/stats:stats_macros",
+        "//envoy/stream_info:uint64_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",

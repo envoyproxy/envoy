@@ -3,6 +3,9 @@
 
 #include <tuple>
 
+#include "envoy/stream_info/uint64_accessor.h"
+
+#include "source/common/tls/tls_filter_state_keys.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
@@ -593,6 +596,38 @@ TEST_F(PostgresFilterTest, UpstreamSSLStats) {
   ASSERT_THAT(filter_->getStats().transactions_.value(), 1);
   ASSERT_THAT(filter_->getStats().transactions_commit_.value(), 1);
   ASSERT_THAT(filter_->getStats().transactions_rollback_.value(), 0);
+}
+
+// Verify that filter state for TLS record size limit is set when configured.
+TEST_F(PostgresFilterTest, TlsRecordSizeLimitFilterStateSet) {
+  PostgresFilterConfig::PostgresFilterConfigOptions config_options{
+      stat_prefix_,
+      true,
+      false,
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
+      absl::make_optional<uint32_t>(8192)};
+
+  auto config = std::make_shared<PostgresFilterConfig>(config_options, scope_);
+  auto filter = std::make_unique<PostgresFilter>(config);
+
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+
+  const auto* accessor = stream_info_.filter_state_->getDataReadOnly<StreamInfo::UInt64Accessor>(
+      Extensions::TransportSockets::Tls::TlsRecordSizeLimitKey);
+  ASSERT_NE(nullptr, accessor);
+  EXPECT_EQ(8192, accessor->value());
+}
+
+// Verify that filter state for TLS record size limit is NOT set when not configured.
+TEST_F(PostgresFilterTest, TlsRecordSizeLimitFilterStateNotSet) {
+  EXPECT_CALL(read_callbacks_, connection()).Times(0);
+
+  EXPECT_FALSE(stream_info_.filter_state_->hasDataWithName(
+      Extensions::TransportSockets::Tls::TlsRecordSizeLimitKey));
 }
 
 } // namespace PostgresProxy
