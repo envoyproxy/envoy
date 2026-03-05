@@ -53,6 +53,28 @@ def _exdates(seats: int, start_date: date, override_days: list[date]) -> str:
     return ""
 
 
+def _vevent_rotation(stamp: str, start_date: date, oncall: str, seats: int,
+                     override_days: list[date]) -> str:
+    return f"""BEGIN:VEVENT
+{stamp}
+UID:{oncall}
+DTSTART:{_date(start_date)}
+DURATION:P1W
+SUMMARY:Envoy on-call ({oncall})
+{_every_n_weeks(seats)}{_exdates(seats, start_date, override_days)}
+END:VEVENT"""
+
+
+def _vevent_override(stamp: str, override: Override) -> str:
+    return f"""BEGIN:VEVENT
+{stamp}
+UID:{override.oncall}-override-{_date(override.start)}
+DTSTART:{_date(override.start)}
+DURATION:P{override.duration_days}D
+SUMMARY: Envoy on-call (override -> {override.oncall})
+END:VEVENT"""
+
+
 def gen_ical() -> str:
     start_date, updated, rotation = rotation_from_yaml()
     overrides = overrides_from_yaml()
@@ -61,27 +83,13 @@ def gen_ical() -> str:
     seats = len(rotation)
     stamp = f"DTSTAMP:{_date_with_zero_time(updated)}"
     for oncall in rotation:
-        event = f"""BEGIN:VEVENT
-{stamp}
-UID:{oncall}
-DTSTART:{_date(start_date)}
-DURATION:P1W
-SUMMARY:Envoy on-call ({oncall})
-{_every_n_weeks(seats)}{_exdates(seats, start_date, override_days)}
-END:VEVENT"""
-        events.append(event)
+        events.append(
+            _vevent_rotation(stamp, start_date, oncall, seats, override_days))
         start_date += timedelta(days=7)
 
     for override in overrides:
         assert override.oncall in rotation, f"override.oncall = {override.oncall} is not listed in rotation.yaml"
-        event = f"""BEGIN:VEVENT
-{stamp}
-UID:{override.oncall}-override-{_date(override.start)}
-DTSTART:{_date(override.start)}
-DURATION:P{override.duration_days}D
-SUMMARY: Envoy on-call (override -> {override.oncall})
-END:VEVENT"""
-        events.append(event)
+        events.append(_vevent_override(stamp, override))
     return f"""{_HEADER}
 {"\n".join(events)}
 {_FOOTER}"""
