@@ -665,10 +665,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -676,17 +676,15 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
         tls_sni_hostname: sni
     connection_properties:
-      received_bytes: {}
-      sent_bytes: {}
+      received_bytes: {1}
+      sent_bytes: {1}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT(147, 172), SSL_SELECT(147, 172))));
+                                          SSL_SELECT(147, 172))));
 
   cleanup();
 }
@@ -720,10 +718,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -731,19 +729,17 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
         tls_sni_hostname: sni
-        ja3_fingerprint: "{}"
+        ja3_fingerprint: "{1}"
     connection_properties:
-      received_bytes: {}
-      sent_bytes: {}
+      received_bytes: {2}
+      sent_bytes: {2}
 )EOF",
       Network::Test::getLoopbackAddressString(ipVersion()),
-      Network::Test::getLoopbackAddressString(ipVersion()),
-      Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("258098c50651a607e22864521af69746", "cd865a85db6b1066e3af8cba28be21ee"),
-      SSL_SELECT(147, 172), SSL_SELECT(147, 172))));
+      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "cd865a85db6b1066e3af8cba28be21ee"),
+      SSL_SELECT(147, 172))));
 
   cleanup();
 }
@@ -776,10 +772,10 @@ tcp_logs:
     common_properties:
       downstream_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       downstream_local_address:
         socket_address:
-          address: {}
+          address: {0}
       upstream_remote_address:
         socket_address:
       upstream_local_address:
@@ -787,18 +783,16 @@ tcp_logs:
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
-          address: {}
+          address: {0}
       tls_properties:
-        ja3_fingerprint: "{}"
+        ja3_fingerprint: "{1}"
     connection_properties:
-      received_bytes: {}
-      sent_bytes: {}
+      received_bytes: {2}
+      sent_bytes: {2}
 )EOF",
       Network::Test::getLoopbackAddressString(ipVersion()),
-      Network::Test::getLoopbackAddressString(ipVersion()),
-      Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("c68cd85633d6847f599328eb2df750b7", "bcab080434778b813a3903a51fdc90fc"),
-      SSL_SELECT(135, 160), SSL_SELECT(135, 160))));
+      SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "bcab080434778b813a3903a51fdc90fc"),
+      SSL_SELECT(135, 160))));
 
   cleanup();
 }
