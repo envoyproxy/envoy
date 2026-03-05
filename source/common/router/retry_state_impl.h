@@ -140,7 +140,7 @@ private:
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
   // This may be unset if no attempt admission controller extensions are configured.
-  // If this is set, then we defer to the attempt admission controller in leiu of the circuit
+  // If this is set, then we defer to the attempt admission controller in lieu of the circuit
   // breakers.
   OptRef<Upstream::AttemptStreamAdmissionController> attempt_admission_controller_;
   uint32_t attempt_number_{1};

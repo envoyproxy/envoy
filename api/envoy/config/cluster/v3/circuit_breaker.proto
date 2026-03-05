@@ -94,8 +94,6 @@ message CircuitBreakers {
     //    circuit breakers.
     //
     //    In addition, extensions in this field may deny the initial attempt of a request.
-    //
-    // [#extension-category: envoy.attempt_admission_control]
     core.v3.TypedExtensionConfig attempt_admission_control = 9;
 
     // If track_remaining is true, then stats will be published that expose
