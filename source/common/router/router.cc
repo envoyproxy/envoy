@@ -2383,25 +2383,12 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (orca_load_report_received_) {
     return;
   }
-  // Check whether we need to send the load report to the LRS or invoke the ORCA
-  // callbacks.
+
   Upstream::HostDescriptionOptConstRef upstream_host = upstream_request.upstreamHost();
 
   // The upstream host should always be available because the upstream request has got
   // the response headers/trailers from the upstream host.
   ASSERT(upstream_host.has_value(), "upstream host is not available for upstream request");
-
-  OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
-
-  if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value()) {
-    // If the cluster doesn't have LRS metric names configured then there is no need to
-    // extract the stats for LRS.
-    // If the host doesn't have LB policy data then that means the LB policy doesn't care
-    // about the ORCA load report.
-    // Return early here to avoid parsing the ORCA load report because no one is interested
-    // in it.
-    return;
-  }
 
   absl::StatusOr<xds::data::orca::v3::OrcaLoadReport> orca_load_report =
       Envoy::Orca::parseOrcaLoadReportHeaders(headers_or_trailers);
@@ -2413,12 +2400,25 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   orca_load_report_received_ = true;
 
+  // 1. Non-destructive utilization store for locality-level LBs.
+  double util = orca_load_report->application_utilization();
+  if (!(util > 0)) {
+    util = orca_load_report->cpu_utilization();
+  }
+  if (util > 0) {
+    upstream_host->orcaUtilization().set(util);
+  }
+
+  // 2. LRS (accumulator, destructive read by reporter).
   if (cluster_->lrsReportMetricNames().has_value()) {
     ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
                      orca_load_report->DebugString());
     Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
+
+  // 3. LB policy data (single-owner slot).
+  OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
   if (host_lb_policy_data.has_value()) {
     ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
                      upstream_host->address()->asString(), orca_load_report->DebugString());

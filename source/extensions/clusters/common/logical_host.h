@@ -134,6 +134,9 @@ public:
                                                         transport_socket_options);
   }
   OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  OrcaUtilizationStore& orcaUtilization() const override {
+    return logical_host_->orcaUtilization();
+  }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
