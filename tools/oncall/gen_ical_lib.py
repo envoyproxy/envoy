@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+
 from tools.oncall.parsing import rotation_from_yaml, overrides_from_yaml, Override
 
 _HEADER = """BEGIN:VCALENDAR
