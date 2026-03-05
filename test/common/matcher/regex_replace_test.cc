@@ -41,6 +41,13 @@ TEST_F(RegexReplaceTest, UninitializedIsNull) {
   EXPECT_TRUE(r.isNull());
 }
 
+TEST_F(RegexReplaceTest, CreatedWithNoPatternIsNull) {
+  ::envoy::type::matcher::v3::RegexMatchAndSubstitute proto;
+  auto regex_or = RegexReplace::create(engine_, proto);
+  ASSERT_OK(regex_or.status());
+  EXPECT_TRUE(regex_or->isNull());
+}
+
 TEST_F(RegexReplaceTest, ErrorsOnInvalidRegex) {
   ::envoy::type::matcher::v3::RegexMatchAndSubstitute proto;
   proto.mutable_pattern()->set_regex("\\x");
