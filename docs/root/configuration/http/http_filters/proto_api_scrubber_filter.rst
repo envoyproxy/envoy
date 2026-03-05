@@ -39,7 +39,7 @@ How it Works
 
 1. **Descriptor Loading**: The filter loads a ``FileDescriptorSet`` provided in the configuration. This allows the filter to decode binary gRPC payloads into structured data.
 2. **Transcoding**: The filter buffers the gRPC stream, decodes the Protobuf payload, and traverses the message structure.
-3. **Unknown Field Filtering**: If "scrub_unknown_fields" is set to ``true`` in the ``ProtoApiScrubberConfig``, the filter scrubs the field if it is unknown to the FileDescriptorSet (i.e. sending a request with a modified request message schema). By default this is disabled.
+3. **Unknown Field Filtering**: If ``scrub_unknown_fields`` is set to ``true`` in the ``ProtoApiScrubberConfig``, the filter scrubs the field if it is unknown to the FileDescriptorSet (i.e. sending a request with a modified request message schema). By default this is disabled.
 
 4. **Matching & Scrubbing**:
 
