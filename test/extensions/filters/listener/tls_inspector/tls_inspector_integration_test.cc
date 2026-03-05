@@ -296,7 +296,8 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
 TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA3` fingerprint:
-  //   `771,49199-255,11-10-35-16-22-23-13,23,0-1-2`
+  //   `771,49199,23-65281-10-11-35-16-13,23,0` (BoringSSL)
+  //   `771,49199-255,11-10-35-16-22-23-13,23,0-1-2` (OpenSSL)
   // MD5 hash:
   //   `c68cd85633d6847f599328eb2df750b7` (BoringSSL)
   //   `bcab080434778b813a3903a51fdc90fc` (OpenSSL)
