@@ -226,6 +226,13 @@ bool envoy_dynamic_module_on_lb_choose_host(
     bool should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
         lb_envoy_ptr, context_envoy_ptr, 0, 0);
     (void)should_retry;
+
+    // Test override host.
+    envoy_dynamic_module_type_envoy_buffer override_addr = {NULL, 0};
+    bool strict = false;
+    bool has_override = envoy_dynamic_module_callback_lb_context_get_override_host(
+        context_envoy_ptr, &override_addr, &strict);
+    (void)has_override;
   }
 
   if (healthy_count == 0) {

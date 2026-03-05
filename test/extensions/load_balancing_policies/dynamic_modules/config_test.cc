@@ -547,6 +547,10 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(nullptr), 0);
   EXPECT_FALSE(
       envoy_dynamic_module_callback_lb_context_should_select_another_host(nullptr, nullptr, 0, 0));
+
+  // Test override host context callback with null.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(nullptr, nullptr, nullptr));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
@@ -1096,6 +1100,73 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostInvalidPriority) {
   // Invalid host index returns false.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_should_select_another_host(
       lb_ptr, context_ptr, 0, 999));
+}
+
+// =============================================================================
+// Override Host Selection Tests
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresent) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(
+          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  envoy_dynamic_module_type_envoy_buffer address = {nullptr, 0};
+  bool strict = false;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(context_ptr, &address, &strict));
+  EXPECT_EQ(absl::string_view(address.ptr, address.length), "10.0.0.1:8080");
+  EXPECT_TRUE(strict);
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresentNonStrict) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(
+          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.2:9090", false})));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  envoy_dynamic_module_type_envoy_buffer address = {nullptr, 0};
+  bool strict = true;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(context_ptr, &address, &strict));
+  EXPECT_EQ(absl::string_view(address.ptr, address.length), "10.0.0.2:9090");
+  EXPECT_FALSE(strict);
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNotSet) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect()).WillByDefault(Return(absl::nullopt));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  envoy_dynamic_module_type_envoy_buffer address = {nullptr, 0};
+  bool strict = false;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(context_ptr, &address, &strict));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNullOutputs) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(
+          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  // Null address output.
+  bool strict = false;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(context_ptr, nullptr, &strict));
+
+  // Null strict output.
+  envoy_dynamic_module_type_envoy_buffer address = {nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_override_host(context_ptr, &address, nullptr));
 }
 
 // =============================================================================
