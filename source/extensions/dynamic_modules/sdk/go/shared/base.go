@@ -656,4 +656,9 @@ type HttpFilterConfigHandle interface {
 	// @Return the counter metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineCounter(name string, tagKeys ...string) (MetricID, MetricsResult)
+
+	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
+	// This should be called only during the plugin configuration phase, and the returned
+	// Scheduler can be used later even outside of the callbacks and at other threads.
+	GetScheduler() Scheduler
 }
