@@ -646,6 +646,18 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_locality_wei
   return 0;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_member_update_host_address: "
+               "not implemented in this context");
+  if (result != nullptr) {
+    result->ptr = nullptr;
+    result->length = 0;
+  }
+  return false;
+}
+
 // ---------------------- Matcher callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher extension abi_impl.cc when the matcher extension is used.

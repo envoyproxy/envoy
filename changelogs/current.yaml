@@ -525,6 +525,11 @@ new_features:
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target
     is automatically registered for every bootstrap extension, blocking traffic until the module
     signals readiness via ``signal_init_complete``.
+- area: dynamic_modules
+  change: |
+    Added ``on_host_membership_update`` event hook and ``get_member_update_host_address`` callback
+    for dynamic module load balancers, enabling modules to receive notifications when hosts are
+    added or removed from the cluster and inspect the affected host addresses.
 - area: geoip
   change: |
     Added ``asn_org`` field to :ref:`geo_field_keys

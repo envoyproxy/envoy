@@ -129,6 +129,16 @@ pub trait EnvoyLoadBalancer {
   fn get_locality_weight(&self, priority: u32, locality_index: usize) -> u32;
 
   // -------------------------------------------------------------------------
+  // Member update methods are only valid during on_host_membership_update callback.
+  // -------------------------------------------------------------------------
+
+  /// Returns the address of an added or removed host during on_host_membership_update.
+  /// If `is_added` is true, returns the address of the added host at the given index.
+  /// If `is_added` is false, returns the address of the removed host at the given index.
+  /// Only valid during on_host_membership_update callback.
+  fn get_member_update_host_address(&self, index: usize, is_added: bool) -> Option<String>;
+
+  // -------------------------------------------------------------------------
   // Context methods are only valid during choose_host callback.
   // -------------------------------------------------------------------------
 
@@ -587,6 +597,32 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
+  fn get_member_update_host_address(&self, index: usize, is_added: bool) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_member_update_host_address(
+        self.lb_ptr,
+        index,
+        is_added,
+        &mut result,
+      )
+    };
+    if found && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+        .to_string()
+      })
+    } else {
+      None
+    }
+  }
+
   fn has_context(&self) -> bool {
     !self.context_ptr.is_null()
   }
@@ -806,6 +842,21 @@ pub trait LoadBalancer {
   /// in the healthy hosts list at that priority, or `None` if no host should be selected
   /// (which will result in no upstream connection).
   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection>;
+
+  /// Called when the set of hosts in the cluster changes (hosts added or removed).
+  ///
+  /// The `envoy_lb` provides access to cluster/host information. During this callback,
+  /// [`EnvoyLoadBalancer::get_member_update_host_address`] can be used to get the addresses
+  /// of the added or removed hosts.
+  ///
+  /// The default implementation is a no-op.
+  fn on_host_membership_update(
+    &mut self,
+    _envoy_lb: &dyn EnvoyLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+  }
 }
 
 /// # Safety
@@ -887,6 +938,25 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
     },
     None => false,
   }
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
+  num_hosts_added: usize,
+  num_hosts_removed: usize,
+) {
+  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+  let lb = {
+    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+    &mut **raw
+  };
+  lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
 }
 
 /// # Safety
