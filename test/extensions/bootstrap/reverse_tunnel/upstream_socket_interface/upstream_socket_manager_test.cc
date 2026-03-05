@@ -65,6 +65,7 @@ protected:
   void verifyInitialState() {
     EXPECT_EQ(socket_manager_->accepted_reverse_connections_.size(), 0);
     EXPECT_EQ(socket_manager_->fd_to_node_map_.size(), 0);
+    EXPECT_EQ(socket_manager_->fd_to_socket_it_map_.size(), 0);
     EXPECT_EQ(socket_manager_->node_to_cluster_map_.size(), 0);
     EXPECT_EQ(socket_manager_->cluster_to_node_info_map_.size(), 0);
   }
@@ -96,6 +97,12 @@ protected:
     return socket_manager_->fd_to_ping_send_timer_map_.find(fd) !=
            socket_manager_->fd_to_ping_send_timer_map_.end();
   }
+
+  bool verifyFDToSocketItMap(int fd) {
+    return socket_manager_->fd_to_socket_it_map_.find(fd) !=
+           socket_manager_->fd_to_socket_it_map_.end();
+  }
+  size_t getFDToSocketItMapSize() { return socket_manager_->fd_to_socket_it_map_.size(); }
 
   uint32_t getNodeToActiveFdCount(const std::string& node_id) {
     auto it = socket_manager_->node_to_active_fd_count_.find(node_id);

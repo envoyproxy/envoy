@@ -133,6 +133,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { onPingTimeout(fd); });
 
   accepted_reverse_connections_[node_id].push_back(std::move(socket));
+  fd_to_socket_it_map_[fd] = std::prev(accepted_reverse_connections_[node_id].end());
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
 
   // Update stats registry.
@@ -210,6 +211,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
   fd_to_ping_send_timer_map_.erase(fd);
+  fd_to_socket_it_map_.erase(fd);
 
   return socket;
 }
@@ -279,35 +281,26 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   // Decrement the active FD counter for the node.
   auto count_it = node_to_active_fd_count_.find(node_id);
   if (count_it != node_to_active_fd_count_.end()) {
-    if (count_it->second > 0) {
-      count_it->second--;
-    }
-    if (count_it->second == 0) {
+    ASSERT(count_it->second > 0);
+    if (--count_it->second == 0) {
       node_to_active_fd_count_.erase(count_it);
     }
   }
 
-  // Determine if this is an idle or used socket by searching for the FD in the idle pool.
-  auto& sockets = accepted_reverse_connections_[node_id];
-  bool is_idle_socket = false;
+  // Determine if this is an idle or used socket via O(1) iterator lookup.
+  auto socket_it = fd_to_socket_it_map_.find(fd);
+  if (socket_it != fd_to_socket_it_map_.end()) {
+    // Found in idle pool — erase from list and clean up timers/events.
+    ENVOY_LOG(debug, "reverse_tunnel: marking idle socket dead. node: {} cluster: {} fd: {}.",
+              node_id, cluster_id, fd);
+    ::shutdown(fd, SHUT_RDWR);
+    accepted_reverse_connections_[node_id].erase(socket_it->second);
+    fd_to_socket_it_map_.erase(socket_it);
 
-  for (auto itr = sockets.begin(); itr != sockets.end(); itr++) {
-    if (fd == itr->get()->ioHandle().fdDoNotUse()) {
-      // Found the FD in idle pool, this is an idle socket.
-      ENVOY_LOG(debug, "reverse_tunnel: marking idle socket dead. node: {} cluster: {} fd: {}.",
-                node_id, cluster_id, fd);
-      ::shutdown(fd, SHUT_RDWR);
-      itr = sockets.erase(itr);
-      is_idle_socket = true;
-
-      fd_to_event_map_.erase(fd);
-      fd_to_timer_map_.erase(fd);
-      fd_to_ping_send_timer_map_.erase(fd);
-      break;
-    }
-  }
-
-  if (!is_idle_socket) {
+    fd_to_event_map_.erase(fd);
+    fd_to_timer_map_.erase(fd);
+    fd_to_ping_send_timer_map_.erase(fd);
+  } else {
     // FD not found in idle pool, this is a used socket.
     // The socket will be closed by the owning UpstreamReverseConnectionIOHandle.
     ENVOY_LOG(debug, "reverse_tunnel: marking used socket dead. node: {} cluster: {} fd: {}.",
@@ -430,19 +423,12 @@ void UpstreamSocketManager::sendPingForConnection(int fd) {
   }
   const std::string& node_id = node_it->second;
 
-  auto& sockets = accepted_reverse_connections_[node_id];
-  Network::ConnectionSocket* socket_ptr = nullptr;
-  for (auto& s : sockets) {
-    if (s->ioHandle().fdDoNotUse() == fd) {
-      socket_ptr = s.get();
-      break;
-    }
-  }
-
-  if (socket_ptr == nullptr) {
+  auto socket_it = fd_to_socket_it_map_.find(fd);
+  if (socket_it == fd_to_socket_it_map_.end()) {
     ENVOY_LOG(debug, "reverse_tunnel: sendPingForConnection: fd {} not found in idle pool.", fd);
     return;
   }
+  Network::ConnectionSocket* socket_ptr = socket_it->second->get();
 
   auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
       createPingResponse();
@@ -535,6 +521,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   // Clear any remaining fd mappings.
   fd_to_node_map_.clear();
   fd_to_cluster_map_.clear();
+  fd_to_socket_it_map_.clear();
 
   // Remove this instance from the global socket managers list.
   absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);

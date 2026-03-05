@@ -168,6 +168,9 @@ private:
   // node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
 
+  // Map from FD to its iterator in accepted_reverse_connections_, used to avoid linear scans.
+  absl::flat_hash_map<int, std::list<Network::ConnectionSocketPtr>::iterator> fd_to_socket_it_map_;
+
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_cluster_map_;
