@@ -30,11 +30,13 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", input->get(match_input).stringData().value());
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", input->get(match_input).stringData().value());
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_host_as_service", result2.stringData().value());
 }
 
 TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
@@ -48,11 +50,13 @@ TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", input->get(match_input).stringData().value());
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", input->get(match_input).stringData().value());
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_host_as_service", result2.stringData().value());
 }
 
 TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
@@ -66,11 +70,13 @@ TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", input->get(match_input).stringData().value());
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.path_ = "fake_path";
 
-  EXPECT_EQ("fake_path", input->get(match_input).stringData().value());
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_path", result2.stringData().value());
 }
 
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
@@ -84,11 +90,13 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", input->get(match_input).stringData().value());
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.method_ = "fake_method";
 
-  EXPECT_EQ("fake_method", input->get(match_input).stringData().value());
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_method", result2.stringData().value());
 }
 
 TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
@@ -107,11 +115,13 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ(absl::nullopt, input->get(match_input).stringData());
+  auto result = input->get(match_input);
+  EXPECT_EQ(absl::nullopt, result.stringData());
 
   request.data_["key_0"] = "value_0";
 
-  EXPECT_EQ("value_0", input->get(match_input).stringData().value());
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("value_0", result2.stringData().value());
 }
 
 TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
@@ -132,7 +142,8 @@ TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
   EXPECT_EQ(&stream_info, &match_input.streamInfo());
   EXPECT_EQ(MatchAction::RouteAction, match_input.expectAction());
 
-  auto custom_match_data = input->get(match_input).customData<RequestMatchData>();
+  auto result = input->get(match_input);
+  auto custom_match_data = result.customData<RequestMatchData>();
   ASSERT_TRUE(custom_match_data.has_value());
   EXPECT_EQ(&match_input, &custom_match_data->data());
 }

@@ -37,7 +37,8 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
       // Create `DataInput` factory callback from the config.
       Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
           input_factory_ptr->createDataInput(builder_method.custom_value());
-      auto result = data_input_cb()->get(data).stringData();
+      auto input = data_input_cb()->get(data);
+      auto result = input.stringData();
       // If result has data.
       if (!result) {
         return absl::InternalError("Failed to generate the id from custom value config.");
