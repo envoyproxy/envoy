@@ -64,7 +64,7 @@ bazel build --config=openssl //source/exe:envoy-static
 - **Version string:** `OpenSSL` (visible in `envoy --version`)
 - **Note:** HTTP/3 (QUIC) is disabled for OpenSSL builds
 
-**NOTE:** Because of the dynamic linking method, rebuilding Envoy due to a security vulnerability (CVE) affecting OpenSSL should not be necessary. This leaves the responsibility of handling any security issue with the runtime system administrators to keep their system up to date. **Thus, Envoy builds with OpenSSL are not covered by [Envoy Security Policy](../SECURITY.md)**.
+**NOTE: Envoy builds with OpenSSL are not currently covered by [Envoy Security Policy](../SECURITY.md)**.
 
 ## Migration from `--define boringssl=fips`
 
