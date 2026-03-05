@@ -60,7 +60,8 @@ minor_behavior_changes:
     to account for histogram changes.
 - area: proto_api_scrubber
   change: |
-    Unknown fields will now be scrubbed.
+    If "scrub_unknown_fields" is set to ``true`` in the ``ProtoApiScrubberConfig``, unknown fields will now be scrubbed.
+    This is disabled by default.
 - area: stat_sinks
   change: |
     OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
