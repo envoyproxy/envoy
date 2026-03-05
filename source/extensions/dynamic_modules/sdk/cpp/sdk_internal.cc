@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -148,11 +149,14 @@ public:
   SchedulerImplBase(void* host_ptr) : scheduler_ptr_(newScheduler(host_ptr)) {}
 
   void schedule(std::function<void()> func) override {
+    uint64_t task_id = 0;
+
     // Lock to protect access to tasks_ and next_task_id_ manually
-    mutex_.lock();
-    const uint64_t task_id = next_task_id_++;
-    tasks_[task_id] = std::move(func);
-    mutex_.unlock();
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      task_id = next_task_id_++;
+      tasks_[task_id] = std::move(func);
+    }
 
     commitScheduler(scheduler_ptr_, task_id);
   }
@@ -160,14 +164,15 @@ public:
   void onScheduled(uint64_t task_id) {
     std::function<void()> func;
 
-    // Lock to protect access to tasks_ manually
-    mutex_.lock();
-    auto it = tasks_.find(task_id);
-    if (it != tasks_.end()) {
-      func = std::move(it->second);
-      tasks_.erase(it);
+    {
+      // Lock to protect access to tasks_ manually
+      std::lock_guard<std::mutex> lock(mutex_);
+      auto it = tasks_.find(task_id);
+      if (it != tasks_.end()) {
+        func = std::move(it->second);
+        tasks_.erase(it);
+      }
     }
-    mutex_.unlock();
 
     if (func) {
       func();
@@ -201,9 +206,9 @@ private:
 
   void* scheduler_ptr_{};
 
-  absl::Mutex mutex_;
-  uint64_t next_task_id_ ABSL_GUARDED_BY(mutex_){1}; // 0 is reserved.
-  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_ ABSL_GUARDED_BY(mutex_);
+  std::mutex mutex_;
+  uint64_t next_task_id_{1}; // 0 is reserved.
+  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_;
 };
 
 using SchedulerImpl = SchedulerImplBase<false>;
