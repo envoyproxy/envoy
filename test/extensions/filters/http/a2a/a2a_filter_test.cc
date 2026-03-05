@@ -200,16 +200,12 @@ TEST_F(A2aFilterTest, DecodeDataFragmentedBuffer) {
   std::string fragment2 = R"(: "2.0", "method")";
   std::string fragment3 = R"(: "message/send", "id": "123" })";
 
-  // Use buffer fragments to simulate raw slices
-  Buffer::BufferFragmentImpl frag1(fragment1.data(), fragment1.size(), nullptr);
-  Buffer::BufferFragmentImpl frag2(fragment2.data(), fragment2.size(), nullptr);
-  Buffer::BufferFragmentImpl frag3(fragment3.data(), fragment3.size(), nullptr);
+  // Use appendSliceForTest to simulate raw slices.
+  buffer.appendSliceForTest(fragment1);
+  buffer.appendSliceForTest(fragment2);
+  buffer.appendSliceForTest(fragment3);
 
-  buffer.addBufferFragment(frag1);
-  buffer.addBufferFragment(frag2);
-  buffer.addBufferFragment(frag3);
-
-  // Verify multiple slices are present (implementation detail of OwnedImpl + addBufferFragment)
+  // Verify multiple slices are present
   EXPECT_GT(buffer.getRawSlices().size(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
