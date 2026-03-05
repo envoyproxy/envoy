@@ -24,7 +24,6 @@ public:
     token_path_ = TestEnvironment::temporaryPath("datasource_token.txt");
     TestEnvironment::writeStringToFileForTest("datasource_token.txt", "initial-token");
 
-    // Build the datasource formatter extension config.
     envoy::config::core::v3::TypedExtensionConfig formatter_ext;
     formatter_ext.set_name("envoy.formatter.datasource");
     envoy::extensions::formatter::datasource::v3::DataSource datasource_cfg;

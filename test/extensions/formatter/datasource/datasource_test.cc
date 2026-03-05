@@ -43,7 +43,6 @@ formatters:
   EXPECT_EQ("prefix-hello-suffix", formatter->format(formatter_context_, stream_info_));
 }
 
-// An unknown datasource name (not in the formatter config) is rejected at parse time.
 TEST_F(DataSourceFormatterTest, UnknownNameThrows) {
   const std::string yaml = R"EOF(
 text_format_source:
@@ -61,7 +60,6 @@ formatters:
                             "Not supported field in StreamInfo: DATASOURCE");
 }
 
-// Multiple datasources can be configured and resolve independently.
 TEST_F(DataSourceFormatterTest, MultipleDatasources) {
   const std::string yaml = R"EOF(
 text_format_source:
