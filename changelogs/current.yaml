@@ -235,6 +235,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: filters
+  change: |
+    Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
