@@ -2260,6 +2260,23 @@ envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
                "implemented in this context");
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number: not "
+               "implemented in this context");
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_listener_filter_set_gauge(
     envoy_dynamic_module_type_listener_filter_envoy_ptr, size_t, uint64_t) {
