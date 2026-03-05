@@ -8,10 +8,8 @@ class TestIcal(unittest.TestCase):
 
     def test_ical_up_to_date(self):
         checked_in_ical = ical_path().read_text()
-        assert (
-            gen_ical().strip() == checked_in_ical.strip(),
-            "generated rotation and checked in rotation don't match - to fix run\n  bazel run //tools/oncall:rotation",
-        )
+        assert gen_ical().strip() == checked_in_ical.strip(
+        ), "generated rotation and checked in rotation don't match - to fix run\n  bazel run //tools/oncall:rotation"
 
 
 if __name__ == '__main__':
