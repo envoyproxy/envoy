@@ -111,7 +111,8 @@ TEST_F(MatcherTest, Regex) {
 TEST_F(MatcherTest, Nullopt) {
   setup("^/asdf/.+", 0, false);
 
-  EXPECT_EQ(matcher_->match(absl::monostate()), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(::Envoy::Matcher::DataInputGetResult::NoData()),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching will be performed case-insensitively.
