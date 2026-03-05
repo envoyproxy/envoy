@@ -1,4 +1,3 @@
-// swiftlint:disable type_body_length
 @_implementationOnly import EnvoyEngine
 import Foundation
 

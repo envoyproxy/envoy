@@ -122,5 +122,4 @@ final class NetworkChangeMonitorTests: XCTestCase {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
   }
-
 }
