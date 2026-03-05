@@ -22,6 +22,8 @@ using OnLbConfigNewType = decltype(&envoy_dynamic_module_on_lb_config_new);
 using OnLbConfigDestroyType = decltype(&envoy_dynamic_module_on_lb_config_destroy);
 using OnLbNewType = decltype(&envoy_dynamic_module_on_lb_new);
 using OnLbChooseHostType = decltype(&envoy_dynamic_module_on_lb_choose_host);
+using OnLbOnHostMembershipUpdateType =
+    decltype(&envoy_dynamic_module_on_lb_on_host_membership_update);
 using OnLbDestroyType = decltype(&envoy_dynamic_module_on_lb_destroy);
 
 /**
@@ -49,6 +51,7 @@ public:
   OnLbConfigDestroyType on_config_destroy_;
   OnLbNewType on_lb_new_;
   OnLbChooseHostType on_choose_host_;
+  OnLbOnHostMembershipUpdateType on_host_membership_update_;
   OnLbDestroyType on_lb_destroy_;
 
   // The in-module configuration pointer.

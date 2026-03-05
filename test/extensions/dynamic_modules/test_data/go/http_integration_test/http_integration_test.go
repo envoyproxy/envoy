@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -33,6 +34,7 @@ func init() {
 		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
+		"http_struct_config":           &HttpStructConfigFactory{},
 	})
 }
 
@@ -55,11 +57,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 	sharedStatus := new(atomic.Bool)
 	sharedStatus.Store(false)
 
-	// TODO(wbpcode): to support the actual config scheduler in golang SDK.
-	go func() {
+	handle.GetScheduler().Schedule(func() {
 		time.Sleep(100 * time.Millisecond)
 		sharedStatus.Store(true)
-	}()
+	})
 
 	return &ConfigSchedulerFilterFactory{sharedStatus: sharedStatus}, nil
 }
@@ -67,6 +68,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 type ConfigSchedulerFilterFactory struct {
 	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
+}
+
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
 }
 
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
@@ -1296,4 +1301,31 @@ func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
 		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
 	}
 	return shared.HeadersStatusStop
+}
+
+type HttpStructConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpStructConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// Parse config as JSON
+	var cfg map[string]string = make(map[string]string)
+	err := json.Unmarshal(config, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON config: %v", err)
+	}
+	return &HttpStructFilterFactory{cfg: cfg}, nil
+}
+
+type HttpStructFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cfg map[string]string
+}
+
+func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.cfg {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &shared.EmptyHttpFilter{}
 }

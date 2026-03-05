@@ -717,4 +717,9 @@ type HttpFilterConfigHandle interface {
 	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.
 	// @Param streamID the ID of the HTTP stream.
 	ResetHttpStream(streamID uint64)
+
+	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
+	// This should be called only during the plugin configuration phase, and the returned
+	// Scheduler can be used later even outside of the callbacks and at other threads.
+	GetScheduler() Scheduler
 }

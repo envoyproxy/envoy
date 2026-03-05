@@ -551,6 +551,21 @@ TEST(CommonAbiImplTest, LbGetHostHealthEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_get_host_health_by_address triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbGetHostHealthByAddressEnvoyBug) {
+  envoy_dynamic_module_type_host_health health = envoy_dynamic_module_type_host_health_Unhealthy;
+  envoy_dynamic_module_type_module_buffer addr = {"10.0.0.1:8080", 13};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_get_host_health_by_address(nullptr, addr, &health);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+  EXPECT_EQ(health, envoy_dynamic_module_type_host_health_Unhealthy);
+}
+
 // Test that the weak symbol stub for lb_get_host_address triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
@@ -651,6 +666,42 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
         auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header(
             nullptr, key, &result, 0, nullptr);
         EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_context_get_host_selection_retry_count triggers an
+// ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbContextGetHostSelectionRetryCountEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto count =
+            envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(nullptr);
+        EXPECT_EQ(count, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_context_should_select_another_host triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbContextShouldSelectAnotherHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
+            nullptr, nullptr, 0, 0);
+        EXPECT_FALSE(should_retry);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_context_get_override_host triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbContextGetOverrideHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_context_get_override_host(nullptr, nullptr, nullptr);
+        EXPECT_FALSE(found);
       },
       "not implemented in this context");
 }
@@ -757,6 +808,19 @@ TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
       {
         auto weight = envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0);
         EXPECT_EQ(weight, 0);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_get_member_update_host_address triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbGetMemberUpdateHostAddressEnvoyBug) {
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0,
+                                                                                     true, &result);
+        EXPECT_FALSE(found);
       },
       "not implemented in this context");
 }
