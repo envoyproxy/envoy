@@ -60,7 +60,7 @@ minor_behavior_changes:
     to account for histogram changes.
 - area: proto_api_scrubber
   change: |
-    If "scrub_unknown_fields" is set to ``true`` in the ``ProtoApiScrubberConfig``, unknown fields will now be scrubbed.
+    If ``scrub_unknown_fields`` is set to ``true`` in the ``ProtoApiScrubberConfig``, unknown fields will now be scrubbed.
     This is disabled by default.
 - area: stat_sinks
   change: |
