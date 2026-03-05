@@ -128,6 +128,29 @@ vhds:
                    .ok());
 }
 
+// Verify that VHDS over GRPC fails when ADS is using DELTA_GRPC.
+TEST_F(VhdsTest, VhdsInstantiationShouldFailWithGrpcAndAdsDeltaGrpc) {
+  factory_context_.bootstrap().mutable_dynamic_resources()->mutable_ads_config()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_FALSE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                        context_, provider_)
+                   .status()
+                   .ok());
+}
+
 // verify that ADS with DELTA_GRPC in bootstrap passes validation
 TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithAdsAndDeltaGrpc) {
   // Configure bootstrap with ADS using DELTA_GRPC

@@ -178,7 +178,7 @@ The following keys are supported:
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate. The current proxy's certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
-4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format.
+4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format. Note that this is not the validated chain; it is the original chain provided by the client which may include certificates not in the validated chain.
 5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
@@ -480,6 +480,46 @@ configuration option, ``x-forwarded-proto`` will be updated as well.
 The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where the underlying
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
+Inferring x-forwarded-proto from PROXY protocol destination port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that terminates TLS and
+forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
+original protocol for correct redirect behavior and routing decisions.
+
+The :ref:`forward_proto_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_proto_config>`
+configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
+When configured:
+
+1. If the connection's local address was restored from PROXY protocol (indicated by the
+   :ref:`proxy_protocol <config_listener_filters_proxy_protocol>` listener filter)
+2. And the destination port is in ``https_destination_ports``, ``x-forwarded-proto`` is set to ``https``
+3. Or if the destination port is in ``http_destination_ports``, ``x-forwarded-proto`` is set to ``http``
+
+If the port is not in either list or the address was not restored from PROXY protocol, the behavior
+falls back to using the current connection's TLS status.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  http_connection_manager:
+    forward_proto_config:
+      https_destination_ports: [443, 8443]
+      http_destination_ports: [80, 8080]
+
+This is particularly useful for the following deployment pattern:
+
+.. code-block:: text
+
+  Client (HTTPS:443) → L4 Load Balancer (TLS termination) → PROXY protocol → Envoy (HTTP)
+
+In this scenario, without this configuration, Envoy would set ``x-forwarded-proto: http`` because
+it sees an unencrypted connection. With ``https_destination_ports`` configured to include 443,
+Envoy correctly sets ``x-forwarded-proto: https`` based on the original destination port from the
+PROXY protocol header.
 
 .. _config_http_conn_man_headers_x-envoy-local-overloaded:
 

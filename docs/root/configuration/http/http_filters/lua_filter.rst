@@ -1529,7 +1529,9 @@ is no peer certificate or encoding fails.
   downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
 
 Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
-leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
+leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails. Note that this
+is not the validated chain; it is the original chain provided by the client which may include
+certificates not in the validated chain.
 
 ``dnsSansPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

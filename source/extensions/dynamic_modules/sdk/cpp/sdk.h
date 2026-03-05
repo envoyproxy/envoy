@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -99,13 +101,13 @@ public:
    * Returns all data chunks in the buffer.
    * @return Vector of buffer views containing all chunks.
    */
-  virtual std::vector<BufferView> getChunks() = 0;
+  virtual std::vector<BufferView> getChunks() const = 0;
 
   /**
    * Returns the total size of the buffer.
    * @return The total size in bytes.
    */
-  virtual size_t getSize() = 0;
+  virtual size_t getSize() const = 0;
 
   /**
    * Removes size from the front of the buffer.
@@ -379,6 +381,27 @@ public:
   virtual absl::optional<double> getMetadataNumber(absl::string_view ns, absl::string_view key) = 0;
 
   /**
+   * Retrieves a bool metadata value by namespace and key.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @return The bool value if found, otherwise nullopt.
+   */
+  virtual absl::optional<bool> getMetadataBool(absl::string_view ns, absl::string_view key) = 0;
+
+  /**
+   * Retrieves all keys in a metadata namespace.
+   * @param ns The metadata namespace.
+   * @return Vector of key strings.
+   */
+  virtual std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) = 0;
+
+  /**
+   * Retrieves all namespace names in the metadata.
+   * @return Vector of namespace name strings.
+   */
+  virtual std::vector<absl::string_view> getMetadataNamespaces() = 0;
+
+  /**
    * Sets a string metadata value.
    * @param ns The metadata namespace.
    * @param key The metadata key.
@@ -394,6 +417,19 @@ public:
    * @param value The numeric value to set.
    */
   virtual void setMetadata(absl::string_view ns, absl::string_view key, double value) = 0;
+
+  /**
+   * Sets a bool metadata value.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The bool value to set.
+   */
+  virtual void setMetadata(absl::string_view ns, absl::string_view key, bool value) = 0;
+
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  void setMetadata(absl::string_view ns, absl::string_view key, const char* value) {
+    setMetadata(ns, key, absl::string_view(value));
+  }
 
   /**
    * Retrieves the serialized filter state value of the stream.
@@ -422,6 +458,13 @@ public:
    * @return Pair of double and bool indicating if attribute was found.
    */
   virtual absl::optional<uint64_t> getAttributeNumber(AttributeID id) = 0;
+
+  /**
+   * Retrieves a boolean attribute value.
+   * @param id The attribute ID.
+   * @return The bool value if found, otherwise nullopt.
+   */
+  virtual absl::optional<bool> getAttributeBool(AttributeID id) = 0;
 
   /**
    * Sends a local response with status code, body, and detail.
@@ -486,6 +529,15 @@ public:
   virtual BodyBuffer& bufferedRequestBody() = 0;
 
   /**
+   * Returns reference to the latest received request body chunk.
+   * NOTE: This is only valid in the onRequestBody callback, and it retrieves the latest received
+   * body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+   * should use bufferedRequestBody() to get the currently buffered body in the chain.
+   * @return Reference to BodyBuffer containing the latest received request body chunk.
+   */
+  virtual BodyBuffer& receivedRequestBody() = 0;
+
+  /**
    * Returns reference to request trailers.
    * @return Reference to StreamHeaderMap containing request trailers.
    */
@@ -502,6 +554,33 @@ public:
    * @return Reference to BodyBuffer containing response body.
    */
   virtual BodyBuffer& bufferedResponseBody() = 0;
+
+  /**
+   * Returns reference to the latest received response body chunk.
+   * NOTE: This is only valid in the onResponseBody callback, and it retrieves the latest received
+   * body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
+   * should use bufferedResponseBody() to get the currently buffered body in the chain.
+   * @return Reference to BodyBuffer containing the latest received response body chunk.
+   */
+  virtual BodyBuffer& receivedResponseBody() = 0;
+
+  /**
+   * Returns true if the latest received request body is the previously buffered request body.
+   * This is true when a previous filter in the chain stopped and buffered the request body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onRequestBody callback.
+   * @return true if the received request body is the previously buffered request body.
+   */
+  virtual bool receivedBufferedRequestBody() = 0;
+
+  /**
+   * Returns true if the latest received response body is the previously buffered response body.
+   * This is true when a previous filter in the chain stopped and buffered the response body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onResponseBody callback.
+   * @return true if the received response body is the previously buffered response body.
+   */
+  virtual bool receivedBufferedResponseBody() = 0;
 
   /**
    * Returns reference to response trailers.
@@ -696,6 +775,68 @@ public:
    * @param message The message to log.
    */
   virtual void log(LogLevel level, absl::string_view message) = 0;
+
+  /**
+   * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
+   * HttpFilterConfigFactory::onHttpCalloutDone.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The request body.
+   * @param timeout_ms The timeout in milliseconds.
+   * @param cb The callback to invoke when the callout completes.
+   * @return HttpCalloutInitResult and callout ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
+              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
+
+  /**
+   * Starts a streamable HTTP callout to a cluster. Stream events will be delivered via
+   * HttpFilterConfigFactory::onHttpStream* methods.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The initial request body (may be empty).
+   * @param end_of_stream If true, the stream ends after sending the initial headers/body.
+   * @param timeout_ms The timeout in milliseconds (0 for no timeout).
+   * @param cb The callback to invoke for stream events.
+   * @return HttpCalloutInitResult and stream ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
+                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+                  HttpStreamCallback& cb) = 0;
+
+  /**
+   * Sends data on an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param body The data to send.
+   * @param end_of_stream If true, this is the last data chunk.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamData(uint64_t stream_id, absl::string_view body,
+                                  bool end_of_stream) = 0;
+
+  /**
+   * Sends trailers on an active stream, implicitly ending the stream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param trailers The trailers to send.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamTrailers(uint64_t stream_id,
+                                      absl::Span<const HeaderView> trailers) = 0;
+
+  /**
+   * Resets an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   */
+  virtual void resetHttpStream(uint64_t stream_id) = 0;
+
+  /**
+   * Returns a scheduler for deferred task execution. This can only be called on config loading
+   * event and then the returned Scheduler can be used in other threads.
+   * @return Unique pointer to Scheduler instance.
+   */
+  virtual std::shared_ptr<Scheduler> getScheduler() = 0;
 };
 
 /**
@@ -771,9 +912,18 @@ public:
   virtual TrailersStatus onResponseTrailers(HeaderMap& trailers) = 0;
 
   /**
-   * Called when the stream processing is complete.
+   * Called when the stream processing is complete and before access logs are flushed.
+   * This is a good place to do any final processing or cleanup before the request is fully
+   * completed.
    */
   virtual void onStreamComplete() = 0;
+
+  /**
+   * Called when the HTTP filter instance is being destroyed. This is called
+   * after onStreamComplete and access logs are flushed. This is a good place to release
+   * any per-stream resources.
+   */
+  virtual void onDestroy() = 0;
 };
 
 class HttpFilterFactory {
@@ -814,6 +964,32 @@ public:
 };
 
 using HttpFilterConfigFactoryPtr = std::unique_ptr<HttpFilterConfigFactory>;
+
+namespace Utility {
+
+/**
+ * Reads the whole request body by combining the buffered body and the latest received body.
+ * This will copy all request body content into a module owned string.
+ *
+ * This should only be called after we see the end of the request, which means the end_of_stream
+ * flag is true in the onRequestBody callback or we are in the onRequestTrailers callback.
+ * @param handle The HTTP filter handle.
+ * @return The combined request body as a string.
+ */
+std::string readWholeRequestBody(HttpFilterHandle& handle);
+
+/**
+ * Reads the whole response body by combining the buffered body and the latest received body.
+ * This will copy all response body content into a module owned string.
+ *
+ * This should only be called after we see the end of the response, which means the end_of_stream
+ * flag is true in the onResponseBody callback or we are in the onResponseTrailers callback.
+ * @param handle The HTTP filter handle.
+ * @return The combined response body as a string.
+ */
+std::string readWholeResponseBody(HttpFilterHandle& handle);
+
+} // namespace Utility
 
 class HttpFilterConfigFactoryRegistry {
 public:

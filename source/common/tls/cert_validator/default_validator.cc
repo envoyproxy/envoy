@@ -1,5 +1,8 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include <algorithm>
 #include <array>
 #include <climits>
@@ -30,7 +33,6 @@
 #include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -116,7 +118,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_trusted_ca_ = true;
 
       if (config_->allowExpiredCertificate()) {
-        CertValidatorUtil::setIgnoreCertificateExpiration(store);
+        X509_STORE_set_flags(store, X509_V_FLAG_NO_CHECK_TIME);
       }
     }
   }
@@ -254,11 +256,15 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
     if (!verifySubjectAltName(cert, verify_san_list)) {
-      const char* error = "verify cert failed: verify SAN list";
+      const std::string error_msg = fmt::format(
+          "verify cert failed: verify SAN list, expected SANs: [{}], certificate SANs: [{}]",
+          fmt::join(verify_san_list, ", "),
+          fmt::join(Utility::getCertificateSansForLogging(cert), ", "));
+
       if (error_details != nullptr) {
-        *error_details = error;
+        *error_details = error_msg;
       }
-      ENVOY_LOG(debug, error);
+      ENVOY_LOG(debug, error_msg);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
@@ -267,11 +273,13 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
 
   if (!subject_alt_name_matchers.empty()) {
     if (!matchSubjectAltName(cert, stream_info, subject_alt_name_matchers)) {
-      const char* error = "verify cert failed: SAN matcher";
+      const std::string error_msg =
+          fmt::format("verify cert failed: SAN matcher, certificate SANs are [{}]",
+                      fmt::join(Utility::getCertificateSansForLogging(cert), ", "));
       if (error_details != nullptr) {
-        *error_details = error;
+        *error_details = error_msg;
       }
-      ENVOY_LOG(debug, error);
+      ENVOY_LOG(debug, error_msg);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
@@ -543,7 +551,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (cert == nullptr) {
       break;
     }
-    X509_NAME* name = X509_get_subject_name(cert.get());
+    const X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));

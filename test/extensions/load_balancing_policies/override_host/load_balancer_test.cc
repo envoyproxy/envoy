@@ -46,6 +46,11 @@ public:
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(load_balancer_context_, downstreamHeaders())
         .WillByDefault(Return(&downstream_headers_));
+    ON_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
+              (*metadata_.mutable_filter_metadata())[std::string(name)].MergeFrom(value);
+            }));
   }
 
 protected:
@@ -125,6 +130,25 @@ protected:
     return config;
   }
 
+  OverrideHost makeDefaultConfigWithSelectedHostKey(absl::string_view selected_endpoint_key_name) {
+    OverrideHost config;
+
+    OverrideHost::OverrideHostSource* host_source = config.add_override_host_sources();
+    host_source->mutable_metadata()->set_key("envoy.lb");
+    host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
+
+    auto* metadata_key = config.mutable_selected_host_key();
+    metadata_key->set_key("envoy.lb");
+    metadata_key->add_path()->set_key(selected_endpoint_key_name);
+
+    Config locality_picker_config;
+    auto* typed_extension_config =
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
+    return config;
+  }
+
   void setSelectedEndpointsMetadata(absl::string_view key,
                                     absl::string_view selected_endpoints_text_proto) {
     Envoy::Protobuf::Struct selected_endpoints;
@@ -171,7 +195,7 @@ protected:
   LoadBalancerPtr load_balancer_;
 };
 
-TEST_F(OverrideHostLoadBalancerTest, NoMetadatOrHeaders) {
+TEST_F(OverrideHostLoadBalancerTest, NoMetadataOrHeaders) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -705,6 +729,115 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
   EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostStoredInMetadata) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
+
+  // Expect that the selected host metadata key will contain the selected address.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+
+  EXPECT_EQ(metadata_value.string_value(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostMetadataMultipleHostsChosen) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://3.5.8.13:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ =
+      ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}, {host_set->hosts_[1]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "3.5.8.13:80,5.6.7.8:80" }
+    }
+  )pb");
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "3.5.8.13:80");
+
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "5.6.7.8:80");
+
+  // Expect that the selected host metadata key will contain the final selected address.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value = ::Envoy::Config::Metadata::metadataValue(
+      &metadata, "envoy.lb", "x-gateway-destination-endpoint-served");
+
+  EXPECT_EQ(metadata_value.string_value(), "5.6.7.8:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedEndpointMetadataDoesNotOverwriteEnvoyLb) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "1.2.3.4:80" }
+    }
+  )pb");
+
+  // Set metadata under "envoy.lb" before choosing a host.
+  Protobuf::Struct new_metadata;
+  (*new_metadata.mutable_fields())["canary"].set_string_value("false");
+  load_balancer_context_.requestStreamInfo()->setDynamicMetadata("envoy.lb", new_metadata);
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(testing::AtLeast(1));
+  // Expect the address from the metadata to be used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+
+  // Expect that the pre-existing metadata under envoy.lb was not removed.
+  const auto& metadata = load_balancer_context_.requestStreamInfo()->dynamicMetadata();
+  const Protobuf::Value& metadata_value =
+      ::Envoy::Config::Metadata::metadataValue(&metadata, "envoy.lb", "canary");
+  EXPECT_EQ(metadata_value.string_value(), "false");
+}
 } // namespace
 } // namespace OverrideHost
 } // namespace LoadBalancingPolicies

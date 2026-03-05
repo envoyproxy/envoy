@@ -1006,7 +1006,7 @@ std::string ParentHistogramImpl::bucketSummary() const {
 }
 
 std::vector<Stats::ParentHistogram::Bucket>
-ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
+ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) const {
   const uint32_t num_buckets = hist_num_buckets(&histogram);
   std::vector<Stats::ParentHistogram::Bucket> buckets(num_buckets);
   hist_bucket_t hist_bucket;
@@ -1015,8 +1015,22 @@ ParentHistogramImpl::detailedlBucketsHelper(const histogram_t& histogram) {
     hist_bucket_idx_bucket(&histogram, i, &hist_bucket, &bucket.count_);
     bucket.lower_bound_ = hist_bucket_to_double(hist_bucket);
     bucket.width_ = hist_bucket_to_double_bin_width(hist_bucket);
+    if (unit_ == Histogram::Unit::Percent) {
+      constexpr double percent_scale = 1.0 / Histogram::PercentScale;
+      bucket.lower_bound_ *= percent_scale;
+      bucket.width_ *= percent_scale;
+    }
   }
   return buckets;
+}
+
+uint64_t ParentHistogramImpl::cumulativeCountLessThanOrEqualToValue(double value) const {
+  // `hist_approx_count_below` is slightly misnamed. It's documentation states:
+  //
+  // Returns the number of values in buckets that are entirely lower than or equal to threshold.
+  const double raw_value =
+      (unit_ == Histogram::Unit::Percent) ? (value * Histogram::PercentScale) : value;
+  return hist_approx_count_below(cumulative_histogram_, raw_value);
 }
 
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {

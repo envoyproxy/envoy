@@ -471,6 +471,12 @@ statistics:
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_total, Counter, Total requests initiated by the router to the upstream
 
+.. note::
+   The ``upstream_rq_<*xx>`` and ``upstream_rq_<*>`` stats only count **final** responses that
+   were sent to the downstream client. Responses that triggered a retry are not counted here;
+   they are counted in ``cluster.<name>.retry.upstream_rq_<*>`` instead. See
+   :ref:`cluster retry statistics <config_cluster_manager_cluster_stats_retry>` for details.
+
 Runtime
 -------
 

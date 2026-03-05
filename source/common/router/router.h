@@ -447,8 +447,8 @@ public:
     if (!is_retry_) {
       return original_priority_load;
     }
-    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
-                                              priority_mapping_func);
+    return retry_state_->priorityLoadForRetry(requestStreamInfo(), priority_set,
+                                              original_priority_load, priority_mapping_func);
   }
 
   uint32_t hostSelectionRetryCount() const override {

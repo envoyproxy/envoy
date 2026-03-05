@@ -467,6 +467,16 @@ public:
    */
   virtual uint32_t maxHeadersCount() const PURE;
 
+  // aliases to make iterate() and iterateReverse() callbacks easier to read
+  enum class Iterate { Continue, Break };
+
+  /**
+   * Callback when calling iterate() over a const header map.
+   * @param header supplies the header entry.
+   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop;
+   */
+  using ConstIterateCb = std::function<Iterate(const HeaderEntry&)>;
+
   /**
    * This is a wrapper for the return result from get(). It avoids a copy when translating from
    * non-const HeaderEntry to const HeaderEntry and only provides const access to the result.
@@ -481,6 +491,13 @@ public:
     bool empty() const { return result_.empty(); }
     size_t size() const { return result_.size(); }
     const HeaderEntry* operator[](size_t i) const { return result_[i]; }
+    void iterate(ConstIterateCb cb) const {
+      for (const auto& val : result_) {
+        if (cb(*val) == Iterate::Break) {
+          break;
+        }
+      }
+    }
 
   private:
     NonConstGetResult result_;
@@ -492,16 +509,6 @@ public:
    * @return all header entries matching the key.
    */
   virtual GetResult get(const LowerCaseString& key) const PURE;
-
-  // aliases to make iterate() and iterateReverse() callbacks easier to read
-  enum class Iterate { Continue, Break };
-
-  /**
-   * Callback when calling iterate() over a const header map.
-   * @param header supplies the header entry.
-   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop;
-   */
-  using ConstIterateCb = std::function<Iterate(const HeaderEntry&)>;
 
   /**
    * Iterate over a constant header map.

@@ -34,17 +34,23 @@ const Http::HeaderMap& lengthZeroHeader() {
 }
 
 // Static response used for creating authorization ERROR responses.
+// Note: status_code is left unset so the filter can use the configured status_on_error
+// configuration.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            HeaderMutationVector{},
-                                            HeaderMutationVector{},
-                                            HeaderMutationVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
+                                            UnsafeHeaderVector{},
                                             false,
-                                            {},
+                                            {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
-                                            Http::Code::Forbidden,
+                                            static_cast<Http::Code>(0),
                                             Protobuf::Struct{}});
 }
 
@@ -65,39 +71,26 @@ struct SuccessResponse {
         response_matchers_(response_matchers),
         to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
         response_(std::make_unique<Response>(response)) {
-    const bool is_ok_response = response_->status == CheckStatus::OK;
-    headers_.iterate([this,
-                      is_ok_response](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      // UpstreamHeaderMatcher only applies to OK responses for upstream request headers.
-      if (is_ok_response && matchers_->matches(header.key().getStringView())) {
-        response_->request_header_mutations.push_back(
-            {std::string(header.key().getStringView()), std::string(header.value().getStringView()),
-             HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD});
+    headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      // UpstreamHeaderMatcher
+      if (matchers_->matches(header.key().getStringView())) {
+        response_->headers_to_set.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
-      if (is_ok_response && append_matchers_->matches(header.key().getStringView())) {
+      if (append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
         // appended with the same key. For example, given {"key": "value1"} headers, if there is
         // a matching "key" from the authorization response headers {"key": "value2"}, the
         // request to upstream server will have two entries for "key": {"key": "value1", "key":
         // "value2"}.
-        response_->request_header_mutations.push_back({std::string(header.key().getStringView()),
-                                                       std::string(header.value().getStringView()),
-                                                       HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+        response_->headers_to_add.emplace_back(header.key().getStringView(),
+                                               header.value().getStringView());
       }
       if (response_matchers_->matches(header.key().getStringView())) {
-        // For OK responses, these headers are appended to the encoded response headers.
-        // For Denied responses, these headers go to the local reply.
-        if (is_ok_response) {
-          response_->response_header_mutations.push_back(
-              {std::string(header.key().getStringView()),
-               std::string(header.value().getStringView()),
-               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-        } else {
-          response_->local_response_header_mutations.push_back(
-              {std::string(header.key().getStringView()),
-               std::string(header.value().getStringView()),
-               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-        }
+        // For HTTP implementation, the response headers from the auth server will, by default, be
+        // appended (using addCopy) to the encoded response headers.
+        response_->response_headers_to_add.emplace_back(header.key().getStringView(),
+                                                        header.value().getStringView());
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
@@ -122,6 +115,22 @@ absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
     return absl::InvalidArgumentError("path_prefix should start with \"/\".");
   }
   return std::string(path_prefix);
+}
+
+absl::StatusOr<std::string> validatePathOverride(absl::string_view path_override) {
+  if (!path_override.empty() && path_override[0] != '/') {
+    return absl::InvalidArgumentError("path_override should start with \"/\".");
+  }
+  return std::string(path_override);
+}
+
+absl::Status validateOnlyOneOfPathPrefixOrOverride(absl::string_view path_prefix,
+                                                   absl::string_view path_override) {
+  if (!path_prefix.empty() && !path_override.empty()) {
+    return absl::InvalidArgumentError(
+        "Only one of path_prefix or path_override may be set, not both.");
+  }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<Router::RetryPolicyConstSharedPtr>
@@ -163,6 +172,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
+      path_override_(THROW_OR_RETURN_VALUE(
+          validatePathOverride(config.http_service().path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -174,7 +185,10 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                         ? THROW_OR_RETURN_VALUE(
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
-                        : nullptr) {}
+                        : nullptr) {
+  THROW_IF_NOT_OK(
+      validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
+}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -192,6 +206,8 @@ ClientConfig::ClientConfig(
       cluster_name_(http_service.server_uri().cluster()), timeout_(timeout),
       path_prefix_(
           THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
+      path_override_(
+          THROW_OR_RETURN_VALUE(validatePathOverride(http_service.path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -203,7 +219,10 @@ ClientConfig::ClientConfig(
           http_service.has_retry_policy()
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
-              : nullptr) {}
+              : nullptr) {
+  THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
+                                                        http_service.path_override()));
+}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -301,8 +320,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+        } else {
+          headers->addCopy(key, header.raw_value());
+        }
       } else {
         headers->addCopy(key, header.raw_value());
       }
@@ -316,8 +341,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+        } else {
+          headers->addCopy(key, header.second);
+        }
       } else {
         headers->addCopy(key, header.second);
       }
@@ -432,9 +463,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK,
-                                HeaderMutationVector{},
-                                HeaderMutationVector{},
-                                HeaderMutationVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
+                                UnsafeHeaderVector{},
                                 false,
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
@@ -446,20 +481,24 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   // Create a Denied authorization response.
-  // For denied responses, headers matching clientHeaderMatchers go to
-  // local_response_header_mutations for the local reply. The upstream request headers (matchers_,
-  // append_matchers_) are not used, so we pass never-matching matchers for those positions.
+  // For denied responses, only headers_to_set which is populated by the first matcher is
+  // used by the ext_authz filter when sending the local reply. The headers_to_add and
+  // response_headers_to_add fields are not used, so we pass a never-matching matcher.
   SuccessResponse denied{message->headers(),
-                         neverMatchingMatcher(),
-                         neverMatchingMatcher(),
                          config_->clientHeaderMatchers(),
+                         neverMatchingMatcher(),
+                         neverMatchingMatcher(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
-                                  HeaderMutationVector{},
-                                  HeaderMutationVector{},
-                                  HeaderMutationVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
+                                  UnsafeHeaderVector{},
                                   false,
-                                  {},
+                                  {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},
                                   message->bodyAsString(),

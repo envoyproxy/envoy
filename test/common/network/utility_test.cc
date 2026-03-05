@@ -4,8 +4,8 @@
 #include <net/if.h>
 
 #else
-#include <winsock2.h>
 #include <iphlpapi.h>
+#include <winsock2.h>
 #endif
 
 #include <cstdint>

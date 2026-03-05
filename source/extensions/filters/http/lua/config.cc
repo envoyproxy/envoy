@@ -25,6 +25,18 @@ absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromPr
   };
 }
 
+Envoy::Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  FilterConfigConstSharedPtr filter_config(new FilterConfig{proto_config, context.threadLocal(),
+                                                            context.clusterManager(), context.api(),
+                                                            context.scope(), stats_prefix});
+  auto& time_source = context.mainThreadDispatcher().timeSource();
+  return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, time_source));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 LuaFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,

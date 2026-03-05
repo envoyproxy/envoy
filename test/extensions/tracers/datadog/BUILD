@@ -54,8 +54,8 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
-        "@com_github_nlohmann_json//:json",
+        "@dd-trace-cpp//:dd_trace_cpp",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )

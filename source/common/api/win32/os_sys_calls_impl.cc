@@ -1,3 +1,5 @@
+#include "source/common/api/os_sys_calls_impl.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <io.h>
@@ -5,8 +7,6 @@
 
 #include <cstdint>
 #include <string>
-
-#include "source/common/api/os_sys_calls_impl.h"
 
 #define DWORD_MAX UINT32_MAX
 

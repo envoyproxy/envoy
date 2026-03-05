@@ -2,6 +2,8 @@
 
 #include "source/extensions/filters/common/mcp/filter_state.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -45,13 +47,20 @@ parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::Mcp
 
   return result;
 }
+
+McpRouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = absl::StrCat(prefix, "mcp_router.");
+  return McpRouterStats{MCP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
 } // namespace
 
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope,
     Server::Configuration::FactoryContext& context)
     : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)),
-      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()) {
+      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
+      stats_(generateStats(stats_prefix, scope)) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();

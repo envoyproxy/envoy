@@ -45,6 +45,7 @@ public:
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
   void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   // Network::Connection
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
