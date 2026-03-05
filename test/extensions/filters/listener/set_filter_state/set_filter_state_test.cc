@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/listener/set_filter_state/v3/set_filter_state.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/listener/set_filter_state/config.h"
@@ -7,8 +9,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-#include "envoy/extensions/filters/listener/set_filter_state/v3/set_filter_state.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +47,9 @@ on_new_connection:
 )EOF";
   initialize(yaml);
 
-  EXPECT_EQ("test_value", cb_.stream_info_.filterState()->getDataReadOnly<Router::StringAccessor>("test_key")->asString());
+  EXPECT_EQ("test_value", cb_.stream_info_.filterState()
+                              ->getDataReadOnly<Router::StringAccessor>("test_key")
+                              ->asString());
 }
 
 } // namespace

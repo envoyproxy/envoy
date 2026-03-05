@@ -1,4 +1,3 @@
-licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -35,6 +34,7 @@ envoy_extension_cc_test(
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/set_filter_state:config",
         "//source/extensions/filters/network/echo:config",
+        "//source/extensions/formatter/metadata:config",
         "//test/integration:integration_lib",
         "//test/integration:utility_lib",
         "//test/test_common:utility_lib",

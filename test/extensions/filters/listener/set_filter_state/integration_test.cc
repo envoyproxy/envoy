@@ -42,13 +42,12 @@ public:
   }
 
   void addListenerFilter(const std::string& config) {
-    config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          auto* filter = listener->add_listener_filters();
-          filter->set_name("set_filter_state");
-          MessageUtil::loadFromYaml(config, *filter->mutable_typed_config());
-        });
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter = listener->add_listener_filters();
+      filter->set_name("set_filter_state");
+      TestUtility::loadFromYaml(config, *filter->mutable_typed_config());
+    });
   }
 
   void SetUp() override { useListenerAccessLog("%FILTER_STATE(early)%"); }
@@ -59,6 +58,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SetFilterStateIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(SetFilterStateIntegrationTest, OnAccept) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    const std::string metadata_yaml = R"EOF(
+      filter_metadata:
+        com.test.my_filter:
+          my_key: "my_value"
+    )EOF";
+    TestUtility::loadFromYaml(metadata_yaml, *listener->mutable_metadata());
+  });
   const std::string filter_config = R"EOF(
     "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
     on_new_connection:
@@ -66,7 +74,7 @@ TEST_P(SetFilterStateIntegrationTest, OnAccept) {
         factory_key: "foo"
         format_string:
           text_format_source:
-            inline_string: "bar"
+            inline_string: "%METADATA(LISTENER:com.test.my_filter:my_key)%"
   )EOF";
   addListenerFilter(filter_config);
   BaseIntegrationTest::initialize();
@@ -75,7 +83,7 @@ TEST_P(SetFilterStateIntegrationTest, OnAccept) {
   ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("bar"));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("my_value"));
 }
 
 } // namespace
