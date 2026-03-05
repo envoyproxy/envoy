@@ -134,6 +134,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admission_control_interface",
+    hdrs = ["admission_control.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/upstream:types_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_local_cluster_interface",
     hdrs = ["thread_local_cluster.h"],
     deps = [
@@ -156,6 +167,7 @@ envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
     deps = [
+        ":admission_control_interface",
         ":health_check_host_monitor_interface",
         ":locality_lib",
         ":resource_manager_interface",

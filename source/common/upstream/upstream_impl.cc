@@ -408,6 +408,28 @@ createUpstreamLocalAddressSelector(
   return selector_or_error.value();
 }
 
+OptRef<const envoy::config::core::v3::TypedExtensionConfig>
+getAttemptAdmissionControlConfigForPriority(
+    const envoy::config::cluster::v3::Cluster& config,
+    const envoy::config::core::v3::RoutingPriority& priority) {
+  const auto& thresholds = config.circuit_breakers().thresholds();
+  const auto it = std::find_if(
+      thresholds.cbegin(), thresholds.cend(),
+      [priority](const envoy::config::cluster::v3::CircuitBreakers::Thresholds& threshold) {
+        return threshold.priority() == priority;
+      });
+
+  if (it == thresholds.cend()) {
+    return {};
+  }
+
+  if (it->has_attempt_admission_control()) {
+    return {it->attempt_admission_control()};
+  } else {
+    return {};
+  }
+}
+
 } // namespace
 
 // Allow disabling ALPN checks for transport sockets. See
@@ -1133,10 +1155,10 @@ ClusterInfoImpl::ClusterInfoImpl(
               : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
           config, *http_protocol_options_)),
-      resource_managers_(config, runtime, name_, *stats_scope_,
-                         factory_context.serverFactoryContext()
-                             .clusterManager()
-                             .clusterCircuitBreakersStatNames()),
+      resource_managers_(
+          config, runtime, name_, *stats_scope_,
+          factory_context.serverFactoryContext().clusterManager().clusterCircuitBreakersStatNames(),
+          server_context.messageValidationVisitor()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
@@ -1701,6 +1723,18 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
+OptRef<AdmissionControl> ClusterInfoImpl::admissionControl(ResourcePriority priority) const {
+  ASSERT(enumToInt(priority) < resource_managers_.controls_.size());
+  // If we move the default circuit breaker behaviors transparently over to the admission control
+  // extensions, we can get rid of this as we'd always have default attempt admission control
+  // policies.
+  auto val = resource_managers_.controls_[enumToInt(priority)];
+  if (val == nullptr) {
+    return {};
+  }
+  return *val;
+}
+
 void ClusterImplBase::initialize(std::function<absl::Status()> callback) {
   ASSERT(!initialization_started_);
   ASSERT(initialization_complete_callback_ == nullptr);
@@ -1937,14 +1971,22 @@ ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     const std::string& cluster_name, Stats::Scope& stats_scope,
-    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names)
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
     : circuit_breakers_stat_names_(circuit_breakers_stat_names) {
-  managers_[enumToInt(ResourcePriority::Default)] = THROW_OR_RETURN_VALUE(
-      load(config, runtime, cluster_name, stats_scope, envoy::config::core::v3::DEFAULT),
-      ResourceManagerImplPtr);
-  managers_[enumToInt(ResourcePriority::High)] = THROW_OR_RETURN_VALUE(
-      load(config, runtime, cluster_name, stats_scope, envoy::config::core::v3::HIGH),
-      ResourceManagerImplPtr);
+  using ResourceManagerAndAdmissionControlPtrs =
+      std::pair<ResourceManagerImplPtr, AdmissionControlImplSharedPtr>;
+
+  std::tie(managers_[enumToInt(ResourcePriority::Default)],
+           controls_[enumToInt(ResourcePriority::Default)]) =
+      THROW_OR_RETURN_VALUE(load(config, runtime, cluster_name, stats_scope,
+                                 envoy::config::core::v3::DEFAULT, validation_visitor),
+                            ResourceManagerAndAdmissionControlPtrs);
+  std::tie(managers_[enumToInt(ResourcePriority::High)],
+           controls_[enumToInt(ResourcePriority::High)]) =
+      THROW_OR_RETURN_VALUE(load(config, runtime, cluster_name, stats_scope,
+                                 envoy::config::core::v3::HIGH, validation_visitor),
+                            ResourceManagerAndAdmissionControlPtrs);
 }
 
 ClusterCircuitBreakersStats
@@ -2044,11 +2086,12 @@ ClusterInfoImpl::createSingletonUpstreamNetworkFilterConfigProviderManager(
       [] { return std::make_shared<Filter::UpstreamNetworkFilterConfigProviderManagerImpl>(); });
 }
 
-absl::StatusOr<ResourceManagerImplPtr>
+absl::StatusOr<std::pair<ResourceManagerImplPtr, AdmissionControlImplSharedPtr>>
 ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
                                         Stats::Scope& stats_scope,
-                                        const envoy::config::core::v3::RoutingPriority& priority) {
+                                        const envoy::config::core::v3::RoutingPriority& priority,
+                                        ProtobufMessage::ValidationVisitor& validation_visitor) {
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
@@ -2087,7 +2130,6 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       [priority](const envoy::config::cluster::v3::CircuitBreakers::Thresholds& threshold) {
         return threshold.priority() == priority;
       });
-
   absl::optional<double> budget_percent;
   absl::optional<uint32_t> min_retry_concurrency;
   if (it != thresholds.cend()) {
@@ -2111,12 +2153,27 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       max_connections_per_host = per_host_it->max_connections().value();
     }
   }
-  return std::make_unique<ResourceManagerImpl>(
-      runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
-      max_connection_pools, max_connections_per_host,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_stat_name,
-                                                    track_remaining, circuit_breakers_stat_names_),
-      budget_percent, min_retry_concurrency);
+
+  auto cb_stats = ClusterInfoImpl::generateCircuitBreakersStats(
+      stats_scope, priority_stat_name, track_remaining, circuit_breakers_stat_names_);
+
+  auto admission_control_config = getAttemptAdmissionControlConfigForPriority(config, priority);
+  AdmissionControlImplSharedPtr admission_control;
+  if (admission_control_config.has_value()) {
+    admission_control =
+        std::make_shared<AdmissionControlImpl>(admission_control_config.value(), validation_visitor,
+                                               runtime, runtime_prefix, cb_stats, stats_scope);
+  }
+
+  // If an attempt extension is configured, we use it to control the circuit breaker retry stats.
+  const bool attempt_extension_configured =
+      getAttemptAdmissionControlConfigForPriority(config, priority).has_value();
+  return std::make_pair(std::make_unique<ResourceManagerImpl>(
+                            runtime, runtime_prefix, max_connections, max_pending_requests,
+                            max_requests, max_retries, max_connection_pools,
+                            max_connections_per_host, cb_stats, budget_percent,
+                            min_retry_concurrency, attempt_extension_configured),
+                        admission_control);
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,

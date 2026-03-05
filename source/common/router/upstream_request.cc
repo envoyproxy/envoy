@@ -80,8 +80,8 @@ public:
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3,
-                                 bool enable_half_close)
-    : parent_(parent), conn_pool_(std::move(conn_pool)),
+                                 bool enable_half_close, uint32_t attempt_number)
+    : parent_(parent), conn_pool_(std::move(conn_pool)), attempt_number_(attempt_number),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(),
                    parent_.callbacks()->connection().has_value()
                        ? parent_.callbacks()->connection()->connectionInfoProviderSharedPtr()

@@ -22,6 +22,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/upstream/admission_control.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -1146,6 +1147,12 @@ public:
    *         a particular priority).
    */
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
+
+  /**
+   * @return AdmissionControl& the attempt limiter to use for streams associated with this cluster
+   *         (at a particular priority) if it exists.
+   */
+  virtual OptRef<AdmissionControl> admissionControl(ResourcePriority priority) const PURE;
 
   /**
    * @return TransportSocketMatcher& the transport socket matcher associated

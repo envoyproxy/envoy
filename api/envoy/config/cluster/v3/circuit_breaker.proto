@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.cluster.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -27,7 +28,7 @@ message CircuitBreakers {
 
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Thresholds {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
@@ -80,6 +81,22 @@ message CircuitBreakers {
     //    If this field is set, the retry budget will override any configured retry circuit
     //    breaker.
     RetryBudget retry_budget = 8;
+
+    // The attempt admission control extension admits or rejects candidate requests based on
+    // overall traffic patterns and load across the cluster at the given priority level.
+    // This field is optional.
+    //
+    // .. note::
+    //
+    //    If this field is set, the attempt admission control will override any configured
+    //    :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` or
+    //    :ref:`retry_budget <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
+    //    circuit breakers.
+    //
+    //    In addition, extensions in this field may deny the initial attempt of a request.
+    //
+    // [#extension-category: envoy.attempt_admission_control]
+    core.v3.TypedExtensionConfig attempt_admission_control = 9;
 
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If

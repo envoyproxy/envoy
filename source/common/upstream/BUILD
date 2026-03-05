@@ -384,6 +384,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admission_control_lib",
+    hdrs = ["admission_control_impl.h"],
+    deps = [
+        "//envoy/upstream:admission_control_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     rbe_pool = "6gig",
@@ -459,6 +468,7 @@ envoy_cc_library(
         "upstream_impl.h",
     ],
     deps = [
+        ":admission_control_lib",
         ":load_balancer_context_base_lib",
         ":locality_pool_lib",
         ":resource_manager_lib",

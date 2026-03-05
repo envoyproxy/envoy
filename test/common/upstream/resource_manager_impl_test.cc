@@ -31,7 +31,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0, 100,
-      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt);
+      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt, false);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -89,7 +89,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   auto stats = clusterCircuitBreakersStats(store);
   ResourceManagerImpl resource_manager(runtime,
                                        "circuit_breakers.runtime_resource_manager_test.default.", 1,
-                                       2, 1, 0, 3, 100, stats, absl::nullopt, absl::nullopt);
+                                       2, 1, 0, 3, 100, stats, absl::nullopt, absl::nullopt, false);
 
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
@@ -155,7 +155,7 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
 
   // Test retry budgets disable remaining_retries gauge (it should always be 0).
   ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
-                         1, 0, 3, 100, stats, 20.0, 5);
+                         1, 0, 3, 100, stats, 20.0, 5, false);
 
   EXPECT_EQ(5U, rm.retries().max());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
@@ -165,6 +165,33 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   EXPECT_EQ(0U, stats.remaining_retries_.value());
   EXPECT_EQ(100u, rm.maxConnectionsPerHost());
   rm.retries().dec();
+}
+
+TEST(ResourceManagerImplTest, AttemptBudgetOverridesRetryBudget) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  // Test retry budgets disable remaining_retries gauge (it should always be 0).
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
+                         1, 0, 3, 100, stats, 20.0, 5, true);
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, rm.retries().count());
+
+  rm.retries().inc();
+
+  EXPECT_EQ(0U, rm.retries().count());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+
+  rm.retries().dec();
+
+  EXPECT_EQ(0U, rm.retries().count());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+
+  rm.retries().decBy(10);
+  EXPECT_EQ(0U, rm.retries().count());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
 }
 } // namespace
 } // namespace Upstream
