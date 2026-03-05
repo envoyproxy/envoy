@@ -163,6 +163,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
     const nlohmann::json& arguments) {
   std::string pattern;
   std::string method = "";
+  // TODO(guoyilin42): Add validation to ensure exactly one HTTP method is specified.
   if (!http_rule.get().empty()) {
     method = "GET";
     pattern = http_rule.get();
