@@ -99,10 +99,7 @@ def rotation_from_yaml() -> tuple[date, date, list[str]]:
     return data['start_date'], data['updated'], data['rotation']
 
 
-def overrides_to_yaml(overrides: list[Override]) -> None:
-    with open(_overrides_path(), 'w') as file:
-        file.write(
-            """# This file can be modified manually to add or remove on-call overrides.
+_OVERRIDES_HEADER_COMMENT = """# This file can be modified manually to add or remove on-call overrides.
 # After modifying, run
 # bazel run //tools/oncall:rotation
 # to update the ical file.
@@ -112,7 +109,12 @@ def overrides_to_yaml(overrides: list[Override]) -> None:
 # - start: 2026-03-01
 #   duration_days: 3
 #   oncall: $USERNAME
-""")
+"""
+
+
+def overrides_to_yaml(overrides: list[Override]) -> None:
+    with open(_overrides_path(), 'w') as file:
+        file.write(_OVERRIDES_HEADER_COMMENT)
         # Forget any overrides more than 30 days in the past.
         # We keep a short amount in the past for people checking calendar history.
         # If you need older calendar history, you can check the git history of overrides.yaml!
