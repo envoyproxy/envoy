@@ -3056,18 +3056,6 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
 }
 
 TEST_P(SslSocketTest, Pkcs12CertificatesWithPassword) {
-#ifdef ENVOY_SSL_OPENSSL
-  // The `password_protected_certkey.p12` used in this test, uses the "RC2-40-CBC"
-  // encryption algorithm, which OpenSSL considers legacy and insecure.
-  // Therefore, to get this test to pass, we need to temporarily load OpenSSL's
-  // legacy provider (as well as the default one) and also unload it when finished.
-  std::unique_ptr<ossl_OSSL_PROVIDER, void (*)(ossl_OSSL_PROVIDER*)> legacy_provider(
-      ossl_OSSL_PROVIDER_load(nullptr, "legacy"),
-      [](ossl_OSSL_PROVIDER* p) { ossl_OSSL_PROVIDER_unload(p); });
-  std::unique_ptr<ossl_OSSL_PROVIDER, void (*)(ossl_OSSL_PROVIDER*)> default_provider(
-      ossl_OSSL_PROVIDER_load(nullptr, "default"),
-      [](ossl_OSSL_PROVIDER* p) { ossl_OSSL_PROVIDER_unload(p); });
-#endif
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
