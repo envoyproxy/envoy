@@ -21,41 +21,43 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the load_aware_locality LB policy which uses ORCA utilization data
 // to route traffic between localities based on available headroom.
-// [#next-free-field: 10]
+// [#next-free-field: 7]
 message LoadAwareLocality {
-  reserved 2, 3, 5;
-
-  reserved "blackout_period", "weight_expiration_period", "error_utilization_penalty";
-
   // The child LB policy to create for endpoint-picking within each locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1
       [(validate.rules).message = {required: true}];
 
   // How frequently ORCA weights and locality utilization are recomputed on the
   // main thread. Defaults to 1s.
-  google.protobuf.Duration weight_update_period = 4;
+  google.protobuf.Duration weight_update_period = 2;
 
+  // [#not-implemented-hide:]
   // Named metrics from ORCA reports to use for computing utilization.
-  // If empty, ``application_utilization`` or ``cpu_utilization`` are used.
+  // The precedence order for determining which metric to use is:
+  //
+  // 1. ``metric_names_for_computing_utilization`` if set.
+  // 2. ``application_utilization`` if > 0.
+  // 3. ``cpu_utilization``.
+  //
   // NOTE: Not yet implemented. Currently ``application_utilization`` (if > 0) or
   // ``cpu_utilization`` is always used regardless of this field.
   // TODO: Implement metric name selection at the ORCA report write site in the router.
-  repeated string metric_names_for_computing_utilization = 6;
+  repeated string metric_names_for_computing_utilization = 3;
 
   // When the local locality's utilization is at most this threshold above the
   // remote average, route 100% of traffic to the local locality. This avoids
   // unnecessary cross-zone routing when utilization is roughly balanced.
   // Must be in [0, 1]. Defaults to 0.1.
-  google.protobuf.DoubleValue utilization_variance_threshold = 7
+  google.protobuf.DoubleValue utilization_variance_threshold = 4
       [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 
   // EWMA smoothing factor for per-locality utilization. Must be in (0, 1].
   // Higher values react faster to changes, lower values are more stable.
   // Defaults to 0.3.
-  google.protobuf.DoubleValue ewma_alpha = 8 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
+  google.protobuf.DoubleValue ewma_alpha = 5 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
 
   // Minimum fraction of traffic sent to non-local localities to keep
   // ORCA data fresh. Applied even in all_local mode. Must be in [0, 1).
   // Set to 0 to disable. Defaults to 0.03 (3%).
-  google.protobuf.DoubleValue probe_percentage = 9 [(validate.rules).double = {lt: 1.0 gte: 0.0}];
+  google.protobuf.DoubleValue probe_percentage = 6 [(validate.rules).double = {lt: 1.0 gte: 0.0}];
 }
