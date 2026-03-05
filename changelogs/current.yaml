@@ -554,6 +554,6 @@ new_features:
     ``on_downstream_data`` (see
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
-    connection filter state to be populated after first receiving data from downstream TLS handshake completes.
+    connection filter state to be populated after first receiving data from the downstream connection.  
 
 deprecated:

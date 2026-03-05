@@ -16,10 +16,10 @@ class SetFilterState : public Network::ReadFilter,
 public:
   SetFilterState(Filters::Common::SetFilterState::ConfigSharedPtr on_new_connection,
                  Filters::Common::SetFilterState::ConfigSharedPtr on_downstream_tls_handshake,
-                 Filters::Common::SetFilterState::ConfigSharedPtr on_downstream_data_)
+                 Filters::Common::SetFilterState::ConfigSharedPtr on_downstream_data)
       : on_new_connection_(std::move(on_new_connection)),
         on_downstream_tls_handshake_(std::move(on_downstream_tls_handshake)),
-        on_downstream_data_(std::move(on_downstream_data_)) {}
+        on_downstream_data_(std::move(on_downstream_data)) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override;
