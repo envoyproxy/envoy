@@ -17,7 +17,7 @@ LoadAwareLocalityLoadBalancer::LoadAwareLocalityLoadBalancer(
     OptRef<const Upstream::LoadBalancerConfig> lb_config, const Upstream::ClusterInfo& cluster_info,
     const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
     Envoy::Random::RandomGenerator& random, TimeSource& time_source)
-    : priority_set_(priority_set) {
+    : priority_set_(priority_set), stats_(cluster_info.lbStats()) {
   const auto* typed_config = dynamic_cast<const LoadAwareLocalityLbConfig*>(lb_config.ptr());
   ASSERT(typed_config != nullptr);
 
@@ -43,6 +43,7 @@ absl::Status LoadAwareLocalityLoadBalancer::initialize() {
 void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
   // Re-arm first so the timer always fires on schedule regardless of early returns below.
   weight_update_timer_->enableTimer(weight_update_period_);
+  stats_.lb_recalculate_zone_structures_.inc();
 
   if (priority_set_.hostSetsPerPriority().empty()) {
     return;
@@ -134,6 +135,7 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
     snapshot->weights[0] = 1.0;
   };
 
+  snapshot->has_local_locality = hosts_per_locality.hasLocalLocality();
   if (hosts_per_locality.hasLocalLocality()) {
     // Compute host-count-weighted remote average utilization (target_util).
     // Excludes the local locality so that local's own load does not inflate
@@ -250,7 +252,7 @@ Upstream::LoadBalancerPtr WorkerLocalLbFactory::create(Upstream::LoadBalancerPar
 
 WorkerLocalLb::WorkerLocalLb(WorkerLocalLbFactory& factory,
                              const Upstream::PrioritySet& priority_set)
-    : factory_(factory), priority_set_(priority_set) {
+    : factory_(factory), priority_set_(priority_set), stats_(factory.lbStats()) {
   if (!priority_set_.hostSetsPerPriority().empty()) {
     buildPerLocality(priority_set_.hostSetsPerPriority()[0]->hostsPerLocality());
   }
@@ -383,7 +385,24 @@ Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancer
   if (per_locality_.empty()) {
     return {nullptr};
   }
-  return per_locality_[chooseLocality()].lb->chooseHost(context);
+
+  const size_t locality_idx = chooseLocality();
+
+  // Increment zone routing stats when a local locality is present.
+  const auto* snapshot = factory_.routingWeights();
+  if (snapshot != nullptr && snapshot->has_local_locality) {
+    if (locality_idx == 0) {
+      if (snapshot->all_local) {
+        stats_.lb_zone_routing_all_directly_.inc();
+      } else {
+        stats_.lb_zone_routing_sampled_.inc();
+      }
+    } else {
+      stats_.lb_zone_routing_cross_zone_.inc();
+    }
+  }
+
+  return per_locality_[locality_idx].lb->chooseHost(context);
 }
 
 size_t WorkerLocalLb::chooseLocality() {

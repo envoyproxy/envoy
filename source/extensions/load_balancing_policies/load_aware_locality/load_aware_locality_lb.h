@@ -77,6 +77,9 @@ struct RoutingWeightsSnapshot {
   // Not consulted on the hot path — the routing decision is fully encoded in weights[].
   // With probe_percentage > 0, weights[] still include a small remote share even when true.
   bool all_local{false};
+  // True when the hosts-per-locality has a local locality (index 0 is "local").
+  // Workers use this to pick the correct zone routing stat counter.
+  bool has_local_locality{false};
 };
 
 using RoutingWeightsSnapshotConstSharedPtr = std::shared_ptr<const RoutingWeightsSnapshot>;
@@ -136,6 +139,7 @@ public:
   bool recreateChildOnHostChange() const;
 
   Envoy::Random::RandomGenerator& random() const { return random_; }
+  Upstream::ClusterLbStats& lbStats() const { return cluster_info_.lbStats(); }
 
 private:
   Upstream::TypedLoadBalancerFactory& child_factory_;
@@ -204,6 +208,7 @@ private:
 
   WorkerLocalLbFactory& factory_;
   const Upstream::PrioritySet& priority_set_;
+  Upstream::ClusterLbStats& stats_;
   std::vector<PerLocalityState> per_locality_;
   // Must be declared LAST — destroyed first so the callback doesn't fire during destruction
   // and access freed per-locality state.
@@ -231,6 +236,7 @@ private:
   void computeLocalityRoutingWeights();
 
   const Upstream::PrioritySet& priority_set_;
+  Upstream::ClusterLbStats& stats_;
   double utilization_variance_threshold_;
   double ewma_alpha_;
   double probe_percentage_;

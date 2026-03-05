@@ -552,6 +552,18 @@ TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalitiesDistribution) {
   // Weights: zone-a = 2*(1-0.8) = 0.4, zone-b = 2*(1-0.3) = 1.4, zone-c = 2*(1-0.5) = 1.0
   // Total = 2.8 → zone-a ~14%, zone-b ~50%, zone-c ~36%.
   std::vector<double> utilizations = {0.8, 0.8, 0.3, 0.3, 0.5, 0.5};
+
+  // Cycle 1: Initial weights (from initialize()) are all_local with probe=0.1, so
+  // ~90% of traffic goes to zone-a and only ~5% each to zone-b/zone-c. With 30
+  // requests, each remote zone expects only ~1.5 requests — P(zone gets 0) ≈ 22%.
+  // When a remote zone gets no traffic, its util defaults to 0.0 (max headroom),
+  // which can reverse the intended zone-b > zone-c ordering.
+  sendRequestsAndTrack(30, utilizations);
+  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+
+  // Cycle 2: Now that weights exist, traffic reaches all three zones. This second
+  // seeding phase populates ORCA data for zone-b and zone-c so the next timer tick
+  // computes the correct differentiated weights.
   sendRequestsAndTrack(30, utilizations);
   timeSystem().advanceTimeWait(std::chrono::seconds(11));
 

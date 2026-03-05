@@ -1228,6 +1228,150 @@ TEST_F(LoadAwareLocalityLbTest, ClampedEffectiveTotalZero) {
   }
 }
 
+// --- Stats tests ---
+
+// Test: lb_recalculate_zone_structures incremented on each timer tick.
+TEST_F(LoadAwareLocalityLbTest, StatsRecalculateZoneStructures) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+
+  // initialize() calls computeLocalityRoutingWeights() once.
+  EXPECT_EQ(1, cluster_info_.lbStats().lb_recalculate_zone_structures_.value());
+
+  // Each timer tick increments the counter.
+  timer_->invokeCallback();
+  EXPECT_EQ(2, cluster_info_.lbStats().lb_recalculate_zone_structures_.value());
+
+  timer_->invokeCallback();
+  EXPECT_EQ(3, cluster_info_.lbStats().lb_recalculate_zone_structures_.value());
+}
+
+// Test: lb_zone_routing_all_directly incremented when all_local is true and locality 0 chosen.
+TEST_F(LoadAwareLocalityLbTest, StatsZoneRoutingAllDirectly) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+  setupLocalities({{h_local}, {h_remote}}, /*has_local_locality=*/true);
+
+  // Low variance threshold so all_local triggers easily.
+  createLb(/*variance_threshold=*/1.0, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+
+  setHostUtilization(*h_local, 0.3);
+  setHostUtilization(*h_remote, 0.3);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory->routingWeights());
+  EXPECT_TRUE(typed_factory->routingWeights()->all_local);
+  EXPECT_TRUE(typed_factory->routingWeights()->has_local_locality);
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  const int num_picks = 10;
+  for (int i = 0; i < num_picks; ++i) {
+    worker_lb->chooseHost(nullptr);
+  }
+
+  EXPECT_EQ(num_picks,
+            static_cast<int>(cluster_info_.lbStats().lb_zone_routing_all_directly_.value()));
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_cross_zone_.value());
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_sampled_.value());
+}
+
+// Test: lb_zone_routing_cross_zone incremented when a remote locality is chosen.
+TEST_F(LoadAwareLocalityLbTest, StatsZoneRoutingCrossZone) {
+  auto h_local = makeWeightTrackingMockHost();
+  Upstream::HostVector remote_hosts;
+  for (int i = 0; i < 10; ++i) {
+    remote_hosts.push_back(makeWeightTrackingMockHost());
+  }
+  setupLocalities({{h_local}, remote_hosts}, /*has_local_locality=*/true);
+
+  // High variance threshold won't trigger, and local is heavily overloaded.
+  createLb(/*variance_threshold=*/0.01, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+
+  setHostUtilization(*h_local, 0.99);
+  for (auto& host : remote_hosts) {
+    setHostUtilization(dynamic_cast<Upstream::MockHost&>(*host), 0.1);
+  }
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory->routingWeights());
+  EXPECT_FALSE(typed_factory->routingWeights()->all_local);
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  const int num_picks = 100;
+  for (int i = 0; i < num_picks; ++i) {
+    worker_lb->chooseHost(nullptr);
+  }
+
+  // Local has weight 1*0.01=0.01, remote has weight 10*0.9=9.0.
+  // Nearly all traffic should be cross-zone.
+  EXPECT_GT(cluster_info_.lbStats().lb_zone_routing_cross_zone_.value(), 0);
+}
+
+// Test: lb_zone_routing_sampled incremented when local locality chosen without all_local.
+TEST_F(LoadAwareLocalityLbTest, StatsZoneRoutingSampled) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+  setupLocalities({{h_local}, {h_remote}}, /*has_local_locality=*/true);
+
+  // Variance threshold is very low so all_local won't trigger, but traffic will still
+  // sometimes go to local via weighted random.
+  createLb(/*variance_threshold=*/0.0, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+
+  // Both at same utilization → all_local won't trigger (0.3 > 0.3 + 0.0 is false, but
+  // the condition is <=, so 0.3 <= 0.3 + 0.0 is true). Use local slightly higher.
+  setHostUtilization(*h_local, 0.31);
+  setHostUtilization(*h_remote, 0.3);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory->routingWeights());
+  EXPECT_FALSE(typed_factory->routingWeights()->all_local);
+  EXPECT_TRUE(typed_factory->routingWeights()->has_local_locality);
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  const int num_picks = 200;
+  for (int i = 0; i < num_picks; ++i) {
+    worker_lb->chooseHost(nullptr);
+  }
+
+  // With roughly equal weights, some picks go local (sampled) and some cross-zone.
+  EXPECT_GT(cluster_info_.lbStats().lb_zone_routing_sampled_.value(), 0);
+  EXPECT_GT(cluster_info_.lbStats().lb_zone_routing_cross_zone_.value(), 0);
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_all_directly_.value());
+}
+
+// Test: No zone routing stats incremented when has_local_locality is false.
+TEST_F(LoadAwareLocalityLbTest, StatsNoLocalLocality) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}}, /*has_local_locality=*/false);
+
+  createLb();
+
+  setHostUtilization(*h1, 0.3);
+  setHostUtilization(*h2, 0.3);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory->routingWeights());
+  EXPECT_FALSE(typed_factory->routingWeights()->has_local_locality);
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  const int num_picks = 100;
+  for (int i = 0; i < num_picks; ++i) {
+    worker_lb->chooseHost(nullptr);
+  }
+
+  // No zone routing stats should be incremented without a local locality.
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_all_directly_.value());
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_cross_zone_.value());
+  EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_sampled_.value());
+}
+
 } // namespace
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies
