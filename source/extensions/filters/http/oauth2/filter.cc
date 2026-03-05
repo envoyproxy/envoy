@@ -696,7 +696,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
       flow_id_ = result.flow_id_;
       if (!result.is_valid_) {
-        return onUnauthorized(result.error_details_);
+        sendUnauthorizedResponse(result.error_details_);
+        return Http::FilterHeadersStatus::StopIteration;
       }
 
       // Return 401 unauthorized if the original request URL in the state matches the redirect
@@ -704,9 +705,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::Url original_request_url;
       original_request_url.initialize(result.original_request_url_, false);
       if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
-        return onUnauthorized(
+        sendUnauthorizedResponse(
             fmt::format("State url query params matches the redirect path matcher: {}",
                         original_request_url.pathAndQueryParams()));
+        return Http::FilterHeadersStatus::StopIteration;
       }
 
       // Since the user is already logged in, we don't need to exchange the auth code for tokens.
@@ -751,13 +753,19 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
 
-    if (canRedirectToOAuthServer(headers)) {
+    if (shouldAllowFailed(headers)) {
+      continueAsUnauthorized(fmt::format(
+          "Unauthorized, and forwarding as unauthorized because OAuth failure is allowed: {}",
+          path_str));
+      return Http::FilterHeadersStatus::Continue;
+    } else if (shouldDenyRedirect(headers)) {
+      sendUnauthorizedResponse(fmt::format(
+          "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
+      return Http::FilterHeadersStatus::StopIteration;
+    } else {
       ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
-    } else {
-      return onUnauthorized(fmt::format(
-          "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
     }
   }
 
@@ -767,7 +775,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
   flow_id_ = result.flow_id_;
   if (!result.is_valid_) {
-    return onUnauthorized(result.error_details_);
+    sendUnauthorizedResponse(result.error_details_);
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   original_request_url_ = result.original_request_url_;
@@ -779,14 +788,16 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   absl::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
   if (!encrypted_code_verifier.has_value()) {
-    return onUnauthorized("Code verifier cookie is missing in the request");
+    sendUnauthorizedResponse("Code verifier cookie is missing in the request");
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_code_verifier.value(), config_->hmacSecret());
   if (decrypt_result.error.has_value()) {
-    return onUnauthorized(fmt::format("Failed to decrypt code verifier: {}, error: {}",
-                                      encrypted_code_verifier.value(),
-                                      decrypt_result.error.value()));
+    sendUnauthorizedResponse(fmt::format("Failed to decrypt code verifier: {}, error: {}",
+                                         encrypted_code_verifier.value(),
+                                         decrypt_result.error.value()));
+    return Http::FilterHeadersStatus::StopIteration;
   }
   std::string code_verifier = decrypt_result.plaintext;
 
@@ -795,7 +806,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                          redirect_uri, code_verifier, config_->authType());
   if (!status.ok()) {
     // Async task failed to start - handle immediately
-    return onUnauthorized(std::string(status.message()));
+    sendUnauthorizedResponse(std::string(status.message()));
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // pause while we await the next step from the OAuth server
@@ -899,23 +911,6 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
     return encrypted_token;
   }
   return decrypt_result.plaintext;
-}
-
-bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
-  for (const auto& matcher : config_->allowFailedMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      ENVOY_LOG(debug, "allow_failed_matcher matched, will not redirect");
-      return false;
-    }
-  }
-
-  for (const auto& matcher : config_->denyRedirectMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      ENVOY_STREAM_LOG(debug, "redirect is denied for this request", *decoder_callbacks_);
-      return false;
-    }
-  }
-  return true;
 }
 
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
@@ -1294,13 +1289,17 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 
 void OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
-  // We failed to get an access token via the refresh token, so send the user to the oauth
-  // endpoint.
-  if (canRedirectToOAuthServer(*request_headers_)) {
-    redirectToOAuthServer(*request_headers_);
-  } else {
-    asyncOnUnauthorized(
+  // We failed to get an access token via the refresh token. Forward the request based on the
+  // matcher configuration.
+  if (shouldAllowFailed(*request_headers_)) {
+    continueAsUnauthorized("Failed to refresh the access token, and forwarding as unauthorized "
+                           "because OAuth failure is allowed");
+    decoder_callbacks_->continueDecoding();
+  } else if (shouldDenyRedirect(*request_headers_)) {
+    sendUnauthorizedResponse(
         "Failed to refresh the access token, and redirecting to OAuth server is not allowed");
+  } else {
+    redirectToOAuthServer(*request_headers_);
   }
 }
 
@@ -1439,6 +1438,15 @@ bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) cons
   }
 
   for (const auto& matcher : config_->allowFailedMatchers()) {
+    if (matcher->matchesHeaders(headers)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) const {
+  for (const auto& matcher : config_->denyRedirectMatchers()) {
     if (matcher->matchesHeaders(headers)) {
       return true;
     }

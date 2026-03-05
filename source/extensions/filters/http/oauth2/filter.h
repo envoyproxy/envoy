@@ -394,7 +394,6 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
-  bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers) const;
@@ -423,6 +422,7 @@ private:
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
+  bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
   void continueAsUnauthorized(const std::string& failure_reason);
   void sendUnauthorizedResponse(const std::string& details);
 };
