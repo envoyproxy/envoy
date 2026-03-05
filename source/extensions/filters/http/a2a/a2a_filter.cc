@@ -62,20 +62,21 @@ uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBo
 
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
-  if (isValidA2aGetRequest(headers)) {
+  // According to RFC 7231, a payload body in a GET request has no defined semantics.
+  // In A2A filter here, GET with body will be rejected in REJECT mode, will pass through in
+  // PASS_THROUGH mode.
+  if (isValidA2aGetRequest(headers) && end_stream) {
     is_a2a_request_ = true;
     ENVOY_LOG(debug, "valid A2A GET request, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (isValidA2aPostRequest(headers)) {
-    is_json_post_request_ = true;
     if (end_stream) {
       is_a2a_request_ = false;
     } else {
-      // Need to buffer the body to check for JSON-RPC 2.0
+      // Set it to true first to perform the JSON-RPC 2.0 compliance check in decodeData() phase.
       is_a2a_request_ = true;
-
       // Set the buffer limit
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
@@ -100,10 +101,11 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
 }
 
 Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!is_json_post_request_ || !is_a2a_request_) {
+  if (!is_a2a_request_) {
     return Http::FilterDataStatus::Continue;
   }
 
+  // Early return if we have already completed parsing.
   if (parsing_complete_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -169,9 +171,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
 
 void A2aFilter::handleParseError(absl::string_view error_msg) {
   ENVOY_LOG(debug, "parse error: {}", error_msg);
-
   is_a2a_request_ = false;
-
   decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
                                      "a2a_filter_parse_error");
 }

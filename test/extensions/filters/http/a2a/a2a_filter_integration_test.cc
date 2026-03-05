@@ -43,10 +43,8 @@ TEST_P(A2aFilterIntegrationTest, NonPostRequestIgnored) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
-      0);
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -229,8 +227,8 @@ TEST_P(A2aFilterIntegrationTest, RejectModeRejectsNonA2aContentType) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
-// Test REJECT mode allows GET requests.
-TEST_P(A2aFilterIntegrationTest, RejectModeAllowsGetRequest) {
+// Test REJECT mode rejects GET requests with body
+TEST_P(A2aFilterIntegrationTest, RejectModeRejectsGetRequestWithBody) {
   initializeFilter(R"EOF(
     name: envoy.filters.http.a2a
     typed_config:
@@ -239,17 +237,16 @@ TEST_P(A2aFilterIntegrationTest, RejectModeAllowsGetRequest) {
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = "this body should be ignored by filter";
+  // According to RFC 7231, a payload body in a GET request has no defined semantics.
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
-      0);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+      request_body);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_FALSE(upstream_request_ != nullptr);
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 // Test Max Request Body Size limit.

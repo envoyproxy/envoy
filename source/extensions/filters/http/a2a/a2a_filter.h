@@ -87,7 +87,7 @@ private:
   uint32_t bytes_parsed_{0};
   bool parsing_complete_{false};
   bool is_a2a_request_{false};
-  bool is_json_post_request_{false};
+  // bool is_json_post_request_{false};
 };
 
 } // namespace A2a
