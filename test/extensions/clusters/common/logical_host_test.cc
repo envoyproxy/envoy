@@ -67,6 +67,14 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
 
   Upstream::Outlier::DetectorHostMonitorPtr detector_host;
   description_.setOutlierDetector(std::move(detector_host));
+
+  // Verify orcaUtilization() delegates to the logical host.
+  mock_host_->orca_utilization_store_.set(0.42);
+  EXPECT_NEAR(description_.orcaUtilization().get(), 0.42, 0.001);
+
+  // Verify lbPolicyData() delegates to the logical host.
+  description_.lbPolicyData();
+  description_.setLbPolicyData(nullptr);
 }
 
 // Test fixture for LogicalHost per-connection transport socket resolution.

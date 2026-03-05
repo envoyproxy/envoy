@@ -952,6 +952,282 @@ TEST_F(LoadAwareLocalityLbTest, HealthyHostsDivergeFromAll) {
   EXPECT_NEAR(weights->weights[1], 1.0, 0.01);
 }
 
+// --- Tests for onHealthChange path ---
+
+// Test: Health-only update (no membership change) re-partitions each locality's child LB.
+TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateRepartitions) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Both hosts reachable initially.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+
+  // Fire a health-only update (empty hosts_added, empty hosts_removed).
+  // This triggers onHealthChange(0) which re-partitions each locality.
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  // Both hosts should still be reachable after health-only update.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+}
+
+// Test: Health-only update at priority > 0 is ignored.
+TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateHigherPriorityIgnored) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+
+  // Fire a health-only update at priority 1 — should be ignored.
+  priority_set_.runUpdateCallbacks(1, {}, {});
+
+  // Both hosts still accessible.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+}
+
+// Test: Health-only update with topology mismatch is a no-op (waits for onHostChange).
+TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateTopologyMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+
+  // Mutate the underlying host_set to have 3 localities, simulating a topology change
+  // that hasn't yet been processed by onHostChange.
+  auto h3 = makeWeightTrackingMockHost();
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {h1, h2, h3};
+  host_set->healthy_hosts_ = {h1, h2, h3};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{h1}, {h2}, {h3}}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  // Fire health-only update — topology mismatch (3 localities vs 2 in per_locality_)
+  // should cause early return, not crash.
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  // Original hosts still work (per_locality_ unchanged).
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+}
+
+// --- Tests for edge cases in computeLocalityRoutingWeights ---
+
+// Test: Host set exists but locality_hosts is empty (e.g., all hosts removed).
+TEST_F(LoadAwareLocalityLbTest, EmptyLocalityHosts) {
+  // Set up an empty locality_hosts vector on host_set 0.
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {};
+  host_set->healthy_hosts_ = {};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  createLb();
+
+  // computeLocalityRoutingWeights should return early on empty locality_hosts.
+  // No crash, and factory has no routing weights.
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+  // Weights may be nullptr or empty, but should not crash.
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+  auto result = worker_lb->chooseHost(nullptr);
+  EXPECT_EQ(nullptr, result.host);
+}
+
+// Test: All hosts are unhealthy (total_hosts == 0) with local locality → defaults to local.
+TEST_F(LoadAwareLocalityLbTest, NoHealthyHostsWithLocalLocality) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+
+  // All hosts exist but none are healthy.
+  setupLocalities({{h1}, {h2}}, /*has_local_locality=*/true,
+                  std::vector<Upstream::HostVector>{{}, {}});
+
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  auto weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+
+  // total_hosts == 0 with has_local_locality → setAllLocal() is called.
+  EXPECT_TRUE(weights->all_local);
+  EXPECT_NEAR(weights->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(weights->weights[1], 0.0, 0.01);
+}
+
+// Test: Probe redistribution skipped when no remote healthy hosts exist.
+TEST_F(LoadAwareLocalityLbTest, ProbeSkippedWhenNoRemoteHealthyHosts) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+
+  // Local has healthy hosts, remote has none.
+  setupLocalities({{h1}, {h2}}, /*has_local_locality=*/true,
+                  std::vector<Upstream::HostVector>{{h1}, {}});
+
+  createLb(/*variance_threshold=*/1.0, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.1);
+
+  setHostUtilization(*h1, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  auto weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+
+  // all_local triggers, but probe redistribution is skipped because remote has 0 healthy hosts.
+  // All weight stays on local.
+  EXPECT_TRUE(weights->all_local);
+  EXPECT_NEAR(weights->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(weights->weights[1], 0.0, 0.01);
+}
+
+// Test: selectLocality with a snapshot that has total_weight == 0 returns 0.
+TEST_F(LoadAwareLocalityLbTest, SelectLocalityZeroTotalWeight) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot with zero total weight and empty weights.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->weights = {};
+  snapshot->total_weight = 0.0;
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // selectLocality should return 0 for empty/zero snapshot, selecting locality 0.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
+// Test: selectLocality with a snapshot smaller than per_locality_ (fewer weights than localities).
+TEST_F(LoadAwareLocalityLbTest, SnapshotFewerWeightsThanLocalities) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  auto h3 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}, {h3}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot with only 1 locality weight, but per_locality_ has 3.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->weights = {1.0};
+  snapshot->total_weight = 1.0;
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // selectLocality should clamp to min(1, 3) = 1, all traffic goes to locality 0.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
+// Test: Local at exact threshold boundary (<=) triggers all_local.
+TEST_F(LoadAwareLocalityLbTest, LocalAtExactThreshold) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+  setupLocalities({{h_local}, {h_remote}}, /*has_local_locality=*/true);
+
+  // threshold = 0.1, local_util = 0.6, remote_util = 0.5
+  // local_util (0.6) <= remote_util (0.5) + threshold (0.1) = 0.6 → exact boundary → all_local
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+
+  setHostUtilization(*h_local, 0.6);
+  setHostUtilization(*h_remote, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  auto weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+
+  // Condition is <= (not <), so exact boundary triggers all_local.
+  EXPECT_TRUE(weights->all_local);
+}
+
+// Test: EWMA topology change — smoothed state is re-initialized when locality count changes.
+TEST_F(LoadAwareLocalityLbTest, EwmaTopologyChangeReinitializes) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/0.3);
+
+  // Initialize smoothed state with 2 localities.
+  setHostUtilization(*h1, 0.5);
+  setHostUtilization(*h2, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  // Now change to 3 localities (topology change).
+  auto h3 = makeWeightTrackingMockHost();
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {h1, h2, h3};
+  host_set->healthy_hosts_ = {h1, h2, h3};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{h1}, {h2}, {h3}}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  setHostUtilization(*h3, 0.8);
+
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  auto weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(3, weights->weights.size());
+  // Cold start re-init: weights come from raw values, no blending with old smoothed state.
+  // h3 at 0.8 util → weight = 1 * 0.2 = 0.2.
+  EXPECT_NEAR(weights->weights[2], 0.2, 0.05);
+}
+
+// Test: Clamped effective total is zero — all clamped weights are zero.
+TEST_F(LoadAwareLocalityLbTest, ClampedEffectiveTotalZero) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot with 3 weights where the first 2 (clamped range) are zero.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->weights = {0.0, 0.0, 5.0};
+  snapshot->total_weight = 5.0;
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // selectLocality clamps to min(3, 2) = 2, re-sums weights[0..1] = 0.0.
+  // effective_total <= 0, so returns locality 0.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
 } // namespace
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies

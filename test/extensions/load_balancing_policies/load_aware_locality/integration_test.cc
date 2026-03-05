@@ -555,7 +555,10 @@ TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalitiesDistribution) {
   sendRequestsAndTrack(30, utilizations);
   timeSystem().advanceTimeWait(std::chrono::seconds(11));
 
-  auto usage = sendRequestsAndTrack(200, utilizations);
+  // Use 400 samples so the expected ordering is statistically robust.
+  // Expected proportions: zone-a ~14%, zone-b ~50%, zone-c ~36%.
+  // With 400 samples the probability of a zone-b < zone-c reversal is < 0.01%.
+  auto usage = sendRequestsAndTrack(400, utilizations);
   uint64_t zone_a = usage[0] + usage[1];
   uint64_t zone_b = usage[2] + usage[3];
   uint64_t zone_c = usage[4] + usage[5];

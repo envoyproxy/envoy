@@ -116,6 +116,38 @@ TEST(LoadAwareLocalityConfigTest, CustomParsedParams) {
   ASSERT_TRUE(thread_aware_lb->initialize().ok());
 }
 
+// Test: weight_update_period <= 0 returns an error.
+TEST(LoadAwareLocalityConfigTest, InvalidWeightUpdatePeriod) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
+
+  // Round robin policy for endpoint picking.
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig rr_config;
+  rr_config.set_name("envoy.load_balancing_policies.round_robin");
+  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = rr_config;
+
+  // Set weight_update_period to 0ms (invalid).
+  load_aware_config_msg.mutable_weight_update_period()->set_seconds(0);
+  load_aware_config_msg.mutable_weight_update_period()->set_nanos(0);
+
+  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
+  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
+  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
 } // namespace
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies
