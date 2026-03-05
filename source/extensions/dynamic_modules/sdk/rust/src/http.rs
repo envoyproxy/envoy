@@ -1,12 +1,21 @@
-use crate::abi;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
-  bytes_to_module_buffer, str_to_module_buffer, ClusterHostCount, EnvoyCounterId,
-  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
-  NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
-  NEW_HTTP_FILTER_CONFIG_FUNCTION, NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+  abi,
+  bytes_to_module_buffer,
+  str_to_module_buffer,
+  ClusterHostCount,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NewHttpFilterConfigFunction,
+  NewHttpFilterPerRouteConfigFunction,
+  NEW_HTTP_FILTER_CONFIG_FUNCTION,
+  NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::any::Any;
@@ -3468,7 +3477,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1..count {
+    for i in 1 .. count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,
@@ -3588,6 +3597,10 @@ impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> 
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -3631,6 +3644,10 @@ pub fn envoy_dynamic_module_on_http_filter_config_new_impl(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
@@ -3638,6 +3655,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   crate::drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
   _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -3649,6 +3670,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
   config.on_scheduled(event_id);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -3673,6 +3698,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_ne
   )
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
@@ -3695,6 +3724,10 @@ pub fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
@@ -3718,6 +3751,10 @@ pub fn envoy_dynamic_module_on_http_filter_new_impl(
   crate::wrap_into_c_void_ptr!(filter)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
@@ -3725,6 +3762,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
   crate::drop_wrapped_c_void_ptr!(filter_ptr, HttpFilter<EnvoyHttpFilterImpl>);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3735,6 +3776,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
   filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3746,6 +3791,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
   filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3757,6 +3806,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
   filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3767,6 +3820,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
   filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3778,6 +3835,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
   filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3789,6 +3850,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
   filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3799,6 +3864,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
   filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3833,6 +3902,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
   )
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3844,6 +3917,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
   filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3854,6 +3931,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_wr
   filter.on_downstream_above_write_buffer_high_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3864,6 +3945,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_wr
   filter.on_downstream_below_write_buffer_low_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_local_reply(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3883,6 +3968,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_local_reply(
   )
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_headers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3909,6 +3998,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_headers
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3933,6 +4026,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_trailers(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3957,6 +4054,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_trailer
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_complete(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3968,6 +4069,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_complet
   filter.on_http_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr), stream_handle);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_reset(
   envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3984,6 +4089,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_reset(
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_callout_done(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -4020,6 +4129,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_callout
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_headers(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -4048,6 +4161,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_data(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -4074,6 +4191,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -4100,6 +4221,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_complete(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -4116,6 +4241,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_reset(
   envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,

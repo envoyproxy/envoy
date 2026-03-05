@@ -1,5 +1,9 @@
-use crate::abi;
-use crate::{drop_wrapped_c_void_ptr, wrap_into_c_void_ptr, NEW_LOAD_BALANCER_CONFIG_FUNCTION};
+use crate::{
+  abi,
+  drop_wrapped_c_void_ptr,
+  wrap_into_c_void_ptr,
+  NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+};
 use mockall::*;
 
 /// Trait for interacting with the Envoy load balancer and its context.
@@ -765,6 +769,10 @@ pub trait LoadBalancer {
   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection>;
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   _lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
@@ -785,6 +793,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
@@ -792,6 +804,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
   drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
@@ -807,6 +823,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   wrap_into_c_void_ptr!(lb)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
@@ -830,6 +850,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,

@@ -1,6 +1,9 @@
-use crate::abi;
 use crate::{
-  drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, NEW_CLUSTER_CONFIG_FUNCTION,
+  abi,
+  drop_wrapped_c_void_ptr,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -223,6 +226,10 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_config_new(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
@@ -230,6 +237,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
   drop_wrapped_c_void_ptr!(config_module_ptr, ClusterConfig);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
   config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
@@ -253,6 +264,10 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_init(
   cluster.on_init(&envoy_cluster);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -260,6 +275,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
   drop_wrapped_c_void_ptr!(cluster_module_ptr, Cluster);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -272,6 +291,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
   wrap_into_c_void_ptr!(lb)
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,

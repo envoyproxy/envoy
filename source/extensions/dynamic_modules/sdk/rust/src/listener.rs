@@ -1,8 +1,13 @@
-use crate::abi;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
-  EnvoyGaugeId, EnvoyHistogramId, NewListenerFilterConfigFunction,
+  abi,
+  drop_wrapped_c_void_ptr,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyGaugeId,
+  EnvoyHistogramId,
+  NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -1217,6 +1222,10 @@ pub(crate) fn init_listener_filter_config<
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
@@ -1227,6 +1236,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,

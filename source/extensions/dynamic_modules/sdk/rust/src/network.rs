@@ -1,9 +1,16 @@
-use crate::abi;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
-  ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewNetworkFilterConfigFunction,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  ClusterHostCount,
+  EnvoyCounterId,
+  EnvoyGaugeId,
+  EnvoyHistogramId,
+  NewNetworkFilterConfigFunction,
   NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -1648,6 +1655,10 @@ pub(crate) fn init_network_filter_config<EC: EnvoyNetworkFilterConfig, ENF: Envo
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
@@ -1658,6 +1669,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
   );
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,

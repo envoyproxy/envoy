@@ -1,10 +1,18 @@
-use crate::abi;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
-  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
-  NewBootstrapExtensionConfigFunction, NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+  abi,
+  drop_wrapped_c_void_ptr,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction,
+  NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -1195,6 +1203,10 @@ pub(crate) fn init_bootstrap_extension_config(
   }
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1202,6 +1214,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_dest
   drop_wrapped_c_void_ptr!(extension_config_ptr, BootstrapExtensionConfig);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1296,6 +1312,10 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
 /// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
 /// must ensure that all pointers are valid and that the memory they point to remains valid for
 /// the duration of the function call.
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
@@ -1358,6 +1378,10 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
 /// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
 /// must ensure that all pointers are valid and that the memory they point to remains valid for
 /// the duration of the function call.
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_request(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
