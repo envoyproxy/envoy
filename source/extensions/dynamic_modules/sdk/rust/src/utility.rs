@@ -72,6 +72,69 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
   get_body_content(envoy_filter, false)
 }
 
+pub(crate) struct HeaderPairSlice(
+  pub(crate) *const crate::abi::envoy_dynamic_module_type_module_http_header,
+  pub(crate) usize,
+);
+
+const _: () = {
+  type HeaderPair<'a> = (&'a str, &'a [u8]);
+  assert!(
+    std::mem::size_of::<HeaderPair>()
+      == std::mem::size_of::<crate::abi::envoy_dynamic_module_type_module_http_header>()
+  );
+  assert!(
+    std::mem::align_of::<HeaderPair>()
+      == std::mem::align_of::<crate::abi::envoy_dynamic_module_type_module_http_header>()
+  );
+
+  assert!(
+    std::mem::offset_of!(HeaderPair, 0)
+      == std::mem::offset_of!(
+        crate::abi::envoy_dynamic_module_type_module_http_header,
+        key_ptr
+      )
+  );
+  assert!(
+    std::mem::offset_of!(HeaderPair, 1)
+      == std::mem::offset_of!(
+        crate::abi::envoy_dynamic_module_type_module_http_header,
+        value_ptr
+      )
+  );
+};
+
+impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
+  fn from(headers: &[(&'a str, &'a [u8])]) -> Self {
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break, so we assert on them here in debug builds.
+    type HeaderPair<'a> = (&'a str, &'a [u8]);
+
+    debug_assert!({
+      let pair: HeaderPair<'_> = ("test", b"value");
+      let constructed = crate::abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<HeaderPair, crate::abi::envoy_dynamic_module_type_module_http_header>(
+          pair,
+        )
+      };
+      constructed == punned
+    });
+
+    let ptr = headers.as_ptr() as *const crate::abi::envoy_dynamic_module_type_module_http_header;
+    HeaderPairSlice(ptr, headers.len())
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

@@ -11,36 +11,6 @@ namespace DynamicModules {
 
 namespace {
 
-// Extract configuration bytes from the Any field.
-std::string extractConfigBytes(const Protobuf::Any& any_config) {
-  if (any_config.type_url().empty()) {
-    return "";
-  }
-
-  const std::string& type_url = any_config.type_url();
-
-  // Handle well-known types that can be passed directly as bytes.
-  if (type_url == "type.googleapis.com/google.protobuf.StringValue") {
-    Protobuf::StringValue string_value;
-    if (any_config.UnpackTo(&string_value)) {
-      return string_value.value();
-    }
-  } else if (type_url == "type.googleapis.com/google.protobuf.BytesValue") {
-    Protobuf::BytesValue bytes_value;
-    if (any_config.UnpackTo(&bytes_value)) {
-      return bytes_value.value();
-    }
-  } else if (type_url == "type.googleapis.com/google.protobuf.Struct") {
-    Protobuf::Struct struct_value;
-    if (any_config.UnpackTo(&struct_value)) {
-      return MessageUtil::getJsonStringFromMessageOrError(struct_value, false);
-    }
-  }
-
-  // For unknown types, use the serialized bytes.
-  return any_config.value();
-}
-
 /**
  * Thread-aware load balancer implementation that creates DynamicModuleLoadBalancer instances.
  */
@@ -103,7 +73,12 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf
   }
 
   // Create the load balancer configuration.
-  std::string config_bytes = extractConfigBytes(typed_config.lb_policy_config());
+  std::string config_bytes;
+  if (typed_config.has_lb_policy_config()) {
+    auto config_or_error = MessageUtil::knownAnyToBytes(typed_config.lb_policy_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    config_bytes = std::move(config_or_error.value());
+  }
   auto lb_config_or_error = DynamicModuleLbConfig::create(
       typed_config.lb_policy_name(), config_bytes, std::move(module_or_error.value()));
   if (!lb_config_or_error.ok()) {

@@ -8094,6 +8094,28 @@ bool envoy_dynamic_module_on_lb_choose_host(
     uint32_t* result_index);
 
 /**
+ * envoy_dynamic_module_on_lb_on_host_membership_update is called when the set of hosts in the
+ * cluster changes. This is triggered by EDS updates, health check transitions, or any other
+ * mechanism that adds or removes hosts from the priority set.
+ *
+ * During this callback, the module can call
+ * envoy_dynamic_module_callback_lb_get_member_update_host_address to get the addresses of the
+ * added or removed hosts by index.
+ *
+ * After this callback returns, the module can use the standard host query callbacks
+ * (get_hosts_count, get_healthy_hosts_count, etc.) to inspect the new host state.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ * @param num_hosts_added is the number of hosts added.
+ * @param num_hosts_removed is the number of hosts removed.
+ */
+void envoy_dynamic_module_on_lb_on_host_membership_update(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed);
+
+/**
  * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
  * destroyed. The module should release any resources associated with it.
  *
@@ -8195,6 +8217,24 @@ uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
  */
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_health(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_health_by_address looks up a host by its address
+ * string across all priorities and returns the health status. This uses the cross-priority host
+ * map internally, providing O(1) lookup by address instead of requiring the caller to iterate
+ * through all hosts by index.
+ *
+ * The address string must match the format returned by host->address()->asStringView(), which is
+ * typically "ip:port" (e.g., "10.0.0.1:8080").
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param address is the address string to look up.
+ * @param result is the output for the health status of the host.
+ * @return true if the host was found, false if the address is not in the host map.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, envoy_dynamic_module_type_host_health* result);
 
 /**
  * envoy_dynamic_module_callback_lb_get_host_address returns the address of a host
@@ -8469,6 +8509,70 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count returns the number
+ * of times host selection should be retried if the chosen host is rejected by
+ * shouldSelectAnotherHost. Built-in load balancers use this value as the upper bound of a
+ * retry loop during host selection.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @return the maximum number of host selection retries, or 0 if the context is null.
+ */
+uint32_t envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries
+ * to avoid selecting hosts that were already attempted. The host is identified by priority
+ * and index within all hosts at that priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return true if the host should be rejected and selection retried, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_override_host returns the override host address
+ * and strict mode flag from the load balancer context. Override host allows upstream filters to
+ * direct the load balancer to prefer a specific host by address. Note that override host
+ * resolution is normally handled by the ClusterManager before the load balancer is invoked, so
+ * this callback provides read-only access to the override host preference.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param address is the output buffer for the override host address string. The buffer points to
+ * Envoy-owned memory valid for the duration of the context.
+ * @param strict is the output for the strict mode flag. When true, the load balancer should
+ * return nullptr if the override host is not valid. When false, the load balancer should fall
+ * back to normal selection.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_member_update_host_address returns the address of an added
+ * or removed host during the on_host_membership_update event hook. This callback is only valid
+ * during envoy_dynamic_module_on_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer for the host address string. The buffer points to Envoy-owned
+ * memory that is valid only for the duration of the on_host_membership_update callback.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 // =============================================================================
 // Matcher Types

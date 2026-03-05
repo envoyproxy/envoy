@@ -93,6 +93,11 @@ minor_behavior_changes:
     Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
     headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
     collected and can be accesses via method requestProcessingEffect() and failedOpen().
+- area: dynamic_modules
+  change: |
+    Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
+    serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
+    dynamic module side as the configuration.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -105,6 +110,12 @@ bug_fixes:
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
     resolves an error when a dynamic modules network filter closes a connection that has an HTTP filter present.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module extensions do not handle the ``google.protobuf.Struct`` configuration
+    properly as the API definition requires.
+    The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
+    to the dynamic module side as the configuration.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
@@ -237,6 +248,13 @@ new_features:
     to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
     the ``x-envoy-degraded`` header. Degraded hosts are deprioritized in load balancing but remain in rotation (not
     ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to false.
+- area: http2
+  change: |
+    Added :ref:`max_header_field_size_kb
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_header_field_size_kb>` to configure the
+    maximum wire-encoded size in KiB of an individual HPACK-encoded header field that the HTTP/2
+    codec will accept. This allows increasing the default nghttp2 per-header limit of 64 KiB on the
+    wire when larger single headers need to be supported.
 - area: dynamic_modules
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
@@ -283,6 +301,9 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: access_log
+  change: |
+    Added customization support on stats in the stats :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
@@ -421,6 +442,10 @@ new_features:
     Added :ref:`load balancing policies
     <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
     support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added ``get_host_health_by_address`` ABI callback for dynamic module load balancers, providing O(1)
+    host health lookup by address string using the cross-priority host map.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
@@ -464,6 +489,12 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added support for loading dynamic module binaries from local file paths via the new
+    :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
+    field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
+    via ``module.local.filename`` as an alternative to the name-based search path.
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts
@@ -494,6 +525,11 @@ new_features:
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target
     is automatically registered for every bootstrap extension, blocking traffic until the module
     signals readiness via ``signal_init_complete``.
+- area: dynamic_modules
+  change: |
+    Added ``on_host_membership_update`` event hook and ``get_member_update_host_address`` callback
+    for dynamic module load balancers, enabling modules to receive notifications when hosts are
+    added or removed from the cluster and inspect the affected host addresses.
 - area: geoip
   change: |
     Added ``asn_org`` field to :ref:`geo_field_keys
@@ -539,6 +575,10 @@ new_features:
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
     standard JSON-REST HTTP requests.
+- area: http
+  change: |
+    Added :ref:`file_server http filter <config_http_filters_file_server>` to allow responding with
+    file contents from the filesystem.
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
@@ -552,5 +592,16 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
+    ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include the certificate's CRL Distribution Point (CRLDP) information when CRL
+    validation fails. For errors such as ``CRL for certificate was not provided``, ``CRL has expired``, ``CRL
+    is not yet valid``, or ``certificate revoked``, the error message now includes the certificate's
+    CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: certificate revocation
+    check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
+    [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
+    validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
 
 deprecated:

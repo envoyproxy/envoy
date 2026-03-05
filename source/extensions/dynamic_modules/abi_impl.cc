@@ -462,6 +462,17 @@ envoy_dynamic_module_callback_lb_get_host_health(envoy_dynamic_module_type_lb_en
   return envoy_dynamic_module_type_host_health_Unhealthy;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_host_health* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_health_by_address: "
+               "not implemented in this context");
+  if (result != nullptr) {
+    *result = envoy_dynamic_module_type_host_health_Unhealthy;
+  }
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
                                                   size_t,
@@ -529,6 +540,30 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstre
     envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint32_t
+envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_lb_context_envoy_ptr,
+    uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_should_select_another_host: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_override_host: "
                "not implemented in this context");
   return false;
 }
@@ -609,6 +644,18 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_locality_wei
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_locality_weight: "
                "not implemented in this context");
   return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_member_update_host_address: "
+               "not implemented in this context");
+  if (result != nullptr) {
+    result->ptr = nullptr;
+    result->length = 0;
+  }
+  return false;
 }
 
 // ---------------------- Matcher callbacks ------------------------

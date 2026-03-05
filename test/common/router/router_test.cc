@@ -5987,6 +5987,7 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return(absl::string_view{}));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
@@ -6007,6 +6008,7 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return(absl::string_view{}));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
 
@@ -6089,6 +6091,54 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(0U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, router_->stats().rq_direct_response_.value());
+}
+
+// Verifies that when responseContentType() returns a non-empty string, the Content-Type header
+// in the response is set to that value.
+TEST_F(RouterTest, DirectResponseWithBodyFormatContentType) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  const std::string response_body("Hello");
+  EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(response_body));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return("text/html"));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "5"}, {"content-type", "text/html"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(0U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, router_->stats().rq_direct_response_.value());
+}
+
+// Verifies that when responseContentType() returns an empty string, the Content-Type header
+// is NOT explicitly set by the router (falls back to default behavior).
+TEST_F(RouterTest, DirectResponseWithBodyFormatNoContentType) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  const std::string response_body("Hello");
+  EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(response_body));
+  EXPECT_CALL(direct_response, responseContentType()).WillRepeatedly(Return(absl::string_view{}));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "5"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
