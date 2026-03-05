@@ -121,27 +121,6 @@ private:
       match_result_cache_;
 };
 
-class UnknownFieldChecker : public FieldCheckerInterface,
-                            public Logger::Loggable<Logger::Id::filter> {
-public:
-  UnknownFieldChecker() = default;
-
-  // This type is neither copyable nor movable.
-  UnknownFieldChecker(const UnknownFieldChecker&) = delete;
-  UnknownFieldChecker& operator=(const UnknownFieldChecker&) = delete;
-  ~UnknownFieldChecker() override {}
-
-  using FieldCheckerInterface::CheckField;
-
-  FieldCheckResults CheckField(const std::vector<std::string>&, const Protobuf::Field* field,
-                               const int, const Protobuf::Type*) const override {
-    if (field == nullptr) {
-      return FieldCheckResults::kExclude;
-    }
-    return FieldCheckResults::kInclude;
-  }
-};
-
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters
 } // namespace Extensions
