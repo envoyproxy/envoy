@@ -342,10 +342,12 @@ EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
   return *this;
 }
 
+#if defined(__APPLE__)
 EngineBuilder& EngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
   enable_network_change_monitor_ = network_change_monitor_on;
   return *this;
 }
+#endif
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS

@@ -239,9 +239,12 @@ public:
   EngineBuilder& setNodeMetadata(Protobuf::Struct node_metadata);
   // Sets whether to collect Envoy's internal stats (counters & guages). Off by default.
   EngineBuilder& enableStatsCollection(bool stats_collection_on);
+#if defined(__APPLE__)
   // If true, initialize the platform network change monitor to listen for network change events.
+  // Only takes effect on iOS, where it is required in order to enable the network change monitor.
   // Defaults to false.
   EngineBuilder& enableNetworkChangeMonitor(bool network_change_monitor_on);
+#endif
 
 #ifdef ENVOY_MOBILE_XDS
   // Sets the xDS configuration for the Envoy Mobile engine.

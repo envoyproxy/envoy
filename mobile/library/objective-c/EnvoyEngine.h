@@ -31,13 +31,10 @@ NS_ASSUME_NONNULL_BEGIN
  running.
  @param logger Logging interface.
  @param eventTracker Event tracking interface.
- @param networkMonitoringMode Configure whether network monitoring is enabled. Any non-zero value
- enables Apple network monitoring.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
-                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode;
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker;
 /**
  Run the Envoy engine with the provided configuration and log level.
 

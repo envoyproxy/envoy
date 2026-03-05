@@ -4,7 +4,6 @@
 #import "library/objective-c/EnvoyKeyValueStoreBridgeImpl.h"
 
 #include "library/common/api/c_types.h"
-#include "library/common/network/apple_network_change_monitor.h"
 
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
@@ -20,26 +19,6 @@
 @interface EnvoyConfiguration (CXX)
 - (std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>)generateBootstrap;
 @end
-
-namespace {
-
-class InternalEngineNetworkChangeListener final : public Envoy::Platform::NetworkChangeListener {
-public:
-  explicit InternalEngineNetworkChangeListener(Envoy::InternalEngine &engine) : engine_(engine) {}
-
-  void onDefaultNetworkChangeEvent(int network) override {
-    engine_.onDefaultNetworkChangeEvent(network);
-  }
-
-  void onDefaultNetworkAvailable() override { engine_.onDefaultNetworkAvailable(); }
-
-  void onDefaultNetworkUnavailable() override { engine_.onDefaultNetworkUnavailable(); }
-
-private:
-  Envoy::InternalEngine &engine_;
-};
-
-} // namespace
 
 static const void *ios_http_filter_init(const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
@@ -383,14 +362,11 @@ static envoy_data ios_get_string(const void *context) {
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
   Envoy::InternalEngine *_engine;
-  std::unique_ptr<Envoy::Platform::NetworkChangeListener> _networkChangeListener;
-  std::unique_ptr<Envoy::Platform::NetworkChangeMonitor> _networkMonitor;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
-                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode {
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker {
   self = [super init];
   if (!self) {
     return nil;
@@ -446,13 +422,6 @@ static envoy_data ios_get_string(const void *context) {
   _engine = new Envoy::InternalEngine(std::move(native_callbacks), std::move(native_logger),
                                       std::move(native_event_tracker));
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
-
-  if (networkMonitoringMode != 0) {
-    _networkChangeListener = std::make_unique<InternalEngineNetworkChangeListener>(*_engine);
-    _networkMonitor =
-        std::make_unique<Envoy::Platform::AppleNetworkChangeMonitor>(*_networkChangeListener.get());
-    _networkMonitor->start();
-  }
 
   return self;
 }
@@ -580,18 +549,11 @@ static envoy_data ios_get_string(const void *context) {
 }
 
 - (void)terminate {
-  if (_networkMonitor != nullptr) {
-    _networkMonitor->stop();
-  }
   _engine->terminate();
 }
 
 - (void)resetConnectivityState {
   _engine->resetConnectivityState();
-}
-
-- (BOOL)isNetworkMonitorEnabledForTesting {
-  return _networkMonitor != nullptr;
 }
 
 #pragma mark - Private

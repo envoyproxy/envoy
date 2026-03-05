@@ -275,12 +275,11 @@ Specify a closure to be called by Envoy to access arbitrary strings from Platfor
   // Swift
   builder.addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``setNetworkMonitoringMode``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableNetworkChangeMonitor``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Configure how the engine observes network reachability state changes to update the preferred Envoy network cluster (e.g. WLAN vs WWAN).
-Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachability`` or be disabled completely.
+Specify whether to enable the network change monitor.
 
 **Example**::
 
@@ -288,7 +287,7 @@ Defaults to ``NWPathMonitor``, but can be configured to use ``SCNetworkReachabil
   // N/A
 
   // Swift
-  builder.setNetworkMonitoringMode(.pathMonitor)
+  builder.enableNetworkChangeMonitor(true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``

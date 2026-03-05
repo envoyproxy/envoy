@@ -39,7 +39,6 @@ open class EngineBuilder: NSObject {
   private var onEngineRunning: (() -> Void)?
   private var logger: ((LogLevel, String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
-  private(set) var monitoringMode: NetworkMonitoringMode = .pathMonitor
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
@@ -483,15 +482,14 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Configure how the engine observes network reachability state changes.
-  /// Defaults to `.pathMonitor`.
+  /// Add the App ID of the App using this Envoy Client.
   ///
-  /// - parameter mode: The mode to use.
+  /// - parameter appId: The ID.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func setNetworkMonitoringMode(_ mode: NetworkMonitoringMode) -> Self {
-    self.monitoringMode = mode
+  public func addAppId(_ appId: String) -> Self {
+    self.appId = appId
     return self
   }
 
@@ -503,17 +501,6 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addAppVersion(_ appVersion: String) -> Self {
     self.appVersion = appVersion
-    return self
-  }
-
-  /// Add the App ID of the App using this Envoy Client.
-  ///
-  /// - parameter appId: The ID.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addAppId(_ appId: String) -> Self {
-    self.appId = appId
     return self
   }
 
@@ -531,8 +518,7 @@ open class EngineBuilder: NSObject {
                                           }
                                         }
                                       },
-                                      eventTracker: self.eventTracker,
-                                      networkMonitoringMode: Int32(self.monitoringMode.rawValue))
+                                      eventTracker: self.eventTracker)
     let config = self.makeConfig()
 
     return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)

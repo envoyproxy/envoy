@@ -46,31 +46,6 @@ final class NetworkChangeMonitorTests: XCTestCase {
     XCTAssertTrue((wlanWithVpn & generic) != 0, "Combined should contain Generic (VPN)")
   }
 
-  // MARK: - NetworkMonitoringMode Tests
-
-  func testNetworkMonitoringModeValues() {
-    XCTAssertEqual(NetworkMonitoringMode.disabled.rawValue, 0)
-    XCTAssertEqual(NetworkMonitoringMode.reachability.rawValue, 1)
-    XCTAssertEqual(NetworkMonitoringMode.pathMonitor.rawValue, 2)
-  }
-
-  func testEngineBuilderDefaultsToPathMonitor() {
-    let builder = EngineBuilder()
-    XCTAssertEqual(builder.monitoringMode, .pathMonitor)
-  }
-
-  func testEngineBuilderCanSetMonitoringMode() {
-    let builder = EngineBuilder()
-      .setNetworkMonitoringMode(.disabled)
-    XCTAssertEqual(builder.monitoringMode, .disabled)
-
-    builder.setNetworkMonitoringMode(.reachability)
-    XCTAssertEqual(builder.monitoringMode, .reachability)
-
-    builder.setNetworkMonitoringMode(.pathMonitor)
-    XCTAssertEqual(builder.monitoringMode, .pathMonitor)
-  }
-
   // MARK: - NWPathMonitor Integration Tests
 
   /// Test that NWPathMonitor provides network path information.
@@ -147,4 +122,5 @@ final class NetworkChangeMonitorTests: XCTestCase {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
   }
+
 }
