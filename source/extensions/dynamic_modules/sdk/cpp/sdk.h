@@ -830,6 +830,13 @@ public:
    * @param stream_id The stream handle returned from startHttpStream.
    */
   virtual void resetHttpStream(uint64_t stream_id) = 0;
+
+  /**
+   * Returns a scheduler for deferred task execution. This can only be called on config loading
+   * event and then the returned Scheduler can be used in other threads.
+   * @return Unique pointer to Scheduler instance.
+   */
+  virtual std::shared_ptr<Scheduler> getScheduler() = 0;
 };
 
 /**

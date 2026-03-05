@@ -91,10 +91,10 @@ public:
     auto shared_status = std::make_shared<std::atomic<bool>>(false);
 
     // Simulate async config update.
-    std::thread([shared_status]() {
+    handle.getScheduler()->schedule([shared_status]() {
       std::this_thread::sleep_for(std::chrono::milliseconds(100)); // NO_CHECK_FORMAT(real_time)
       shared_status->store(true);
-    }).detach();
+    });
 
     return std::make_unique<ConfigSchedulerFilterFactory>(shared_status);
   }
