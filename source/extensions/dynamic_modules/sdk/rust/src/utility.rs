@@ -72,9 +72,9 @@ pub fn read_whole_response_body<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF) ->
   get_body_content(envoy_filter, false)
 }
 
-pub(super) struct HeaderPairSlice(
-  pub(super) *const crate::abi::envoy_dynamic_module_type_module_http_header,
-  pub(super) usize,
+pub(crate) struct HeaderPairSlice(
+  pub(crate) *const crate::abi::envoy_dynamic_module_type_module_http_header,
+  pub(crate) usize,
 );
 
 const _: () = {
@@ -134,7 +134,6 @@ impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
     HeaderPairSlice(ptr, headers.len())
   }
 }
-
 
 #[cfg(test)]
 mod tests {

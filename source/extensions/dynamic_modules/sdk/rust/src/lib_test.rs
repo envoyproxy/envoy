@@ -261,7 +261,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -275,7 +275,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -306,7 +306,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_destroy() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let config_ptr = init_listener_filter_config(
+  let config_ptr = listener::init_listener_filter_config(
     &mut EnvoyListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -341,7 +341,7 @@ fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let result = envoy_dynamic_module_on_listener_filter_new_impl(
+  let result = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -391,7 +391,7 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_listener_filter_new_impl(
+  let filter = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -838,7 +838,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
     EnvoyNetworkFilterConfigImpl,
     EnvoyNetworkFilterImpl,
   > = |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -852,7 +852,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -881,7 +881,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_destroy() {
 
   let new_fn: NewNetworkFilterConfigFunction<EnvoyNetworkFilterConfigImpl, EnvoyNetworkFilterImpl> =
     |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let config_ptr = init_network_filter_config(
+  let config_ptr = network::init_network_filter_config(
     &mut EnvoyNetworkFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -916,7 +916,7 @@ fn test_envoy_dynamic_module_on_network_filter_new_destroy() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let result = envoy_dynamic_module_on_network_filter_new_impl(
+  let result = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -983,7 +983,7 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1261,7 +1261,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -1275,7 +1275,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -1306,7 +1306,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_destroy() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let config_ptr = init_udp_listener_filter_config(
+  let config_ptr = udp_listener::init_udp_listener_filter_config(
     &mut EnvoyUdpListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1341,7 +1341,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let result = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let result = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1377,7 +1377,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let filter = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -2198,7 +2198,7 @@ fn test_network_filter_watermark_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -2506,8 +2506,8 @@ fn test_bootstrap_extension_config_new_destroy() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2544,9 +2544,9 @@ fn test_bootstrap_extension_new_destroy() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
   assert!(!extension_ptr.is_null());
 
   envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
@@ -2575,9 +2575,9 @@ fn test_bootstrap_extension_drain_started() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_drain_started(std::ptr::null_mut(), extension_ptr);
 
@@ -2619,9 +2619,9 @@ fn test_bootstrap_extension_shutdown() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_shutdown(
     std::ptr::null_mut(),
@@ -2662,9 +2662,9 @@ fn test_bootstrap_extension_shutdown_default_calls_completion() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_shutdown(
     std::ptr::null_mut(),
@@ -2711,8 +2711,8 @@ fn test_bootstrap_extension_admin_request() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2785,8 +2785,8 @@ fn test_bootstrap_extension_admin_request_default() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2869,8 +2869,8 @@ fn test_bootstrap_extension_timer_fired_identity() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
