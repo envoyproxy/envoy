@@ -26,6 +26,8 @@ DynamicModuleLbConfig::create(const std::string& lb_policy_name, const std::stri
                  on_config_destroy_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_lb_new", OnLbNewType, on_lb_new_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_lb_choose_host", OnLbChooseHostType, on_choose_host_);
+  RESOLVE_SYMBOL("envoy_dynamic_module_on_lb_on_host_membership_update",
+                 OnLbOnHostMembershipUpdateType, on_host_membership_update_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_lb_destroy", OnLbDestroyType, on_lb_destroy_);
 
 #undef RESOLVE_SYMBOL

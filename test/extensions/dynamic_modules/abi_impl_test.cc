@@ -812,6 +812,19 @@ TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_get_member_update_host_address triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbGetMemberUpdateHostAddressEnvoyBug) {
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto found = envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0,
+                                                                                     true, &result);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Matcher weak symbol stub tests
 // =====================================================================
