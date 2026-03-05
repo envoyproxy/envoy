@@ -1,7 +1,8 @@
 #include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -47,21 +48,25 @@ public:
 
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
-    ON_CALL(local_info_, zoneName()).WillByDefault(ReturnRef(ZONE_NAME));
-    ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(CLUSTER_NAME));
-    ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(NODE_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, zoneName())
+        .WillByDefault(ReturnRef(ZONE_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, clusterName())
+        .WillByDefault(ReturnRef(CLUSTER_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, nodeName())
+        .WillByDefault(ReturnRef(NODE_NAME));
 
-    http_access_logger_ =
-        std::make_unique<HttpAccessLoggerImpl>(cluster_manager_, http_service, config, dispatcher_,
-                                               local_info_, *stats_store_.rootScope());
+    absl::Status creation_status = absl::OkStatus();
+    http_access_logger_ = std::make_unique<HttpAccessLoggerImpl>(
+        cluster_manager_, http_service, config, dispatcher_,
+        factory_context_.server_factory_context_, creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
 protected:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<HttpAccessLoggerImpl> http_access_logger_;
 };
 
@@ -341,21 +346,23 @@ TEST(HttpAccessLoggerCacheTest, CacheHitReturnsSameLogger) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.set_log_name("test_log");
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
-  cluster_manager.initializeThreadLocalClusters({"my_o11y_backend"});
-  cluster_manager.initializeClusters({"my_o11y_backend"}, {});
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->name_ = "my_o11y_backend";
+  factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"my_o11y_backend"});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"},
+                                                                              {});
 
-  ON_CALL(local_info, zoneName()).WillByDefault(ReturnRef(ZONE_NAME));
-  ON_CALL(local_info, clusterName()).WillByDefault(ReturnRef(CLUSTER_NAME));
-  ON_CALL(local_info, nodeName()).WillByDefault(ReturnRef(NODE_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, zoneName())
+      .WillByDefault(ReturnRef(ZONE_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, clusterName())
+      .WillByDefault(ReturnRef(CLUSTER_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, nodeName())
+      .WillByDefault(ReturnRef(NODE_NAME));
 
-  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(
-      cluster_manager, *stats_store.rootScope(), tls, local_info);
+  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(factory_context.server_factory_context_);
 
   auto logger1 = cache->getOrCreateLogger(config, http_service);
   ASSERT_NE(nullptr, logger1);

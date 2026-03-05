@@ -35,14 +35,14 @@ message HeaderValue {
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of ``-``.
   // Header value is encoded as string. This does not work for non-utf8 characters.
-  // Only one of ``value`` or ``raw_value`` can be set.
+  // Only one of ``value``, ``raw_value``, or ``formatted_value`` can be set.
   string value = 2 [
     (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"
   ];
 
   // Header value is encoded as bytes which can support non-utf8 characters.
-  // Only one of ``value`` or ``raw_value`` can be set.
+  // Only one of ``value``, ``raw_value``, or ``formatted_value`` can be set.
   bytes raw_value = 3 [
     (validate.rules).bytes = {min_len: 0 max_len: 16384},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"
@@ -53,7 +53,8 @@ message HeaderValue {
   // extension formatters (e.g. ``%GENERIC_SECRET(name)%``). Evaluated once at
   // initialization time. Only one of ``value``, ``raw_value``, or
   // ``formatted_value`` can be set.
-  SubstitutionFormatString formatted_value = 4;
+  SubstitutionFormatString formatted_value = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
 }
 
 // Header name/value pair plus option to control append behavior.

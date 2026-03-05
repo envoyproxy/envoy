@@ -230,6 +230,8 @@ proto_library(
         "//envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3:pkg",
         "//envoy/extensions/filters/udp/udp_proxy/v3:pkg",
         "//envoy/extensions/formatter/cel/v3:pkg",
+        "//envoy/extensions/formatter/datasource/v3:pkg",
+        "//envoy/extensions/formatter/generic_secret/v3:pkg",
         "//envoy/extensions/formatter/metadata/v3:pkg",
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
         "//envoy/extensions/geoip_providers/common/v3:pkg",
