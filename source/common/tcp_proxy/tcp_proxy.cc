@@ -831,6 +831,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   Upstream::HostConstSharedPtr host =
       Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(cluster.chooseHost(this));
   if (host) {
+    // Track attempted hosts for access logging
+    getStreamInfo().upstreamInfo()->addUpstreamHostAttempted(host);
     generic_conn_pool_ = factory->createGenericConnPool(
         host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
         upstream_decoder_filter_callbacks_, getStreamInfo());
@@ -1196,7 +1198,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
                  static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
-    Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
+    absl::string_view downstream_close_details = read_callbacks_->connection().localCloseReason();
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data(
+        upstream_->onDownstreamEvent(event, downstream_close_details));
     if (conn_data != nullptr &&
         conn_data->connection().state() != Network::Connection::State::Closed) {
       config_->drainManager().add(config_->sharedConfig(), std::move(conn_data),
@@ -1240,6 +1244,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    // Propagate the upstream local close reason to the downstream stream info's upstreamInfo.
+    if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamLocalCloseReason(upstream_->localCloseReason());
+    }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));

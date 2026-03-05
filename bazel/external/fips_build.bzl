@@ -5,17 +5,23 @@ BUILD_COMMAND = """
 set -eo pipefail
 
 # c++
-SYSROOT="$$(realpath $$(dirname "$(location %s)"))"
+SYSROOT="%s"
+if [ -n "$${SYSROOT}" ]; then
+    SYSROOT="$$(realpath $$(dirname "$${SYSROOT}"))"
+    export SYSROOT_FLAG="--sysroot=$${SYSROOT}"
+else
+    export SYSROOT_FLAG=""
+fi
 export CC="$$(realpath $(CC))"
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
-    export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
+    export CXXFLAGS="-stdlib=libc++ $${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread $${SYSROOT_FLAG}"
 else
-    export CXXFLAGS="--sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
+    export CXXFLAGS="$${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread $${SYSROOT_FLAG}"
 fi
-export CGO_CFLAGS="--sysroot=$${SYSROOT}"
+export CGO_CFLAGS="$${SYSROOT_FLAG}"
 export CGO_CXXFLAGS="$${CXXFLAGS}"
 export CGO_LDFLAGS="$${LDFLAGS}"
 
@@ -63,14 +69,20 @@ PYTHON_BIN=$$(realpath $(PYTHON3))
 export CC="$$(realpath $(CC))"
 export CXX="$$(realpath $(CC))"
 export AR="$$(realpath $(AR))"
-SYSROOT="$$(realpath $$(dirname "$(location %s)"))"
+SYSROOT="%s"
+if [ -n "$${SYSROOT}" ]; then
+    SYSROOT="$$(realpath $$(dirname "$${SYSROOT}"))"
+    export SYSROOT_FLAG="--sysroot=$${SYSROOT}"
+else
+    export SYSROOT_FLAG=""
+fi
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
 if [[ "%s" == "libc++" ]]; then
-    export CXXFLAGS="-stdlib=libc++ --sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread --sysroot=$${SYSROOT}"
+    export CXXFLAGS="-stdlib=libc++ $${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -stdlib=libc++ -l:libc++.a -l:libc++abi.a -lm -pthread $${SYSROOT_FLAG}"
 else
-    export CXXFLAGS="--sysroot=$${SYSROOT}"
-    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread --sysroot=$${SYSROOT}"
+    export CXXFLAGS="$${SYSROOT_FLAG}"
+    export LDFLAGS="-fuse-ld=lld -lstdc++ -lm -pthread $${SYSROOT_FLAG}"
 fi
 cd $$SRC_DIR
 OUTPUT=$$(mktemp)
@@ -82,21 +94,34 @@ fi
 cp ninja $$OUT_FILE
 """
 
-def _create_build_config(prefix, lib, arch, arch_alias):
+def _config_name(prefix, arch, lib, hermetic_sysroot):
+    return "%s_%s_%s%s" % (prefix, arch, lib, "_hermetic_sysroot" if hermetic_sysroot else "")
+
+def _create_build_config(prefix, lib, arch, arch_alias, hermetic_sysroot):
     """Create the config_setting_group combination."""
     conditions = ["@platforms//cpu:%s" % arch]
+
+    # We currently support only libc++ and libstdc++, so these variants are mutually exclusive
     if lib == "libc++":
         conditions.append("@envoy//bazel:libc++_enabled")
+    else:
+        conditions.append("@envoy//bazel:libstdc++_enabled")
+
+    if hermetic_sysroot:
+        conditions.append("@envoy_repo//:use_hermetic_sysroot")
+    else:
+        conditions.append("@envoy_repo//:use_local_sysroot")
+
     selects.config_setting_group(
-        name = "%s_%s_%s" % (prefix, arch, lib),
+        name = _config_name(prefix, arch, lib, hermetic_sysroot),
         match_all = conditions,
     )
 
-def _create_boringssl_fips_build_command(lib, arch, arch_alias):
+def _create_boringssl_fips_build_command(lib, arch, arch_alias, hermetic_sysroot):
     """Create the command."""
-    _create_build_config("boringssl", lib, arch, arch_alias)
+    _create_build_config("boringssl", lib, arch, arch_alias, hermetic_sysroot)
     return BUILD_COMMAND % (
-        "@sysroot_linux_%s//:WORKSPACE" % arch_alias,
+        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic_sysroot else "",
         lib,
         "@fips_cmake_linux_%s" % arch,
         "@fips_go_linux_%s" % arch_alias,
@@ -105,31 +130,35 @@ def _create_boringssl_fips_build_command(lib, arch, arch_alias):
 def boringssl_fips_build_command(arches, libs):
     """Create conditional commands from the cartesian product of possible arches/stdlib."""
     return {
-        ":boringssl_%s_%s" % (arch, lib): _create_boringssl_fips_build_command(
+        ":%s" % _config_name("boringssl", arch, lib, hermetic_sysroot): _create_boringssl_fips_build_command(
             lib,
             arch,
             arch_alias,
+            hermetic_sysroot,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
+        for hermetic_sysroot in [False, True]
     }
 
-def _create_ninja_build_command(lib, arch, arch_alias):
+def _create_ninja_build_command(lib, arch, arch_alias, hermetic_sysroot):
     """Create the command."""
-    _create_build_config("ninja", lib, arch, arch_alias)
+    _create_build_config("ninja", lib, arch, arch_alias, hermetic_sysroot)
     return NINJA_BUILD_COMMAND % (
-        "@sysroot_linux_%s//:WORKSPACE" % arch_alias,
+        ("$(location @sysroot_linux_%s//:WORKSPACE)" % arch_alias) if hermetic_sysroot else "",
         lib,
     )
 
 def ninja_build_command(arches, libs):
     """Create the ninja command conditioned to correct stdlib."""
     return {
-        ":ninja_%s_%s" % (arch, lib): _create_ninja_build_command(
+        ":%s" % _config_name("ninja", arch, lib, hermetic_sysroot): _create_ninja_build_command(
             lib,
             arch,
             arch_alias,
+            hermetic_sysroot,
         )
         for arch, arch_alias in arches.items()
         for lib in libs
+        for hermetic_sysroot in [False, True]
     }

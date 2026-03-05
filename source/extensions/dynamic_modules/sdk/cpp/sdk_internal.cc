@@ -1,5 +1,7 @@
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -14,7 +16,7 @@ template <envoy_dynamic_module_type_http_body_type Type> class BodyBufferImpl : 
 public:
   BodyBufferImpl(void* host_plugin_ptr) : host_plugin_ptr_(host_plugin_ptr) {}
 
-  std::vector<BufferView> getChunks() override {
+  std::vector<BufferView> getChunks() const override {
     size_t chunks_size =
         envoy_dynamic_module_callback_http_get_body_chunks_size(host_plugin_ptr_, Type);
     if (chunks_size == 0) {
@@ -28,7 +30,7 @@ public:
     return result_chunks;
   }
 
-  size_t getSize() override {
+  size_t getSize() const override {
     return envoy_dynamic_module_callback_http_get_body_size(host_plugin_ptr_, Type);
   }
 
@@ -142,49 +144,75 @@ using ResponseHeaders = HeaderMapImpl<envoy_dynamic_module_type_http_header_type
 using ResponseTrailers = HeaderMapImpl<envoy_dynamic_module_type_http_header_type_ResponseTrailer>;
 
 // Scheduler implementation
-class SchedulerImpl : public Scheduler {
+template <bool IsConfigScheduler> class SchedulerImplBase : public Scheduler {
 public:
-  SchedulerImpl(void* host_plugin_ptr)
-      : scheduler_ptr_(envoy_dynamic_module_callback_http_filter_scheduler_new(host_plugin_ptr)) {}
+  SchedulerImplBase(void* host_ptr) : scheduler_ptr_(newScheduler(host_ptr)) {}
 
   void schedule(std::function<void()> func) override {
-    // Lock to protect access to tasks_ and next_task_id_ manually
-    mutex_.lock();
-    const uint64_t task_id = next_task_id_++;
-    tasks_[task_id] = std::move(func);
-    mutex_.unlock();
+    uint64_t task_id = 0;
 
-    envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler_ptr_, task_id);
+    // Lock to protect access to tasks_ and next_task_id_ manually
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      task_id = next_task_id_++;
+      tasks_[task_id] = std::move(func);
+    }
+
+    commitScheduler(scheduler_ptr_, task_id);
   }
 
   void onScheduled(uint64_t task_id) {
     std::function<void()> func;
 
-    // Lock to protect access to tasks_ manually
-    mutex_.lock();
-    auto it = tasks_.find(task_id);
-    if (it != tasks_.end()) {
-      func = std::move(it->second);
-      tasks_.erase(it);
+    {
+      // Lock to protect access to tasks_ manually
+      std::lock_guard<std::mutex> lock(mutex_);
+      auto it = tasks_.find(task_id);
+      if (it != tasks_.end()) {
+        func = std::move(it->second);
+        tasks_.erase(it);
+      }
     }
-    mutex_.unlock();
 
     if (func) {
       func();
     }
   }
 
-  ~SchedulerImpl() override {
-    envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler_ptr_);
-  }
+  ~SchedulerImplBase() override { deleteScheduler(scheduler_ptr_); }
 
 private:
+  static void* newScheduler(void* host_ptr) {
+    if constexpr (IsConfigScheduler) {
+      return envoy_dynamic_module_callback_http_filter_config_scheduler_new(host_ptr);
+    } else {
+      return envoy_dynamic_module_callback_http_filter_scheduler_new(host_ptr);
+    }
+  }
+  static void deleteScheduler(void* scheduler_ptr) {
+    if constexpr (IsConfigScheduler) {
+      envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler_ptr);
+    } else {
+      envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler_ptr);
+    }
+  }
+  static void commitScheduler(void* scheduler_ptr, uint64_t task_id) {
+    if constexpr (IsConfigScheduler) {
+      envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler_ptr, task_id);
+    } else {
+      envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler_ptr, task_id);
+    }
+  }
+
   void* scheduler_ptr_{};
 
-  absl::Mutex mutex_;
-  uint64_t next_task_id_ ABSL_GUARDED_BY(mutex_){1}; // 0 is reserved.
-  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_ ABSL_GUARDED_BY(mutex_);
+  std::mutex mutex_;
+  uint64_t next_task_id_{1}; // 0 is reserved.
+  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_;
 };
+
+using SchedulerImpl = SchedulerImplBase<false>;
+using ConfigSchedulerImpl = SchedulerImplBase<true>;
 
 // HttpFilterHandle implementation
 class HttpFilterHandleImpl : public HttpFilterHandle {
@@ -416,6 +444,14 @@ public:
 
   BodyBuffer& receivedResponseBody() override { return received_response_body_; }
 
+  bool receivedBufferedRequestBody() override {
+    return envoy_dynamic_module_callback_http_received_buffered_request_body(host_plugin_ptr_);
+  }
+
+  bool receivedBufferedResponseBody() override {
+    return envoy_dynamic_module_callback_http_received_buffered_response_body(host_plugin_ptr_);
+  }
+
   HeaderMap& responseTrailers() override { return response_trailers_; }
 
   const RouteSpecificConfig* getMostSpecificConfig() override {
@@ -626,6 +662,72 @@ public:
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
   }
 
+  std::pair<HttpCalloutInitResult, uint64_t>
+  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
+              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) override {
+    uint64_t callout_id_out = 0;
+    auto result = envoy_dynamic_module_callback_http_filter_config_http_callout(
+        host_config_ptr_, &callout_id_out,
+        envoy_dynamic_module_type_module_buffer{cluster.data(), cluster.size()},
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+        timeout_ms);
+
+    if (result == envoy_dynamic_module_type_http_callout_init_result_Success) {
+      callout_callbacks_[callout_id_out] = &cb;
+    }
+    return {static_cast<HttpCalloutInitResult>(result), callout_id_out};
+  }
+
+  std::pair<HttpCalloutInitResult, uint64_t>
+  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
+                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+                  HttpStreamCallback& cb) override {
+    uint64_t stream_id_out = 0;
+    auto result = envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+        host_config_ptr_, &stream_id_out,
+        envoy_dynamic_module_type_module_buffer{cluster.data(), cluster.size()},
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+        end_of_stream, timeout_ms);
+
+    if (result == envoy_dynamic_module_type_http_callout_init_result_Success) {
+      stream_callbacks_[stream_id_out] = &cb;
+    }
+    return {static_cast<HttpCalloutInitResult>(result), stream_id_out};
+  }
+
+  bool sendHttpStreamData(uint64_t stream_id, absl::string_view body, bool end_of_stream) override {
+    return envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+        host_config_ptr_, stream_id,
+        envoy_dynamic_module_type_module_buffer{body.data(), body.size()}, end_of_stream);
+  }
+
+  bool sendHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {
+    return envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+        host_config_ptr_, stream_id,
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(trailers.data())),
+        trailers.size());
+  }
+
+  void resetHttpStream(uint64_t stream_id) override {
+    envoy_dynamic_module_callback_http_filter_config_reset_http_stream(host_config_ptr_, stream_id);
+  }
+
+  std::shared_ptr<Scheduler> getScheduler() override {
+    if (!scheduler_) {
+      scheduler_ = std::make_shared<ConfigSchedulerImpl>(host_config_ptr_);
+    }
+    return scheduler_;
+  }
+
+  absl::flat_hash_map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
+  absl::flat_hash_map<uint64_t, HttpStreamCallback*> stream_callbacks_;
+  std::shared_ptr<ConfigSchedulerImpl> scheduler_;
+
 private:
   void* host_config_ptr_;
 };
@@ -657,7 +759,7 @@ template <class T> void* wrapPointer(const T* ptr) {
 }
 
 struct HttpFilterFactoryWrapper {
-  std::unique_ptr<HttpFilterConfigHandle> config_handle_;
+  std::unique_ptr<HttpFilterConfigHandleImpl> config_handle_;
   std::unique_ptr<HttpFilterFactory> factory_;
 };
 
@@ -746,6 +848,7 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
     DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create plugin instance");
     return nullptr;
   }
+  // So the plugin_ field will never be null as long as the plugin handle is alive.
   plugin_handle->plugin_ = std::move(plugin);
 
   return wrapPointer(plugin_handle.release());
@@ -754,6 +857,10 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
   auto* plugin_handle = unwrapPointer<HttpFilterHandleImpl>(filter_module_ptr);
+  if (plugin_handle == nullptr) {
+    return;
+  }
+  plugin_handle->plugin_->onDestroy();
   delete plugin_handle;
 }
 
@@ -999,6 +1106,152 @@ envoy_dynamic_module_on_http_filter_local_reply(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
     envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent) {
   return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_callout_done(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
+  auto* typed_body_chunks = reinterpret_cast<BufferView*>(body_chunks);
+
+  auto it = config_handle->callout_callbacks_.find(callout_id);
+  if (it != config_handle->callout_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->callout_callbacks_.erase(it);
+    cb->onHttpCalloutDone(static_cast<HttpCalloutResult>(result), {typed_headers, headers_size},
+                          {typed_body_chunks, body_chunks_size});
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_headers = reinterpret_cast<HeaderView*>(headers);
+    it->second->onHttpStreamHeaders(stream_id, {typed_headers, headers_size}, end_stream);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    const envoy_dynamic_module_type_envoy_buffer* chunks, size_t chunks_size, bool end_stream) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_chunks =
+        reinterpret_cast<BufferView*>(const_cast<envoy_dynamic_module_type_envoy_buffer*>(chunks));
+    it->second->onHttpStreamData(stream_id, {typed_chunks, chunks_size}, end_stream);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* typed_trailers = reinterpret_cast<HeaderView*>(trailers);
+    it->second->onHttpStreamTrailers(stream_id, {typed_trailers, trailers_size});
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->stream_callbacks_.erase(it);
+    cb->onHttpStreamComplete(stream_id);
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_http_stream_reset_reason reason) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (!factory_wrapper) {
+    return;
+  }
+  auto* config_handle =
+      static_cast<HttpFilterConfigHandleImpl*>(factory_wrapper->config_handle_.get());
+  if (!config_handle) {
+    return;
+  }
+
+  auto it = config_handle->stream_callbacks_.find(stream_id);
+  if (it != config_handle->stream_callbacks_.end()) {
+    auto* cb = it->second;
+    config_handle->stream_callbacks_.erase(it);
+    cb->onHttpStreamReset(stream_id, static_cast<HttpStreamResetReason>(reason));
+  }
+}
+
+void envoy_dynamic_module_on_http_filter_config_scheduled(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t event_id) {
+  auto* factory_wrapper = unwrapPointer<HttpFilterFactoryWrapper>(filter_config_ptr);
+  if (factory_wrapper == nullptr || factory_wrapper->config_handle_ == nullptr ||
+      factory_wrapper->config_handle_->scheduler_ == nullptr) {
+    return;
+  }
+  factory_wrapper->config_handle_->scheduler_->onScheduled(event_id);
 }
 }
 

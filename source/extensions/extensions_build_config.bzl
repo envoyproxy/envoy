@@ -144,6 +144,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+    "envoy.matching.actions.transform_stat":            "//source/extensions/matching/actions/transform_stat:config",
     "envoy.matching.action.transport_socket.name":      "//source/extensions/matching/common_inputs/transport_socket:config",
 
     #
@@ -155,6 +156,7 @@ EXTENSIONS = {
     # HTTP filters
     #
 
+    "envoy.filters.http.a2a":                           "//source/extensions/filters/http/a2a:config",
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
     "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
     "envoy.filters.http.alternate_protocols_cache":     "//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -179,6 +181,7 @@ EXTENSIONS = {
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.ext_proc":                      "//source/extensions/filters/http/ext_proc:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
+    "envoy.filters.http.file_server":                   "//source/extensions/filters/http/file_server:config",
     "envoy.filters.http.file_system_buffer":            "//source/extensions/filters/http/file_system_buffer:config",
     "envoy.filters.http.gcp_authn":                     "//source/extensions/filters/http/gcp_authn:config",
     "envoy.filters.http.geoip":                         "//source/extensions/filters/http/geoip:config",

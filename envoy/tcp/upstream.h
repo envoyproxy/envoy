@@ -152,11 +152,12 @@ public:
   /**
    * Called when an event is received on the downstream connection
    * @param event supplies the event which occurred.
+   * @param details supplies the details of the event, e.g. the local close reason.
    * @return the underlying ConnectionData if the event is not "Connected" and draining
              is supported for this upstream.
    */
   virtual Tcp::ConnectionPool::ConnectionData*
-  onDownstreamEvent(Network::ConnectionEvent event) PURE;
+  onDownstreamEvent(Network::ConnectionEvent event, absl::string_view details = "") PURE;
 
   /* Called to convert underlying transport socket from non-secure mode
    * to secure mode. Implemented only by start_tls transport socket.
@@ -175,6 +176,11 @@ public:
    * @return the detected close type from socket.
    */
   virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
+
+  /**
+   * @return the failure reason of the local close.
+   */
+  virtual absl::string_view localCloseReason() const { return ""; }
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

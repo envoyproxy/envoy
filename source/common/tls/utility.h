@@ -174,6 +174,13 @@ std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
  */
 std::vector<std::string> getCertificateSansForLogging(X509* cert);
 
+/**
+ * Returns a list of all CRL Distribution Points from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of CRL distribution points as strings.
+ */
+std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets

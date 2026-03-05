@@ -101,13 +101,13 @@ public:
    * Returns all data chunks in the buffer.
    * @return Vector of buffer views containing all chunks.
    */
-  virtual std::vector<BufferView> getChunks() = 0;
+  virtual std::vector<BufferView> getChunks() const = 0;
 
   /**
    * Returns the total size of the buffer.
    * @return The total size in bytes.
    */
-  virtual size_t getSize() = 0;
+  virtual size_t getSize() const = 0;
 
   /**
    * Removes size from the front of the buffer.
@@ -565,6 +565,24 @@ public:
   virtual BodyBuffer& receivedResponseBody() = 0;
 
   /**
+   * Returns true if the latest received request body is the previously buffered request body.
+   * This is true when a previous filter in the chain stopped and buffered the request body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onRequestBody callback.
+   * @return true if the received request body is the previously buffered request body.
+   */
+  virtual bool receivedBufferedRequestBody() = 0;
+
+  /**
+   * Returns true if the latest received response body is the previously buffered response body.
+   * This is true when a previous filter in the chain stopped and buffered the response body, then
+   * resumed, and this filter is now receiving that buffered body.
+   * NOTE: This is only meaningful inside the onResponseBody callback.
+   * @return true if the received response body is the previously buffered response body.
+   */
+  virtual bool receivedBufferedResponseBody() = 0;
+
+  /**
    * Returns reference to response trailers.
    * @return Reference to StreamHeaderMap containing response trailers.
    */
@@ -757,6 +775,68 @@ public:
    * @param message The message to log.
    */
   virtual void log(LogLevel level, absl::string_view message) = 0;
+
+  /**
+   * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
+   * HttpFilterConfigFactory::onHttpCalloutDone.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The request body.
+   * @param timeout_ms The timeout in milliseconds.
+   * @param cb The callback to invoke when the callout completes.
+   * @return HttpCalloutInitResult and callout ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
+              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
+
+  /**
+   * Starts a streamable HTTP callout to a cluster. Stream events will be delivered via
+   * HttpFilterConfigFactory::onHttpStream* methods.
+   * @param cluster The cluster name.
+   * @param headers The request headers. Must include :method, :path, and host headers.
+   * @param body The initial request body (may be empty).
+   * @param end_of_stream If true, the stream ends after sending the initial headers/body.
+   * @param timeout_ms The timeout in milliseconds (0 for no timeout).
+   * @param cb The callback to invoke for stream events.
+   * @return HttpCalloutInitResult and stream ID pair.
+   */
+  virtual std::pair<HttpCalloutInitResult, uint64_t>
+  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
+                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+                  HttpStreamCallback& cb) = 0;
+
+  /**
+   * Sends data on an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param body The data to send.
+   * @param end_of_stream If true, this is the last data chunk.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamData(uint64_t stream_id, absl::string_view body,
+                                  bool end_of_stream) = 0;
+
+  /**
+   * Sends trailers on an active stream, implicitly ending the stream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   * @param trailers The trailers to send.
+   * @return True if successful, false if the stream is not found.
+   */
+  virtual bool sendHttpStreamTrailers(uint64_t stream_id,
+                                      absl::Span<const HeaderView> trailers) = 0;
+
+  /**
+   * Resets an active stream started via startHttpStream.
+   * @param stream_id The stream handle returned from startHttpStream.
+   */
+  virtual void resetHttpStream(uint64_t stream_id) = 0;
+
+  /**
+   * Returns a scheduler for deferred task execution. This can only be called on config loading
+   * event and then the returned Scheduler can be used in other threads.
+   * @return Unique pointer to Scheduler instance.
+   */
+  virtual std::shared_ptr<Scheduler> getScheduler() = 0;
 };
 
 /**
@@ -832,9 +912,18 @@ public:
   virtual TrailersStatus onResponseTrailers(HeaderMap& trailers) = 0;
 
   /**
-   * Called when the stream processing is complete.
+   * Called when the stream processing is complete and before access logs are flushed.
+   * This is a good place to do any final processing or cleanup before the request is fully
+   * completed.
    */
   virtual void onStreamComplete() = 0;
+
+  /**
+   * Called when the HTTP filter instance is being destroyed. This is called
+   * after onStreamComplete and access logs are flushed. This is a good place to release
+   * any per-stream resources.
+   */
+  virtual void onDestroy() = 0;
 };
 
 class HttpFilterFactory {
