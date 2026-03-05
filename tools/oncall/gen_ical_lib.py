@@ -22,6 +22,10 @@ def _date_with_zero_time(t: date) -> str:
 
 
 def _date_intersects(seats: int, start_date: date, d: date) -> bool:
+    """Returns true if the date d occurs within a week specified by `start_date`
+    on a rotation of `seats` weeks, e.g. if seats was 3 and start_date was Jan 1,
+    would return true if d is in the week Jan 1 to Jan 7 or if d is in the week
+    Jan 22 to Jan 29, and so on."""
     if d < start_date:
         # in the past
         return False
