@@ -337,26 +337,32 @@ pub struct ClusterHostCount {
 
 /// The identifier for an EnvoyCounter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyCounterId(usize);
 
 /// The identifier for an EnvoyCounterVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyCounterVecId(usize);
 
 /// The identifier for an EnvoyGauge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyGaugeId(usize);
 
 /// The identifier for an EnvoyGaugeVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyGaugeVecId(usize);
 
 /// The identifier for an EnvoyHistogram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyHistogramId(usize);
 
 /// The identifier for an EnvoyHistogramVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvoyHistogramVecId(usize);
 
 impl From<envoy_dynamic_module_type_metrics_result>
