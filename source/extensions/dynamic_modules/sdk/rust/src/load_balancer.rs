@@ -165,6 +165,13 @@ pub trait EnvoyLoadBalancer {
   /// The host is identified by priority and index within all hosts at that priority.
   /// Only valid during choose_host callback.
   fn context_should_select_another_host(&self, priority: u32, index: usize) -> bool;
+
+  /// Returns the override host address and strict mode flag from the context. Override host
+  /// allows upstream filters to direct the load balancer to prefer a specific host by address.
+  /// Returns `Some((address, strict))` if an override host is set, `None` otherwise. When
+  /// `strict` is true, the load balancer should return no host if the override is not valid.
+  /// Only valid during choose_host callback.
+  fn context_get_override_host(&self) -> Option<(String, bool)>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -713,6 +720,38 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         priority,
         index,
       )
+    }
+  }
+
+  fn context_get_override_host(&self) -> Option<(String, bool)> {
+    if self.context_ptr.is_null() {
+      return None;
+    }
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut strict = false;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_override_host(
+        self.context_ptr,
+        &mut address,
+        &mut strict,
+      )
+    };
+    if found {
+      unsafe {
+        Some((
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            address.ptr as *const _,
+            address.length,
+          ))
+          .to_string(),
+          strict,
+        ))
+      }
+    } else {
+      None
     }
   }
 }

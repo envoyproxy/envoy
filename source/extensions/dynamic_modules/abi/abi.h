@@ -8517,6 +8517,25 @@ bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
     size_t index);
 
+/**
+ * envoy_dynamic_module_callback_lb_context_get_override_host returns the override host address
+ * and strict mode flag from the load balancer context. Override host allows upstream filters to
+ * direct the load balancer to prefer a specific host by address. Note that override host
+ * resolution is normally handled by the ClusterManager before the load balancer is invoked, so
+ * this callback provides read-only access to the override host preference.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param address is the output buffer for the override host address string. The buffer points to
+ * Envoy-owned memory valid for the duration of the context.
+ * @param strict is the output for the strict mode flag. When true, the load balancer should
+ * return nullptr if the override host is not valid. When false, the load balancer should fall
+ * back to normal selection.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
 // =============================================================================
 // Matcher Types
 // =============================================================================

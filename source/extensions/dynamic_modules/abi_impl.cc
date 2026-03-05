@@ -560,6 +560,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_should_selec
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_override_host: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_set_host_data(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
                                                size_t, uintptr_t) {

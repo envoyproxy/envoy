@@ -694,6 +694,18 @@ TEST(CommonAbiImplTest, LbContextShouldSelectAnotherHostEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_context_get_override_host triggers an ENVOY_BUG when
+// called.
+TEST(CommonAbiImplTest, LbContextGetOverrideHostEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto found =
+            envoy_dynamic_module_callback_lb_context_get_override_host(nullptr, nullptr, nullptr);
+        EXPECT_FALSE(found);
+      },
+      "not implemented in this context");
+}
+
 // Test that the weak symbol stub for lb_set_host_data triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, LbSetHostDataEnvoyBug) {
   EXPECT_ENVOY_BUG(

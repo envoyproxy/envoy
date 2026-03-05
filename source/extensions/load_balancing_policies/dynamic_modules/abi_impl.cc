@@ -436,6 +436,23 @@ bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
   return getContext(context_envoy_ptr)->shouldSelectAnotherHost(*hosts[index]);
 }
 
+bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict) {
+  if (context_envoy_ptr == nullptr || address == nullptr || strict == nullptr) {
+    return false;
+  }
+  auto override_host = getContext(context_envoy_ptr)->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return false;
+  }
+  auto host_address = override_host.value().first;
+  address->ptr = const_cast<char*>(host_address.data());
+  address->length = host_address.size();
+  *strict = override_host.value().second;
+  return true;
+}
+
 bool envoy_dynamic_module_callback_lb_set_host_data(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     uintptr_t data) {
