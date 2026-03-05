@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/listener/set_filter_state/v3/set_filter_state.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/listener/set_filter_state/config.h"
 
@@ -28,6 +29,14 @@ public:
         proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection, context_);
     filter_ = std::make_unique<SetFilterState>(on_new_connection_config_);
     filter_->onAccept(cb_);
+    EXPECT_EQ(0, filter_->maxReadBytes());
+    {
+      NiceMock<Network::MockIoHandle> io_handle;
+      NiceMock<Event::MockDispatcher> dispatcher;
+      Network::ListenerFilterBufferImpl buffer(
+          io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, false, 1);
+      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(buffer));
+    }
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;

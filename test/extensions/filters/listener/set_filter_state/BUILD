@@ -16,6 +16,7 @@ envoy_cc_test(
     name = "set_filter_state_test",
     srcs = ["set_filter_state_test.cc"],
     deps = [
+        "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/set_filter_state:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
