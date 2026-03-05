@@ -230,7 +230,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   }
 
   if (isValidMcpPostRequest(headers)) {
-    is_json_post_request_ = true;
+    // is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
     if (end_stream) {
       is_mcp_request_ = false;
@@ -263,7 +263,8 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 }
 
 Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!is_json_post_request_ || !is_mcp_request_) {
+  // if (!is_json_post_request_ || !is_mcp_request_) {
+  if (!is_mcp_request_) {
     return Http::FilterDataStatus::Continue;
   }
 
