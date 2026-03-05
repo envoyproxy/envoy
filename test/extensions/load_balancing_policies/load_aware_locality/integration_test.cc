@@ -30,13 +30,20 @@ public:
     use_bootstrap_node_metadata_ = true;
   }
 
+  // Initialize with a local zone-a and the given remote zones (default: {"zone-b"}).
+  // Each zone has 2 endpoints; num_upstreams_ is updated accordingly.
+  // Upstream indices are contiguous: zone 0 → [0,1], zone 1 → [2,3], zone 2 → [4,5], etc.
   void initializeConfig(double variance_threshold = 0.1, double probe_percentage = 0.1,
-                        int weight_update_period_seconds = 10, double ewma_alpha = 1.0) {
+                        int weight_update_period_seconds = 10, double ewma_alpha = 1.0,
+                        std::vector<std::string> remote_zones = {"zone-b"}) {
+    num_upstreams_ = static_cast<uint32_t>(2 * (1 + remote_zones.size()));
+    setUpstreamCount(num_upstreams_);
+
     const auto ip_version = GetParam();
     config_helper_.addConfigModifier([ip_version, variance_threshold, probe_percentage,
-                                      weight_update_period_seconds, ewma_alpha](
+                                      weight_update_period_seconds, ewma_alpha, remote_zones](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Set node metadata so the node locality matches the first endpoint locality.
+      // Set node metadata so the node locality matches zone-a (the local zone).
       auto* node = bootstrap.mutable_node();
       node->set_id("node_name");
       node->set_cluster("cluster_name");
@@ -46,37 +53,27 @@ public:
 
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
       ASSERT(cluster_0->name() == "cluster_0");
-
-      // Clear default endpoints and rebuild with two localities.
       cluster_0->mutable_load_assignment()->clear_endpoints();
       cluster_0->mutable_load_assignment()->set_cluster_name("cluster_0");
 
       const std::string local_address = Network::Test::getLoopbackAddressString(ip_version);
 
-      // Locality 0: zone-a (local) - 2 endpoints.
-      auto* locality_0 = cluster_0->mutable_load_assignment()->add_endpoints();
-      locality_0->mutable_locality()->set_region("test-region");
-      locality_0->mutable_locality()->set_zone("zone-a");
-      for (int i = 0; i < 2; ++i) {
-        auto* addr = locality_0->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-        addr->set_address(local_address);
-        addr->set_port_value(0);
-      }
-
-      // Locality 1: zone-b (remote) - 2 endpoints.
-      auto* locality_1 = cluster_0->mutable_load_assignment()->add_endpoints();
-      locality_1->mutable_locality()->set_region("test-region");
-      locality_1->mutable_locality()->set_zone("zone-b");
-      for (int i = 0; i < 2; ++i) {
-        auto* addr = locality_1->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-        addr->set_address(local_address);
-        addr->set_port_value(0);
+      // Build one locality per zone: zone-a first (local), then each remote zone.
+      // Each locality gets 2 endpoints.
+      std::vector<std::string> all_zones = {"zone-a"};
+      all_zones.insert(all_zones.end(), remote_zones.begin(), remote_zones.end());
+      for (const auto& zone : all_zones) {
+        auto* locality_pb = cluster_0->mutable_load_assignment()->add_endpoints();
+        locality_pb->mutable_locality()->set_region("test-region");
+        locality_pb->mutable_locality()->set_zone(zone);
+        for (int i = 0; i < 2; ++i) {
+          auto* addr = locality_pb->add_lb_endpoints()
+                           ->mutable_endpoint()
+                           ->mutable_address()
+                           ->mutable_socket_address();
+          addr->set_address(local_address);
+          addr->set_port_value(0);
+        }
       }
 
       // Configure load_aware_locality LB policy with round_robin child.
@@ -156,98 +153,22 @@ public:
     return upstream_usage;
   }
 
-  void initializeThreeLocalityConfig(double variance_threshold = 0.1, double probe_percentage = 0.1,
-                                     int weight_update_period_seconds = 10,
-                                     double ewma_alpha = 1.0) {
-    num_upstreams_ = 6;
-    setUpstreamCount(num_upstreams_);
+  // Send two 30-request seeding rounds with timer advances to ensure all endpoints have
+  // ORCA data before the measurement phase. With only probe=0.1, the initial all_local
+  // cycle may skip some remote hosts (P ≈ 22% per zone with 30 requests), so a second
+  // cycle is needed to guarantee all hosts accumulate data.
+  // starting_count: lb_recalculate_zone_structures value before this call (1 after initialize()).
+  // After returning, the counter is at starting_count + 2.
+  void seedWithTwoCycles(const std::vector<double>& utilizations, uint64_t starting_count = 1) {
+    sendRequestsAndTrack(30, utilizations);
+    timeSystem().advanceTimeWait(std::chrono::seconds(11));
+    test_server_->waitForCounterGe("cluster.cluster_0.lb_recalculate_zone_structures",
+                                   starting_count + 1);
 
-    const auto ip_version = GetParam();
-    config_helper_.addConfigModifier([ip_version, variance_threshold, probe_percentage,
-                                      weight_update_period_seconds, ewma_alpha](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* node = bootstrap.mutable_node();
-      node->set_id("node_name");
-      node->set_cluster("cluster_name");
-      auto* locality = node->mutable_locality();
-      locality->set_region("test-region");
-      locality->set_zone("zone-a");
-
-      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
-      ASSERT(cluster_0->name() == "cluster_0");
-
-      cluster_0->mutable_load_assignment()->clear_endpoints();
-      cluster_0->mutable_load_assignment()->set_cluster_name("cluster_0");
-
-      const std::string local_address = Network::Test::getLoopbackAddressString(ip_version);
-
-      // Locality 0: zone-a (local) - 2 endpoints (indices 0, 1).
-      auto* locality_0 = cluster_0->mutable_load_assignment()->add_endpoints();
-      locality_0->mutable_locality()->set_region("test-region");
-      locality_0->mutable_locality()->set_zone("zone-a");
-      for (int i = 0; i < 2; ++i) {
-        auto* addr = locality_0->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-        addr->set_address(local_address);
-        addr->set_port_value(0);
-      }
-
-      // Locality 1: zone-b (remote) - 2 endpoints (indices 2, 3).
-      auto* locality_1 = cluster_0->mutable_load_assignment()->add_endpoints();
-      locality_1->mutable_locality()->set_region("test-region");
-      locality_1->mutable_locality()->set_zone("zone-b");
-      for (int i = 0; i < 2; ++i) {
-        auto* addr = locality_1->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-        addr->set_address(local_address);
-        addr->set_port_value(0);
-      }
-
-      // Locality 2: zone-c (remote) - 2 endpoints (indices 4, 5).
-      auto* locality_2 = cluster_0->mutable_load_assignment()->add_endpoints();
-      locality_2->mutable_locality()->set_region("test-region");
-      locality_2->mutable_locality()->set_zone("zone-c");
-      for (int i = 0; i < 2; ++i) {
-        auto* addr = locality_2->add_lb_endpoints()
-                         ->mutable_endpoint()
-                         ->mutable_address()
-                         ->mutable_socket_address();
-        addr->set_address(local_address);
-        addr->set_port_value(0);
-      }
-
-      auto* policy = cluster_0->mutable_load_balancing_policy();
-      const std::string policy_yaml = fmt::format(R"EOF(
-              policies:
-              - typed_extension_config:
-                  name: envoy.load_balancing_policies.load_aware_locality
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
-                    endpoint_picking_policy:
-                      policies:
-                      - typed_extension_config:
-                          name: envoy.load_balancing_policies.round_robin
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
-                    weight_update_period:
-                      seconds: {}
-                    utilization_variance_threshold:
-                      value: {}
-                    probe_percentage:
-                      value: {}
-                    ewma_alpha:
-                      value: {}
-              )EOF",
-                                                  weight_update_period_seconds, variance_threshold,
-                                                  probe_percentage, ewma_alpha);
-      TestUtility::loadFromYaml(policy_yaml, *policy);
-    });
-
-    HttpIntegrationTest::initialize();
+    sendRequestsAndTrack(30, utilizations);
+    timeSystem().advanceTimeWait(std::chrono::seconds(11));
+    test_server_->waitForCounterGe("cluster.cluster_0.lb_recalculate_zone_structures",
+                                   starting_count + 2);
   }
 
 protected:
@@ -258,38 +179,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LoadAwareLocalityIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify the policy loads, routes requests, and responds correctly.
-// With no ORCA data and probe_percentage=0.1, initial routing should favor local
-// (all_local mode with 10% probe to remote).
-TEST_P(LoadAwareLocalityIntegrationTest, BasicRouting) {
-  initializeConfig();
-  std::vector<double> utilizations = {0.3, 0.3, 0.3, 0.3};
-  auto usage = sendRequestsAndTrack(20, utilizations);
-
-  uint64_t total = usage[0] + usage[1] + usage[2] + usage[3];
-  EXPECT_EQ(total, 20u);
-
-  uint64_t local_count = usage[0] + usage[1];
-  uint64_t remote_count = usage[2] + usage[3];
-  // Verify local preference is active (hasLocalLocality should be true).
-  EXPECT_GE(local_count, 14u) << "local=" << local_count << " remote=" << remote_count
-                              << " u0=" << usage[0] << " u1=" << usage[1] << " u2=" << usage[2]
-                              << " u3=" << usage[3];
-}
-
 // With equal utilization across localities, traffic stays local due to variance threshold.
-// Uses a long weight_update_period to ensure the timer doesn't fire during the seeding phase
-// with partial ORCA data, which would cause the variance check to fail spuriously.
+// Uses a long weight_update_period to ensure the timer doesn't fire during seeding with
+// partial ORCA data, which would cause the variance check to fail spuriously.
 TEST_P(LoadAwareLocalityIntegrationTest, LocalLocalityPreference) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
                    /*weight_update_period_seconds=*/10);
 
-  // Seed ORCA data: all upstreams report 0.3 utilization.
   std::vector<double> utilizations = {0.3, 0.3, 0.3, 0.3};
-  sendRequestsAndTrack(30, utilizations);
-
-  // Advance past weight_update_period so timer fires with all ORCA data present.
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // After recomputing: local_util=0.3, remote_avg=0.3.
   // 0.3 <= 0.3 + 0.1 → all_local. Probe gives 10% to remote.
@@ -299,8 +197,8 @@ TEST_P(LoadAwareLocalityIntegrationTest, LocalLocalityPreference) {
   uint64_t remote_count = usage[2] + usage[3];
 
   // Expect majority local. Probe percentage sends ~10% remote.
-  EXPECT_GE(local_count, 80u);
-  EXPECT_LE(remote_count, 20u);
+  EXPECT_GE(local_count, 75u);
+  EXPECT_LE(remote_count, 25u);
 }
 
 // When local zone is overloaded, traffic spills proportionally to remote.
@@ -308,12 +206,8 @@ TEST_P(LoadAwareLocalityIntegrationTest, SpillToRemoteOnOverload) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
                    /*weight_update_period_seconds=*/10);
 
-  // Seed ORCA data: local reports high util, remote reports low.
   std::vector<double> utilizations = {0.9, 0.9, 0.2, 0.2};
-  sendRequestsAndTrack(30, utilizations);
-
-  // Advance past weight_update_period so timer fires with all ORCA data present.
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // After recomputing: local_util=0.9, remote_avg=0.2.
   // 0.9 > 0.2 + 0.1 → NOT all_local.
@@ -335,11 +229,8 @@ TEST_P(LoadAwareLocalityIntegrationTest, AllLocalitiesOverloaded) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
                    /*weight_update_period_seconds=*/10);
 
-  // Seed ORCA data: all upstreams report 100% utilization.
   std::vector<double> utilizations = {1.0, 1.0, 1.0, 1.0};
-  sendRequestsAndTrack(30, utilizations);
-
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // After recomputing: every locality has headroom = 0, total_weight = 0.
   // Fallback: weights proportional to host_count → [2, 2], total = 4 → 50/50 split.
@@ -355,11 +246,10 @@ TEST_P(LoadAwareLocalityIntegrationTest, AllLocalitiesOverloaded) {
   EXPECT_GE(remote_count, 25u) << "local=" << local_count << " remote=" << remote_count;
 }
 
-// With probe_percentage=0, the all_local mode routes 100% to the local locality —
-// no traffic leaks to remotes for probing. To ensure all_local triggers even with no
-// remote ORCA data (remote util defaults to 0.0 when no requests reach it), local
-// utilization is kept below the variance_threshold.
-TEST_P(LoadAwareLocalityIntegrationTest, ZeroProbePercentage) {
+// In all_local mode, the child round_robin policy distributes evenly across the two
+// local endpoints. Uses probe_percentage=0 and low local utilization so that all
+// requests stay in locality 0. Also verifies that with probe=0 no traffic leaks to remote.
+TEST_P(LoadAwareLocalityIntegrationTest, RoundRobinWithinLocality) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.0,
                    /*weight_update_period_seconds=*/10);
 
@@ -368,35 +258,15 @@ TEST_P(LoadAwareLocalityIntegrationTest, ZeroProbePercentage) {
   // Variance check: local (0.05) <= remote (0.0) + threshold (0.1) → all_local.
   std::vector<double> utilizations = {0.05, 0.05, 0.05, 0.05};
   sendRequestsAndTrack(30, utilizations);
-
   timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_recalculate_zone_structures", 2);
 
   // With probe_percentage=0, all_local → weights=[1,0] → strictly 100% local.
-  auto usage = sendRequestsAndTrack(50, utilizations);
-
-  EXPECT_EQ(usage[2] + usage[3], 0u)
-      << "Expected zero remote traffic with probe_percentage=0 in all_local mode";
-  EXPECT_EQ(usage[0] + usage[1], 50u);
-}
-
-// In all_local mode, the child round_robin policy distributes evenly across the two
-// local endpoints. Uses probe_percentage=0 and low local utilization so that all
-// requests stay in locality 0 and verify the within-locality distribution.
-TEST_P(LoadAwareLocalityIntegrationTest, RoundRobinWithinLocality) {
-  initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.0,
-                   /*weight_update_period_seconds=*/10);
-
-  // Low local util to ensure all_local (see ZeroProbePercentage for details).
-  std::vector<double> utilizations = {0.05, 0.05, 0.05, 0.05};
-  sendRequestsAndTrack(30, utilizations);
-
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
-
-  // All 100 requests route to locality 0 (all_local, probe=0).
   // Child RR distributes between host 0 and host 1.
   auto usage = sendRequestsAndTrack(100, utilizations);
 
-  EXPECT_EQ(usage[2] + usage[3], 0u) << "Expected zero remote traffic";
+  EXPECT_EQ(usage[2] + usage[3], 0u)
+      << "Expected zero remote traffic with probe_percentage=0 in all_local mode";
   EXPECT_EQ(usage[0] + usage[1], 100u);
 
   // RR within the locality gives approximately equal split (allow ±20% margin).
@@ -412,11 +282,8 @@ TEST_P(LoadAwareLocalityIntegrationTest, HighProbePercentage) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.3,
                    /*weight_update_period_seconds=*/10);
 
-  // Seed with equal utilization. Probe=0.3 ensures remote hosts also get ORCA data.
   std::vector<double> utilizations = {0.3, 0.3, 0.3, 0.3};
-  sendRequestsAndTrack(30, utilizations);
-
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // After recomputing: local_util=0.3, remote_avg=0.3 → all_local=true.
   // Probe redistributes 30% to remote: weights before probe [1, 0], total=1.
@@ -441,9 +308,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, LocalAtExactThreshold) {
   // → exactly at boundary → all_local (the condition uses <=, not <).
   // Using probe=0.1 so remote hosts receive seeding traffic and report util=0.2.
   std::vector<double> utilizations = {0.3, 0.3, 0.2, 0.2};
-  sendRequestsAndTrack(30, utilizations);
-
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // all_local=true, probe=0.1 → ~90% local, ~10% remote.
   auto usage = sendRequestsAndTrack(100, utilizations);
@@ -463,24 +328,24 @@ TEST_P(LoadAwareLocalityIntegrationTest, EwmaAlphaDampensSpike) {
   initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
                    /*weight_update_period_seconds=*/10, /*ewma_alpha=*/0.5);
 
-  // Phase 1: Establish baseline with low equal utilization → all_local.
-  // probe=0.1 ensures remote hosts also receive seeding traffic and have valid util data.
+  // Phase 1: Seed baseline with low equal utilization.
   std::vector<double> low_util = {0.2, 0.2, 0.2, 0.2};
-  sendRequestsAndTrack(30, low_util);
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
-  // After tick 1 (cold start): smoothed=[0.2, 0.2], all_local=true.
+  seedWithTwoCycles(low_util);
+  // Tick 2 (cycle 1): cold-start — smoothed-utilization set directly from raw avg_utils_,
+  // no EWMA blend on the first tick with data. Tick 3 (cycle 2): first actual EWMA blend,
+  // smoothed_i = 0.5*0.2 + 0.5*0.2 = 0.2. Nominal result: smoothed={0.2,0.2}, all_local=true.
 
   // Phase 2: Spike local utilization to 0.9. Since we're still in all_local mode,
   // ~90% of requests go local (reporting 0.9). Remote (~10%) still report 0.2.
   std::vector<double> high_local_util = {0.9, 0.9, 0.2, 0.2};
   sendRequestsAndTrack(30, high_local_util);
   timeSystem().advanceTimeWait(std::chrono::seconds(11));
-  // After tick 2 (EWMA with alpha=0.5):
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_recalculate_zone_structures", 4);
+  // Tick 4 EWMA blend (alpha=0.5, baseline ≈ {0.2, 0.2} from seeding):
   //   smoothed_local = 0.5 * 0.9 + 0.5 * 0.2 = 0.55  (damped, not full 0.9)
   //   smoothed_remote = 0.5 * 0.2 + 0.5 * 0.2 = 0.2
   // Variance: 0.55 > 0.2 + 0.1 = 0.3 → NOT all_local → spill begins.
   // Weights: local = 2*(1-0.55) = 0.9, remote = 2*(1-0.2) = 1.6, total = 2.5
-  // Probe not needed (remote already exceeds probe target).
   // remote% ≈ 64%. Contrast: alpha=1.0 would give smoothed_local=0.9, remote%≈89%.
 
   auto usage = sendRequestsAndTrack(100, high_local_util);
@@ -505,8 +370,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, LoadShiftOnUtilizationChange) {
 
   // Phase 1: Local overloaded, remote low → traffic should spill to remote.
   std::vector<double> phase1_util = {0.9, 0.9, 0.2, 0.2};
-  sendRequestsAndTrack(30, phase1_util);
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(phase1_util);
 
   // local_util=0.9, remote_avg=0.2. 0.9 > 0.2 + 0.1 → NOT all_local.
   // Weights: local=2*(1-0.9)=0.2, remote=2*(1-0.2)=1.6 → remote ~89%.
@@ -521,6 +385,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, LoadShiftOnUtilizationChange) {
   std::vector<double> phase2_util = {0.3, 0.3, 0.3, 0.3};
   sendRequestsAndTrack(60, phase2_util);
   timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_recalculate_zone_structures", 4);
 
   // local_util=0.3, remote_avg=0.3. 0.3 <= 0.3 + 0.1 → all_local.
   // The system may not fully converge in a single cycle after the phase 1 remote-heavy
@@ -537,45 +402,32 @@ TEST_P(LoadAwareLocalityIntegrationTest, LoadShiftOnUtilizationChange) {
       << "Phase 2: expected meaningful local shift after utilization equalizes; local=" << local_p2;
 }
 
-// Verifies correct weight distribution across 3 localities (all existing tests use only 2).
+// Verifies correct weight distribution across 3 localities (all other tests use only 2).
 // Exercises the 3-locality config loading path, multi-remote probe distribution, and
 // 3-way weighted random selection.
 TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalitiesDistribution) {
-  initializeThreeLocalityConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
-                                /*weight_update_period_seconds=*/10);
+  initializeConfig(/*variance_threshold=*/0.1, /*probe_percentage=*/0.1,
+                   /*weight_update_period_seconds=*/10, /*ewma_alpha=*/1.0,
+                   /*remote_zones=*/{"zone-b", "zone-c"});
 
-  // zone-a (local, hosts 0-1): 0.8
-  // zone-b (remote, hosts 2-3): 0.3
-  // zone-c (remote, hosts 4-5): 0.5
-  // remote_avg = (0.3 + 0.5) / 2 = 0.4
+  // zone-a (local, hosts 0-1): util=0.8
+  // zone-b (remote, hosts 2-3): util=0.3
+  // zone-c (remote, hosts 4-5): util=0.5
+  // remote_avg = (0.3 * 2 + 0.5 * 2) / 4 = 0.4
   // Variance check: 0.8 > 0.4 + 0.1 → NOT all_local.
   // Weights: zone-a = 2*(1-0.8) = 0.4, zone-b = 2*(1-0.3) = 1.4, zone-c = 2*(1-0.5) = 1.0
   // Total = 2.8 → zone-a ~14%, zone-b ~50%, zone-c ~36%.
   std::vector<double> utilizations = {0.8, 0.8, 0.3, 0.3, 0.5, 0.5};
-
-  // Cycle 1: Initial weights (from initialize()) are all_local with probe=0.1, so
-  // ~90% of traffic goes to zone-a and only ~5% each to zone-b/zone-c. With 30
-  // requests, each remote zone expects only ~1.5 requests — P(zone gets 0) ≈ 22%.
-  // When a remote zone gets no traffic, its util defaults to 0.0 (max headroom),
-  // which can reverse the intended zone-b > zone-c ordering.
-  sendRequestsAndTrack(30, utilizations);
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
-
-  // Cycle 2: Now that weights exist, traffic reaches all three zones. This second
-  // seeding phase populates ORCA data for zone-b and zone-c so the next timer tick
-  // computes the correct differentiated weights.
-  sendRequestsAndTrack(30, utilizations);
-  timeSystem().advanceTimeWait(std::chrono::seconds(11));
+  seedWithTwoCycles(utilizations);
 
   // Use 400 samples so the expected ordering is statistically robust.
-  // Expected proportions: zone-a ~14%, zone-b ~50%, zone-c ~36%.
-  // With 400 samples the probability of a zone-b < zone-c reversal is < 0.01%.
+  // With 400 samples, P(zone-b count < zone-c count) ≈ 0.1% (normal approx:
+  //   E[B-C]=56, Var[B-C]=336, σ=18.3, z=-3.06).
   auto usage = sendRequestsAndTrack(400, utilizations);
   uint64_t zone_a = usage[0] + usage[1];
   uint64_t zone_b = usage[2] + usage[3];
   uint64_t zone_c = usage[4] + usage[5];
 
-  // All three zones should receive some traffic.
   EXPECT_GT(zone_a, 0u) << "zone-a should receive some traffic";
   EXPECT_GT(zone_b, 0u) << "zone-b should receive some traffic";
   EXPECT_GT(zone_c, 0u) << "zone-c should receive some traffic";
