@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 10]
 message LoadAwareLocality {
   reserved 2, 3, 5;
+  reserved "blackout_period", "weight_expiration_period", "error_utilization_penalty";
 
   // The child LB policy to create for endpoint-picking within each locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1

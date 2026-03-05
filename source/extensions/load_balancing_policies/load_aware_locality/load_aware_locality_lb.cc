@@ -270,6 +270,12 @@ WorkerLocalLb::WorkerLocalLb(WorkerLocalLbFactory& factory,
       });
 }
 
+WorkerLocalLb::~WorkerLocalLb() {
+  // Reset callback handle before other members are destroyed, so the callback
+  // doesn't fire during destruction and access freed per-locality state.
+  member_update_cb_.reset();
+}
+
 void WorkerLocalLb::updateLocalityHosts(PerLocalityState& state, const Upstream::HostVector& hosts,
                                         bool is_local, const Upstream::HostVector& hosts_added,
                                         const Upstream::HostVector& hosts_removed) {

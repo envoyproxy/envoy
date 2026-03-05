@@ -124,7 +124,9 @@ public:
   }
 
   // Called by workers to get the current routing weights (lock-free TLS read).
-  // Returns a raw pointer — lifetime is guaranteed by the TLS slot, no atomic ops needed.
+  // SAFETY: Must only be called on a thread that owns a TLS slot instance (worker or main
+  // thread). The returned pointer is valid only for the duration of the current task; do not
+  // store it across yield points or after the TLS slot could be updated.
   const RoutingWeightsSnapshot* routingWeights() const {
     auto shim = tls_->get();
     return shim.has_value() ? shim->routing_weights.get() : nullptr;
@@ -175,6 +177,7 @@ class WorkerLocalLb : public Upstream::LoadBalancer,
                       protected Logger::Loggable<Logger::Id::upstream> {
 public:
   WorkerLocalLb(WorkerLocalLbFactory& factory, const Upstream::PrioritySet& priority_set);
+  ~WorkerLocalLb() override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -210,8 +213,8 @@ private:
   const Upstream::PrioritySet& priority_set_;
   Upstream::ClusterLbStats& stats_;
   std::vector<PerLocalityState> per_locality_;
-  // Must be declared LAST — destroyed first so the callback doesn't fire during destruction
-  // and access freed per-locality state.
+  // Destroyed explicitly in the destructor before other members so the callback doesn't fire
+  // during destruction and access freed per-locality state.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
 };
 

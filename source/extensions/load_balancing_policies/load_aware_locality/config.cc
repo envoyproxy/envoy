@@ -60,11 +60,11 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
       const double probe_percentage =
           lb_config.has_probe_percentage() ? lb_config.probe_percentage().value() : 0.03;
 
-      return Upstream::LoadBalancerConfigPtr{new LoadAwareLocalityLbConfig(
+      return std::make_unique<LoadAwareLocalityLbConfig>(
           *endpoint_picking_policy_factory,
           LoadBalancerConfigSharedPtr(std::move(lb_config_or_error.value())), weight_update_period,
           utilization_variance_threshold, ewma_alpha, probe_percentage,
-          context.mainThreadDispatcher(), context.threadLocal())};
+          context.mainThreadDispatcher(), context.threadLocal());
     }
   }
 
