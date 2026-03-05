@@ -116,6 +116,12 @@ public:
                                        std::string& body_out) const PURE;
 
   /**
+   * @return the content type to use for the direct response body, or empty string if not
+   * configured (in which case the default "text/plain" will be used).
+   */
+  virtual absl::string_view responseContentType() const PURE;
+
+  /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
    * example prefix rewriting for redirects etc. This should only be called ONCE
    * immediately prior to redirecting.

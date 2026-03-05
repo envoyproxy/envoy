@@ -20,7 +20,7 @@ class LoadStatsReporterImpl
       public Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                        Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
+                        Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr async_client,
                         Event::Dispatcher& dispatcher);
   ~LoadStatsReporterImpl() override;
 

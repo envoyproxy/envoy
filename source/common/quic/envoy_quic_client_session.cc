@@ -324,6 +324,12 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
 
 void EnvoyQuicClientSession::OnConfigNegotiated() {
   received_custom_transport_parameters_ = config()->received_custom_transport_parameters();
+  if (config()->HasReceivedIPv6AlternateServerAddress()) {
+    received_ipv6_alternate_server_address_ = config()->ReceivedIPv6AlternateServerAddress();
+  }
+  if (config()->HasReceivedIPv4AlternateServerAddress()) {
+    received_ipv4_alternate_server_address_ = config()->ReceivedIPv4AlternateServerAddress();
+  }
   quic::QuicSpdyClientSession::OnConfigNegotiated();
 }
 
