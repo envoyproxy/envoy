@@ -156,7 +156,7 @@ private:
   bool parsing_complete_{false};
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
-  // bool is_json_post_request_{false};
+  bool is_json_post_request_{false};
 };
 
 } // namespace Mcp
