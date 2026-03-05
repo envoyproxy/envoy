@@ -37,8 +37,7 @@ public:
   StatTagValueInput() = default;
 
   Matcher::DataInputGetResult get(const Envoy::Stats::StatTagMatchingData& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.value())};
+    return Matcher::DataInputGetResult::CreateStringView(data.value());
   }
 };
 
