@@ -882,7 +882,10 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = []
-        if self.run_code_validation:
+        # This dynamic module SDK will be built into a shared library which we prefer to use
+        # standard library rather then the absl equivalents. We simply skip the content check
+        # for this directory to avoid false positives.
+        if self.run_code_validation and "dynamic_modules/sdk/cpp" not in file_path:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
         if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
