@@ -124,8 +124,8 @@ public:
   virtual void onAboveWriteBufferHighWatermark() PURE;
 
   /**
-   * Called by a write filter to signal that its internal buffer has drained below its low watermark.
-   * Must be paired with a prior onAboveWriteBufferHighWatermark() call.
+   * Called by a write filter to signal that its internal buffer has drained below its low
+   * watermark. Must be paired with a prior onAboveWriteBufferHighWatermark() call.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };
