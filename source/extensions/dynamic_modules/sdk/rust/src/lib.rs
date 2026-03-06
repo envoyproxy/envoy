@@ -827,8 +827,15 @@ macro_rules! declare_cluster_init_functions {
 // =================================================================================================
 
 /// The function signature for creating a new load balancer configuration.
-pub type NewLoadBalancerConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn load_balancer::LoadBalancerConfig>>;
+///
+/// The `envoy_lb_config` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., in `choose_host`) for recording metrics.
+pub type NewLoadBalancerConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_lb_config: std::sync::Arc<dyn load_balancer::EnvoyLbConfig>,
+) -> Option<Box<dyn load_balancer::LoadBalancerConfig>>;
 
 /// Global function for creating load balancer configurations.
 pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunction> =
@@ -842,27 +849,42 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///
 /// ```ignore
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
 ///
 /// fn program_init() -> bool {
 ///   true
 /// }
 ///
-/// fn new_lb_config(name: &str, config: &[u8]) -> Option<Box<dyn LoadBalancerConfig>> {
-///   Some(Box::new(MyLbConfig {}))
+/// fn new_lb_config(
+///   name: &str,
+///   config: &[u8],
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// ) -> Option<Box<dyn LoadBalancerConfig>> {
+///   let counter_id = envoy_lb_config.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyLbConfig { counter_id, envoy_lb_config }))
 /// }
 ///
 /// declare_load_balancer_init_functions!(program_init, new_lb_config);
 ///
-/// struct MyLbConfig {}
+/// struct MyLbConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// }
 ///
 /// impl LoadBalancerConfig for MyLbConfig {
 ///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
-///     Box::new(MyLoadBalancer { next_index: 0 })
+///     Box::new(MyLoadBalancer {
+///       next_index: 0,
+///       counter_id: self.counter_id,
+///       envoy_lb_config: self.envoy_lb_config.clone(),
+///     })
 ///   }
 /// }
 ///
 /// struct MyLoadBalancer {
 ///   next_index: usize,
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
@@ -873,6 +895,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
+///     self.envoy_lb_config.increment_counter(self.counter_id, 1).ok();
 ///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }
