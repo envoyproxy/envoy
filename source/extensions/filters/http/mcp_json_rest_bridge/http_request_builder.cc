@@ -44,7 +44,10 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     if (!template_value_json.ok()) {
       return template_value_json.status();
     }
-    std::string value_str = jsonValueToString(*template_value_json);
+    // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
+    // in addition to the specified reserved characters.
+    std::string value_str = Http::Utility::PercentEncoding::encode(
+        jsonValueToString(*template_value_json), ReservedChars);
     std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
     RE2::GlobalReplace(&base_url, var_pattern, value_str);
   }

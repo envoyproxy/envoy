@@ -199,16 +199,24 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
 }
 
 void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_rpc) {
-  if (!json_rpc.contains(McpConstants::PARAMS_FIELD) ||
-      !json_rpc[McpConstants::PARAMS_FIELD].contains(McpConstants::NAME_FIELD) ||
-      !json_rpc[McpConstants::PARAMS_FIELD][McpConstants::NAME_FIELD].is_string()) {
-    ENVOY_LOG(error, "Failed to get the name of the tool call request. The tool call "
-                     "request will not be handled.");
+  const auto params_it = json_rpc.find(McpConstants::PARAMS_FIELD);
+  if (params_it == json_rpc.end() || !params_it->is_object()) {
+    ENVOY_LOG(error, "The tool call request is missing 'params' field or it's not an object.");
+    sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_tool_params_not_found",
+                      generateErrorJsonResponse(-32602, "Invalid params").dump());
+    return;
+  }
+  const auto& params = *params_it;
+
+  const auto name_it = params.find(McpConstants::NAME_FIELD);
+  if (name_it == params.end() || !name_it->is_string()) {
+    ENVOY_LOG(error, "Failed to get the name of the tool call request.");
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_tool_name_not_found",
                       generateErrorJsonResponse(-32602, "Tool name not found").dump());
     return;
   }
-  std::string tool_name = json_rpc[McpConstants::PARAMS_FIELD][McpConstants::NAME_FIELD];
+  const std::string tool_name = name_it->get<std::string>();
+
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
       config_->getHttpRule(tool_name);
   if (!http_rule.ok()) {
@@ -218,16 +226,16 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
     return;
   }
 
-  if (!json_rpc[McpConstants::PARAMS_FIELD].contains(McpConstants::ARGUMENTS_FIELD)) {
-    ENVOY_LOG(error, "Failed to get the arguments of the tool call request.");
+  const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
+  if (arguments_it == params.end() || !arguments_it->is_object()) {
+    ENVOY_LOG(error, "Failed to get the arguments of the tool call request or it's not an object.");
     sendErrorResponse(Http::Code::BadRequest,
                       "mcp_json_rest_bridge_filter_tool_arguments_not_found",
                       generateErrorJsonResponse(-32602, "Tool arguments not found").dump());
     return;
   }
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(
-      *http_rule, json_rpc[McpConstants::PARAMS_FIELD][McpConstants::ARGUMENTS_FIELD]);
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, *arguments_it);
   if (!http_request.ok()) {
     ENVOY_LOG(error, "Failed to build HTTP request for method: {} with status: {}", tool_name,
               http_request.status().message());
