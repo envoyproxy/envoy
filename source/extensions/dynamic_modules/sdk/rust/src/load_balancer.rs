@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
   abi,
   drop_wrapped_c_void_ptr,
@@ -14,6 +12,7 @@ use crate::{
   NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::sync::Arc;
 
 /// Trait for interacting with the Envoy load balancer and its context.
 ///

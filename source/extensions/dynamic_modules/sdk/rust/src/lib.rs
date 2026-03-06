@@ -849,6 +849,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///
 /// ```ignore
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -857,27 +858,33 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 /// fn new_lb_config(
 ///   name: &str,
 ///   config: &[u8],
-///   envoy_lb_config: &mut dyn EnvoyLbConfig,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// ) -> Option<Box<dyn LoadBalancerConfig>> {
 ///   let counter_id = envoy_lb_config.define_counter("my_counter").ok()?;
-///   Some(Box::new(MyLbConfig { counter_id }))
+///   Some(Box::new(MyLbConfig { counter_id, envoy_lb_config }))
 /// }
 ///
 /// declare_load_balancer_init_functions!(program_init, new_lb_config);
 ///
 /// struct MyLbConfig {
 ///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// }
 ///
 /// impl LoadBalancerConfig for MyLbConfig {
 ///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
-///     Box::new(MyLoadBalancer { next_index: 0, counter_id: self.counter_id })
+///     Box::new(MyLoadBalancer {
+///       next_index: 0,
+///       counter_id: self.counter_id,
+///       envoy_lb_config: self.envoy_lb_config.clone(),
+///     })
 ///   }
 /// }
 ///
 /// struct MyLoadBalancer {
 ///   next_index: usize,
 ///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
@@ -888,7 +895,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
-///     envoy_lb.increment_counter(self.counter_id, 1).ok();
+///     self.envoy_lb_config.increment_counter(self.counter_id, 1).ok();
 ///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }

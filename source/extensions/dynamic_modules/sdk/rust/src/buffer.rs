@@ -80,10 +80,11 @@ impl EnvoyMutBuffer<'_> {
   /// static mut BUF: [u8; 1024] = [0; 1024];
   /// let _buffer = unsafe { envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer::new(&raw mut BUF) };
   /// ```
+  #[allow(unknown_lints, dangerous_implicit_autorefs)]
   pub unsafe fn new(static_buf: *mut [u8]) -> Self {
     Self {
       raw_ptr: static_buf as *mut u8,
-      length: (&(*static_buf)).len(),
+      length: (*static_buf).len(),
       _marker: std::marker::PhantomData,
     }
   }
