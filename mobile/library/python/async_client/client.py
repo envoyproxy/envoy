@@ -7,91 +7,10 @@ import library.python.envoy_engine as envoy_engine
 from library.python.envoy_engine import EngineBuilder
 
 from .executor import AsyncioExecutor, Executor
-from .response import Response
+from .response import ClientResponseError, Response
 from .utils import (
     normalize_request,
 )
-
-
-class StreamCallbacks:
-    """Container for a single-stream's callback handlers."""
-
-    def __init__(
-        self, response: Response, stream_complete: asyncio.Event, executor: Executor
-    ) -> None:
-        self._response = response
-        self._stream_complete = stream_complete
-        self._executor = executor
-
-    def attach(self, engine: envoy_engine.Engine) -> envoy_engine.Stream:
-        proto = engine.stream_client().new_stream_prototype()
-        return proto.start(
-            on_headers=self._executor.wrap(self.on_headers),
-            on_data=self._executor.wrap(self.on_data),
-            on_trailers=self._executor.wrap(self.on_trailers),
-            on_complete=self._executor.wrap(self.on_complete),
-            on_error=self._executor.wrap(self.on_error),
-            on_cancel=self._executor.wrap(self.on_cancel),
-            explicit_flow_control=False,
-        )
-
-    def on_headers(
-        self,
-        headers: Dict[str, Union[str, List[str]]],
-        end_stream: bool,
-        intel: envoy_engine.StreamIntel,
-    ) -> None:
-        # shim delivers a dict where values are lists of strings
-        # status code arrives as the ":status" pseudo-header
-        status = headers.get(":status")
-        if status is not None:
-            try:
-                self._response.status_code = int(status[0] if isinstance(status, list) else status)
-            except ValueError:
-                pass
-        for key, value in headers.items():
-            self._response.headers[key] = (
-                value[0] if isinstance(value, list) and len(value) == 1 else value
-            )
-
-    def on_data(
-        self,
-        data: bytes,
-        length: int,
-        end_stream: bool,
-        intel: envoy_engine.StreamIntel,
-    ) -> None:
-        # length is redundant with len(data)
-        self._response.body_raw.extend(data)
-
-    def on_trailers(
-        self,
-        trailers: Dict[str, Union[str, List[str]]],
-        intel: envoy_engine.StreamIntel,
-    ) -> None:
-        for key, value in trailers.items():
-            self._response.trailers[key] = (
-                value[0] if isinstance(value, list) and len(value) == 1 else value
-            )
-
-    def on_complete(
-        self, intel: envoy_engine.StreamIntel, final_intel: envoy_engine.FinalStreamIntel
-    ) -> None:
-        self._stream_complete.set()
-
-    def on_error(
-        self,
-        error: envoy_engine.EnvoyError,
-        intel: envoy_engine.StreamIntel,
-        final_intel: envoy_engine.FinalStreamIntel,
-    ) -> None:
-        self._response.envoy_error = error
-        self._stream_complete.set()
-
-    def on_cancel(
-        self, intel: envoy_engine.StreamIntel, final_intel: envoy_engine.FinalStreamIntel
-    ) -> None:
-        self._stream_complete.set()
 
 
 class AsyncClient:
@@ -142,6 +61,7 @@ class AsyncClient:
         if hasattr(self, "_engine") and self._engine is not None:
             self._engine.terminate()
 
+    # The main request method, which all verb-specific methods delegate to.
     async def request(
         self,
         method: str,
@@ -151,14 +71,25 @@ class AsyncClient:
         headers: Dict[str, Union[str, List[str]]] = None,
         timeout: Optional[Union[int, float]] = None,
     ) -> Response:
-        """Send a single request and wait for the response."""
-        response = Response()
+        """Send a single request and wait for either the response headers to arrive or an error to occur.
+        It returns the Response object populated with response headers if no error occurs, and the caller can await response.body to get the response body once it's fully received.
+        If an error occurs before the headers are received, it raises a ClientResponseError with the underlying Envoy error attached.
+        """
         stream_complete = asyncio.Event()
-
-        callbacks = StreamCallbacks(response, stream_complete, self._executor)
-        stream = callbacks.attach(self._engine)
+        header_complete = asyncio.Event()
+        response = Response(header_complete, stream_complete, self._executor)
+        stream = response.attach(self._engine)
         self._send_request(stream, method, url, data=data, headers=headers, timeout=timeout)
-        await stream_complete.wait()
+        # Wait for either the response headers to arrive or an error to occur.
+        await asyncio.wait(
+            [
+                asyncio.create_task(stream_complete.wait()),
+                asyncio.create_task(header_complete.wait()),
+            ],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if response.envoy_error is not None:
+            raise ClientResponseError("Request failed with Envoy error", response.envoy_error)
         return response
 
     def _send_request(
@@ -172,7 +103,9 @@ class AsyncClient:
         timeout: Optional[Union[int, float]] = None,
     ) -> None:
         # Normalize the request and get headers and body
-        header_dict, body = normalize_request(method, url, data=data, headers=headers, timeout=timeout)
+        header_dict, body = normalize_request(
+            method, url, data=data, headers=headers, timeout=timeout
+        )
 
         # Send headers with end_stream flag based on whether we have a body
         has_data = len(body) > 0

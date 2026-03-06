@@ -1,6 +1,7 @@
 """Integration tests for the Envoy Mobile Python asyncio bindings."""
 
 import asyncio
+import json
 import random
 import unittest
 from test.python.echo_test_server import EchoTestServer
@@ -35,25 +36,34 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.get(f"{self._echo_server_url}/")
-                self.assertEqual(response.status_code, 200)
-                self.assertGreater(len(response.body), 0)
+                async with await client.get(f"{self._echo_server_url}/") as response:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertGreater(len(await response.body), 0)
 
         asyncio.run(run())
 
-    def test_get_with_custom_headers(self):
+    def test_get_with_custom_headers_and_streaming_response(self):
         """Send a GET request with custom headers."""
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
                 headers = {"x-custom-header": "test-value"}
-                response = await client.get(
+                async with await client.get(
                     f"{self._echo_server_url}/",
                     headers=headers,
-                )
-                self.assertEqual(response.status_code, 200)
-                # Echo server should echo back the custom header in the response body
-                self.assertIn("x-custom-header", response.json()["headers"])
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
+                    # The body hasn't been read yet.
+                    self.assertEqual(len(response.body_raw), 0)
+                    body = bytearray()
+                    while True:
+                        chunk = await response.content.read(1)  # Read 1 bytes at a time.
+                        if not chunk:
+                            break  # EOF
+                        body.extend(chunk)
+                    self.assertIn(
+                        "x-custom-header", json.loads(body)["headers"]
+                    )  # Verify the body contains the custom header we sent.
 
         asyncio.run(run())
 
@@ -63,13 +73,13 @@ class TestAsyncClientFetch(unittest.TestCase):
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
                 test_data = "hello from async client"
-                response = await client.post(
+                async with await client.post(
                     f"{self._echo_server_url}/",
                     data=test_data,
-                )
-                self.assertEqual(response.status_code, 200)
-                # Echo server should echo back the data
-                self.assertIn(test_data, response.text)
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
+                    # Echo server should echo back the data
+                    self.assertIn(test_data, await response.text)
 
         asyncio.run(run())
 
@@ -78,10 +88,10 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.head(f"{self._echo_server_url}/")
-                self.assertEqual(response.status_code, 200)
-                # HEAD response should have no body
-                self.assertEqual(len(response.body), 0)
+                async with await client.head(f"{self._echo_server_url}/") as response:
+                    self.assertEqual(response.status_code, 200)
+                    # HEAD response should have no body
+                    self.assertEqual(len(await response.body), 0)
 
         asyncio.run(run())
 
@@ -101,7 +111,8 @@ class TestAsyncClientFetch(unittest.TestCase):
                 responses = await asyncio.gather(*tasks)
 
                 for resp in responses:
-                    self.assertEqual(resp.status_code, 200)
+                    async with resp:
+                        self.assertEqual(resp.status_code, 200)
 
         asyncio.run(run())
 
@@ -110,8 +121,8 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.delete(f"{self._echo_server_url}/")
-                self.assertEqual(response.status_code, 200)
+                async with await client.delete(f"{self._echo_server_url}/") as response:
+                    self.assertEqual(response.status_code, 200)
 
         asyncio.run(run())
 
@@ -120,11 +131,11 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.put(
+                async with await client.put(
                     f"{self._echo_server_url}/",
                     data="updated content",
-                )
-                self.assertEqual(response.status_code, 200)
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
 
         asyncio.run(run())
 
@@ -133,11 +144,11 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.patch(
+                async with await client.patch(
                     f"{self._echo_server_url}/",
                     data="patched content",
-                )
-                self.assertEqual(response.status_code, 200)
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
 
         asyncio.run(run())
 
@@ -146,10 +157,10 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.get(f"{self._echo_server_url}/")
-                self.assertEqual(response.status_code, 200)
-                # Verify status code header is present
-                self.assertIn(":status", response.headers)
+                async with await client.get(f"{self._echo_server_url}/") as response:
+                    self.assertEqual(response.status_code, 200)
+                    # Verify status code header is present
+                    self.assertIn(":status", response.headers)
 
         asyncio.run(run())
 
@@ -158,15 +169,15 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         async def run():
             async with AsyncClient(self._make_client_builder()) as client:
-                response = await client.post(
+                async with await client.post(
                     f"{self._echo_server_url}/",
                     data="test string ñ",
-                )
-                self.assertEqual(response.status_code, 200)
-                # Verify text property works
-                text = response.text
-                self.assertIsInstance(text, str)
-                self.assertGreater(len(text), 0)
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
+                    # Verify text property works
+                    text = await response.text
+                    self.assertIsInstance(text, str)
+                    self.assertGreater(len(text), 0)
 
         asyncio.run(run())
 
