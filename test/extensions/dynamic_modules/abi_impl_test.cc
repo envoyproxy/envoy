@@ -825,6 +825,17 @@ TEST(CommonAbiImplTest, LbGetMemberUpdateHostAddressEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_get_host_counter_stat triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHostCounterStatEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        auto value = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+            nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal);
+        EXPECT_EQ(value, 0);
+      },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Matcher weak symbol stub tests
 // =====================================================================

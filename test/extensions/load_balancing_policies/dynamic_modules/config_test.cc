@@ -555,6 +555,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   // Test member update host address callback with null.
   EXPECT_FALSE(
       envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0, true, &result));
+
+  // Test host counter stat callback with null.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
@@ -598,6 +603,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 999, 0), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 999, 0, nullptr, nullptr,
                                                                   nullptr));
+
+  // Test host counter stat with invalid priority.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 999, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
@@ -636,6 +646,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 999), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 999, nullptr, nullptr,
                                                                   nullptr));
+
+  // Test host counter stat with invalid host index.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 999, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
@@ -727,6 +742,15 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
   host2_->stats().rq_active_.set(10);
   host2_->stats().cx_active_.set(7);
 
+  // Set counter stats on hosts.
+  host1_->stats().cx_connect_fail_.inc();
+  host1_->stats().cx_connect_fail_.inc();
+  host1_->stats().cx_total_.add(100);
+  host1_->stats().rq_error_.add(3);
+  host1_->stats().rq_success_.add(42);
+  host1_->stats().rq_timeout_.inc();
+  host1_->stats().rq_total_.add(46);
+
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
@@ -770,6 +794,31 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
   EXPECT_TRUE(
       envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region, nullptr, nullptr));
   EXPECT_EQ(absl::string_view(region.ptr, region.length), "us-east");
+
+  // Verify host counter stats.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxConnectFail),
+            2);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxTotal),
+            100);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqError),
+            3);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqSuccess),
+            42);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTimeout),
+            1);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            46);
+
+  // Verify host2 counter stats are 0 (not set).
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 1, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {

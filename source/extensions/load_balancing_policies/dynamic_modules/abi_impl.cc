@@ -628,4 +628,36 @@ bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
   return true;
 }
 
+uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_counter_stat stat) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  const auto& host_stats = hosts[index]->stats();
+  switch (stat) {
+  case envoy_dynamic_module_type_host_counter_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_counter_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  }
+  return 0;
+}
+
 } // extern "C"

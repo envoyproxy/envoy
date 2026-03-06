@@ -8062,6 +8062,25 @@ typedef enum {
   envoy_dynamic_module_type_host_health_Healthy = 2,
 } envoy_dynamic_module_type_host_health;
 
+/**
+ * envoy_dynamic_module_type_host_counter_stat identifies a per-host counter stat.
+ * These correspond to the counters in Envoy's HostStats struct.
+ */
+typedef enum {
+  // Total connection connect failures.
+  envoy_dynamic_module_type_host_counter_stat_CxConnectFail = 0,
+  // Total connections opened.
+  envoy_dynamic_module_type_host_counter_stat_CxTotal = 1,
+  // Total request errors (used for EDS load reporting).
+  envoy_dynamic_module_type_host_counter_stat_RqError = 2,
+  // Total successful requests (used for EDS load reporting).
+  envoy_dynamic_module_type_host_counter_stat_RqSuccess = 3,
+  // Total request timeouts.
+  envoy_dynamic_module_type_host_counter_stat_RqTimeout = 4,
+  // Total requests sent.
+  envoy_dynamic_module_type_host_counter_stat_RqTotal = 5,
+} envoy_dynamic_module_type_host_counter_stat;
+
 // =============================================================================
 // Load Balancer Event Hooks
 // =============================================================================
@@ -8603,6 +8622,21 @@ bool envoy_dynamic_module_callback_lb_context_get_override_host(
 bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_counter_stat returns the value of a per-host counter
+ * stat identified by the stat enum. This provides access to host-level counters such as total
+ * connections, request errors, and request totals.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param stat is the counter stat to query.
+ * @return the counter value, or 0 if the host was not found or the stat is invalid.
+ */
+uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_counter_stat stat);
 
 // =============================================================================
 // Matcher Types
