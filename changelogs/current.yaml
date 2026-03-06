@@ -495,6 +495,13 @@ new_features:
     via ``module.local.filename`` as an alternative to the name-based search path.
 - area: dynamic_modules
   change: |
+    Added support for fetching dynamic module binaries from remote HTTP sources via
+    ``module.remote`` in ``DynamicModuleConfig``. The module is downloaded asynchronously during
+    listener initialization with SHA256 verification, written to a temporary file, and loaded
+    via ``dlopen``. Modules with the same SHA256 are cached on disk and reused across restarts.
+    If the remote fetch fails, the filter is not installed and requests pass through (fail-open).
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts

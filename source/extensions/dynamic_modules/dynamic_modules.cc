@@ -1,7 +1,9 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include <dlfcn.h>
+#include <unistd.h>
 
+#include <fstream>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -146,6 +148,44 @@ void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   // avoid unnecessary copy because it is likely that this is only called for a constant string,
   // though this is not a performance critical path.
   return dlsym(handle_, std::string(symbol_ref).c_str());
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  std::filesystem::path temp_file_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+
+  if (std::filesystem::exists(temp_file_path)) {
+    return newDynamicModule(temp_file_path, do_not_close, load_globally);
+  }
+
+  // Write to a pid-unique staging file, then atomically rename to the final path.
+  // This avoids corruption if two processes race on the same sha256.
+  std::filesystem::path staging_path = temp_file_path;
+  staging_path += fmt::format(".tmp.{}", getpid());
+  {
+    std::ofstream temp_file(staging_path, std::ios::binary);
+    if (!temp_file) {
+      return absl::InternalError(absl::StrCat(
+          "Failed to create temporary file for dynamic module: ", staging_path.string()));
+    }
+    temp_file.write(module_bytes.data(), module_bytes.size());
+    if (!temp_file) {
+      return absl::InternalError(absl::StrCat(
+          "Failed to write to temporary file for dynamic module: ", staging_path.string()));
+    }
+  }
+  std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace);
+  std::filesystem::rename(staging_path, temp_file_path);
+  auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
+  if (!result.ok()) {
+    // Clean up so an invalid file doesn't get cached.
+    std::filesystem::remove(temp_file_path);
+  }
+  return result;
 }
 
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {

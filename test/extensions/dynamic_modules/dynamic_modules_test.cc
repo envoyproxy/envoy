@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -189,6 +191,76 @@ TEST(CreateDynamicModulesByName, ModuleNotFound) {
   EXPECT_THAT(module.status().message(),
               testing::HasSubstr(
                   "Failed to load dynamic module: libno_op.so not found in any search path"));
+}
+
+TEST(NewDynamicModuleFromBytes, Success) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::ifstream input(test_lib, std::ios::binary);
+  ASSERT_TRUE(input.good()) << "Failed to open test shared object file: " << test_lib;
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  const std::string sha256 = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+  // Ensure no leftover from previous runs.
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, sha256, false, false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module from bytes: " << module.status().message();
+  EXPECT_TRUE(std::filesystem::exists(temp_path));
+
+  // Cleanup.
+  module->reset();
+  std::filesystem::remove(temp_path);
+}
+
+TEST(NewDynamicModuleFromBytes, InvalidBytes) {
+  const std::string garbage = "this is not a valid shared object";
+  const std::string sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(garbage, sha256, false, false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+
+  // The invalid file should have been cleaned up to avoid poisoning the cache.
+  EXPECT_FALSE(std::filesystem::exists(temp_path));
+}
+
+TEST(NewDynamicModuleFromBytes, ExistingFileSkipsWrite) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::ifstream input(test_lib, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  const std::string sha256 = "1111111111111111111111111111111111111111111111111111111111111111";
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  // First load writes the file.
+  absl::StatusOr<DynamicModulePtr> module1 =
+      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+  ASSERT_TRUE(module1.ok()) << module1.status().message();
+  ASSERT_TRUE(std::filesystem::exists(temp_path));
+  auto mtime = std::filesystem::last_write_time(temp_path);
+
+  // Second load with same sha256 should skip writing (file already exists).
+  module1->reset();
+  absl::StatusOr<DynamicModulePtr> module2 =
+      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+  ASSERT_TRUE(module2.ok()) << module2.status().message();
+  EXPECT_EQ(std::filesystem::last_write_time(temp_path), mtime);
+
+  // Cleanup.
+  module2->reset();
+  std::filesystem::remove(temp_path);
 }
 
 } // namespace DynamicModules
