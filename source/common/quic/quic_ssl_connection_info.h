@@ -36,9 +36,11 @@ public:
     return absl::nullopt;
   }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
+  const std::string& pemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
     return EMPTY_STRING;
   }
+  absl::Span<const std::string> pemEncodedPeerCertificateChain() const override { return {}; }
   absl::Span<const std::string> dnsSansPeerCertificate() const override { return {}; }
   absl::optional<SystemTime> validFromPeerCertificate() const override { return absl::nullopt; }
   absl::optional<SystemTime> expirationPeerCertificate() const override { return absl::nullopt; }
