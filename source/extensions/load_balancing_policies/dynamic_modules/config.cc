@@ -1,5 +1,7 @@
 #include "source/extensions/load_balancing_policies/dynamic_modules/config.h"
 
+#include "envoy/server/factory_context.h"
+
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
@@ -59,7 +61,8 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 }
 
 absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message& config) {
+Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
+                    const Protobuf::Message& config) {
   const auto& typed_config = dynamic_cast<const DynamicModulesLbProto&>(config);
   const auto& module_config = typed_config.dynamic_module_config();
   const std::string& module_name = module_config.name();
@@ -79,8 +82,9 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config_bytes = std::move(config_or_error.value());
   }
-  auto lb_config_or_error = DynamicModuleLbConfig::create(
-      typed_config.lb_policy_name(), config_bytes, std::move(module_or_error.value()));
+  auto lb_config_or_error =
+      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes,
+                                    std::move(module_or_error.value()), context.serverScope());
   if (!lb_config_or_error.ok()) {
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}", module_name,

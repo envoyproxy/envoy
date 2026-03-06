@@ -9,288 +9,6 @@ namespace Extensions {
 namespace DynamicModules {
 namespace {
 
-// Test that the weak symbol stub for scheduler_new triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerNewEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for scheduler_delete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerDeleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for scheduler_commit triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerCommitEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(nullptr, 0); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for signal_init_complete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SignalInitCompleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for http_callout triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, HttpCalloutEnvoyBug) {
-  uint64_t callout_id = 0;
-  envoy_dynamic_module_type_module_buffer cluster_name = {"cluster", 7};
-  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-            nullptr, &callout_id, cluster_name, nullptr, 0, body, 5000);
-        EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_counter_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetCounterValueEnvoyBug) {
-  uint64_t value = 0;
-  envoy_dynamic_module_type_module_buffer name = {"counter_name", 12};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
-            nullptr, name, &value);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_gauge_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetGaugeValueEnvoyBug) {
-  uint64_t value = 0;
-  envoy_dynamic_module_type_module_buffer name = {"gauge_name", 10};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
-            nullptr, name, &value);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_histogram_summary triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetHistogramSummaryEnvoyBug) {
-  uint64_t sample_count = 0;
-  double sample_sum = 0.0;
-  envoy_dynamic_module_type_module_buffer name = {"histogram_name", 14};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
-            nullptr, name, &sample_count, &sample_sum);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for iterate_counters triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IterateCountersEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(nullptr, nullptr,
-                                                                           nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for iterate_gauges triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IterateGaugesEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(nullptr, nullptr, nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_new triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerNewEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_new(nullptr);
-        EXPECT_EQ(result, nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_enable triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerEnableEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_disable triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerDisableEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_enabled triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerEnabledEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_delete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerDeleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr); },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Bootstrap extension admin handler weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for register_admin_handler triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RegisterAdminHandlerEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
-  envoy_dynamic_module_type_module_buffer help = {"help", 4};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
-            nullptr, path, help, true, false);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for remove_admin_handler triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RemoveAdminHandlerEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(nullptr, path);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for admin_set_response triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, AdminSetResponseEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer body = {"response", 8};
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr, body); },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Bootstrap extension stats definition and update weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for define_counter triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineCounterEnvoyBug) {
-  size_t counter_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"counter", 7};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-            nullptr, name, nullptr, 0, &counter_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for increment_counter triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IncrementCounterEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for define_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineGaugeEnvoyBug) {
-  size_t gauge_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"gauge", 5};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-            nullptr, name, nullptr, 0, &gauge_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for set_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SetGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
-            nullptr, 0, nullptr, 0, 42);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for increment_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IncrementGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for decrement_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DecrementGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for define_histogram triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineHistogramEnvoyBug) {
-  size_t histogram_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"histogram", 9};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
-            nullptr, name, nullptr, 0, &histogram_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for record_histogram_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RecordHistogramValueEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
-                nullptr, 0, nullptr, 0, 100);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Function registry tests
-// =====================================================================
-
 // Test registering and retrieving a function.
 TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
   auto fn = [](int x) { return x + 1; };
@@ -366,505 +84,6 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
   EXPECT_EQ(resolved_b(0), 20);
 }
 
-// =====================================================================
-// Cert Validator weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for cert_validator_set_error_details triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, CertValidatorSetErrorDetailsEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer error_details = {"error", 5};
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_cert_validator_set_error_details(nullptr, error_details); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cert_validator_set_filter_state triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, CertValidatorSetFilterStateEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer key = {"key", 3};
-  envoy_dynamic_module_type_module_buffer value = {"value", 5};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_cert_validator_set_filter_state(nullptr, key, value);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cert_validator_get_filter_state triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, CertValidatorGetFilterStateEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer key = {"key", 3};
-  envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, key, &value_out);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Cluster extension weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for cluster_add_hosts triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, ClusterAddHostsEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:80", 12};
-  uint32_t weight = 1;
-  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_cluster_add_hosts(nullptr, &addr, &weight, 1, &host_ptr);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cluster_remove_hosts triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, ClusterRemoveHostsEnvoyBug) {
-  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, &host_ptr, 1);
-        EXPECT_EQ(result, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cluster_pre_init_complete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, ClusterPreInitCompleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cluster_lb_get_healthy_host_count triggers an ENVOY_BUG.
-TEST(CommonAbiImplTest, ClusterLbGetHealthyHostCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0);
-        EXPECT_EQ(result, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for cluster_lb_get_healthy_host triggers an ENVOY_BUG.
-TEST(CommonAbiImplTest, ClusterLbGetHealthyHostEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0);
-        EXPECT_EQ(result, nullptr);
-      },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Load Balancer weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for lb_get_cluster_name triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetClusterNameEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, &result); },
-      "not implemented in this context");
-  EXPECT_EQ(result.ptr, nullptr);
-  EXPECT_EQ(result.length, 0);
-}
-
-// Test that the weak symbol stub for lb_get_hosts_count triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostsCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_healthy_hosts_count triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHealthyHostsCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_healthy_hosts_count(nullptr, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_degraded_hosts_count triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetDegradedHostsCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_degraded_hosts_count(nullptr, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_priority_set_size triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetPrioritySetSizeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto size = envoy_dynamic_module_callback_lb_get_priority_set_size(nullptr);
-        EXPECT_EQ(size, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_healthy_host_address triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHealthyHostAddressEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto success =
-            envoy_dynamic_module_callback_lb_get_healthy_host_address(nullptr, 0, 0, &result);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-  EXPECT_EQ(result.ptr, nullptr);
-  EXPECT_EQ(result.length, 0);
-}
-
-// Test that the weak symbol stub for lb_get_healthy_host_weight triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHealthyHostWeightEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto weight = envoy_dynamic_module_callback_lb_get_healthy_host_weight(nullptr, 0, 0);
-        EXPECT_EQ(weight, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_health triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostHealthEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto health = envoy_dynamic_module_callback_lb_get_host_health(nullptr, 0, 0);
-        EXPECT_EQ(health, envoy_dynamic_module_type_host_health_Unhealthy);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_health_by_address triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, LbGetHostHealthByAddressEnvoyBug) {
-  envoy_dynamic_module_type_host_health health = envoy_dynamic_module_type_host_health_Unhealthy;
-  envoy_dynamic_module_type_module_buffer addr = {"10.0.0.1:8080", 13};
-  EXPECT_ENVOY_BUG(
-      {
-        auto found =
-            envoy_dynamic_module_callback_lb_get_host_health_by_address(nullptr, addr, &health);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-  EXPECT_EQ(health, envoy_dynamic_module_type_host_health_Unhealthy);
-}
-
-// Test that the weak symbol stub for lb_get_host_address triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-  EXPECT_EQ(result.ptr, nullptr);
-  EXPECT_EQ(result.length, 0);
-}
-
-// Test that the weak symbol stub for lb_get_host_weight triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostWeightEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto weight = envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0);
-        EXPECT_EQ(weight, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_active_requests triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostActiveRequestsEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_active_connections triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, LbGetHostActiveConnectionsEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_locality triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostLocalityEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr,
-                                                                        nullptr, nullptr);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_compute_hash_key triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbContextComputeHashKeyEnvoyBug) {
-  uint64_t hash_out = 0;
-  EXPECT_ENVOY_BUG(
-      {
-        auto success =
-            envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, &hash_out);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_downstream_headers_size triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersSizeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_downstream_headers triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto success =
-            envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_downstream_header triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer key = {"test-key", 8};
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header(
-            nullptr, key, &result, 0, nullptr);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_host_selection_retry_count triggers an
-// ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbContextGetHostSelectionRetryCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count =
-            envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(nullptr);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_should_select_another_host triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbContextShouldSelectAnotherHostEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
-            nullptr, nullptr, 0, 0);
-        EXPECT_FALSE(should_retry);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_override_host triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, LbContextGetOverrideHostEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto found =
-            envoy_dynamic_module_callback_lb_context_get_override_host(nullptr, nullptr, nullptr);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_set_host_data triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbSetHostDataEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_lb_set_host_data(nullptr, 0, 0, 42);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_data triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostDataEnvoyBug) {
-  uintptr_t data = 0;
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_lb_get_host_data(nullptr, 0, 0, &data);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_metadata_string triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostMetadataStringEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
-  envoy_dynamic_module_type_module_buffer key = {"version", 7};
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_string(
-            nullptr, 0, 0, filter_name, key, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_metadata_number triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostMetadataNumberEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
-  envoy_dynamic_module_type_module_buffer key = {"version", 7};
-  double result = 0.0;
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_number(
-            nullptr, 0, 0, filter_name, key, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_host_metadata_bool triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostMetadataBoolEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
-  envoy_dynamic_module_type_module_buffer key = {"version", 7};
-  bool result = false;
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_host_metadata_bool(
-            nullptr, 0, 0, filter_name, key, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_locality_count triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetLocalityCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_locality_count(nullptr, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_locality_host_count triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetLocalityHostCountEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_lb_get_locality_host_count(nullptr, 0, 0);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_locality_host_address triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, LbGetLocalityHostAddressEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto found =
-            envoy_dynamic_module_callback_lb_get_locality_host_address(nullptr, 0, 0, 0, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_locality_weight triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetLocalityWeightEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto weight = envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0);
-        EXPECT_EQ(weight, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_get_member_update_host_address triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbGetMemberUpdateHostAddressEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto found = envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0,
-                                                                                     true, &result);
-        EXPECT_FALSE(found);
-      },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Matcher weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for matcher_get_headers_size triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, MatcherGetHeadersSizeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto count = envoy_dynamic_module_callback_matcher_get_headers_size(
-            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader);
-        EXPECT_EQ(count, 0);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for matcher_get_headers triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, MatcherGetHeadersEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_matcher_get_headers(
-            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for matcher_get_header_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, MatcherGetHeaderValueEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer key = {"test-key", 8};
-  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_matcher_get_header_value(
-            nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 0,
-            nullptr);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
 // =============================================================================
 // Weak symbol stub tests for network filter, listener filter, access logger, and
 // UDP listener filter callbacks. These verify that the weak stubs installed in
@@ -877,6 +96,210 @@ TEST(CommonAbiImplTest, MatcherGetHeaderValueEnvoyBug) {
   TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
     EXPECT_ENVOY_BUG({ call; }, "not implemented in this context");                                \
   }
+
+WEAK_STUB(BootstrapExtensionConfigSchedulerNew,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(nullptr))
+WEAK_STUB(BootstrapExtensionConfigSchedulerDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(nullptr))
+WEAK_STUB(BootstrapExtensionConfigSchedulerCommit,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(nullptr, 0))
+WEAK_STUB(BootstrapExtensionConfigSignalInitComplete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(nullptr))
+
+WEAK_STUB(BootstrapExtensionHttpCallout,
+          envoy_dynamic_module_callback_bootstrap_extension_http_callout(nullptr, nullptr,
+                                                                         {"cluster", 7}, nullptr, 0,
+                                                                         {nullptr, 0}, 5000))
+
+WEAK_STUB(BootstrapExtensionGetCounterValue,
+          envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(nullptr, {nullptr, 0},
+                                                                              nullptr))
+WEAK_STUB(BootstrapExtensionGetGaugeValue,
+          envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(nullptr, {nullptr, 0},
+                                                                            nullptr))
+WEAK_STUB(BootstrapExtensionGetHistogramSummary,
+          envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr, nullptr))
+
+WEAK_STUB(BootstrapExtensionIterateCounters,
+          envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(nullptr, nullptr,
+                                                                             nullptr))
+WEAK_STUB(BootstrapExtensionIterateGauges,
+          envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(nullptr, nullptr,
+                                                                           nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerNew,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_new(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerEnable,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100))
+WEAK_STUB(BootstrapExtensionTimerDisable,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerEnabled,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+
+WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
+          envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+              nullptr, {"/test", 5}, {"help", 4}, true, false))
+WEAK_STUB(BootstrapExtensionRemoveAdminHandler,
+          envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(nullptr,
+                                                                                 {"/test", 5}))
+
+WEAK_STUB(BootstrapExtensionAdminSetResponse,
+          envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr,
+                                                                               {nullptr, 0}))
+
+WEAK_STUB(BootstrapExtensionConfigDefineCounter,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+              nullptr, {"counter", 7}, nullptr, 0, nullptr))
+WEAK_STUB(BootstrapExtensionConfigIncrementCounter,
+          envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(nullptr, 0,
+                                                                                     nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDefineGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+              nullptr, {"gauge", 5}, nullptr, 0, nullptr))
+
+WEAK_STUB(BootstrapExtensionConfigSetGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(nullptr, 0, nullptr, 0,
+                                                                             42))
+
+WEAK_STUB(BootstrapExtensionConfigIncrementGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(nullptr, 0,
+                                                                                   nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDecrementGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(nullptr, 0,
+                                                                                   nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDefineHistogram,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+              nullptr, {"histogram", 9}, nullptr, 0, nullptr))
+
+WEAK_STUB(BootstrapExtensionConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+              nullptr, 0, nullptr, 0, 100))
+
+WEAK_STUB(CertValidatorSetErrorDetails,
+          envoy_dynamic_module_callback_cert_validator_set_error_details(nullptr, {nullptr, 0}))
+WEAK_STUB(CertValidatorSetFilterState,
+          envoy_dynamic_module_callback_cert_validator_set_filter_state(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
+WEAK_STUB(CertValidatorGetFilterState,
+          envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
+                                                                        nullptr))
+
+WEAK_STUB(ClusterAddHosts,
+          envoy_dynamic_module_callback_cluster_add_hosts(nullptr, nullptr, nullptr, 0, nullptr))
+WEAK_STUB(ClusterRemoveHosts,
+          envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
+WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
+WEAK_STUB(ClusterLbGetHealthyHostCount,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
+WEAK_STUB(ClusterLbGetHealthyHost,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+
+WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
+WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))
+WEAK_STUB(LbGetHealthyHostsCount,
+          envoy_dynamic_module_callback_lb_get_healthy_hosts_count(nullptr, 0))
+WEAK_STUB(LbGetDegradedHostsCount,
+          envoy_dynamic_module_callback_lb_get_degraded_hosts_count(nullptr, 0))
+WEAK_STUB(LbGetPrioritySetSize, envoy_dynamic_module_callback_lb_get_priority_set_size(nullptr))
+WEAK_STUB(LbGetHealthyHostAddress,
+          envoy_dynamic_module_callback_lb_get_healthy_host_address(nullptr, 0, 0, nullptr))
+WEAK_STUB(LbGetHealthyHostWeight,
+          envoy_dynamic_module_callback_lb_get_healthy_host_weight(nullptr, 0, 0))
+WEAK_STUB(LbGetHostHealth, envoy_dynamic_module_callback_lb_get_host_health(nullptr, 0, 0))
+WEAK_STUB(LbGetHostHealthByAddress,
+          envoy_dynamic_module_callback_lb_get_host_health_by_address(nullptr, {nullptr, 0},
+                                                                      nullptr))
+WEAK_STUB(LbGetHostAddress,
+          envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, nullptr))
+WEAK_STUB(LbGetHostWeight, envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0))
+WEAK_STUB(LbGetHostActiveRequests,
+          envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0))
+WEAK_STUB(LbGetHostActiveConnections,
+          envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0))
+WEAK_STUB(LbGetHostLocality,
+          envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr, nullptr,
+                                                             nullptr))
+WEAK_STUB(LbContextComputeHashKey,
+          envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, nullptr))
+WEAK_STUB(LbContextGetDownstreamHeadersSize,
+          envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr))
+WEAK_STUB(LbContextGetDownstreamHeaders,
+          envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr))
+WEAK_STUB(LbContextGetDownstreamHeader,
+          envoy_dynamic_module_callback_lb_context_get_downstream_header(nullptr, {nullptr, 0},
+                                                                         nullptr, 0, nullptr))
+WEAK_STUB(LbContextGetHostSelectionRetryCount,
+          envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(nullptr))
+WEAK_STUB(LbContextShouldSelectAnotherHost,
+          envoy_dynamic_module_callback_lb_context_should_select_another_host(nullptr, nullptr, 0,
+                                                                              0))
+WEAK_STUB(LbContextGetOverrideHost,
+          envoy_dynamic_module_callback_lb_context_get_override_host(nullptr, nullptr, nullptr))
+WEAK_STUB(LbSetHostData, envoy_dynamic_module_callback_lb_set_host_data(nullptr, 0, 0, 42))
+WEAK_STUB(LbGetHostData, envoy_dynamic_module_callback_lb_get_host_data(nullptr, 0, 0, nullptr))
+WEAK_STUB(LbGetHostMetadataString,
+          envoy_dynamic_module_callback_lb_get_host_metadata_string(nullptr, 0, 0, {nullptr, 0},
+                                                                    {nullptr, 0}, nullptr))
+WEAK_STUB(LbGetHostMetadataNumber,
+          envoy_dynamic_module_callback_lb_get_host_metadata_number(nullptr, 0, 0, {nullptr, 0},
+                                                                    {nullptr, 0}, nullptr))
+WEAK_STUB(LbGetHostMetadataBool,
+          envoy_dynamic_module_callback_lb_get_host_metadata_bool(nullptr, 0, 0, {nullptr, 0},
+                                                                  {nullptr, 0}, nullptr))
+WEAK_STUB(LbGetLocalityCount, envoy_dynamic_module_callback_lb_get_locality_count(nullptr, 0))
+WEAK_STUB(LbGetLocalityHostCount,
+          envoy_dynamic_module_callback_lb_get_locality_host_count(nullptr, 0, 0))
+WEAK_STUB(LbGetLocalityHostAddress,
+          envoy_dynamic_module_callback_lb_get_locality_host_address(nullptr, 0, 0, 0, nullptr))
+WEAK_STUB(LbGetLocalityWeight, envoy_dynamic_module_callback_lb_get_locality_weight(nullptr, 0, 0))
+WEAK_STUB(LbGetMemberUpdateHostAddress,
+          envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0, true,
+                                                                          nullptr))
+WEAK_STUB(LbGetHostCounterStat,
+          envoy_dynamic_module_callback_lb_get_host_counter_stat(
+              nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal))
+
+WEAK_STUB(LbConfigDefineCounter,
+          envoy_dynamic_module_callback_lb_config_define_counter(nullptr, {"counter", 7}, nullptr,
+                                                                 0, nullptr))
+WEAK_STUB(LbConfigIncrementCounter,
+          envoy_dynamic_module_callback_lb_config_increment_counter(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDefineGauge,
+          envoy_dynamic_module_callback_lb_config_define_gauge(nullptr, {"gauge", 5}, nullptr, 0,
+                                                               nullptr))
+WEAK_STUB(LbConfigSetGauge,
+          envoy_dynamic_module_callback_lb_config_set_gauge(nullptr, 0, nullptr, 0, 42))
+WEAK_STUB(LbConfigIncrementGauge,
+          envoy_dynamic_module_callback_lb_config_increment_gauge(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDecrementGauge,
+          envoy_dynamic_module_callback_lb_config_decrement_gauge(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDefineHistogram,
+          envoy_dynamic_module_callback_lb_config_define_histogram(nullptr, {"histogram", 9},
+                                                                   nullptr, 0, nullptr))
+WEAK_STUB(LbConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_lb_config_record_histogram_value(nullptr, 0, nullptr, 0,
+                                                                         100))
+
+WEAK_STUB(MatcherGetHeadersSize,
+          envoy_dynamic_module_callback_matcher_get_headers_size(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader))
+WEAK_STUB(MatcherGetHeaders,
+          envoy_dynamic_module_callback_matcher_get_headers(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr))
+WEAK_STUB(MatcherGetHeaderValue,
+          envoy_dynamic_module_callback_matcher_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
 
 WEAK_STUB(NetworkFilterWrite,
           envoy_dynamic_module_callback_network_filter_write(nullptr, {nullptr, 0}, false))

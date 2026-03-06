@@ -235,6 +235,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
+    Modules can now define metrics during configuration and record them during host selection.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,

@@ -402,11 +402,9 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
 
 __attribute__((weak)) void
 envoy_dynamic_module_callback_lb_get_cluster_name(envoy_dynamic_module_type_lb_envoy_ptr,
-                                                  envoy_dynamic_module_type_envoy_buffer* result) {
+                                                  envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_cluster_name: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
 }
 
 __attribute__((weak)) size_t
@@ -437,13 +435,12 @@ envoy_dynamic_module_callback_lb_get_priority_set_size(envoy_dynamic_module_type
   return 0;
 }
 
-__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
-    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_lb_get_healthy_host_address(envoy_dynamic_module_type_lb_envoy_ptr,
+                                                          uint32_t, size_t,
+                                                          envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_healthy_host_address: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
   return false;
 }
 
@@ -464,23 +461,17 @@ envoy_dynamic_module_callback_lb_get_host_health(envoy_dynamic_module_type_lb_en
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
     envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_host_health* result) {
+    envoy_dynamic_module_type_host_health*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_health_by_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    *result = envoy_dynamic_module_type_host_health_Unhealthy;
-  }
   return false;
 }
 
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
-                                                  size_t,
-                                                  envoy_dynamic_module_type_envoy_buffer* result) {
+                                                  size_t, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_address: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
   return false;
 }
 
@@ -587,13 +578,9 @@ envoy_dynamic_module_callback_lb_get_host_data(envoy_dynamic_module_type_lb_envo
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata_string: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
 }
 
@@ -629,13 +616,9 @@ __attribute__((weak)) size_t envoy_dynamic_module_callback_lb_get_locality_host_
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_locality_host_address(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t, size_t,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_locality_host_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
 }
 
@@ -647,15 +630,91 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_locality_wei
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
-    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_member_update_host_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_host_counter_stat) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_counter_stat: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_define_counter(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_define_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_increment_counter(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, size_t, envoy_dynamic_module_type_module_buffer*,
+    size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_increment_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_define_gauge(envoy_dynamic_module_type_lb_config_envoy_ptr,
+                                                     envoy_dynamic_module_type_module_buffer,
+                                                     envoy_dynamic_module_type_module_buffer*,
+                                                     size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_define_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_set_gauge(envoy_dynamic_module_type_lb_config_envoy_ptr,
+                                                  size_t, envoy_dynamic_module_type_module_buffer*,
+                                                  size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_increment_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, size_t, envoy_dynamic_module_type_module_buffer*,
+    size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_increment_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_decrement_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, size_t, envoy_dynamic_module_type_module_buffer*,
+    size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_decrement_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_define_histogram(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_define_histogram: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_record_histogram_value(
+    envoy_dynamic_module_type_lb_config_envoy_ptr, size_t, envoy_dynamic_module_type_module_buffer*,
+    size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_Success;
 }
 
 // ---------------------- Matcher callbacks ------------------------
@@ -963,6 +1022,21 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_network_get_dynamic_met
     envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_module_buffer, double*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_network_get_dynamic_metadata_number: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_set_dynamic_metadata_bool: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_get_dynamic_metadata_bool: "
                "not implemented in this context");
   return false;
 }
@@ -2257,6 +2331,23 @@ envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number: not "
                "implemented in this context");
 }
 
