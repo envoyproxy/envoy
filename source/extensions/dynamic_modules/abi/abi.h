@@ -3819,6 +3819,37 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double* result);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_bool is called by the module to
+ * set the bool value of the dynamic metadata with the given namespace and key. If the metadata
+ * is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the bool value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_bool is called by the module to
+ * get the bool value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a bool, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the bool value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -5090,6 +5121,36 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number is called by the
+ * module to retrieve a number-typed dynamic metadata value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param result is the output pointer to the number value of the dynamic metadata.
+ * @return true if the metadata was found and is a number type, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number is called by the
+ * module to set a number-typed dynamic metadata value. If the metadata is existing, it will be
+ * overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the

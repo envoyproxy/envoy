@@ -151,9 +151,9 @@ fn test_body_callbacks_filter_on_bodies() {
     .returning(|| {
       static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
       Some(vec![
-        EnvoyMutBuffer::new(unsafe { &mut BUF[0] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF[1] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF[2] }),
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[0]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[1]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[2]) },
       ])
     })
     .times(2);
@@ -162,9 +162,9 @@ fn test_body_callbacks_filter_on_bodies() {
     .returning(|| {
       static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
       Some(vec![
-        EnvoyMutBuffer::new(unsafe { &mut BUF[0] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF[1] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF[2] }),
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[0]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[1]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF[2]) },
       ])
     })
     .times(2);
@@ -199,9 +199,9 @@ fn test_body_callbacks_filter_on_bodies() {
     .returning(|| {
       static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
       Some(vec![
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[0] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[1] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[2] }),
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[0]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[1]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[2]) },
       ])
     })
     .times(2);
@@ -210,9 +210,9 @@ fn test_body_callbacks_filter_on_bodies() {
     .returning(|| {
       static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
       Some(vec![
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[0] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[1] }),
-        EnvoyMutBuffer::new(unsafe { &mut BUF2[2] }),
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[0]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[1]) },
+        unsafe { EnvoyMutBuffer::new(&raw mut BUF2[2]) },
       ])
     })
     .times(2);

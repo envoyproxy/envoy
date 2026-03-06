@@ -1337,6 +1337,179 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataNumberNegati
   EXPECT_DOUBLE_EQ(negative_value, result);
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataBool) {
+  const std::string ns = "test.ns";
+  const std::string key = "bool.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set the metadata to true.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, true);
+
+  // Verify by reading it back.
+  bool result = false;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataBoolOverwrite) {
+  // Test overwriting a bool metadata value from true to false.
+  const std::string ns = "test.ns";
+  const std::string key = "bool.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set the metadata to true.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, true);
+
+  bool result = false;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_TRUE(result);
+
+  // Overwrite with false.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, false);
+
+  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataBoolNonExistingNamespace) {
+  const std::string ns = "nonexistent.ns";
+  const std::string key = "test.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+
+  bool result = false;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataBoolNonExistingKey) {
+  const std::string ns = "test.ns";
+  const std::string key = "nonexistent.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set a different key.
+  const std::string other_key = "other.key";
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(other_key.data()), other_key.size()}, true);
+
+  // Try to get non-existent key.
+  bool result = false;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataBoolWrongType) {
+  const std::string ns = "test.ns";
+  const std::string key = "string.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set as string first.
+  const std::string value = "test.value";
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, {const_cast<char*>(value.data()), value.size()});
+
+  // Try to get as bool. It should fail because it's a string.
+  bool result = false;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataStringWrongTypeBool) {
+  const std::string ns = "test.ns";
+  const std::string key = "bool.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set as bool first.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, true);
+
+  // Try to get as string. It should fail because it's a bool.
+  envoy_dynamic_module_type_envoy_buffer result;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataNumberWrongTypeBool) {
+  const std::string ns = "test.ns";
+  const std::string key = "bool.key";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  // Set as bool first.
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, true);
+
+  // Try to get as number. It should fail because it's a bool.
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+
+  EXPECT_FALSE(ok);
+}
+
 // =============================================================================
 // Tests for socket options.
 // =============================================================================
