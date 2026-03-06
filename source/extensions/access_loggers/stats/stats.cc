@@ -15,7 +15,7 @@ namespace {
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState() = default;
+  explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
   // When the request is destroyed, we need to subtract the value from the gauge.
   // We look up the gauge centrally using its base name and evaluated tags to
@@ -23,21 +23,20 @@ public:
   // previous Local-Scope gauge became disconnected.
   ~AccessLogState() override {
     for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      auto& gauge = state.scope_->gaugeFromStatNameWithTags(state.base_name_, state.tags_,
-                                                            state.import_mode_);
+      auto& gauge = scope_->gaugeFromStatNameWithTags(state.base_name_, state.tags_,
+                                                      Stats::Gauge::ImportMode::Accumulate);
       gauge.sub(std::min<uint64_t>(gauge.value(), state.value_));
     }
   }
 
-  void addInflightGauge(const Stats::Gauge* gauge, Stats::ScopeSharedPtr scope,
-                        Stats::StatName base_name, Stats::StatNameTagVector tags,
-                        std::vector<Stats::StatNameDynamicStorage> storage,
-                        Stats::Gauge::ImportMode import_mode, uint64_t value) {
+  void addInflightGauge(const Stats::Gauge* gauge, Stats::StatName base_name,
+                        Stats::StatNameTagVector tags,
+                        std::vector<Stats::StatNameDynamicStorage> storage, uint64_t value) {
     // We retain the raw pointer as a fast map key. The Gauge object lives in the
     // central store and even if it evicts, the map key is only used for pointer
     // comparisons before ultimately falling back to central resolution on destruction.
-    inflight_gauges_.try_emplace(gauge, State{std::move(scope), import_mode, value, base_name,
-                                              std::move(tags), std::move(storage)});
+    inflight_gauges_.try_emplace(gauge,
+                                 State{value, base_name, std::move(tags), std::move(storage)});
   }
 
   absl::optional<uint64_t> removeInflightGauge(const Stats::Gauge* gauge) {
@@ -54,13 +53,13 @@ public:
 
 private:
   struct State {
-    Stats::ScopeSharedPtr scope_;
-    Stats::Gauge::ImportMode import_mode_;
     uint64_t value_;
     Stats::StatName base_name_;
     Stats::StatNameTagVector tags_;
     std::vector<Stats::StatNameDynamicStorage> storage_;
   };
+
+  Stats::ScopeSharedPtr scope_;
 
   // The map key holds a raw pointer to the gauge to enable fast O(1) lookups during
   // PAIRED_SUBTRACT.
@@ -340,15 +339,15 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(&gauge_stat, scope_, gauge.stat_.name_, std::move(tags),
-                              std::move(storage), import_mode, value);
+      state->addInflightGauge(&gauge_stat, gauge.stat_.name_, std::move(tags), std::move(storage),
+                              value);
       gauge_stat.add(value);
     } else {
       absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
