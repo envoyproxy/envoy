@@ -82,6 +82,7 @@ py_library(
     data = [
         "envoy_mobile/py.typed",
         ":envoy_engine_so",
+        "//:pyproject.toml",
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
