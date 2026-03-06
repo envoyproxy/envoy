@@ -239,8 +239,8 @@ private:
           if (primary_consecutive_failures_ >= 2) {
             // The primary stream failed to establish a connection 2 times in a row.
             // Terminate the primary stream and establish a connection to the failover stream.
-            ENVOY_LOG(debug, "Primary xDS stream failed to establish a connection at least 2 times "
-                             "in a row. Attempting to connect to the failover stream.");
+            ENVOY_LOG(info, "Primary xDS stream failed to establish a connection at least 2 times "
+                            "in a row. Attempting to connect to the failover stream.");
             // This will close the stream and prevent the retry timer from
             // reconnecting to the primary source.
             parent_.primary_grpc_stream_->closeStream();
@@ -314,7 +314,7 @@ private:
         // Otherwise let the retry mechanism try to access the primary (similar
         // to if the runtime flag was not set).
         if (parent_.previously_connected_to_ == ConnectedTo::Failover) {
-          ENVOY_LOG(debug,
+          ENVOY_LOG(info,
                     "Failover xDS stream disconnected (either after establishing a connection or "
                     "before). Attempting to reconnect to Failover because Envoy successfully "
                     "connected to it previously.");

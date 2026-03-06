@@ -49,7 +49,7 @@ routing PRs, questions, etc. to the right place.
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
-  * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+  * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
@@ -100,6 +100,7 @@ without further review.
 * Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
 
 # Emeritus maintainers
 

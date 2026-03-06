@@ -336,6 +336,13 @@ protected:
     }
   }
 
+  void setLocalCloseReason(absl::string_view reason) override {
+    ConnectionImpl::setLocalCloseReason(reason);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamLocalCloseReason(reason);
+    }
+  }
+
 private:
   void onConnected() override;
 

@@ -12,15 +12,21 @@ namespace Extensions {
 namespace DynamicModules {
 
 /**
- * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle.
- * When the DynamicModule object is destroyed, the dlopen handle is closed.
+ * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle
+ * (for dynamically loaded modules) or a statically-linked symbol namespace (for static modules).
+ * When the DynamicModule object is destroyed, the dlopen handle is closed (if applicable).
  *
  * This class is supposed to be initialized once in the main thread and can be shared with other
  * threads.
  */
 class DynamicModule {
 public:
-  DynamicModule(void* handle) : handle_(handle) {}
+  // Constructor for a dynamically loaded module (via dlopen).
+  explicit DynamicModule(void* handle) : handle_(handle) {}
+  // Constructor for a statically linked module. Symbols are resolved via dlsym(RTLD_DEFAULT)
+  // with the module name used as a prefix: "<static_module_name>_<symbol>".
+  explicit DynamicModule(absl::string_view static_module_name)
+      : handle_(nullptr), static_module_name_(static_module_name) {}
   ~DynamicModule();
 
   /**
@@ -49,8 +55,11 @@ private:
    */
   void* getSymbol(const absl::string_view symbol_ref) const;
 
-  // The raw dlopen handle that can be used to look up symbols.
+  // The raw dlopen handle that can be used to look up symbols. nullptr for static modules.
   void* handle_;
+  // Non-empty for statically linked modules. When set, getSymbol() looks up
+  // "<static_module_name>_<symbol>" via dlsym(RTLD_DEFAULT) instead of using handle_.
+  const std::string static_module_name_;
 };
 
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
@@ -75,7 +84,10 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * Creates a new DynamicModule by name under the search path specified by the environment variable
  * `DYNAMIC_MODULES_SEARCH_PATH`. The file name is assumed to be `lib<module_name>.so`.
  * This is mostly a wrapper around newDynamicModule.
- * @param module_name the name of the module to load.
+ * @param module_name the name of the module to load. If the symbol
+ * ``<module_name>_envoy_dynamic_module_on_program_init`` is found in the process binary, the
+ * module is treated as statically linked and newStaticModule is called instead of loading a
+ * shared object. In that case, do_not_close and load_globally are ignored.
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated.
@@ -86,6 +98,15 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
                                                         const bool load_globally = false);
+
+/**
+ * Creates a new DynamicModule backed by symbols already present in the process binary (i.e.,
+ * statically linked). No shared object file is loaded. Instead, symbols are resolved via
+ * dlsym(RTLD_DEFAULT, ...) with the module name used as a prefix:
+ * "<module_name>_<symbol_name>".
+ * @param module_name the module name used to build the symbol prefix.
+ */
+absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name);
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

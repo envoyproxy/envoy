@@ -84,6 +84,10 @@ public:
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+
   GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                       envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {

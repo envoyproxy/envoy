@@ -246,6 +246,14 @@ generate_x509_cert no_san_cn ca
 generate_rsa_key san_dns
 generate_x509_cert san_dns ca
 
+# Generate san_dns_cert_with_single_crl_dp.pem (certificate with single CRL Distribution Point).
+generate_rsa_key san_dns_cert_with_single_crl_dp
+generate_x509_cert san_dns_cert_with_single_crl_dp ca
+
+# Generate san_dns_cert_with_multiple_crl_dps.pem (certificate with multiple CRL Distribution Points).
+generate_rsa_key san_dns_cert_with_multiple_crl_dps
+generate_x509_cert san_dns_cert_with_multiple_crl_dps ca
+
 # Generate san_dns2_cert.pem (duplicate of san_dns_cert.pem, but with a different private key).
 cp -f san_dns_cert.cfg san_dns2_cert.cfg
 generate_rsa_key san_dns2

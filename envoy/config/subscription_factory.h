@@ -10,6 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "xds/core/v3/resource_locator.pb.h"
 
@@ -147,7 +148,9 @@ public:
          const LocalInfo::LocalInfo& local_info,
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
-         OptRef<XdsResourcesDelegate> xds_resources_delegate) PURE;
+         OptRef<XdsResourcesDelegate> xds_resources_delegate,
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
+      PURE;
 };
 
 } // namespace Config

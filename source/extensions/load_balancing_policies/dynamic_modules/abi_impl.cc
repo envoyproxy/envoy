@@ -15,6 +15,37 @@ Upstream::LoadBalancerContext* getContext(envoy_dynamic_module_type_lb_context_e
   return static_cast<Upstream::LoadBalancerContext*>(ptr);
 }
 
+// Helper to look up a metadata value by filter name and key for a host.
+const Protobuf::Value* getHostMetadataValue(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+                                            uint32_t priority, size_t index,
+                                            envoy_dynamic_module_type_module_buffer filter_name,
+                                            envoy_dynamic_module_type_module_buffer key) {
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return nullptr;
+  }
+  const auto& metadata = hosts[index]->metadata();
+  if (metadata == nullptr) {
+    return nullptr;
+  }
+  const auto& filter_metadata = metadata->filter_metadata();
+  absl::string_view filter_name_view(filter_name.ptr, filter_name.length);
+  auto filter_it = filter_metadata.find(filter_name_view);
+  if (filter_it == filter_metadata.end()) {
+    return nullptr;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto field_it = filter_it->second.fields().find(key_view);
+  if (field_it == filter_it->second.fields().end()) {
+    return nullptr;
+  }
+  return &field_it->second;
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace LoadBalancingPolicies
@@ -152,6 +183,148 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_
   return envoy_dynamic_module_type_host_health_Unhealthy;
 }
 
+bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address,
+    envoy_dynamic_module_type_host_health* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  *result = envoy_dynamic_module_type_host_health_Unhealthy;
+
+  if (lb_envoy_ptr == nullptr || address.ptr == nullptr) {
+    return false;
+  }
+  const auto host_map = getLb(lb_envoy_ptr)->prioritySet().crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return false;
+  }
+  std::string address_str(address.ptr, address.length);
+  const auto it = host_map->find(address_str);
+  if (it == host_map->end()) {
+    return false;
+  }
+  switch (it->second->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    *result = envoy_dynamic_module_type_host_health_Unhealthy;
+    break;
+  case Envoy::Upstream::Host::Health::Degraded:
+    *result = envoy_dynamic_module_type_host_health_Degraded;
+    break;
+  case Envoy::Upstream::Host::Health::Healthy:
+    *result = envoy_dynamic_module_type_host_health_Healthy;
+    break;
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = hosts[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  return hosts[index]->weight();
+}
+
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  return hosts[index]->stats().rq_active_.value();
+}
+
+uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  return hosts[index]->stats().cx_active_.value();
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_locality(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone) {
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  const auto& locality = hosts[index]->locality();
+  if (region != nullptr) {
+    region->ptr = locality.region().data();
+    region->length = locality.region().size();
+  }
+  if (zone != nullptr) {
+    zone->ptr = locality.zone().data();
+    zone->length = locality.zone().size();
+  }
+  if (sub_zone != nullptr) {
+    sub_zone->ptr = locality.sub_zone().data();
+    sub_zone->length = locality.sub_zone().size();
+  }
+  return true;
+}
+
 bool envoy_dynamic_module_callback_lb_context_compute_hash_key(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out) {
   if (context_envoy_ptr == nullptr || hash_out == nullptr) {
@@ -235,6 +408,256 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
   const auto value = values[index]->value().getStringView();
   *result_buffer = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
   return true;
+}
+
+uint32_t envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+  if (context_envoy_ptr == nullptr) {
+    return 0;
+  }
+  return getContext(context_envoy_ptr)->hostSelectionRetryCount();
+}
+
+bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index) {
+  if (lb_envoy_ptr == nullptr || context_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  return getContext(context_envoy_ptr)->shouldSelectAnotherHost(*hosts[index]);
+}
+
+bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict) {
+  if (context_envoy_ptr == nullptr || address == nullptr || strict == nullptr) {
+    return false;
+  }
+  auto override_host = getContext(context_envoy_ptr)->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return false;
+  }
+  auto host_address = override_host.value().first;
+  address->ptr = const_cast<char*>(host_address.data());
+  address->length = host_address.size();
+  *strict = override_host.value().second;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_set_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data) {
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->setHostData(priority, index, data);
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data) {
+  if (lb_envoy_ptr == nullptr || data == nullptr) {
+    if (data != nullptr) {
+      *data = 0;
+    }
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->getHostData(priority, index, data);
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_string_value()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& str = value->string_value();
+  result->ptr = str.data();
+  result->length = str.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_number_value()) {
+    return false;
+  }
+  *result = value->number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* value = getHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_bool_value()) {
+    return false;
+  }
+  *result = value->bool_value();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_lb_get_locality_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->healthyHostsPerLocality().get().size();
+}
+
+size_t envoy_dynamic_module_callback_lb_get_locality_host_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    return 0;
+  }
+  return localities[locality_index].size();
+}
+
+bool envoy_dynamic_module_callback_lb_get_locality_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index,
+    size_t host_index, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts_in_locality = localities[locality_index];
+  if (host_index >= hosts_in_locality.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = hosts_in_locality[host_index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto weights = host_sets[priority]->localityWeights();
+  if (weights == nullptr || locality_index >= weights->size()) {
+    return 0;
+  }
+  return (*weights)[locality_index];
+}
+
+bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = (*hosts)[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_counter_stat stat) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  const auto& host_stats = hosts[index]->stats();
+  switch (stat) {
+  case envoy_dynamic_module_type_host_counter_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_counter_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_counter_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  }
+  return 0;
 }
 
 } // extern "C"

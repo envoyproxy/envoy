@@ -797,7 +797,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
       config.value()->thisAsVoidPtr(), name, nullptr, 0, &counter_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_id, 0u);
+  EXPECT_EQ(counter_id, 1u);
 
   // Increment the counter.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
@@ -846,7 +846,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
       config.value()->thisAsVoidPtr(), name, nullptr, 0, &gauge_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_id, 0u);
+  EXPECT_EQ(gauge_id, 1u);
 
   // Set the gauge.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
@@ -906,7 +906,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
       config.value()->thisAsVoidPtr(), name, nullptr, 0, &histogram_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(histogram_id, 0u);
+  EXPECT_EQ(histogram_id, 1u);
 
   // Record a value.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
@@ -956,8 +956,8 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
                 config.value()->thisAsVoidPtr(), name_1, nullptr, 0, &counter_id_1),
             envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_id_0, 0u);
-  EXPECT_EQ(counter_id_1, 1u);
+  EXPECT_EQ(counter_id_0, 1u);
+  EXPECT_EQ(counter_id_1, 2u);
 
   // Define multiple gauges.
   size_t gauge_id_0 = 0;
@@ -970,8 +970,8 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
                 config.value()->thisAsVoidPtr(), gauge_name_1, nullptr, 0, &gauge_id_1),
             envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_id_0, 0u);
-  EXPECT_EQ(gauge_id_1, 1u);
+  EXPECT_EQ(gauge_id_0, 1u);
+  EXPECT_EQ(gauge_id_1, 2u);
 
   // Increment each counter independently.
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
@@ -1009,7 +1009,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
       config.value()->thisAsVoidPtr(), name, label_names, 2, &counter_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_vec_id, 0u);
+  EXPECT_EQ(counter_vec_id, 1u);
 
   // Increment the counter vec with matching labels.
   envoy_dynamic_module_type_module_buffer label_values[] = {{"GET", 3}, {"200", 3}};
@@ -1064,7 +1064,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
       config.value()->thisAsVoidPtr(), name, label_names, 1, &gauge_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_vec_id, 0u);
+  EXPECT_EQ(gauge_vec_id, 1u);
 
   // Set, increment, and decrement the gauge vec with matching labels.
   envoy_dynamic_module_type_module_buffer label_values[] = {{"upstream_a", 10}};
@@ -1101,7 +1101,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
       config.value()->thisAsVoidPtr(), name, label_names, 1, &histogram_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(histogram_vec_id, 0u);
+  EXPECT_EQ(histogram_vec_id, 1u);
 
   // Record values with matching labels.
   envoy_dynamic_module_type_module_buffer label_values[] = {{"svc_a", 5}};

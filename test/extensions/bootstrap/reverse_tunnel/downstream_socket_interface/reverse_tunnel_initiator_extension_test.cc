@@ -96,6 +96,7 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Server::MockInstance> server_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
@@ -144,7 +145,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   // This should be a no-op.
-  extension_->onServerInitialized();
+  extension_->onServerInitialized(server_);
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnWorkerThreadInitialized) {

@@ -567,8 +567,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
-  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
-      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+  memory_allocator_manager_ =
+      std::make_unique<Memory::AllocatorManager>(*api_, bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -859,13 +859,17 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Now that we are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->onServerInitialized();
+    bootstrap_extension->onServerInitialized(*this);
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
-  worker_guard_dog_ = maybeCreateGuardDog("workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread", config_.mainThreadWatchdogConfig());
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.worker_threads_watchdog_fix")) {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.workerWatchdogConfig());
+  } else {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.mainThreadWatchdogConfig());
+  }
   return absl::OkStatus();
 }
 

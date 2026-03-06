@@ -457,6 +457,7 @@ public:
           envoy_grpc:
             cluster_name: "ext_authz_server"
         validate_mutations: true
+        emit_filter_state_stats: true
     )");
 
     // Simulate a downstream request.
@@ -693,6 +694,137 @@ TEST_F(InvalidMutationTest, InvalidHeaderAppendAction) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.saw_invalid_append_actions = true;
   testResponse(response);
+}
+
+TEST_F(InvalidMutationTest, InvalidRequestHeadersSet) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{InvalidMutationTest::invalid_key_, "bar"}};
+  testResponse(response);
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+}
+
+TEST_F(InvalidMutationTest, InvalidRequestHeadersAppend) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_append = {{InvalidMutationTest::invalid_key_, "bar"}};
+  testResponse(response);
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+}
+
+TEST_F(InvalidMutationTest, InvalidRequestHeadersAdd) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{"foo", InvalidMutationTest::getInvalidValue()}};
+  testResponse(response);
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+}
+
+TEST_F(InvalidMutationTest, InvalidRequestQueryParams) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.query_parameters_to_set = {{"f o o", "bar"}};
+  testResponse(response);
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
+}
+
+TEST_F(HttpFilterTest, MutationAppliedEffect) {
+  InSequence s;
+
+  initialize(R"(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_authz_server"
+      emit_filter_state_stats: true
+  )");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response->headers_to_set = {{"foo", "bar"}};
+
+  request_callbacks_->onComplete(std::move(response));
+
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::MutationApplied);
+}
+
+TEST_F(HttpFilterTest, MutationRejectedSizeLimitExceededEffect) {
+  InSequence s;
+
+  initialize(R"(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_authz_server"
+      emit_filter_state_stats: true
+  )");
+
+  // Use a local request_headers with small limits to trigger size limit rejection.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/1,
+                                                 /*max_headers_count=*/9999);
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true));
+
+  auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // HCM default max header kb is 60. We set it to 1KB above, so 2KB should definitely exceed it.
+  response->headers_to_set = {{"foo", std::string(2048, 'a')}};
+
+  request_callbacks_->onComplete(std::move(response));
+
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  EXPECT_EQ(actual->requestProcessingEffect(),
+            Filters::Common::ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
 }
 
 struct DecoderHeaderMutationRulesTestOpts {
@@ -1219,6 +1351,7 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
       cluster_name: "ext_authz_server"
   failure_mode_allow: true
   failure_mode_allow_header_add: true
+  emit_filter_state_stats: true
   )EOF");
 
   ON_CALL(decoder_filter_callbacks_, connection())
@@ -1250,6 +1383,12 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
   EXPECT_EQ(request_headers_.get_("x-envoy-auth-failure-mode-allowed"), "true");
+
+  auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
+  auto logging_info = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+  ASSERT_NE(logging_info, nullptr);
+  EXPECT_TRUE(logging_info->failedOpen());
 }
 
 // Test error response with custom headers and body.

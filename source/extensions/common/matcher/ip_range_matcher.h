@@ -16,10 +16,10 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
+using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
@@ -71,10 +71,11 @@ public:
     }
   }
 
-  MatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
+  ActionMatchResult match(const DataType& data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
-      return MatchResult::insufficientData();
+      return ActionMatchResult::insufficientData();
     }
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
@@ -94,7 +95,7 @@ public:
         continue;
       }
       // handleRecursionAndSkips should only return match-failure, no-match, or an action cb.
-      MatchResult processed_match =
+      ActionMatchResult processed_match =
           MatchTree<DataType>::handleRecursionAndSkips(*node.on_match_, data, skipped_match_cb);
 
       if (processed_match.isMatch() || processed_match.isInsufficientData()) {
