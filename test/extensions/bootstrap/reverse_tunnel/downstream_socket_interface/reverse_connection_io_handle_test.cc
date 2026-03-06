@@ -15,11 +15,13 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -30,6 +32,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -2327,6 +2330,25 @@ TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   EXPECT_EQ(getConnectionWrappers().size(), 0);
 }
 
+// Bind to address must be no-op for reverse connection io handle.
+TEST_F(ReverseConnectionIOHandleTest, ReverseConnectionIoHandleBindMustBeNoOp) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  auto address = io_handle_->localAddress();
+  EXPECT_EQ(address.ok(), true);
+
+  // Set up the api mocks any call here fails the test.
+  StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+
+  auto result = io_handle_->bind(address.value());
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
+}
+
 // Test ReverseConnectionIOHandle::close() method without trigger pipe.
 TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
   auto config = createDefaultTestConfig();
@@ -2448,6 +2470,36 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupClosesEstablishedConnections) {
   EXPECT_GT(getEstablishedConnectionsSize(), 0);
   cleanup();
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// Test that cleanup() resets file events before closing trigger pipe FDs to prevent busy loop.
+TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  int callback_call_count = 0;
+  Event::FileReadyCb mock_callback = [&callback_call_count](uint32_t) -> absl::Status {
+    callback_call_count++;
+    return absl::OkStatus();
+  };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  EXPECT_TRUE(isTriggerPipeReady());
+  EXPECT_GE(getTriggerPipeReadFd(), 0);
+  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
+
+  cleanup();
+
+  EXPECT_FALSE(isTriggerPipeReady());
+  EXPECT_EQ(getTriggerPipeReadFd(), -1);
+  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
+
+  // Verify the file event callback is not triggered after cleanup (no busy loop).
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(callback_call_count, 0);
 }
 
 // Test initializeFileEvent early-return path when already started.

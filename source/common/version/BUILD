@@ -71,6 +71,7 @@ envoy_cc_library(
     tags = ["notidy"],
     deps = [
         ":version_includes",
+        ":version_suffix_default",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
@@ -97,6 +98,12 @@ envoy_basic_cc_library(
 )
 
 envoy_basic_cc_library(
+    name = "version_suffix_default",
+    srcs = ["version_suffix.cc"],
+    copts = ["-fvisibility=default"],
+)
+
+envoy_basic_cc_library(
     name = "version_linkstamp",
     linkstamp = select({
         "//bazel:manual_stamp": None,
@@ -105,7 +112,7 @@ envoy_basic_cc_library(
     # Linking this library makes build cache inefficient, limiting this to //source/exe package only.
     # Tests are linked with //test/test_common:test_version_linkstamp.
     visibility = ["//source/exe:__pkg__"],
-    deps = select({
+    deps = [":version_suffix_default"] + select({
         "//bazel:manual_stamp": [":manual_version_linkstamp"],
         "//conditions:default": [],
     }),

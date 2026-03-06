@@ -29,17 +29,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
-#ifdef ENVOY_ENABLE_YAML
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config, bootstrap);
-  return bootstrap;
-#else
-  UNREFERENCED_PARAMETER(config);
-  PANIC("YAML support compiled out: can't parse YAML");
-#endif
-}
-
 using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
@@ -889,5 +878,17 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   test_server_->statStore().forEachCounter(nullptr, check_metric);
   test_server_->statStore().forEachGauge(nullptr, check_metric);
   test_server_->statStore().forEachHistogram(nullptr, check_metric);
+}
+
+envoy::config::bootstrap::v3::Bootstrap
+BaseIntegrationTest::configToBootstrap(const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+#else
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out: can't parse YAML");
+#endif
 }
 } // namespace Envoy

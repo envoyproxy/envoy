@@ -175,6 +175,9 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
       OAuth2Config_AuthType_BASIC_AUTH:
     return AuthType::BasicAuth;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_TLS_CLIENT_AUTH:
+    return AuthType::TlsClientAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
   default:
     return AuthType::UrlEncodedBody;

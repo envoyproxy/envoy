@@ -165,8 +165,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
     ),
     tcmalloc = dict(
-        version = "5da4a882003102fba0c0c0e8f6372567057332eb",
-        sha256 = "fd92d64d8302f1677570fdff844e8152c314e559a6c788c6bfc3844954d0dabd",
+        version = "12f255231938d30493186b0a037feedd70f5a1c1",
+        sha256 = "2a6bef88f8cccda4a63a2f4bb09e655b3ee5ea0a2ce68d16e6ea2d5f5c4be9c1",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
     ),
@@ -312,9 +312,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
         # TODO(zhxie): Update to the next release version when it is released.
         version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
-        sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
-        strip_prefix = "colm-{version}",
-        urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
+        sha256 = "f11e62f0e7fd8b26f75a9034af43fd4622a0829b29a7cfb70c0742959bd9cfec",
+        strip_prefix = "colm-suite-{version}",
+        urls = ["https://github.com/adrian-thurston/colm-suite/archive/{version}.tar.gz"],
     ),
     ragel = dict(
         # We used the stable release Ragel 6.10 previously and it is under GPLv2 license (see
@@ -542,8 +542,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "b7b4c0cfe393a57b8706b0f1be81518595daaa44",
-        sha256 = "9d8344faf932165b6013f8fdd2cbfe2be7c2e7a5129c5e572036d13718a3f1bf",
+        version = "73d3b6e2ed78b304e41fae23fe50b237b4c9b78a",
+        sha256 = "e395ce8b3bcf5a1af7cede3e8f0c9a5f9417f20c89a836a4a739e6fe4fbb3c26",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

@@ -679,3 +679,29 @@ envoy_cc_library(
         "@abseil-cpp//absl/types:span",
     ],
 )
+
+envoy_cc_library(
+    name = "session_idle_list_interface",
+    hdrs = ["session_idle_list_interface.h"],
+    deps = [
+        "//envoy/event:timer_interface",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "session_idle_list_lib",
+    srcs = ["session_idle_list.cc"],
+    hdrs = ["session_idle_list.h"],
+    deps = [
+        ":session_idle_list_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/quic:envoy_quic_clock_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/time",
+    ],
+)

@@ -303,8 +303,27 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   const std::string url = "/stats?histogram_buckets=invalid_input";
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)\n",
-            code_response.second);
+  EXPECT_EQ(
+      "usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary|prometheusnative)\n",
+      code_response.second);
+}
+
+TEST_F(AdminStatsTest, HandlerStatsNativeHistogramRequiresPrometheus) {
+  // Native histograms require protobuf format; text format should return 400
+  const std::string url = "/stats?histogram_buckets=prometheusnative";
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ(code_response.second, "Invalid histogram_buckets type for non prometheus stats type");
+}
+
+TEST_F(AdminStatsTest, HandlerStatsNativeHistogramRequiresPrometheusProtobuf) {
+  // Native histograms require protobuf format; text format should return 400
+  const std::string url = "/stats?format=prometheus&histogram_buckets=prometheusnative";
+  CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ(
+      code_response.second,
+      "unsupported prometheusnative histogram type when not using protobuf exposition format");
 }
 
 TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {

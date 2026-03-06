@@ -340,10 +340,6 @@ case $CI_TARGET in
             exit 1
         fi
         ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        # workaround rules_rust bug for docs and external workspaces
-        if [[ "${ENVOY_CACHE_OUTPUT_BASE}" == "docs" || "${ENVOY_CACHE_OUTPUT_BASE}" == "external" ]]; then
-            export CARGO_BAZEL_REPIN=true
-        fi
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
@@ -774,6 +770,10 @@ case $CI_TARGET in
                 -- "${TEST_TARGETS[@]}"
         ;;
 
+    openssl)
+        echo "Nothing to do right now, this is a placeholder for any OpenSSL-specific build or test steps that may be needed in the future."
+        ;;
+
     publish)
         setup_clang_toolchain
         BUILD_SHA="$(git rev-parse HEAD)"
@@ -932,8 +932,10 @@ case $CI_TARGET in
         ;;
 
     verify-distroless)
-        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
         docker run --rm distroless-testing
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
+        docker run --rm distroless-contrib-testing
         ;;
 
     verify_examples)
@@ -945,8 +947,6 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --action_env="CARGO_BAZEL_REPIN=true" \
-                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples

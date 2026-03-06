@@ -4,6 +4,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -32,10 +34,13 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
               returnOrThrow(resolveProtoAddress(additional_address.address()));
           address_list.emplace_back(address);
         }
-        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-          // All addresses must by IP addresses.
-          if (!address->ip()) {
-            throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+        if (!Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses")) {
+          for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+            // All addresses must by IP addresses.
+            if (!address->ip()) {
+              throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+            }
           }
         }
       }

@@ -325,6 +325,7 @@ lang
 libcurl
 libsxg
 LLVM
+LLM
 LPT
 LRS
 Loggable
@@ -498,6 +499,7 @@ SRDS
 SRV
 SS
 SSD
+SSE
 SSL
 STDSTRING
 STL
@@ -1510,6 +1512,7 @@ tracestate
 transcode
 transcoded
 transcoder
+transcodes
 transcoding
 transferral
 trds
@@ -1544,6 +1547,7 @@ unref
 unreferenced
 unzigzag
 upcasts
+upsert
 upstreams
 uptime
 upvalue
@@ -1663,6 +1667,7 @@ effective_cpus
 cpus
 ja3
 ja4
+jsonl
 HBONE
 waypoint
 ztunnel
@@ -1671,3 +1676,10 @@ UIDs
 configurability
 WDS
 OIDC
+Bredband
+Bevtec
+doublings
+lcalpha
+nblk
+chr
+IWYU

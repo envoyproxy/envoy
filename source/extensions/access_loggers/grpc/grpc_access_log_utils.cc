@@ -37,11 +37,14 @@ TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) 
 
 } // namespace
 
-CommonPropertiesConfig::CommonPropertiesConfig(const ProtoCommonGrpcAccessLogConfig& config)
+CommonPropertiesConfig::CommonPropertiesConfig(
+    const ProtoCommonGrpcAccessLogConfig& config,
+    const Formatter::CommandParserPtrVector& command_parsers)
     : filter_states_to_log(config.filter_state_objects_to_log().begin(),
                            config.filter_state_objects_to_log().end()) {
   for (const auto& custom_tag : config.custom_tags()) {
-    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
+    const auto tag_applier =
+        Tracing::CustomTagUtility::createCustomTag(custom_tag, command_parsers);
     custom_tags.push_back(tag_applier);
   }
 }

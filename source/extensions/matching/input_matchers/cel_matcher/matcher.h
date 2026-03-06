@@ -32,7 +32,7 @@ public:
   CelInputMatcher(CelMatcherSharedPtr cel_matcher,
                   Filters::Common::Expr::BuilderInstanceSharedConstPtr builder);
 
-  bool match(const MatchingDataType& input) override;
+  Matcher::MatchResult match(const MatchingDataType& input) override;
 
   // TODO(tyxia) Formalize the validation approach. Use fixed string for now.
   absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
