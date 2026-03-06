@@ -8,6 +8,7 @@ from test.python.echo_test_server import EchoTestServer
 
 from library.python.envoy_engine import EngineBuilder, LogLevel
 from library.python.async_client.client import AsyncClient
+from library.python.async_client.response import ClientResponseError
 
 
 class TestAsyncClientFetch(unittest.TestCase):
@@ -38,6 +39,7 @@ class TestAsyncClientFetch(unittest.TestCase):
             async with AsyncClient(self._make_client_builder()) as client:
                 async with await client.get(f"{self._echo_server_url}/") as response:
                     self.assertEqual(response.status_code, 200)
+                    self.assertTrue(response.ok)
                     self.assertGreater(len(await response.body), 0)
 
         asyncio.run(run())
@@ -53,8 +55,6 @@ class TestAsyncClientFetch(unittest.TestCase):
                     headers=headers,
                 ) as response:
                     self.assertEqual(response.status_code, 200)
-                    # The body hasn't been read yet.
-                    self.assertEqual(len(response.body_raw), 0)
                     body = bytearray()
                     while True:
                         chunk = await response.content.read(1)  # Read 1 bytes at a time.
@@ -178,6 +178,19 @@ class TestAsyncClientFetch(unittest.TestCase):
                     text = await response.text
                     self.assertIsInstance(text, str)
                     self.assertGreater(len(text), 0)
+
+        asyncio.run(run())
+
+    def test_raise_for_status(self):
+        """Verify ok property and raise_for_status with 400 response."""
+
+        async def run():
+            async with AsyncClient(self._make_client_builder()) as client:
+                async with await client.get(f"{self._echo_server_url}/notfound") as response:
+                    self.assertFalse(response.ok)
+                    with self.assertRaises(ClientResponseError) as cm:
+                        response.raise_for_status()
+                    self.assertEqual(cm.exception.status, response.status_code)
 
         asyncio.run(run())
 
