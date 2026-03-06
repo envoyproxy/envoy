@@ -9,288 +9,6 @@ namespace Extensions {
 namespace DynamicModules {
 namespace {
 
-// Test that the weak symbol stub for scheduler_new triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerNewEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for scheduler_delete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerDeleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for scheduler_commit triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SchedulerCommitEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(nullptr, 0); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for signal_init_complete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SignalInitCompleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for http_callout triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, HttpCalloutEnvoyBug) {
-  uint64_t callout_id = 0;
-  envoy_dynamic_module_type_module_buffer cluster_name = {"cluster", 7};
-  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-            nullptr, &callout_id, cluster_name, nullptr, 0, body, 5000);
-        EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_counter_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetCounterValueEnvoyBug) {
-  uint64_t value = 0;
-  envoy_dynamic_module_type_module_buffer name = {"counter_name", 12};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
-            nullptr, name, &value);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_gauge_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetGaugeValueEnvoyBug) {
-  uint64_t value = 0;
-  envoy_dynamic_module_type_module_buffer name = {"gauge_name", 10};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
-            nullptr, name, &value);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for get_histogram_summary triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, GetHistogramSummaryEnvoyBug) {
-  uint64_t sample_count = 0;
-  double sample_sum = 0.0;
-  envoy_dynamic_module_type_module_buffer name = {"histogram_name", 14};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
-            nullptr, name, &sample_count, &sample_sum);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for iterate_counters triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IterateCountersEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(nullptr, nullptr,
-                                                                           nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for iterate_gauges triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IterateGaugesEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(nullptr, nullptr, nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_new triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerNewEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_new(nullptr);
-        EXPECT_EQ(result, nullptr);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_enable triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerEnableEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_disable triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerDisableEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr); },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_enabled triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerEnabledEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for timer_delete triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, TimerDeleteEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr); },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Bootstrap extension admin handler weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for register_admin_handler triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RegisterAdminHandlerEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
-  envoy_dynamic_module_type_module_buffer help = {"help", 4};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
-            nullptr, path, help, true, false);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for remove_admin_handler triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RemoveAdminHandlerEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer path = {"/test", 5};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(nullptr, path);
-        EXPECT_FALSE(result);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for admin_set_response triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, AdminSetResponseEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer body = {"response", 8};
-  EXPECT_ENVOY_BUG(
-      { envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr, body); },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Bootstrap extension stats definition and update weak symbol stub tests
-// =====================================================================
-
-// Test that the weak symbol stub for define_counter triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineCounterEnvoyBug) {
-  size_t counter_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"counter", 7};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-            nullptr, name, nullptr, 0, &counter_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for increment_counter triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IncrementCounterEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for define_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineGaugeEnvoyBug) {
-  size_t gauge_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"gauge", 5};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-            nullptr, name, nullptr, 0, &gauge_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for set_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, SetGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
-            nullptr, 0, nullptr, 0, 42);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for increment_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, IncrementGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for decrement_gauge triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DecrementGaugeEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
-            nullptr, 0, nullptr, 0, 1);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for define_histogram triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, DefineHistogramEnvoyBug) {
-  size_t histogram_id = 0;
-  envoy_dynamic_module_type_module_buffer name = {"histogram", 9};
-  EXPECT_ENVOY_BUG(
-      {
-        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
-            nullptr, name, nullptr, 0, &histogram_id);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for record_histogram_value triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, RecordHistogramValueEnvoyBug) {
-  EXPECT_ENVOY_BUG(
-      {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
-                nullptr, 0, nullptr, 0, 100);
-        EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
-      },
-      "not implemented in this context");
-}
-
-// =====================================================================
-// Function registry tests
-// =====================================================================
-
 // Test registering and retrieving a function.
 TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
   auto fn = [](int x) { return x + 1; };
@@ -366,14 +84,98 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
   EXPECT_EQ(resolved_b(0), 20);
 }
 
-// =====================================================================
-// Cert Validator weak symbol stub tests
-// =====================================================================
-
 #define WEAK_STUB(TestSuffix, call)                                                                \
   TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
     EXPECT_ENVOY_BUG({ call; }, "not implemented in this context");                                \
   }
+
+WEAK_STUB(BootstrapExtensionConfigSchedulerNew,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(nullptr))
+WEAK_STUB(BootstrapExtensionConfigSchedulerDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(nullptr))
+WEAK_STUB(BootstrapExtensionConfigSchedulerCommit,
+          envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(nullptr, 0))
+WEAK_STUB(BootstrapExtensionConfigSignalInitComplete,
+          envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(nullptr))
+
+WEAK_STUB(BootstrapExtensionHttpCallout,
+          envoy_dynamic_module_callback_bootstrap_extension_http_callout(nullptr, nullptr,
+                                                                         {"cluster", 7}, nullptr, 0,
+                                                                         {nullptr, 0}, 5000))
+
+WEAK_STUB(BootstrapExtensionGetCounterValue,
+          envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(nullptr, {nullptr, 0},
+                                                                              nullptr))
+WEAK_STUB(BootstrapExtensionGetGaugeValue,
+          envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(nullptr, {nullptr, 0},
+                                                                            nullptr))
+WEAK_STUB(BootstrapExtensionGetHistogramSummary,
+          envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr, nullptr))
+
+WEAK_STUB(BootstrapExtensionIterateCounters,
+          envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(nullptr, nullptr,
+                                                                             nullptr))
+WEAK_STUB(BootstrapExtensionIterateGauges,
+          envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(nullptr, nullptr,
+                                                                           nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerNew,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_new(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerEnable,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_enable(nullptr, 100))
+WEAK_STUB(BootstrapExtensionTimerDisable,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_disable(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerEnabled,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(nullptr))
+
+WEAK_STUB(BootstrapExtensionTimerDelete,
+          envoy_dynamic_module_callback_bootstrap_extension_timer_delete(nullptr))
+
+WEAK_STUB(BootstrapExtensionRegisterAdminHandler,
+          envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+              nullptr, {"/test", 5}, {"help", 4}, true, false))
+WEAK_STUB(BootstrapExtensionRemoveAdminHandler,
+          envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(nullptr,
+                                                                                 {"/test", 5}))
+
+WEAK_STUB(BootstrapExtensionAdminSetResponse,
+          envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(nullptr,
+                                                                               {nullptr, 0}))
+
+WEAK_STUB(BootstrapExtensionConfigDefineCounter,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+              nullptr, {"counter", 7}, nullptr, 0, nullptr))
+WEAK_STUB(BootstrapExtensionConfigIncrementCounter,
+          envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(nullptr, 0,
+                                                                                     nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDefineGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+              nullptr, {"gauge", 5}, nullptr, 0, nullptr))
+
+WEAK_STUB(BootstrapExtensionConfigSetGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(nullptr, 0, nullptr, 0,
+                                                                             42))
+
+WEAK_STUB(BootstrapExtensionConfigIncrementGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(nullptr, 0,
+                                                                                   nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDecrementGauge,
+          envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(nullptr, 0,
+                                                                                   nullptr, 0, 1))
+
+WEAK_STUB(BootstrapExtensionConfigDefineHistogram,
+          envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+              nullptr, {"histogram", 9}, nullptr, 0, nullptr))
+
+WEAK_STUB(BootstrapExtensionConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+              nullptr, 0, nullptr, 0, 100))
 
 WEAK_STUB(CertValidatorSetErrorDetails,
           envoy_dynamic_module_callback_cert_validator_set_error_details(nullptr, {nullptr, 0}))
@@ -458,10 +260,6 @@ WEAK_STUB(LbGetMemberUpdateHostAddress,
 WEAK_STUB(LbGetHostCounterStat,
           envoy_dynamic_module_callback_lb_get_host_counter_stat(
               nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal))
-
-// =====================================================================
-// Matcher weak symbol stub tests
-// =====================================================================
 
 WEAK_STUB(MatcherGetHeadersSize,
           envoy_dynamic_module_callback_matcher_get_headers_size(
