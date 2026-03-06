@@ -399,6 +399,13 @@ public:
     return nullptr;
   }
 
+  /**
+   * @return true if this LB policy reads per-host ORCA load report data.
+   *         When true, the router will parse ORCA load reports from upstream
+   *         responses.
+   */
+  virtual bool requiresOrcaLoadReports() const { return false; }
+
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };
 

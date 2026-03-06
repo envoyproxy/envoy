@@ -31,6 +31,8 @@ public:
                                               Envoy::Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
+  bool requiresOrcaLoadReports() const override { return true; }
+
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override;
