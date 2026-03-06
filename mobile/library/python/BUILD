@@ -3,6 +3,10 @@ load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 
+# NOTE: This file is used to package the Envoy Mobile Python APIs for PyPI.
+# The core logic is in C++, and we use pybind11 to create a native extension.
+# We then use rules_python to bundle this extension into a wheel (.whl).
+
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])
@@ -49,8 +53,9 @@ pybind_library(
     ],
 )
 
+# This produces envoy_engine.so (or .pyd on Windows)
 pybind_extension(
-    name = "envoy_mobile/envoy_engine",
+    name = "envoy_engine",
     srcs = ["module_definition.cc"],
     visibility = ["//visibility:public"],
     deps = [
@@ -62,13 +67,23 @@ pybind_extension(
     ],
 )
 
+# We use a genrule to move the .so into the envoy_mobile/ package directory
+# so that it is correctly bundled by py_wheel with the right import path.
+genrule(
+    name = "envoy_engine_so",
+    srcs = [":envoy_engine.so"],
+    outs = ["envoy_mobile/envoy_engine.so"],
+    cmd = "cp $< $@",
+)
+
 py_library(
     name = "envoy_mobile_lib",
-    srcs = glob(["**/*.py"]),
+    srcs = glob(["envoy_mobile/**/*.py"]),
     data = [
         "envoy_mobile/py.typed",
-        ":envoy_mobile/envoy_engine.so",
+        ":envoy_engine_so",
     ],
+    imports = ["."],
     visibility = ["//visibility:public"],
 )
 
