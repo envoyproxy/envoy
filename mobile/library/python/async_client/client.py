@@ -33,7 +33,7 @@ class AsyncClient:
         """
         self._engine_builder = engine_builder
         self._engine = None
-        self._executor = None
+        self._executor: Optional[Executor] = None
         self._engine_running = None
 
     async def __aenter__(self) -> "AsyncClient":
