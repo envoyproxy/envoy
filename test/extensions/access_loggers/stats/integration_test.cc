@@ -279,5 +279,71 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
+TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeScopeEviction) {
+  const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
+)EOF";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"},  {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-eviction-tag"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for upstream to receive request.
+  waitForNextUpstreamRequest();
+
+  // After DownstreamStart is logged, gauge should be 1.
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 1);
+
+  // Simulate gauge eviction from the store.
+  // Calling evictUnused once clears the 'used' flag. Calling it twice actually evicts
+  // unreferenced gauges in evictable scopes. Since we no longer hold GaugeSharedPtr
+  // in AccessLogState, the refcount should be 1, making it eligible for eviction.
+  absl::Notification evict_done;
+  test_server_->server().dispatcher().post([this, &evict_done]() {
+    test_server_->statStore().evictUnused();
+    test_server_->statStore().evictUnused();
+    evict_done.Notify();
+  });
+
+  // Re-wait for the dispatcher to complete the post tasks.
+  evict_done.WaitForNotification();
+  // wait we can't wait for counter of gauge. We just post and wait?
+  // We can just rely on the response sending sequence to yield time to dispatcher.
+
+  // Send response from upstream.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for client to receive response.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // After DownstreamEnd is logged, the gauge is looked up again and decremented.
+  // It should be 0 (or appropriately handled if it was evicted).
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 0);
+}
+
 } // namespace
 } // namespace Envoy
