@@ -15,7 +15,7 @@ static_assert(std::is_base_of_v<HttpFilterConfigHandle, MockHttpFilterConfigHand
 static_assert(std::is_base_of_v<HttpFilterHandle, MockHttpFilterHandle>);
 static_assert(std::is_base_of_v<HttpFilter, MockHttpFilter>);
 
-// Instantiation tests: each mock must be concrete (all pure virtuals overridden).
+// Instantiation tests: each mock must be concrete (all pure virtual methods overridden).
 // If any pure virtual is missing from the mock, this file will fail to compile.
 TEST(SdkMocksTest, MocksAreInstantiable) {
   MockBodyBuffer body_buffer;

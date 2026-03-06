@@ -18,6 +18,10 @@ cc_library(
 cc_test(
     name = "sdk_mocks_test",
     srcs = ["sdk_mocks_test.cc"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
     deps = [
         ":sdk_mocks",
         "@googletest//:gtest_main",
@@ -27,6 +31,10 @@ cc_test(
 cc_test(
     name = "sdk_fake_test",
     srcs = ["sdk_fake_test.cc"],
+    tags = [
+        "no_san",
+        "nocoverage",
+    ],
     deps = [
         "//source/extensions/dynamic_modules/sdk/cpp:sdk_fake",
         "@googletest//:gtest_main",
