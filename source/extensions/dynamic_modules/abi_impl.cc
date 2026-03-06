@@ -975,6 +975,21 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_network_get_dynamic_met
   return false;
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_set_dynamic_metadata_bool: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_get_dynamic_metadata_bool: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_network_filter_http_callout(
     envoy_dynamic_module_type_network_filter_envoy_ptr, uint64_t*,
