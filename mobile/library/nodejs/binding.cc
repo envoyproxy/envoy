@@ -86,24 +86,28 @@ private:
 // --- EnvoyStreamWrapper Implementation ---
 
 Napi::Object EnvoyStreamWrapper::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func = DefineClass(env, "EnvoyStream", {
-    InstanceMethod("sendHeaders", &EnvoyStreamWrapper::SendHeaders),
-    InstanceMethod("sendData", &EnvoyStreamWrapper::SendData),
-    InstanceMethod("close", &EnvoyStreamWrapper::Close),
-    InstanceMethod("cancel", &EnvoyStreamWrapper::Cancel),
-  });
+  Napi::Function func =
+      DefineClass(env, "EnvoyStream",
+                  {
+                      InstanceMethod("sendHeaders", &EnvoyStreamWrapper::SendHeaders),
+                      InstanceMethod("sendData", &EnvoyStreamWrapper::SendData),
+                      InstanceMethod("close", &EnvoyStreamWrapper::Close),
+                      InstanceMethod("cancel", &EnvoyStreamWrapper::Cancel),
+                  });
   constructor = Napi::Persistent(func);
   constructor.SuppressDestruct();
   exports.Set("EnvoyStream", func);
   return exports;
 }
 
-EnvoyStreamWrapper::EnvoyStreamWrapper(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EnvoyStreamWrapper>(info) {}
+EnvoyStreamWrapper::EnvoyStreamWrapper(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<EnvoyStreamWrapper>(info) {}
 
 Napi::Value EnvoyStreamWrapper::SendHeaders(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 2 || !info[0].IsObject() || !info[1].IsBoolean()) {
-    Napi::TypeError::New(env, "Expected (headers: object, endStream: boolean)").ThrowAsJavaScriptException();
+    Napi::TypeError::New(env, "Expected (headers: object, endStream: boolean)")
+        .ThrowAsJavaScriptException();
     return env.Null();
   }
 
@@ -156,16 +160,19 @@ Napi::Value EnvoyStreamWrapper::Cancel(const Napi::CallbackInfo& info) {
 // --- EnvoyStreamPrototypeWrapper Implementation ---
 
 Napi::Object EnvoyStreamPrototypeWrapper::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func = DefineClass(env, "EnvoyStreamPrototype", {
-    InstanceMethod("start", &EnvoyStreamPrototypeWrapper::Start),
-  });
+  Napi::Function func =
+      DefineClass(env, "EnvoyStreamPrototype",
+                  {
+                      InstanceMethod("start", &EnvoyStreamPrototypeWrapper::Start),
+                  });
   constructor = Napi::Persistent(func);
   constructor.SuppressDestruct();
   exports.Set("EnvoyStreamPrototype", func);
   return exports;
 }
 
-EnvoyStreamPrototypeWrapper::EnvoyStreamPrototypeWrapper(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EnvoyStreamPrototypeWrapper>(info) {}
+EnvoyStreamPrototypeWrapper::EnvoyStreamPrototypeWrapper(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<EnvoyStreamPrototypeWrapper>(info) {}
 
 Napi::Value EnvoyStreamPrototypeWrapper::Start(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
@@ -180,88 +187,105 @@ Napi::Value EnvoyStreamPrototypeWrapper::Start(const Napi::CallbackInfo& info) {
   auto on_headers_tsfn = std::make_shared<Napi::ThreadSafeFunction>();
   bool has_on_headers = false;
   if (callbacks_obj.Has("onHeaders")) {
-    *on_headers_tsfn = Napi::ThreadSafeFunction::New(env, callbacks_obj.Get("onHeaders").As<Napi::Function>(), "onHeaders", 0, 1);
+    *on_headers_tsfn = Napi::ThreadSafeFunction::New(
+        env, callbacks_obj.Get("onHeaders").As<Napi::Function>(), "onHeaders", 0, 1);
     has_on_headers = true;
   }
 
   auto on_data_tsfn = std::make_shared<Napi::ThreadSafeFunction>();
   bool has_on_data = false;
   if (callbacks_obj.Has("onData")) {
-    *on_data_tsfn = Napi::ThreadSafeFunction::New(env, callbacks_obj.Get("onData").As<Napi::Function>(), "onData", 0, 1);
+    *on_data_tsfn = Napi::ThreadSafeFunction::New(
+        env, callbacks_obj.Get("onData").As<Napi::Function>(), "onData", 0, 1);
     has_on_data = true;
   }
 
   auto on_complete_tsfn = std::make_shared<Napi::ThreadSafeFunction>();
   bool has_on_complete = false;
   if (callbacks_obj.Has("onComplete")) {
-    *on_complete_tsfn = Napi::ThreadSafeFunction::New(env, callbacks_obj.Get("onComplete").As<Napi::Function>(), "onComplete", 0, 1);
+    *on_complete_tsfn = Napi::ThreadSafeFunction::New(
+        env, callbacks_obj.Get("onComplete").As<Napi::Function>(), "onComplete", 0, 1);
     has_on_complete = true;
   }
 
   auto on_error_tsfn = std::make_shared<Napi::ThreadSafeFunction>();
   bool has_on_error = false;
   if (callbacks_obj.Has("onError")) {
-    *on_error_tsfn = Napi::ThreadSafeFunction::New(env, callbacks_obj.Get("onError").As<Napi::Function>(), "onError", 0, 1);
+    *on_error_tsfn = Napi::ThreadSafeFunction::New(
+        env, callbacks_obj.Get("onError").As<Napi::Function>(), "onError", 0, 1);
     has_on_error = true;
   }
 
   auto on_cancel_tsfn = std::make_shared<Napi::ThreadSafeFunction>();
   bool has_on_cancel = false;
   if (callbacks_obj.Has("onCancel")) {
-    *on_cancel_tsfn = Napi::ThreadSafeFunction::New(env, callbacks_obj.Get("onCancel").As<Napi::Function>(), "onCancel", 0, 1);
+    *on_cancel_tsfn = Napi::ThreadSafeFunction::New(
+        env, callbacks_obj.Get("onCancel").As<Napi::Function>(), "onCancel", 0, 1);
     has_on_cancel = true;
   }
 
-  auto release_all = [
-    on_headers_tsfn, has_on_headers, 
-    on_data_tsfn, has_on_data, 
-    on_complete_tsfn, has_on_complete, 
-    on_error_tsfn, has_on_error, 
-    on_cancel_tsfn, has_on_cancel
-  ]() {
-    if (has_on_headers) on_headers_tsfn->Release();
-    if (has_on_data) on_data_tsfn->Release();
-    if (has_on_complete) on_complete_tsfn->Release();
-    if (has_on_error) on_error_tsfn->Release();
-    if (has_on_cancel) on_cancel_tsfn->Release();
+  auto release_all = [on_headers_tsfn, has_on_headers, on_data_tsfn, has_on_data, on_complete_tsfn,
+                      has_on_complete, on_error_tsfn, has_on_error, on_cancel_tsfn,
+                      has_on_cancel]() {
+    if (has_on_headers)
+      on_headers_tsfn->Release();
+    if (has_on_data)
+      on_data_tsfn->Release();
+    if (has_on_complete)
+      on_complete_tsfn->Release();
+    if (has_on_error)
+      on_error_tsfn->Release();
+    if (has_on_cancel)
+      on_cancel_tsfn->Release();
   };
 
-  callbacks.on_headers_ = [on_headers_tsfn, has_on_headers](const Envoy::Http::ResponseHeaderMap& headers, bool end_stream, envoy_stream_intel intel) {
-    if (!has_on_headers) return;
+  callbacks.on_headers_ = [on_headers_tsfn,
+                           has_on_headers](const Envoy::Http::ResponseHeaderMap& headers,
+                                           bool end_stream, envoy_stream_intel intel) {
+    if (!has_on_headers)
+      return;
     auto headers_map = std::make_shared<std::map<std::string, std::string>>();
     headers.iterate([headers_map](const Envoy::Http::HeaderEntry& entry) {
-      (*headers_map)[std::string(entry.key().getStringView())] = std::string(entry.value().getStringView());
+      (*headers_map)[std::string(entry.key().getStringView())] =
+          std::string(entry.value().getStringView());
       return Envoy::Http::HeaderMap::Iterate::Continue;
     });
 
-    on_headers_tsfn->BlockingCall([headers_map, end_stream](Napi::Env env, Napi::Function jsCallback) {
-      Napi::Object js_headers = Napi::Object::New(env);
-      for (auto const& [key, val] : *headers_map) {
-        js_headers.Set(key, val);
-      }
-      jsCallback.Call({js_headers, Napi::Boolean::New(env, end_stream)});
-    });
+    on_headers_tsfn->BlockingCall(
+        [headers_map, end_stream](Napi::Env env, Napi::Function jsCallback) {
+          Napi::Object js_headers = Napi::Object::New(env);
+          for (auto const& [key, val] : *headers_map) {
+            js_headers.Set(key, val);
+          }
+          jsCallback.Call({js_headers, Napi::Boolean::New(env, end_stream)});
+        });
   };
 
-  callbacks.on_data_ = [on_data_tsfn, has_on_data](const Envoy::Buffer::Instance& data, uint64_t length, bool end_stream, envoy_stream_intel intel) {
-    if (!has_on_data) return;
+  callbacks.on_data_ = [on_data_tsfn, has_on_data](const Envoy::Buffer::Instance& data,
+                                                   uint64_t length, bool end_stream,
+                                                   envoy_stream_intel intel) {
+    if (!has_on_data)
+      return;
     std::string data_str = data.toString();
     on_data_tsfn->BlockingCall([data_str, end_stream](Napi::Env env, Napi::Function jsCallback) {
-      Napi::Buffer<char> js_buffer = Napi::Buffer<char>::Copy(env, data_str.c_str(), data_str.length());
+      Napi::Buffer<char> js_buffer =
+          Napi::Buffer<char>::Copy(env, data_str.c_str(), data_str.length());
       jsCallback.Call({js_buffer, Napi::Boolean::New(env, end_stream)});
     });
   };
 
-  callbacks.on_complete_ = [on_complete_tsfn, has_on_complete, release_all](envoy_stream_intel intel, envoy_final_stream_intel final_intel) {
+  callbacks.on_complete_ = [on_complete_tsfn, has_on_complete, release_all](
+                               envoy_stream_intel intel, envoy_final_stream_intel final_intel) {
     if (has_on_complete) {
-      on_complete_tsfn->BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
-        jsCallback.Call({});
-      });
+      on_complete_tsfn->BlockingCall(
+          [](Napi::Env env, Napi::Function jsCallback) { jsCallback.Call({}); });
     }
     release_all();
   };
 
-  callbacks.on_error_ = [on_error_tsfn, has_on_error, release_all](const Envoy::EnvoyError& error, envoy_stream_intel intel, envoy_final_stream_intel final_intel) {
+  callbacks.on_error_ = [on_error_tsfn, has_on_error,
+                         release_all](const Envoy::EnvoyError& error, envoy_stream_intel intel,
+                                      envoy_final_stream_intel final_intel) {
     if (has_on_error) {
       std::string msg = error.message_;
       int code = error.error_code_;
@@ -275,11 +299,11 @@ Napi::Value EnvoyStreamPrototypeWrapper::Start(const Napi::CallbackInfo& info) {
     release_all();
   };
 
-  callbacks.on_cancel_ = [on_cancel_tsfn, has_on_cancel, release_all](envoy_stream_intel intel, envoy_final_stream_intel final_intel) {
+  callbacks.on_cancel_ = [on_cancel_tsfn, has_on_cancel, release_all](
+                             envoy_stream_intel intel, envoy_final_stream_intel final_intel) {
     if (has_on_cancel) {
-      on_cancel_tsfn->BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
-        jsCallback.Call({});
-      });
+      on_cancel_tsfn->BlockingCall(
+          [](Napi::Env env, Napi::Function jsCallback) { jsCallback.Call({}); });
     }
     release_all();
   };
@@ -294,16 +318,19 @@ Napi::Value EnvoyStreamPrototypeWrapper::Start(const Napi::CallbackInfo& info) {
 // --- EnvoyStreamClientWrapper Implementation ---
 
 Napi::Object EnvoyStreamClientWrapper::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func = DefineClass(env, "EnvoyStreamClient", {
-    InstanceMethod("newStreamPrototype", &EnvoyStreamClientWrapper::NewStreamPrototype),
-  });
+  Napi::Function func = DefineClass(
+      env, "EnvoyStreamClient",
+      {
+          InstanceMethod("newStreamPrototype", &EnvoyStreamClientWrapper::NewStreamPrototype),
+      });
   constructor = Napi::Persistent(func);
   constructor.SuppressDestruct();
   exports.Set("EnvoyStreamClient", func);
   return exports;
 }
 
-EnvoyStreamClientWrapper::EnvoyStreamClientWrapper(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EnvoyStreamClientWrapper>(info) {}
+EnvoyStreamClientWrapper::EnvoyStreamClientWrapper(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<EnvoyStreamClientWrapper>(info) {}
 
 Napi::Value EnvoyStreamClientWrapper::NewStreamPrototype(const Napi::CallbackInfo& info) {
   auto proto = client_->newStreamPrototype();
@@ -316,11 +343,13 @@ Napi::Value EnvoyStreamClientWrapper::NewStreamPrototype(const Napi::CallbackInf
 // --- EnvoyEngineWrapper Implementation ---
 
 Napi::Object EnvoyEngineWrapper::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func = DefineClass(env, "EnvoyEngine", {
-    InstanceMethod("terminate", &EnvoyEngineWrapper::Terminate),
-    InstanceMethod("dumpStats", &EnvoyEngineWrapper::DumpStats),
-    InstanceMethod("getStreamClient", &EnvoyEngineWrapper::GetStreamClient),
-  });
+  Napi::Function func =
+      DefineClass(env, "EnvoyEngine",
+                  {
+                      InstanceMethod("terminate", &EnvoyEngineWrapper::Terminate),
+                      InstanceMethod("dumpStats", &EnvoyEngineWrapper::DumpStats),
+                      InstanceMethod("getStreamClient", &EnvoyEngineWrapper::GetStreamClient),
+                  });
 
   constructor = Napi::Persistent(func);
   constructor.SuppressDestruct();
@@ -329,7 +358,8 @@ Napi::Object EnvoyEngineWrapper::Init(Napi::Env env, Napi::Object exports) {
   return exports;
 }
 
-EnvoyEngineWrapper::EnvoyEngineWrapper(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EnvoyEngineWrapper>(info) {}
+EnvoyEngineWrapper::EnvoyEngineWrapper(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<EnvoyEngineWrapper>(info) {}
 
 void EnvoyEngineWrapper::Terminate(const Napi::CallbackInfo& info) {
   if (engine_) {
@@ -356,18 +386,20 @@ Napi::Value EnvoyEngineWrapper::GetStreamClient(const Napi::CallbackInfo& info) 
 // --- EnvoyEngineBuilderWrapper Implementation ---
 
 Napi::Object EnvoyEngineBuilderWrapper::Init(Napi::Env env, Napi::Object exports) {
-  Napi::Function func = DefineClass(env, "EnvoyEngineBuilder", {
-    InstanceMethod("setLogLevel", &EnvoyEngineBuilderWrapper::SetLogLevel),
-    InstanceMethod("setOnEngineRunning", &EnvoyEngineBuilderWrapper::SetOnEngineRunning),
-    InstanceMethod("build", &EnvoyEngineBuilderWrapper::Build),
-  });
+  Napi::Function func = DefineClass(
+      env, "EnvoyEngineBuilder",
+      {
+          InstanceMethod("setLogLevel", &EnvoyEngineBuilderWrapper::SetLogLevel),
+          InstanceMethod("setOnEngineRunning", &EnvoyEngineBuilderWrapper::SetOnEngineRunning),
+          InstanceMethod("build", &EnvoyEngineBuilderWrapper::Build),
+      });
 
   exports.Set("EnvoyEngineBuilder", func);
   return exports;
 }
 
-EnvoyEngineBuilderWrapper::EnvoyEngineBuilderWrapper(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EnvoyEngineBuilderWrapper>(info) {
-}
+EnvoyEngineBuilderWrapper::EnvoyEngineBuilderWrapper(const Napi::CallbackInfo& info)
+    : Napi::ObjectWrap<EnvoyEngineBuilderWrapper>(info) {}
 
 Napi::Value EnvoyEngineBuilderWrapper::SetLogLevel(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
@@ -388,11 +420,10 @@ Napi::Value EnvoyEngineBuilderWrapper::SetOnEngineRunning(const Napi::CallbackIn
     return env.Null();
   }
 
-  auto tsfn = Napi::ThreadSafeFunction::New(env, info[0].As<Napi::Function>(), "OnEngineRunning", 0, 1);
+  auto tsfn =
+      Napi::ThreadSafeFunction::New(env, info[0].As<Napi::Function>(), "OnEngineRunning", 0, 1);
   builder_.setOnEngineRunning([tsfn]() {
-    tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
-      jsCallback.Call({});
-    });
+    tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) { jsCallback.Call({}); });
     tsfn.Release();
   });
 
