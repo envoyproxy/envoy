@@ -976,6 +976,104 @@ TEST_F(FilterManagerTest, AllDecodeOperationsBlockedAfterDownstreamReset) {
   filter_manager_->destroyFilters();
 }
 
+struct TrackedItem {
+  explicit TrackedItem(int& count, int val) : destroy_count_(count), value_(val) {}
+  ~TrackedItem() { ++destroy_count_; }
+
+  TrackedItem(const TrackedItem&) = delete;
+  TrackedItem& operator=(const TrackedItem&) = delete;
+  TrackedItem(TrackedItem&&) = delete;
+  TrackedItem& operator=(TrackedItem&&) = delete;
+
+  int& destroy_count_;
+  int value_;
+};
+
+TEST(InPlaceFilterListTest, ReserveEmplaceAndIterate) {
+  int destroyed = 0;
+  {
+    InPlaceFilterList<TrackedItem> list;
+    list.reserve(3);
+    list.emplace_back(destroyed, 10);
+    list.emplace_back(destroyed, 20);
+    list.emplace_back(destroyed, 30);
+
+    EXPECT_EQ(list.size(), 3);
+    EXPECT_FALSE(list.empty());
+    EXPECT_EQ(list.front().value_, 10);
+    EXPECT_EQ(list.back().value_, 30);
+    EXPECT_EQ(list[1].value_, 20);
+
+    // Forward iteration via iterator adapter: *iter returns T*.
+    std::vector<int> forward_values;
+    for (auto it = list.begin(); it != list.end(); ++it) {
+      TrackedItem* ptr = *it;
+      forward_values.push_back(ptr->value_);
+    }
+    EXPECT_EQ(forward_values, (std::vector<int>{10, 20, 30}));
+
+    // (*iter)->member pattern (the hot path in filter_manager.cc).
+    EXPECT_EQ((*list.begin())->value_, 10);
+
+    // **iter pattern (double dereference).
+    EXPECT_EQ((**list.begin()).value_, 10);
+
+    // Reverse iteration.
+    std::vector<int> reverse_values;
+    for (auto it = list.rbegin(); it != list.rend(); ++it) {
+      reverse_values.push_back((*it)->value_);
+    }
+    EXPECT_EQ(reverse_values, (std::vector<int>{30, 20, 10}));
+
+    // std::next / std::prev.
+    auto second = std::next(list.begin());
+    EXPECT_EQ((*second)->value_, 20);
+    auto back_to_first = std::prev(second);
+    EXPECT_EQ((*back_to_first)->value_, 10);
+
+    EXPECT_EQ(destroyed, 0);
+  }
+  EXPECT_EQ(destroyed, 3);
+}
+
+TEST(InPlaceFilterListTest, EmptyList) {
+  InPlaceFilterList<TrackedItem> list;
+  EXPECT_TRUE(list.empty());
+  EXPECT_EQ(list.size(), 0);
+  EXPECT_EQ(list.begin(), list.end());
+}
+
+TEST(InPlaceFilterListTest, ReserveZeroAsserts) {
+  InPlaceFilterList<TrackedItem> list;
+  EXPECT_DEATH(list.reserve(0), "InPlaceFilterList: reserve called with zero capacity");
+}
+
+TEST(InPlaceFilterListTest, DoubleReserveSmallerIsNoOp) {
+  int destroyed = 0;
+  InPlaceFilterList<TrackedItem> list;
+  list.reserve(5);
+  list.emplace_back(destroyed, 1);
+  // Subsequent reserve with smaller capacity is a no-op; createFilterChain
+  // may be called with fallback factories that have fewer filters.
+  list.reserve(2);
+  EXPECT_EQ(list.size(), 1);
+  EXPECT_EQ((*list.begin())->value_, 1);
+}
+
+TEST(InPlaceFilterListTest, DoubleReserveLargerAsserts) {
+  InPlaceFilterList<TrackedItem> list;
+  list.reserve(2);
+  EXPECT_DEATH(list.reserve(5), "InPlaceFilterList: subsequent reserve exceeds initial capacity");
+}
+
+TEST(InPlaceFilterListTest, EmplaceBackPastCapacityAsserts) {
+  int destroyed = 0;
+  InPlaceFilterList<TrackedItem> list;
+  list.reserve(1);
+  list.emplace_back(destroyed, 1);
+  EXPECT_DEATH(list.emplace_back(destroyed, 2), "InPlaceFilterList: emplace_back past capacity");
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
