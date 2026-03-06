@@ -1470,6 +1470,10 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksSuccess) {
   EXPECT_NE(addr_result.ptr, nullptr);
   EXPECT_GT(addr_result.length, 0);
 
+  // Test invalid host index within a valid locality.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(lb_ptr, 0, 0, 999, &addr_result));
+
   // Test locality weights.
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 0), 70);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 1), 30);
@@ -2051,6 +2055,137 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
             envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
                                                                            nullptr, 0, 10));
+
+  // Wrong label count (too many) should return InvalidLabels.
+  envoy_dynamic_module_type_module_buffer extra_labels[2] = {{.ptr = "a", .length = 1},
+                                                             {.ptr = "b", .length = 1}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(
+                config_ptr, histogram_id, extra_labels, 2, 10));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a counter vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer counter_name = {.ptr = "cv", .length = 2};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "lbl", .length = 3};
+  size_t counter_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, counter_name,
+                                                                   &label_name, 1,
+                                                                   &counter_vec_id));
+
+  // Calling increment_counter with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_vec_id,
+                                                                      nullptr, 0, 1));
+
+  // Define a gauge vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gv", .length = 2};
+  size_t gauge_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, gauge_name,
+                                                                 &label_name, 1, &gauge_vec_id));
+
+  // Calling set_gauge, increment_gauge, decrement_gauge with 0 labels on a vec ID returns
+  // InvalidLabels.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_InvalidLabels,
+      envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_vec_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_vec_id,
+                                                                    nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_vec_id,
+                                                                    nullptr, 0, 1));
+
+  // Define a histogram vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer hist_name = {.ptr = "hv", .length = 2};
+  size_t hist_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, hist_name,
+                                                                     &label_name, 1,
+                                                                     &hist_vec_id));
+
+  // Calling record_histogram_value with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, hist_vec_id,
+                                                                           nullptr, 0, 1));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecWrongLabelCount) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a gauge vec with one label.
+  envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gwl", .length = 3};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "lbl", .length = 3};
+  size_t gauge_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, gauge_name,
+                                                                 &label_name, 1, &gauge_vec_id));
+
+  // Providing wrong number of label values (2 instead of 1).
+  envoy_dynamic_module_type_module_buffer extra_vals[2] = {{.ptr = "a", .length = 1},
+                                                           {.ptr = "b", .length = 1}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_vec_id, extra_vals,
+                                                              2, 50));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_vec_id,
+                                                                    extra_vals, 2, 10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_vec_id,
+                                                                    extra_vals, 2, 5));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Using non-existent vec IDs with labels should return MetricNotFound.
+  envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, 999, &label_val, 1,
+                                                                    10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1,
+                                                                    5));
 }
 
 } // namespace
