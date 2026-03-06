@@ -193,6 +193,14 @@ bool envoy_dynamic_module_on_lb_choose_host(
     (void)bool_found;
   }
 
+  // Test response header modification via context.
+  if (context_envoy_ptr != NULL) {
+    envoy_dynamic_module_type_module_buffer hdr_key = {"x-lb-test", 9};
+    envoy_dynamic_module_type_module_buffer hdr_value = {"test-value", 10};
+    envoy_dynamic_module_callback_lb_context_add_response_header(
+        lb_envoy_ptr, context_envoy_ptr, hdr_key, hdr_value);
+  }
+
   // Test locality-related callbacks.
   size_t locality_count = envoy_dynamic_module_callback_lb_get_locality_count(lb_envoy_ptr, 0);
   if (locality_count > 0) {

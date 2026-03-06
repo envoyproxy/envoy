@@ -8639,6 +8639,25 @@ bool envoy_dynamic_module_callback_lb_context_get_override_host(
     envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
 
 /**
+ * envoy_dynamic_module_callback_lb_context_add_response_header adds a response header to be sent
+ * downstream after the upstream response is received. This callback is only valid during the
+ * ``envoy_dynamic_module_on_lb_choose_host`` event hook. Multiple calls will add multiple headers.
+ * The header values are copied so the module can free the buffers after this call returns.
+ *
+ * This uses the ``LoadBalancerContext::setHeadersModifier`` mechanism internally, which is applied
+ * once per request regardless of retries.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param key is the header name to add.
+ * @param value is the header value to add.
+ */
+void envoy_dynamic_module_callback_lb_context_add_response_header(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
  * envoy_dynamic_module_callback_lb_get_member_update_host_address returns the address of an added
  * or removed host during the on_host_membership_update event hook. This callback is only valid
  * during envoy_dynamic_module_on_lb_on_host_membership_update.

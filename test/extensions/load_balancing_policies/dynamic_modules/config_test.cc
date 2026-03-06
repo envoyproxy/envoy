@@ -560,6 +560,15 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
                 nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
             0);
+
+  // Test add response header callback with null pointers (should not crash).
+  envoy_dynamic_module_type_module_buffer key = {"x-test", 6};
+  envoy_dynamic_module_type_module_buffer value = {"value", 5};
+  envoy_dynamic_module_callback_lb_context_add_response_header(nullptr, nullptr, key, value);
+
+  // Test add response header with null value pointer (empty value, should not crash).
+  envoy_dynamic_module_type_module_buffer null_value = {nullptr, 0};
+  envoy_dynamic_module_callback_lb_context_add_response_header(nullptr, nullptr, key, null_value);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
@@ -1574,6 +1583,90 @@ TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks)
   ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
 
   auto response = lb->chooseHost(&context);
+  EXPECT_NE(response.host, nullptr);
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, ResponseHeaderModification) {
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  auto& filter_metadata = (*metadata->mutable_filter_metadata())["envoy.lb"];
+  (*filter_metadata.mutable_fields())["version"].set_string_value("v1.0");
+  ON_CALL(*host1_, metadata()).WillByDefault(Return(metadata));
+
+  auto* mock_host_set = priority_set_.getMockHostSet(0);
+  Upstream::HostVector locality0_hosts = {host1_, host2_};
+  std::vector<Upstream::HostVector> hosts_per_locality = {locality0_hosts};
+  auto hosts_per_locality_ptr =
+      std::make_shared<Upstream::HostsPerLocalityImpl>(std::move(hosts_per_locality), false);
+  ON_CALL(*mock_host_set, healthyHostsPerLocality())
+      .WillByDefault(ReturnRef(*hosts_per_locality_ptr));
+
+  auto locality_weights =
+      std::make_shared<Upstream::LocalityWeights>(Upstream::LocalityWeights{100});
+  ON_CALL(*mock_host_set, localityWeights()).WillByDefault(Return(locality_weights));
+
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_callbacks_test");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  // Capture the headers modifier set by the LB.
+  std::function<void(Http::ResponseHeaderMap&)> captured_modifier;
+  EXPECT_CALL(context, setHeadersModifier(testing::_))
+      .WillOnce([&captured_modifier](std::function<void(Http::ResponseHeaderMap&)> modifier) {
+        captured_modifier = std::move(modifier);
+      });
+
+  auto response = lb->chooseHost(&context);
+  EXPECT_NE(response.host, nullptr);
+
+  // Verify the modifier was captured and apply it.
+  ASSERT_NE(captured_modifier, nullptr);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  captured_modifier(response_headers);
+  EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-lb-test"))[0]->value().getStringView(),
+            "test-value");
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, ResponseHeaderModificationNoContext) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto thread_aware_lb =
+      factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
+                     cluster_info_, priority_set_, runtime_, random_, time_source_);
+  ASSERT_NE(thread_aware_lb, nullptr);
+  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+
+  Upstream::LoadBalancerParams params{priority_set_, nullptr};
+  auto lb = thread_aware_lb->factory()->create(params);
+  ASSERT_NE(lb, nullptr);
+
+  // With null context, chooseHost should still work without crash.
+  auto response = lb->chooseHost(nullptr);
   EXPECT_NE(response.host, nullptr);
 }
 

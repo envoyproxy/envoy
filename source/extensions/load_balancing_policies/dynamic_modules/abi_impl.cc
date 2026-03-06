@@ -453,6 +453,19 @@ bool envoy_dynamic_module_callback_lb_context_get_override_host(
   return true;
 }
 
+void envoy_dynamic_module_callback_lb_context_add_response_header(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (lb_envoy_ptr == nullptr || context_envoy_ptr == nullptr || key.ptr == nullptr) {
+    return;
+  }
+  getLb(lb_envoy_ptr)
+      ->addPendingResponseHeader(std::string(key.ptr, key.length),
+                                 value.ptr != nullptr ? std::string(value.ptr, value.length)
+                                                      : std::string());
+}
+
 bool envoy_dynamic_module_callback_lb_set_host_data(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     uintptr_t data) {

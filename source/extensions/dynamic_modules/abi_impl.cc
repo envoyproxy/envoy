@@ -666,6 +666,13 @@ __attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_counter
   return 0;
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_lb_context_add_response_header(
+    envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_lb_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_add_response_header: "
+               "not implemented in this context");
+}
+
 // ---------------------- Matcher callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the matcher extension abi_impl.cc when the matcher extension is used.

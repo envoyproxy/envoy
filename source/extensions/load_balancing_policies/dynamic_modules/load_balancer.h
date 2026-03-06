@@ -42,6 +42,9 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Adds a response header to be set via the context's setHeadersModifier after host selection.
+  void addPendingResponseHeader(std::string key, std::string value);
+
 private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
@@ -57,6 +60,9 @@ private:
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
+
+  // Pending response headers accumulated during choose_host, applied via setHeadersModifier.
+  std::vector<std::pair<std::string, std::string>> pending_response_headers_;
 };
 
 } // namespace DynamicModules
