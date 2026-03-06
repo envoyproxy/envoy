@@ -154,5 +154,49 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+// Test that virtual host matching is case-insensitive even though VHDS queries can be
+// case-sensitive. This ensures that:
+// 1. VHDS subscription preserves the case of the host header in the query (e.g., "Example.Com")
+// 2. But virtual host matching remains case-insensitive (so "example.com", "EXAMPLE.COM", etc. all
+//    match the same virtual host)
+TEST_P(VhdsIntegrationTest, VirtualHostMatchingIsCaseInsensitive) {
+  // Note: Case-sensitive VHDS queries are enabled by default via the runtime flag
+  // "envoy.reloadable_features.vhds_case_sensitive_query"
+
+  // First, verify the default virtual host (sni.lyft.com) works as configured during initialization
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Send a VHDS response with a virtual host that has domain "Example.Com" (mixed case)
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          virtualHostYaml("my_route/example_vhost", "Example.Com"))},
+      {}, "2", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // Test 1: Request with lowercase host header should match (case-insensitive matching)
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "example.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Test 2: Request with uppercase host header should match (case-insensitive matching)
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "EXAMPLE.COM");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Test 3: Request with mixed case host header should match (case-insensitive matching)
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "ExAmPlE.cOm");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Test 4: Request with exact case as configured should also match
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "Example.Com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

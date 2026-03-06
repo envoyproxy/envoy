@@ -1031,6 +1031,7 @@ lookup
 lookups
 loopback
 lossy
+lowercased
 lowp
 lstat
 ltrim
