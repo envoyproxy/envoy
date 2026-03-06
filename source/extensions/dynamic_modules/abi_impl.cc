@@ -402,11 +402,9 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
 
 __attribute__((weak)) void
 envoy_dynamic_module_callback_lb_get_cluster_name(envoy_dynamic_module_type_lb_envoy_ptr,
-                                                  envoy_dynamic_module_type_envoy_buffer* result) {
+                                                  envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_cluster_name: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
 }
 
 __attribute__((weak)) size_t
@@ -437,13 +435,12 @@ envoy_dynamic_module_callback_lb_get_priority_set_size(envoy_dynamic_module_type
   return 0;
 }
 
-__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
-    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_lb_get_healthy_host_address(envoy_dynamic_module_type_lb_envoy_ptr,
+                                                          uint32_t, size_t,
+                                                          envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_healthy_host_address: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
   return false;
 }
 
@@ -464,23 +461,17 @@ envoy_dynamic_module_callback_lb_get_host_health(envoy_dynamic_module_type_lb_en
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
     envoy_dynamic_module_type_lb_envoy_ptr, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_host_health* result) {
+    envoy_dynamic_module_type_host_health*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_health_by_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    *result = envoy_dynamic_module_type_host_health_Unhealthy;
-  }
   return false;
 }
 
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
-                                                  size_t,
-                                                  envoy_dynamic_module_type_envoy_buffer* result) {
+                                                  size_t, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_address: "
                "not implemented in this context");
-  result->ptr = nullptr;
-  result->length = 0;
   return false;
 }
 
@@ -587,13 +578,9 @@ envoy_dynamic_module_callback_lb_get_host_data(envoy_dynamic_module_type_lb_envo
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_metadata_string: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
 }
 
@@ -629,13 +616,9 @@ __attribute__((weak)) size_t envoy_dynamic_module_callback_lb_get_locality_host_
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_locality_host_address(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t, size_t,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_locality_host_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
 }
 
@@ -647,14 +630,9 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_locality_wei
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
-    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool,
-    envoy_dynamic_module_type_envoy_buffer* result) {
+    envoy_dynamic_module_type_lb_envoy_ptr, size_t, bool, envoy_dynamic_module_type_envoy_buffer*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_member_update_host_address: "
                "not implemented in this context");
-  if (result != nullptr) {
-    result->ptr = nullptr;
-    result->length = 0;
-  }
   return false;
 }
 
