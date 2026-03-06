@@ -92,6 +92,30 @@ bool envoy_dynamic_module_on_lb_choose_host(
     (void)health;
   }
 
+  // Test O(1) host health lookup by address.
+  if (host_count > 0) {
+    // Get the address of the first host to use for the by-address lookup.
+    envoy_dynamic_module_type_envoy_buffer first_host_addr = {NULL, 0};
+    envoy_dynamic_module_callback_lb_get_host_address(lb_envoy_ptr, 0, 0, &first_host_addr);
+    if (first_host_addr.ptr != NULL && first_host_addr.length > 0) {
+      envoy_dynamic_module_type_host_health health_by_addr =
+          envoy_dynamic_module_type_host_health_Unhealthy;
+      envoy_dynamic_module_type_module_buffer addr_buf = {first_host_addr.ptr,
+                                                          first_host_addr.length};
+      bool found_by_addr = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+          lb_envoy_ptr, addr_buf, &health_by_addr);
+      (void)found_by_addr;
+    }
+
+    // Test with a non-existent address.
+    envoy_dynamic_module_type_host_health not_found_health =
+        envoy_dynamic_module_type_host_health_Unhealthy;
+    envoy_dynamic_module_type_module_buffer bad_addr = {"1.2.3.4:9999", 12};
+    bool not_found = envoy_dynamic_module_callback_lb_get_host_health_by_address(
+        lb_envoy_ptr, bad_addr, &not_found_health);
+    (void)not_found;
+  }
+
   // Test all-hosts callbacks (address, weight, active requests, connections, locality).
   if (host_count > 0) {
     envoy_dynamic_module_type_envoy_buffer host_address_result = {NULL, 0};
@@ -110,6 +134,26 @@ bool envoy_dynamic_module_on_lb_choose_host(
     uint64_t active_cx = envoy_dynamic_module_callback_lb_get_host_active_connections(
         lb_envoy_ptr, 0, 0);
     (void)active_cx;
+
+    // Test host counter stats.
+    uint64_t cx_total = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxTotal);
+    (void)cx_total;
+    uint64_t rq_total = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal);
+    (void)rq_total;
+    uint64_t rq_error = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqError);
+    (void)rq_error;
+    uint64_t rq_success = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqSuccess);
+    (void)rq_success;
+    uint64_t rq_timeout = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTimeout);
+    (void)rq_timeout;
+    uint64_t cx_fail = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxConnectFail);
+    (void)cx_fail;
 
     envoy_dynamic_module_type_envoy_buffer region = {NULL, 0};
     envoy_dynamic_module_type_envoy_buffer zone = {NULL, 0};
@@ -192,6 +236,23 @@ bool envoy_dynamic_module_on_lb_choose_host(
     bool header_found = envoy_dynamic_module_callback_lb_context_get_downstream_header(
         context_envoy_ptr, method_key, &method_result, 0, &method_count);
     (void)header_found;
+
+    // Test host selection retry count.
+    uint32_t retry_count =
+        envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(context_envoy_ptr);
+    (void)retry_count;
+
+    // Test should_select_another_host for the first host.
+    bool should_retry = envoy_dynamic_module_callback_lb_context_should_select_another_host(
+        lb_envoy_ptr, context_envoy_ptr, 0, 0);
+    (void)should_retry;
+
+    // Test override host.
+    envoy_dynamic_module_type_envoy_buffer override_addr = {NULL, 0};
+    bool strict = false;
+    bool has_override = envoy_dynamic_module_callback_lb_context_get_override_host(
+        context_envoy_ptr, &override_addr, &strict);
+    (void)has_override;
   }
 
   if (healthy_count == 0) {
@@ -203,6 +264,35 @@ bool envoy_dynamic_module_on_lb_choose_host(
   *result_priority = 0;
   *result_index = (uint32_t)index;
   return true;
+}
+
+void envoy_dynamic_module_on_lb_on_host_membership_update(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed) {
+  (void)lb_module_ptr;
+
+  // Test accessing added host addresses.
+  for (size_t i = 0; i < num_hosts_added; i++) {
+    envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
+    bool found = envoy_dynamic_module_callback_lb_get_member_update_host_address(
+        lb_envoy_ptr, i, true, &addr);
+    (void)found;
+  }
+
+  // Test accessing removed host addresses.
+  for (size_t i = 0; i < num_hosts_removed; i++) {
+    envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
+    bool found = envoy_dynamic_module_callback_lb_get_member_update_host_address(
+        lb_envoy_ptr, i, false, &addr);
+    (void)found;
+  }
+
+  // Test out-of-bounds index.
+  envoy_dynamic_module_type_envoy_buffer oob_result = {NULL, 0};
+  bool oob = envoy_dynamic_module_callback_lb_get_member_update_host_address(
+      lb_envoy_ptr, num_hosts_added, true, &oob_result);
+  (void)oob;
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

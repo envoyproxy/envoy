@@ -254,7 +254,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
   Config::ScopedResume resume_leds =
       transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
-  update(cluster_load_assignment);
+  update(std::move(cluster_load_assignment));
   // If previously used a cached version, remove the subscription from the cache's
   // callbacks.
   if (using_cached_resource_) {
@@ -265,7 +265,7 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 }
 
 void EdsClusterImpl::update(
-    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment) {
   // Drop overload configuration parsing.
   THROW_IF_NOT_OK(parseDropOverloadConfig(cluster_load_assignment));
 
@@ -287,8 +287,6 @@ void EdsClusterImpl::update(
     return cla_leds_configs.find(leds_config) == cla_leds_configs.end();
   });
 
-  // In case LEDS is used, store the cluster load assignment as a field
-  // (optimize for no-copy).
   const envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (!cla_leds_configs.empty() || eds_resources_cache_.has_value()) {
     cluster_load_assignment_ = std::make_unique<envoy::config::endpoint::v3::ClusterLoadAssignment>(
@@ -343,7 +341,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // TODO(snowp): This should probably just use xDS TTLs?
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(edsServiceName());
-  update(resource);
+  update(std::move(resource));
 
   if (eds_resources_cache_.has_value()) {
     // Clear the resource so it won't be used, and its watchers will be notified.
@@ -362,7 +360,7 @@ void EdsClusterImpl::onCachedResourceRemoved(absl::string_view resource_name) {
   }
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(edsServiceName());
-  update(resource);
+  update(std::move(resource));
 }
 
 void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
@@ -468,7 +466,7 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
           dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(*cached_resource);
       info_->configUpdateStats().assignment_use_cached_.inc();
       using_cached_resource_ = true;
-      update(cached_load_assignment);
+      update(std::move(cached_load_assignment));
       return;
     }
   }

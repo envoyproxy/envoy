@@ -350,18 +350,21 @@ func (b *dymBodyBuffer) Drain(size uint64) {
 }
 
 type dymScheduler struct {
-	schedulerPtr  C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr
+	schedulerPtr  unsafe.Pointer
 	schedulerLock sync.Mutex
 	nextTaskID    uint64
 	tasks         map[uint64]func()
+	commitFunc    func(unsafe.Pointer, C.uint64_t)
 }
 
 func newDymScheduler(
-	schedulerPtr C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr,
+	schedulerPtr unsafe.Pointer,
+	commitFunc func(unsafe.Pointer, C.uint64_t),
 ) *dymScheduler {
 	return &dymScheduler{
 		schedulerPtr: schedulerPtr,
 		tasks:        make(map[uint64]func()),
+		commitFunc:   commitFunc,
 	}
 }
 
@@ -373,10 +376,8 @@ func (s *dymScheduler) Schedule(task func()) {
 	s.tasks[taskID] = task
 	s.schedulerLock.Unlock()
 
-	C.envoy_dynamic_module_callback_http_filter_scheduler_commit(
-		s.schedulerPtr,
-		(C.uint64_t)(taskID),
-	)
+	// Call the host to schedule the task, passing the task ID as context
+	s.commitFunc(s.schedulerPtr, C.uint64_t(taskID))
 }
 
 func (s *dymScheduler) onScheduled(taskID uint64) {
@@ -863,11 +864,19 @@ func (h *dymHttpFilterHandle) GetScheduler() shared.Scheduler {
 		// in practice. But it will be nil in mock tests.
 		schedulerPtr := C.envoy_dynamic_module_callback_http_filter_scheduler_new(
 			h.hostPluginPtr)
-		h.scheduler = newDymScheduler(schedulerPtr)
+		h.scheduler = newDymScheduler(
+			unsafe.Pointer(schedulerPtr),
+			func(schedulerPtr unsafe.Pointer, taskID C.uint64_t) {
+				C.envoy_dynamic_module_callback_http_filter_scheduler_commit(
+					(C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr)(schedulerPtr),
+					taskID,
+				)
+			},
+		)
 
 		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
 			C.envoy_dynamic_module_callback_http_filter_scheduler_delete(
-				s.schedulerPtr,
+				(C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr)(s.schedulerPtr),
 			)
 		})
 	}
@@ -1128,6 +1137,7 @@ type dymConfigHandle struct {
 	hostConfigPtr    C.envoy_dynamic_module_type_http_filter_config_envoy_ptr
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	streamCallbacks  map[uint64]shared.HttpStreamCallback
+	scheduler        *dymScheduler
 }
 
 func (h *dymConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
@@ -1310,6 +1320,31 @@ func (h *dymConfigHandle) ResetHttpStream(streamID uint64) {
 	)
 }
 
+func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
+	if h.scheduler == nil {
+		// The scheduler is created lazily and should never be nil
+		// in practice. But it will be nil in mock tests.
+		schedulerPtr := C.envoy_dynamic_module_callback_http_filter_config_scheduler_new(
+			h.hostConfigPtr)
+		h.scheduler = newDymScheduler(
+			unsafe.Pointer(schedulerPtr),
+			func(schedulerPtr unsafe.Pointer, taskID C.uint64_t) {
+				C.envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+					(C.envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr)(schedulerPtr),
+					taskID,
+				)
+			},
+		)
+
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
+			C.envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+				(C.envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr)(s.schedulerPtr),
+			)
+		})
+	}
+	return h.scheduler
+}
+
 type dymRouteConfigHandle struct{}
 
 func (h *dymRouteConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
@@ -1363,6 +1398,7 @@ func envoy_dynamic_module_on_http_filter_config_destroy(
 	if factoryWrapper == nil {
 		return
 	}
+	factoryWrapper.configHandle.scheduler = nil
 	factoryWrapper.pluginFactory.OnDestroy()
 	configManager.remove(unsafe.Pointer(configPtr))
 }
@@ -1855,5 +1891,22 @@ func envoy_dynamic_module_on_http_filter_config_http_stream_reset(
 	if cb != nil {
 		delete(ch.streamCallbacks, uint64(streamID))
 		cb.OnHttpStreamReset(uint64(streamID), shared.HttpStreamResetReason(reason))
+	}
+}
+
+//export envoy_dynamic_module_on_http_filter_config_scheduled
+func envoy_dynamic_module_on_http_filter_config_scheduled(
+	_ C.envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
+	taskID C.uint64_t,
+) {
+	configWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
+	if configWrapper == nil || configWrapper.configHandle == nil {
+		return
+	}
+	ch := configWrapper.configHandle
+
+	if ch.scheduler != nil {
+		ch.scheduler.onScheduled(uint64(taskID))
 	}
 }

@@ -1159,6 +1159,20 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) DefineHistogram(name any, tagK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DefineHistogram), varargs...)
 }
 
+// GetScheduler mocks base method.
+func (m *MockHttpFilterConfigHandle) GetScheduler() shared.Scheduler {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetScheduler")
+	ret0, _ := ret[0].(shared.Scheduler)
+	return ret0
+}
+
+// GetScheduler indicates an expected call of GetScheduler.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetScheduler() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScheduler", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetScheduler))
+}
+
 // HttpCallout mocks base method.
 func (m *MockHttpFilterConfigHandle) HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64, cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
 	m.ctrl.T.Helper()
