@@ -156,23 +156,21 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
           return;
         }
         auto module_or_error = Extensions::DynamicModules::newDynamicModuleFromBytes(
-            data, module_config_copy.module().remote().sha256(),
-            module_config_copy.do_not_close(), module_config_copy.load_globally());
+            data, module_config_copy.module().remote().sha256(), module_config_copy.do_not_close(),
+            module_config_copy.load_globally());
         if (!module_or_error.ok()) {
-          ENVOY_LOG_TO_LOGGER(
-              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-              "Failed to load remote dynamic module from bytes: {}",
-              module_or_error.status().message());
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
+                              error, "Failed to load remote dynamic module from bytes: {}",
+                              module_or_error.status().message());
           return;
         }
-        auto cb_or_error = buildFilterFactoryCallback(std::move(module_or_error.value()),
-                                                      proto_config_copy, module_config_copy,
-                                                      context, scope);
+        auto cb_or_error =
+            buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,
+                                       module_config_copy, context, scope);
         if (!cb_or_error.ok()) {
-          ENVOY_LOG_TO_LOGGER(
-              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-              "Failed to create filter config from remote module: {}",
-              cb_or_error.status().message());
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
+                              error, "Failed to create filter config from remote module: {}",
+                              cb_or_error.status().message());
           return;
         }
         state->filter_factory_cb = cb_or_error.value();

@@ -129,10 +129,9 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerThrows) {
 
   // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
   DynamicModuleConfigFactory factory;
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProtoWithServerContext(
-          proto_config, "stats", context_.server_factory_context_),
-      EnvoyException, "Remote module sources require an init manager");
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoWithServerContext(
+                              proto_config, "stats", context_.server_factory_context_),
+                          EnvoyException, "Remote module sources require an init manager");
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {
@@ -236,14 +235,13 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
   // Set up cluster and HTTP client to return the module bytes on fetch.
   auto& cm = context_.server_factory_context_.cluster_manager_;
   cm.initializeThreadLocalClusters({"cluster_1"});
-  NiceMock<Http::MockAsyncClientRequest> request(
-      &cm.thread_local_cluster_.async_client_);
+  NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
-                Http::ResponseHeaderMapPtr{
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                     new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
             response->body().add(module_bytes);
             callbacks.onSuccess(request, std::move(response));
