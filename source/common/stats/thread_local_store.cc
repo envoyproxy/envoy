@@ -1117,8 +1117,11 @@ void ThreadLocalStoreImpl::evictUnused() {
         MetricBag metrics(scope->scope_id_);
         CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
-          return [&unused_metrics](std::pair<StatName, T> kv) {
+          return [&unused_metrics](const auto& kv) {
             const auto& [name, metric] = kv;
+            if (metric.use_count() > 1) {
+              return false;
+            }
             if (metric->used()) {
               metric->markUnused();
               return false;

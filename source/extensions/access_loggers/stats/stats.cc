@@ -17,26 +17,17 @@ class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
-  // When the request is destroyed, we need to subtract the value from the gauge.
-  // We look up the gauge centrally using its base name and evaluated tags to
-  // ensure we hit the currently active gauge in the central store, even if the
-  // previous Local-Scope gauge became disconnected.
   ~AccessLogState() override {
     for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      auto& gauge = scope_->gaugeFromStatNameWithTags(state.base_name_, state.tags_,
-                                                      Stats::Gauge::ImportMode::Accumulate);
-      gauge.sub(std::min<uint64_t>(gauge.value(), state.value_));
+      state.gauge_ref_->sub(state.value_);
     }
   }
 
-  void addInflightGauge(const Stats::Gauge* gauge, Stats::StatName base_name,
-                        Stats::StatNameTagVector tags,
-                        std::vector<Stats::StatNameDynamicStorage> storage, uint64_t value) {
+  void addInflightGauge(const Stats::Gauge* gauge, uint64_t value) {
     // We retain the raw pointer as a fast map key. The Gauge object lives in the
-    // central store and even if it evicts, the map key is only used for pointer
-    // comparisons before ultimately falling back to central resolution on destruction.
-    inflight_gauges_.try_emplace(gauge,
-                                 State{value, base_name, std::move(tags), std::move(storage)});
+    // central store and is prevented from evicting by the GaugeSharedPtr in State.
+    inflight_gauges_.try_emplace(
+        gauge, State{value, Stats::GaugeSharedPtr(const_cast<Stats::Gauge*>(gauge))});
   }
 
   absl::optional<uint64_t> removeInflightGauge(const Stats::Gauge* gauge) {
@@ -54,9 +45,7 @@ public:
 private:
   struct State {
     uint64_t value_;
-    Stats::StatName base_name_;
-    Stats::StatNameTagVector tags_;
-    std::vector<Stats::StatNameDynamicStorage> storage_;
+    Stats::GaugeSharedPtr gauge_ref_;
   };
 
   Stats::ScopeSharedPtr scope_;
@@ -346,13 +335,12 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(&gauge_stat, gauge.stat_.name_, std::move(tags), std::move(storage),
-                              value);
+      state->addInflightGauge(&gauge_stat, value);
       gauge_stat.add(value);
     } else {
       absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
       if (added_value.has_value()) {
-        gauge_stat.sub(std::min<uint64_t>(gauge_stat.value(), added_value.value()));
+        gauge_stat.sub(added_value.value());
       }
     }
     return;

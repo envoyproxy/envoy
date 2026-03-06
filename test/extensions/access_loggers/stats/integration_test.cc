@@ -316,9 +316,11 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeScopeEviction) {
       "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 1);
 
   // Simulate gauge eviction from the store.
-  // Calling evictUnused once clears the 'used' flag. Calling it twice actually evicts
-  // unreferenced gauges in evictable scopes. Since we no longer hold GaugeSharedPtr
-  // in AccessLogState, the refcount should be 1, making it eligible for eviction.
+  // Calling evictUnused once clears the 'used' flag. Calling it twice attempts to evict
+  // unreferenced gauges in evictable scopes. Since we hold a GaugeSharedPtr in AccessLogState,
+  // the gauge's refcount is > 1. Our ThreadLocalStore modifications ensure that gauges with
+  // use_count > 1 are not evicted, preventing Use-After-Free or incorrect behavior on Destruction.
+  // Thus, this post sequence tests that the inflight gauge is protected from eviction.
   absl::Notification evict_done;
   test_server_->server().dispatcher().post([this, &evict_done]() {
     test_server_->statStore().evictUnused();

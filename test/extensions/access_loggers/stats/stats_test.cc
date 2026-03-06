@@ -646,6 +646,9 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
   // Expect subtraction on destruction
   EXPECT_CALL(*gauge_, sub(10));
 
+  // Destroy logger before stream_info to simulate logger config deletion while stream is active
+  logger_.reset();
+
   // local_stream_info goes out of scope here.
 }
 
