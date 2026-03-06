@@ -266,6 +266,7 @@ public:
           callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         }) {}
 
+  size_t maxFilterCount() const override { return 1; }
   bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     callbacks.setFilterConfigName("envoy.filters.http.upstream_codec");
     factory_(callbacks);

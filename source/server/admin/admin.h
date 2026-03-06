@@ -122,6 +122,7 @@ public:
                                 Http::FilterChainFactoryCallbacks&) const override {
     return false;
   }
+  size_t maxFilterCount() const override { return 1; }
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {

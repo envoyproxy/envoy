@@ -53,6 +53,13 @@ public:
   virtual bool createFilterChain(FilterChainFactoryCallbacks& callbacks) const PURE;
 
   /**
+   * @return an upper bound on the number of filters this factory will add to the chain.
+   * The filter chain manager uses this to pre-allocate capacity. Implementations must
+   * not add more filters than this value; doing so triggers an assertion failure.
+   */
+  virtual size_t maxFilterCount() const PURE;
+
+  /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.

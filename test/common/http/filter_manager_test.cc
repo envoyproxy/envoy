@@ -75,7 +75,7 @@ public:
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Network::MockConnection> connection_;
-  Envoy::Http::MockFilterChainFactory filter_factory_;
+  NiceMock<Envoy::Http::MockFilterChainFactory> filter_factory_;
   NiceMock<LocalReply::MockLocalReply> local_reply_;
   Protocol protocol_{Protocol::Http2};
   NiceMock<MockTimeSystem> time_source_;
