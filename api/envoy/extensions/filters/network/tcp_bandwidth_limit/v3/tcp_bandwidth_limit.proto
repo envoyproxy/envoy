@@ -35,8 +35,8 @@ message TcpBandwidthLimit {
   // If set to 0, all upload traffic is blocked.
   google.protobuf.UInt64Value upload_limit_kbps = 3;
 
-  // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
-  // It must be at least 20ms to avoid too aggressive refills.
+  // The interval at which to process buffered data and check for available bandwidth.
+  // Defaults to 50ms. It must be at least 20ms to avoid too frequent processing.
   google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
     lte {seconds: 1}
     gte {nanos: 20000000}

@@ -809,12 +809,12 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerDrainsBufferAndReEnablesRead) {
   Buffer::OwnedImpl data(std::string(2048, 'x'));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(true));
   EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, false));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, true));
 
   // Advance time so the token bucket refills
   time_source_.advanceTimeWait(std::chrono::milliseconds(1100));
 
-  EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, true));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(false));
   filter_->onDownloadTokenTimer();
 
@@ -836,12 +836,12 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerDrainsBufferAndSignalsLowWatermar
   Buffer::OwnedImpl data(std::string(2048, 'x'));
   EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, true));
 
   // Advance time so the token bucket refills
   time_source_.advanceTimeWait(std::chrono::milliseconds(1100));
 
-  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, true));
   EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
   filter_->onUploadTokenTimer();
 

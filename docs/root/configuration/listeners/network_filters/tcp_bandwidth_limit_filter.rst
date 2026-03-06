@@ -44,6 +44,8 @@ The TCP bandwidth limit filter outputs statistics in the ``<stat_prefix>.`` name
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  download_enabled, Counter, Total number of times the download limit was applied to incoming data
+  upload_enabled, Counter, Total number of times the upload limit was applied to outgoing data
   download_throttled, Counter, Total number of times download data was throttled
   upload_throttled, Counter, Total number of times upload data was throttled
   download_bytes_buffered, Gauge, Current number of bytes buffered for download
@@ -52,7 +54,6 @@ The TCP bandwidth limit filter outputs statistics in the ``<stat_prefix>.`` name
 Runtime
 -------
 
-The TCP bandwidth limit filter supports the following runtime settings:
-
-* ``<stat_prefix>.runtime_enabled``: Percentage of connections for which the filter is enabled.
-  Default is 100% if runtime_enabled configuration is not specified.
+The TCP bandwidth limit filter can be runtime feature flagged via the :ref:`runtime_enabled
+<envoy_v3_api_field_extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit.runtime_enabled>`
+configuration field.

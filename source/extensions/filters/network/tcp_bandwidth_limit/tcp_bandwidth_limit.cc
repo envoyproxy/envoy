@@ -10,6 +10,11 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace TcpBandwidthLimit {
+namespace {
+
+constexpr uint64_t kiloBytesToBytes(uint64_t val) { return val * 1024; }
+
+} // namespace
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::network::tcp_bandwidth_limit::v3::TcpBandwidthLimit& config,
@@ -59,7 +64,7 @@ TcpBandwidthLimitFilter::~TcpBandwidthLimitFilter() {
   }
 }
 
-Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bool) {
+Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bool end_stream) {
   if (!config_->enabled() || !config_->hasDownloadLimit()) {
     return Network::FilterStatus::Continue;
   }
@@ -78,6 +83,7 @@ Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bo
       read_callbacks_->injectReadDataToFilterChain(passthrough, false);
     }
 
+    download_end_stream_ = end_stream;
     download_buffer_.move(data);
     config_->stats().download_bytes_buffered_.set(download_buffer_.length());
 
@@ -93,7 +99,7 @@ Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bo
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, bool) {
+Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, bool end_stream) {
   if (!config_->enabled() || !config_->hasUploadLimit()) {
     return Network::FilterStatus::Continue;
   }
@@ -112,6 +118,7 @@ Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, b
       write_callbacks_->injectWriteDataToFilterChain(to_send, false);
     }
 
+    upload_end_stream_ = end_stream;
     upload_buffer_.move(data);
     config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
 
@@ -174,7 +181,8 @@ void TcpBandwidthLimitFilter::processBufferedDownloadData() {
   if (consumed > 0) {
     Buffer::OwnedImpl data_to_send;
     data_to_send.move(download_buffer_, consumed);
-    read_callbacks_->injectReadDataToFilterChain(data_to_send, false);
+    const bool end_stream = download_end_stream_ && download_buffer_.length() == 0;
+    read_callbacks_->injectReadDataToFilterChain(data_to_send, end_stream);
     config_->stats().download_bytes_buffered_.set(download_buffer_.length());
   }
 }
@@ -190,7 +198,8 @@ void TcpBandwidthLimitFilter::processBufferedUploadData() {
   if (consumed > 0) {
     Buffer::OwnedImpl data_to_send;
     data_to_send.move(upload_buffer_, consumed);
-    write_callbacks_->injectWriteDataToFilterChain(data_to_send, false);
+    const bool end_stream = upload_end_stream_ && upload_buffer_.length() == 0;
+    write_callbacks_->injectWriteDataToFilterChain(data_to_send, end_stream);
     config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
   }
 }

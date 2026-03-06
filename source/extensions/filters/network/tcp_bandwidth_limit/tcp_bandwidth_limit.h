@@ -67,7 +67,6 @@ public:
 
 private:
   static TcpBandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  static constexpr uint64_t kiloBytesToBytes(uint64_t kilobytes) { return kilobytes * 1024; }
 
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
@@ -126,6 +125,10 @@ private:
   // Buffered data waiting for tokens
   Buffer::WatermarkBuffer download_buffer_;
   Buffer::WatermarkBuffer upload_buffer_;
+
+  // Whether end_stream was observed while buffering data
+  bool download_end_stream_{false};
+  bool upload_end_stream_{false};
 
   // Timers for processing buffered data
   Event::TimerPtr download_timer_;
