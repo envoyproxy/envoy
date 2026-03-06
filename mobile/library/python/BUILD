@@ -97,7 +97,6 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
-
 py_package(
     name = "envoy_mobile_package",
     packages = ["library.python.envoy_mobile"],
