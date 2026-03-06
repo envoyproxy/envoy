@@ -2060,8 +2060,8 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
   envoy_dynamic_module_type_module_buffer extra_labels[2] = {{.ptr = "a", .length = 1},
                                                              {.ptr = "b", .length = 1}};
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
-            envoy_dynamic_module_callback_lb_config_record_histogram_value(
-                config_ptr, histogram_id, extra_labels, 2, 10));
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
+                                                                           extra_labels, 2, 10));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
@@ -2084,9 +2084,8 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
   envoy_dynamic_module_type_module_buffer label_name = {.ptr = "lbl", .length = 3};
   size_t counter_vec_id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
-            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, counter_name,
-                                                                   &label_name, 1,
-                                                                   &counter_vec_id));
+            envoy_dynamic_module_callback_lb_config_define_counter(
+                config_ptr, counter_name, &label_name, 1, &counter_vec_id));
 
   // Calling increment_counter with 0 labels on a vec ID returns InvalidLabels.
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
@@ -2117,8 +2116,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
   size_t hist_vec_id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, hist_name,
-                                                                     &label_name, 1,
-                                                                     &hist_vec_id));
+                                                                     &label_name, 1, &hist_vec_id));
 
   // Calling record_histogram_value with 0 labels on a vec ID returns InvalidLabels.
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
@@ -2180,12 +2178,12 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
 
   // Using non-existent vec IDs with labels should return MetricNotFound.
   envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
-  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
-            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, 999, &label_val, 1,
-                                                                    10));
-  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
-            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1,
-                                                                    5));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, 999, &label_val, 1, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1, 5));
 }
 
 } // namespace
