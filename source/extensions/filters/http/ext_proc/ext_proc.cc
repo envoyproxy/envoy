@@ -419,27 +419,26 @@ const ExtProcLoggingInfo::ProcessingEffects& ExtProcLoggingInfo::processingEffec
 }
 
 void ExtProcLoggingInfo::setBytesSent(uint64_t data, ProcessingRequest::RequestCase request_case) {
-  ExtProcLoggingInfo::HttpEventTrafficStats byte_stats = eventTrafficStats();
   switch (request_case) {
   case ProcessingRequest::RequestCase::kRequestHeaders:
-    byte_stats.request_header_bytes_sent = data;
+    event_traffic_stats_.request_header_bytes_sent = data;
     return;
   case ProcessingRequest::RequestCase::kRequestBody:
-    byte_stats.request_body_bytes_sent += data;
-    byte_stats.request_body_chunks_sent++;
+    event_traffic_stats_.request_body_bytes_sent += data;
+    event_traffic_stats_.request_body_chunks_sent++;
     return;
   case ProcessingRequest::RequestCase::kRequestTrailers:
-    byte_stats.request_trailer_bytes_sent = data;
+    event_traffic_stats_.request_trailer_bytes_sent = data;
     return;
   case ProcessingRequest::RequestCase::kResponseHeaders:
-    byte_stats.response_header_bytes_sent = data;
+    event_traffic_stats_.response_header_bytes_sent = data;
     return;
   case ProcessingRequest::RequestCase::kResponseBody:
-    byte_stats.response_body_bytes_sent += data;
-    byte_stats.response_body_chunks_sent++;
+    event_traffic_stats_.response_body_bytes_sent += data;
+    event_traffic_stats_.response_body_chunks_sent++;
     return;
   case ProcessingRequest::RequestCase::kResponseTrailers:
-    byte_stats.response_trailer_bytes_sent = data;
+    event_traffic_stats_.response_trailer_bytes_sent = data;
     return;
   default:
     return;
@@ -448,27 +447,26 @@ void ExtProcLoggingInfo::setBytesSent(uint64_t data, ProcessingRequest::RequestC
 
 void ExtProcLoggingInfo::setBytesReceived(uint64_t data,
                                           ProcessingResponse::ResponseCase response_case) {
-  ExtProcLoggingInfo::HttpEventTrafficStats byte_stats = eventTrafficStats();
   switch (response_case) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
-    byte_stats.request_header_bytes_received = data;
+    event_traffic_stats_.request_header_bytes_received = data;
     return;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    byte_stats.request_body_bytes_received += data;
-    byte_stats.request_body_chunks_received++;
+    event_traffic_stats_.request_body_bytes_received += data;
+    event_traffic_stats_.request_body_chunks_received++;
     return;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
-    byte_stats.request_trailer_bytes_received = data;
+    event_traffic_stats_.request_trailer_bytes_received = data;
     return;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
-    byte_stats.response_header_bytes_received = data;
+    event_traffic_stats_.response_header_bytes_received = data;
     return;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    byte_stats.response_body_bytes_received += data;
-    byte_stats.response_body_chunks_received++;
+    event_traffic_stats_.response_body_bytes_received += data;
+    event_traffic_stats_.response_body_chunks_received++;
     return;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
-    byte_stats.response_trailer_bytes_received = data;
+    event_traffic_stats_.response_trailer_bytes_received = data;
     return;
   default:
     return;

@@ -6006,6 +6006,136 @@ TEST_F(HttpFilterTest, KeepContentLengthFullDuplex) {
   filter_->onDestroy();
 }
 
+TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
+  initializeTestSendAll();
+
+  // 1. Request Headers
+  request_headers_.addCopy(LowerCaseString("x-test-header"), "value");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  uint64_t expected_request_header_bytes_sent = request_headers_.byteSize();
+  uint64_t expected_request_header_bytes_received = 0;
+
+  processRequestHeaders(false, [&](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    resp.mutable_response()
+        ->mutable_header_mutation()
+        ->add_set_headers()
+        ->mutable_header()
+        ->set_key("foo");
+    expected_request_header_bytes_received = resp.ByteSizeLong();
+  });
+
+  auto stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.request_header_bytes_sent, expected_request_header_bytes_sent);
+  EXPECT_EQ(stats.request_header_bytes_received, expected_request_header_bytes_received);
+
+  // 2. Request Body
+  Buffer::OwnedImpl chunk1("chunk1");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(chunk1, false));
+
+  uint64_t expected_request_body_bytes_sent = chunk1.length();
+  uint64_t expected_request_body_bytes_received = 0;
+
+  processRequestBody(
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        resp.mutable_response()->mutable_body_mutation()->set_body("modified");
+        expected_request_body_bytes_received = resp.ByteSizeLong();
+      },
+      false);
+
+  stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.request_body_bytes_sent, expected_request_body_bytes_sent);
+  EXPECT_EQ(stats.request_body_chunks_sent, 1);
+  EXPECT_EQ(stats.request_body_bytes_received, expected_request_body_bytes_received);
+  EXPECT_EQ(stats.request_body_chunks_received, 1);
+
+  // 3. Response Headers
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  uint64_t expected_response_header_bytes_sent = response_headers_.byteSize();
+  uint64_t expected_response_header_bytes_received = 0;
+
+  processResponseHeaders(false,
+                         [&](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+                           resp.mutable_response()
+                               ->mutable_header_mutation()
+                               ->add_set_headers()
+                               ->mutable_header()
+                               ->set_key("bar");
+                           expected_response_header_bytes_received = resp.ByteSizeLong();
+                         });
+
+  stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.response_header_bytes_sent, expected_response_header_bytes_sent);
+  EXPECT_EQ(stats.response_header_bytes_received, expected_response_header_bytes_received);
+
+  // 4. Response Body
+  Buffer::OwnedImpl resp_chunk1("resp_chunk1");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk1, false));
+  Buffer::OwnedImpl resp_chunk2("resp_chunk2");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk2, false));
+
+  uint64_t expected_response_body_bytes_sent = resp_chunk1.length() + resp_chunk2.length();
+  uint64_t expected_response_body_bytes_received = 0;
+
+  processResponseBody(
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        resp.mutable_response()->mutable_body_mutation()->set_body("resp_modified");
+        expected_response_body_bytes_received = resp.ByteSizeLong();
+      },
+      false);
+
+  processResponseBody(
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        resp.mutable_response()->mutable_body_mutation()->set_body("resp_modified_2");
+        expected_response_body_bytes_received += resp.ByteSizeLong();
+      },
+      false);
+
+  stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.response_body_bytes_sent, expected_response_body_bytes_sent);
+  EXPECT_EQ(stats.response_body_chunks_sent, 2);
+  EXPECT_EQ(stats.response_body_bytes_received, expected_response_body_bytes_received);
+  EXPECT_EQ(stats.response_body_chunks_received, 2);
+
+  // 5. Request Trailers
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+
+  uint64_t expected_request_trailer_bytes_sent = request_trailers_.byteSize();
+  uint64_t expected_request_trailer_bytes_received = 0;
+
+  processRequestTrailers(
+      [&](const HttpTrailers&, ProcessingResponse&, TrailersResponse& resp) {
+        resp.mutable_header_mutation()->add_set_headers()->mutable_header()->set_key("trailer_foo");
+        expected_request_trailer_bytes_received = resp.ByteSizeLong();
+      },
+      true);
+
+  stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.request_trailer_bytes_sent, expected_request_trailer_bytes_sent);
+  EXPECT_EQ(stats.request_trailer_bytes_received, expected_request_trailer_bytes_received);
+
+  // 6. Response Trailers
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+
+  uint64_t expected_response_trailer_bytes_sent = response_trailers_.byteSize();
+  uint64_t expected_response_trailer_bytes_received = 0;
+
+  processResponseTrailers(
+      [&](const HttpTrailers&, ProcessingResponse&, TrailersResponse& resp) {
+        resp.mutable_header_mutation()->add_set_headers()->mutable_header()->set_key("trailer_bar");
+        expected_response_trailer_bytes_received = resp.ByteSizeLong();
+      },
+      true);
+
+  stats = getExtProcLoggingInfo()->eventTrafficStats();
+  EXPECT_EQ(stats.response_trailer_bytes_sent, expected_response_trailer_bytes_sent);
+  EXPECT_EQ(stats.response_trailer_bytes_received, expected_response_trailer_bytes_received);
+
+  filter_->onDestroy();
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
