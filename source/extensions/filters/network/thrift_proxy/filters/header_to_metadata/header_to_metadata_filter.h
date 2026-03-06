@@ -45,12 +45,12 @@ class Rule {
 public:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Matcher::RegexReplace& regexReplace() const { return regex_replace_; }
+  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   std::shared_ptr<const HeaderValueSelector> selector_;
 
 private:
   const ProtoRule rule_;
-  Matcher::RegexReplace regex_replace_;
+  absl::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;

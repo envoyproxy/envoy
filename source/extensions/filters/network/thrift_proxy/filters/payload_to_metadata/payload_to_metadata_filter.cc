@@ -44,8 +44,9 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieShared
 
   if (rule_.has_on_present() && rule_.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule_.on_present().regex_value_rewrite();
-    regex_replace_ = THROW_OR_RETURN_VALUE(
-        Matcher::RegexReplace::create(regex_engine, rewrite_spec), Matcher::RegexReplace);
+    regex_replace_ =
+        THROW_OR_RETURN_VALUE(Matcher::RegexReplace::create(regex_engine, rewrite_spec),
+                              absl::optional<Matcher::RegexReplace>);
   }
 
   switch (rule_.match_specifier_case()) {
@@ -191,7 +192,8 @@ bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, con
 void PayloadToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
                                             const KeyValuePair& keyval) {
   if (keyval.has_regex_value_rewrite()) {
-    value = rule.regexReplace().apply(value);
+    ASSERT(rule.regexReplace().has_value());
+    value = rule.regexReplace()->apply(value);
   } else if (!keyval.value().empty()) {
     value = keyval.value();
   }

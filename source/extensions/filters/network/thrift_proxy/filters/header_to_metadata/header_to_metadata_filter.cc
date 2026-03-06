@@ -44,8 +44,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
 
   if (rule.has_on_present() && rule.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_present().regex_value_rewrite();
-    regex_replace_ = THROW_OR_RETURN_VALUE(
-        Matcher::RegexReplace::create(regex_engine, rewrite_spec), Matcher::RegexReplace);
+    regex_replace_ =
+        THROW_OR_RETURN_VALUE(Matcher::RegexReplace::create(regex_engine, rewrite_spec),
+                              absl::optional<Matcher::RegexReplace>);
   }
 }
 
@@ -133,7 +134,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
 void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
                                            const KeyValuePair& keyval, StructMap& np) const {
   if (keyval.has_regex_value_rewrite()) {
-    value = rule.regexReplace().apply(value);
+    ASSERT(rule.regexReplace().has_value());
+    value = rule.regexReplace()->apply(value);
   } else if (!keyval.value().empty()) {
     value = keyval.value();
   }

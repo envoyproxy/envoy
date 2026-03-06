@@ -23,8 +23,8 @@ TEST_F(RegexReplaceTest, PerformsSubstitution) {
   proto.set_substitution("xyz");
   auto regex_or = RegexReplace::create(engine_, proto);
   ASSERT_OK(regex_or.status());
-  EXPECT_THAT(regex_or->apply("123abc123"), Eq("123xyz123"));
-  EXPECT_FALSE(regex_or->isNull());
+  ASSERT_TRUE(regex_or->has_value());
+  EXPECT_THAT((*regex_or)->apply("123abc123"), Eq("123xyz123"));
 }
 
 TEST_F(RegexReplaceTest, PerformsMarkerSubstitution) {
@@ -33,19 +33,15 @@ TEST_F(RegexReplaceTest, PerformsMarkerSubstitution) {
   proto.set_substitution("d\\0\\1");
   auto regex_or = RegexReplace::create(engine_, proto);
   ASSERT_OK(regex_or.status());
-  EXPECT_THAT(regex_or->apply("123abc123abc"), Eq("123dabcc123dabcc"));
-}
-
-TEST_F(RegexReplaceTest, UninitializedIsNull) {
-  RegexReplace r;
-  EXPECT_TRUE(r.isNull());
+  ASSERT_TRUE(regex_or->has_value());
+  EXPECT_THAT((*regex_or)->apply("123abc123abc"), Eq("123dabcc123dabcc"));
 }
 
 TEST_F(RegexReplaceTest, CreatedWithNoPatternIsNull) {
   ::envoy::type::matcher::v3::RegexMatchAndSubstitute proto;
   auto regex_or = RegexReplace::create(engine_, proto);
   ASSERT_OK(regex_or.status());
-  EXPECT_TRUE(regex_or->isNull());
+  EXPECT_FALSE(regex_or->has_value());
 }
 
 TEST_F(RegexReplaceTest, ErrorsOnInvalidRegex) {

@@ -3,11 +3,11 @@
 namespace Envoy {
 namespace Matcher {
 
-absl::StatusOr<RegexReplace>
+absl::StatusOr<absl::optional<RegexReplace>>
 RegexReplace::create(Regex::Engine& engine,
                      const ::envoy::type::matcher::v3::RegexMatchAndSubstitute& proto) {
   if (proto.pattern().regex().empty()) {
-    return RegexReplace(nullptr, std::string{});
+    return absl::nullopt;
   }
   auto regex_or_status = Regex::Utility::parseRegex(proto.pattern(), engine);
   RETURN_IF_NOT_OK(regex_or_status.status());
@@ -15,7 +15,6 @@ RegexReplace::create(Regex::Engine& engine,
 }
 
 std::string RegexReplace::apply(absl::string_view in) const {
-  ASSERT(!isNull());
   return regex_->replaceAll(in, substitution_);
 }
 

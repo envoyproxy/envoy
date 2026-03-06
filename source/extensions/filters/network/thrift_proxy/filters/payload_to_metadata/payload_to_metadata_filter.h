@@ -34,7 +34,7 @@ public:
   Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root,
        Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Matcher::RegexReplace& regexReplace() const { return regex_replace_; }
+  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   uint16_t ruleId() const { return rule_id_; }
   bool matches(const ThriftProxy::MessageMetadata& metadata) const;
 
@@ -44,7 +44,7 @@ private:
     ServiceName = 2,
   };
   const ProtoRule rule_;
-  Matcher::RegexReplace regex_replace_;
+  absl::optional<Matcher::RegexReplace> regex_replace_;
   std::string method_or_service_name_{};
   MatchType match_type_;
   uint16_t rule_id_;

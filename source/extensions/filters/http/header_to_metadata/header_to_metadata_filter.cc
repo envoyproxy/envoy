@@ -104,7 +104,7 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
     auto regex_replace_or = Matcher::RegexReplace::create(regex_engine, rewrite_spec);
     SET_AND_RETURN_IF_NOT_OK(regex_replace_or.status(), creation_status);
-    regex_replace_ = std::move(regex_replace_or.value());
+    regex_replace_ = std::move(regex_replace_or).value();
   }
 }
 
@@ -314,9 +314,9 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
-    if (!rule.regexReplace().isNull()) {
+    if (rule.regexReplace().has_value()) {
       const bool was_non_empty = !value.empty();
-      value = rule.regexReplace().apply(value);
+      value = rule.regexReplace()->apply(value);
       // If we had a non-empty input but got an empty result from regex, it could indicate a
       // failure.
       if (was_non_empty && value.empty()) {
