@@ -1,11 +1,15 @@
 #include "source/server/server.h"
 
+#include <algorithm>
+#include <cctype>
 #include <csignal>
 #include <cstdint>
 #include <ctime>
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -26,6 +30,7 @@
 
 #include "source/common/api/api_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/notification.h"
@@ -34,6 +39,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_manager_impl.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/filesystem/directory.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
@@ -58,10 +64,276 @@
 #include "source/server/regex_engine.h"
 #include "source/server/utils.h"
 
+#ifdef ENVOY_ENABLE_YAML
+#include "yaml-cpp/yaml.h"
+#endif
+
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Server {
 
 namespace {
+bool isYamlFilePath(absl::string_view path) {
+  return absl::EndsWithIgnoreCase(path, MessageUtil::FileExtensions::get().Yaml) ||
+         absl::EndsWithIgnoreCase(path, MessageUtil::FileExtensions::get().Yml);
+}
+
+std::string normalizePath(absl::string_view path) {
+  if (path.empty()) {
+    return "";
+  }
+
+  std::string path_string(path);
+  std::replace(path_string.begin(), path_string.end(), '\\', '/');
+
+  std::string drive_prefix;
+  size_t index = 0;
+  if (path_string.size() > 1 && std::isalpha(path_string[0]) && path_string[1] == ':') {
+    drive_prefix = path_string.substr(0, 2);
+    index = 2;
+  }
+
+  const bool absolute = index < path_string.size() && path_string[index] == '/';
+  std::vector<absl::string_view> stack;
+  for (absl::string_view segment :
+       absl::StrSplit(absl::string_view(path_string).substr(index), '/', absl::SkipEmpty())) {
+    if (segment == ".") {
+      continue;
+    }
+    if (segment == "..") {
+      if (!stack.empty() && stack.back() != "..") {
+        stack.pop_back();
+      } else if (!absolute) {
+        stack.push_back(segment);
+      }
+      continue;
+    }
+    stack.push_back(segment);
+  }
+
+  std::string normalized = drive_prefix;
+  if (absolute) {
+    normalized += "/";
+  }
+  if (!stack.empty()) {
+    normalized += absl::StrJoin(stack, "/");
+  } else if (normalized.empty()) {
+    normalized = ".";
+  }
+  return normalized;
+}
+
+std::string joinPath(const std::string& directory, absl::string_view filename) {
+  if (directory.empty()) {
+    return std::string(filename);
+  }
+  if (absl::EndsWith(directory, "/") || absl::EndsWith(directory, "\\")) {
+    return normalizePath(absl::StrCat(directory, filename));
+  }
+  return normalizePath(absl::StrCat(directory, "/", filename));
+}
+
+bool wildcardMatch(absl::string_view pattern, absl::string_view input) {
+  if (pattern.empty()) {
+    return input.empty();
+  }
+
+  size_t input_index = 0;
+  size_t pattern_index = 0;
+  size_t input_at_wildcard = input.size();
+  size_t pattern_at_wildcard = 0;
+
+  while (input_index < input.size()) {
+    if (pattern_index < pattern.size() &&
+        (pattern[pattern_index] == input[input_index] || pattern[pattern_index] == '?')) {
+      ++input_index;
+      ++pattern_index;
+    } else if (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
+      input_at_wildcard = input_index;
+      pattern_at_wildcard = pattern_index++;
+    } else if (input_at_wildcard != input.size()) {
+      input_index = ++input_at_wildcard;
+      pattern_index = pattern_at_wildcard + 1;
+    } else {
+      return false;
+    }
+  }
+
+  while (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
+    ++pattern_index;
+  }
+
+  return pattern_index == pattern.size();
+}
+
+absl::StatusOr<std::vector<std::string>>
+collectYamlFilesInDirectory(const std::string& directory_path, absl::string_view wildcard_pattern) {
+  std::vector<std::string> yaml_files;
+  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(directory_path)) {
+    if (entry.type_ != Filesystem::FileType::Regular || !isYamlFilePath(entry.name_)) {
+      continue;
+    }
+    if (!wildcard_pattern.empty() && !wildcardMatch(wildcard_pattern, entry.name_)) {
+      continue;
+    }
+    yaml_files.push_back(joinPath(directory_path, entry.name_));
+  }
+  std::sort(yaml_files.begin(), yaml_files.end());
+  if (yaml_files.empty()) {
+    if (wildcard_pattern.empty()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("No YAML configuration files found in directory \"", directory_path, "\""));
+    }
+    return absl::InvalidArgumentError(absl::StrCat("No YAML configuration files matched pattern \"",
+                                                   wildcard_pattern, "\" in directory \"",
+                                                   directory_path, "\""));
+  }
+  return yaml_files;
+}
+
+#ifdef ENVOY_ENABLE_YAML
+bool isAbsolutePath(absl::string_view path) {
+  if (path.empty()) {
+    return false;
+  }
+  if (path[0] == '/' || path[0] == '\\') {
+    return true;
+  }
+  return path.size() > 1 && std::isalpha(path[0]) && path[1] == ':';
+}
+
+bool hasWildcard(absl::string_view path) {
+  return path.find('*') != std::string::npos || path.find('?') != std::string::npos;
+}
+
+absl::StatusOr<std::vector<std::string>>
+expandIncludePath(const std::string& path, const std::string& including_file_path, Api::Api& api) {
+  auto include_path_or_error = api.fileSystem().splitPathFromFilename(including_file_path);
+  RETURN_IF_NOT_OK_REF(include_path_or_error.status());
+  const std::string include_base_directory = std::string(include_path_or_error->directory_);
+
+  const std::string resolved_path =
+      isAbsolutePath(path) ? normalizePath(path) : joinPath(include_base_directory, path);
+  if (hasWildcard(resolved_path)) {
+    auto split_pattern_or_error = api.fileSystem().splitPathFromFilename(resolved_path);
+    RETURN_IF_NOT_OK_REF(split_pattern_or_error.status());
+
+    const std::string pattern_directory = std::string(split_pattern_or_error->directory_);
+    const std::string filename_pattern = std::string(split_pattern_or_error->file_);
+    if (hasWildcard(pattern_directory)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Include path \"", path,
+                       "\" contains wildcard in directory segment, which is not supported"));
+    }
+    if (!api.fileSystem().directoryExists(pattern_directory)) {
+      return absl::InvalidArgumentError(absl::StrCat("Include path \"", path,
+                                                     "\" resolved to non-existent directory \"",
+                                                     pattern_directory, "\""));
+    }
+    return collectYamlFilesInDirectory(pattern_directory, filename_pattern);
+  }
+
+  if (api.fileSystem().directoryExists(resolved_path)) {
+    return collectYamlFilesInDirectory(resolved_path, "");
+  }
+  if (api.fileSystem().fileExists(resolved_path)) {
+    return std::vector<std::string>{resolved_path};
+  }
+  return absl::InvalidArgumentError(absl::StrCat("Include path \"", path, "\" could not be found"));
+}
+#endif
+
+absl::Status
+loadBootstrapFromPathWithIncludes(const std::string& path,
+                                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api, std::set<std::string>& include_stack) {
+#ifdef ENVOY_ENABLE_YAML
+  if (isYamlFilePath(path)) {
+    const std::string normalized_path = normalizePath(path);
+    if (!include_stack.emplace(normalized_path).second) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Detected bootstrap include cycle while loading \"", normalized_path, "\""));
+    }
+    Cleanup include_stack_cleanup(
+        [&include_stack, normalized_path]() { include_stack.erase(normalized_path); });
+
+    auto contents_or_error = api.fileSystem().fileReadToEnd(normalized_path);
+    RETURN_IF_NOT_OK_REF(contents_or_error.status());
+
+    YAML::Node root_node;
+    try {
+      root_node = YAML::Load(contents_or_error.value());
+    } catch (const YAML::Exception& exception) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to parse YAML file \"", normalized_path,
+                       "\" with YAML parser exception: ", exception.what()));
+    }
+
+    if (root_node.IsMap()) {
+      const YAML::Node include_node = root_node["include"];
+      if (include_node) {
+        std::vector<std::string> include_paths;
+        if (include_node.IsScalar()) {
+          include_paths.push_back(include_node.as<std::string>());
+        } else if (include_node.IsSequence()) {
+          include_paths.reserve(include_node.size());
+          for (const YAML::Node& sequence_entry : include_node) {
+            if (!sequence_entry.IsScalar()) {
+              return absl::InvalidArgumentError(absl::StrCat("The \"include\" field in \"",
+                                                             normalized_path,
+                                                             "\" must contain only string paths"));
+            }
+            include_paths.push_back(sequence_entry.as<std::string>());
+          }
+        } else {
+          return absl::InvalidArgumentError(
+              absl::StrCat("The \"include\" field in \"", normalized_path,
+                           "\" must be either a string or a list of strings"));
+        }
+
+        for (const std::string& include_path : include_paths) {
+          auto expanded_paths_or_error = expandIncludePath(include_path, normalized_path, api);
+          RETURN_IF_NOT_OK_REF(expanded_paths_or_error.status());
+          for (const std::string& expanded_path : expanded_paths_or_error.value()) {
+            RETURN_IF_NOT_OK(loadBootstrapFromPathWithIncludes(
+                expanded_path, bootstrap, validation_visitor, api, include_stack));
+          }
+        }
+        root_node.remove("include");
+      }
+    }
+
+    YAML::Emitter emitter;
+    emitter << root_node;
+    if (!emitter.good()) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Failed to emit YAML while processing bootstrap file \"", normalized_path, "\""));
+    }
+
+    envoy::config::bootstrap::v3::Bootstrap fragment;
+    try {
+      MessageUtil::loadFromYaml(emitter.c_str(), fragment, validation_visitor);
+    } catch (const EnvoyException& exception) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to load YAML bootstrap file \"", normalized_path,
+                       "\" after include expansion: ", exception.what()));
+    }
+    bootstrap.MergeFrom(fragment);
+    return absl::OkStatus();
+  }
+#else
+  UNREFERENCED_PARAMETER(include_stack);
+#endif
+
+  envoy::config::bootstrap::v3::Bootstrap fragment;
+  RETURN_IF_NOT_OK(MessageUtil::loadFromFile(path, fragment, validation_visitor, api));
+  bootstrap.MergeFrom(fragment);
+  return absl::OkStatus();
+}
+
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
   auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
@@ -376,7 +648,18 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-    RETURN_IF_NOT_OK(MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api));
+    std::set<std::string> include_stack;
+    if (api.fileSystem().directoryExists(config_path)) {
+      auto yaml_files_or_error = collectYamlFilesInDirectory(config_path, "");
+      RETURN_IF_NOT_OK_REF(yaml_files_or_error.status());
+      for (const std::string& yaml_file : yaml_files_or_error.value()) {
+        RETURN_IF_NOT_OK(loadBootstrapFromPathWithIncludes(yaml_file, bootstrap, validation_visitor,
+                                                           api, include_stack));
+      }
+    } else {
+      RETURN_IF_NOT_OK(loadBootstrapFromPathWithIncludes(config_path, bootstrap, validation_visitor,
+                                                         api, include_stack));
+    }
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
