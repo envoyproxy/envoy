@@ -65,6 +65,15 @@ pub trait EnvoyLoadBalancer {
   /// priority. This is useful for connection-aware load balancing decisions.
   fn get_host_active_connections(&self, priority: u32, index: usize) -> u64;
 
+  /// Returns the value of a per-host counter stat. This provides access to host-level counters
+  /// such as total connections, request errors, and request totals.
+  fn get_host_counter_stat(
+    &self,
+    priority: u32,
+    index: usize,
+    stat: abi::envoy_dynamic_module_type_host_counter_stat,
+  ) -> u64;
+
   /// Returns the locality information (region, zone, sub_zone) for a host by index within all
   /// hosts at a given priority. This enables zone-aware and locality-aware load balancing.
   fn get_host_locality(&self, priority: u32, index: usize) -> Option<(String, String, String)>;
@@ -349,6 +358,22 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         self.lb_ptr,
         priority,
         index,
+      )
+    }
+  }
+
+  fn get_host_counter_stat(
+    &self,
+    priority: u32,
+    index: usize,
+    stat: abi::envoy_dynamic_module_type_host_counter_stat,
+  ) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        self.lb_ptr,
+        priority,
+        index,
+        stat,
       )
     }
   }
