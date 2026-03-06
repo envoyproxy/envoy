@@ -13,6 +13,38 @@ def envoy_mobile_repositories():
     kotlin_repos()
     android_repos()
     python_repos()
+    node_repos()
+
+def node_repos():
+    http_archive(
+        name = "node_api_headers",
+        build_file_content = """
+cc_library(
+    name = "node_api_headers",
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+""",
+        sha256 = "70608bc1e6dddce280285f3462f18a106f687c0720a4b90893e1ecd86e5a8bbf",
+        strip_prefix = "node-api-headers-1.1.0",
+        urls = ["https://github.com/nodejs/node-api-headers/archive/refs/tags/v1.1.0.tar.gz"],
+    )
+
+    http_archive(
+        name = "node_addon_api",
+        build_file_content = """
+cc_library(
+    name = "node_addon_api",
+    hdrs = glob(["**/*.h"]),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+""",
+        sha256 = "16aa87cdf2f86f185ef4927cf525c01bc19138465f0dcf6ef7f66c5a985d671d",
+        strip_prefix = "node-addon-api-8.3.1",
+        urls = ["https://github.com/nodejs/node-addon-api/archive/refs/tags/v8.3.1.tar.gz"],
+    )
 
 def python_repos():
     http_archive(

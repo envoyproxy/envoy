@@ -75,6 +75,7 @@ __pycache__/
 # Node / frontend
 dist
 node_modules
+*.node
 
 # Java/JetBrains
 **/*.iml
