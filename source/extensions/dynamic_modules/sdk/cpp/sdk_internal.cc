@@ -1,11 +1,14 @@
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <span>
+#include <string_view>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
-#include "absl/synchronization/mutex.h"
 #include "sdk.h"
 
 namespace Envoy {
@@ -34,7 +37,7 @@ public:
     return envoy_dynamic_module_callback_http_get_body_size(host_plugin_ptr_, Type);
   }
 
-  void append(absl::string_view data) override {
+  void append(std::string_view data) override {
     if (data.empty()) {
       return;
     }
@@ -64,14 +67,14 @@ template <envoy_dynamic_module_type_http_header_type Type> class HeaderMapImpl :
 public:
   HeaderMapImpl(void* host_plugin_ptr) : host_plugin_ptr_(host_plugin_ptr) {}
 
-  std::vector<absl::string_view> get(absl::string_view key) const override {
+  std::vector<std::string_view> get(std::string_view key) const override {
     size_t value_count = 0;
     auto first_value = getSingleHeader(key, 0, &value_count);
     if (value_count == 0) {
       return {};
     }
 
-    std::vector<absl::string_view> values;
+    std::vector<std::string_view> values;
     values.reserve(value_count);
     values.push_back(first_value);
 
@@ -81,7 +84,7 @@ public:
     return values;
   }
 
-  absl::string_view getOne(absl::string_view key) const override {
+  std::string_view getOne(std::string_view key) const override {
     return getSingleHeader(key, 0, nullptr);
   }
 
@@ -99,19 +102,19 @@ public:
     return result_headers;
   }
 
-  void set(absl::string_view key, absl::string_view value) override {
+  void set(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_set_header(
         host_plugin_ptr_, Type, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  void add(absl::string_view key, absl::string_view value) override {
+  void add(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_add_header(
         host_plugin_ptr_, Type, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  void remove(absl::string_view key) override {
+  void remove(std::string_view key) override {
     envoy_dynamic_module_callback_http_set_header(
         host_plugin_ptr_, Type, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{nullptr, 0});
@@ -124,8 +127,7 @@ public:
 private:
   void* host_plugin_ptr_;
 
-  absl::string_view getSingleHeader(absl::string_view key, size_t index,
-                                    size_t* value_count) const {
+  std::string_view getSingleHeader(std::string_view key, size_t index, size_t* value_count) const {
     BufferView value{nullptr, 0};
 
     bool ret = envoy_dynamic_module_callback_http_get_header(
@@ -208,7 +210,7 @@ private:
 
   std::mutex mutex_;
   uint64_t next_task_id_{1}; // 0 is reserved.
-  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_;
+  std::map<uint64_t, std::function<void()>> tasks_;
 };
 
 using SchedulerImpl = SchedulerImplBase<false>;
@@ -224,8 +226,8 @@ public:
         received_response_body_(host_plugin_ptr), buffered_request_body_(host_plugin_ptr),
         buffered_response_body_(host_plugin_ptr) {}
 
-  absl::optional<absl::string_view> getMetadataString(absl::string_view ns,
-                                                      absl::string_view key) override {
+  std::optional<std::string_view> getMetadataString(std::string_view ns,
+                                                    std::string_view key) override {
     BufferView value{nullptr, 0};
 
     const bool ret = envoy_dynamic_module_callback_http_get_metadata_string(
@@ -240,7 +242,7 @@ public:
     return value.toStringView();
   }
 
-  absl::optional<double> getMetadataNumber(absl::string_view ns, absl::string_view key) override {
+  std::optional<double> getMetadataNumber(std::string_view ns, std::string_view key) override {
     double value = 0.0;
     const bool ret = envoy_dynamic_module_callback_http_get_metadata_number(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
@@ -253,7 +255,7 @@ public:
     return value;
   }
 
-  absl::optional<bool> getMetadataBool(absl::string_view ns, absl::string_view key) override {
+  std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) override {
     bool value = false;
     const bool ret = envoy_dynamic_module_callback_http_get_metadata_bool(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
@@ -266,7 +268,7 @@ public:
     return value;
   }
 
-  std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) override {
+  std::vector<std::string_view> getMetadataKeys(std::string_view ns) override {
     size_t count = envoy_dynamic_module_callback_http_get_metadata_keys_count(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
         envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()});
@@ -280,7 +282,7 @@ public:
     if (!ret) {
       return {};
     }
-    std::vector<absl::string_view> keys;
+    std::vector<std::string_view> keys;
     keys.reserve(count);
     for (size_t i = 0; i < count; i++) {
       keys.emplace_back(buffers[i].ptr, buffers[i].length);
@@ -288,7 +290,7 @@ public:
     return keys;
   }
 
-  std::vector<absl::string_view> getMetadataNamespaces() override {
+  std::vector<std::string_view> getMetadataNamespaces() override {
     size_t count = envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
         host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic);
     if (count == 0) {
@@ -300,7 +302,7 @@ public:
     if (!ret) {
       return {};
     }
-    std::vector<absl::string_view> namespaces;
+    std::vector<std::string_view> namespaces;
     namespaces.reserve(count);
     for (size_t i = 0; i < count; i++) {
       namespaces.emplace_back(buffers[i].ptr, buffers[i].length);
@@ -308,26 +310,26 @@ public:
     return namespaces;
   }
 
-  void setMetadata(absl::string_view ns, absl::string_view key, absl::string_view value) override {
+  void setMetadata(std::string_view ns, std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  void setMetadata(absl::string_view ns, absl::string_view key, double value) override {
+  void setMetadata(std::string_view ns, std::string_view key, double value) override {
     envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
-  void setMetadata(absl::string_view ns, absl::string_view key, bool value) override {
+  void setMetadata(std::string_view ns, std::string_view key, bool value) override {
     envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
-  absl::optional<absl::string_view> getFilterState(absl::string_view key) override {
+  std::optional<std::string_view> getFilterState(std::string_view key) override {
     BufferView value{nullptr, 0};
 
     const bool ret = envoy_dynamic_module_callback_http_get_filter_state_bytes(
@@ -340,13 +342,13 @@ public:
     return value.toStringView();
   }
 
-  void setFilterState(absl::string_view key, absl::string_view value) override {
+  void setFilterState(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_set_filter_state_bytes(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
-  absl::optional<absl::string_view> getAttributeString(AttributeID id) override {
+  std::optional<std::string_view> getAttributeString(AttributeID id) override {
     BufferView value{nullptr, 0};
 
     const bool ret = envoy_dynamic_module_callback_http_filter_get_attribute_string(
@@ -359,7 +361,7 @@ public:
     return value.toStringView();
   }
 
-  absl::optional<uint64_t> getAttributeNumber(AttributeID id) override {
+  std::optional<uint64_t> getAttributeNumber(AttributeID id) override {
     uint64_t value = 0;
     const bool ret = envoy_dynamic_module_callback_http_filter_get_attribute_int(
         host_plugin_ptr_, static_cast<envoy_dynamic_module_type_attribute_id>(id), &value);
@@ -370,7 +372,7 @@ public:
     return value;
   }
 
-  absl::optional<bool> getAttributeBool(AttributeID id) override {
+  std::optional<bool> getAttributeBool(AttributeID id) override {
     bool value = false;
     const bool ret = envoy_dynamic_module_callback_http_filter_get_attribute_bool(
         host_plugin_ptr_, static_cast<envoy_dynamic_module_type_attribute_id>(id), &value);
@@ -381,8 +383,8 @@ public:
     return value;
   }
 
-  void sendLocalResponse(uint32_t status, absl::Span<const HeaderView> headers,
-                         absl::string_view body, absl::string_view detail) override {
+  void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
+                         std::string_view body, std::string_view detail) override {
     envoy_dynamic_module_callback_http_send_response(
         host_plugin_ptr_, status,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -391,7 +393,7 @@ public:
         envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
   }
 
-  void sendResponseHeaders(absl::Span<const HeaderView> headers, bool end_stream) override {
+  void sendResponseHeaders(std::span<const HeaderView> headers, bool end_stream) override {
     envoy_dynamic_module_callback_http_send_response_headers(
         host_plugin_ptr_,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -399,13 +401,13 @@ public:
         headers.size(), end_stream);
   }
 
-  void sendResponseData(absl::string_view body, bool end_stream) override {
+  void sendResponseData(std::string_view body, bool end_stream) override {
     envoy_dynamic_module_callback_http_send_response_data(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
         end_stream);
   }
 
-  void sendResponseTrailers(absl::Span<const HeaderView> trailers) override {
+  void sendResponseTrailers(std::span<const HeaderView> trailers) override {
     envoy_dynamic_module_callback_http_send_response_trailers(
         host_plugin_ptr_,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -413,7 +415,7 @@ public:
         trailers.size());
   }
 
-  void addCustomFlag(absl::string_view flag) override {
+  void addCustomFlag(std::string_view flag) override {
     envoy_dynamic_module_callback_http_add_custom_flag(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{flag.data(), flag.size()});
   }
@@ -470,9 +472,10 @@ public:
     return scheduler_;
   }
 
-  std::pair<HttpCalloutInitResult, uint64_t>
-  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
-              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) override {
+  std::pair<HttpCalloutInitResult, uint64_t> httpCallout(std::string_view cluster,
+                                                         std::span<const HeaderView> headers,
+                                                         std::string_view body, uint64_t timeout_ms,
+                                                         HttpCalloutCallback& cb) override {
     uint64_t callout_id_out = 0;
     auto result = envoy_dynamic_module_callback_http_filter_http_callout(
         host_plugin_ptr_, &callout_id_out,
@@ -490,8 +493,8 @@ public:
   }
 
   std::pair<HttpCalloutInitResult, uint64_t>
-  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
-                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+  startHttpStream(std::string_view cluster, std::span<const HeaderView> headers,
+                  std::string_view body, bool end_of_stream, uint64_t timeout_ms,
                   HttpStreamCallback& cb) override {
     uint64_t stream_id_out = 0;
     auto result = envoy_dynamic_module_callback_http_filter_start_http_stream(
@@ -509,13 +512,13 @@ public:
     return {static_cast<HttpCalloutInitResult>(result), stream_id_out};
   }
 
-  bool sendHttpStreamData(uint64_t stream_id, absl::string_view body, bool end_of_stream) override {
+  bool sendHttpStreamData(uint64_t stream_id, std::string_view body, bool end_of_stream) override {
     return envoy_dynamic_module_callback_http_stream_send_data(
         host_plugin_ptr_, stream_id,
         envoy_dynamic_module_type_module_buffer{body.data(), body.size()}, end_of_stream);
   }
 
-  bool sendHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {
+  bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) override {
     return envoy_dynamic_module_callback_http_stream_send_trailers(
         host_plugin_ptr_, stream_id,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -534,7 +537,7 @@ public:
   void clearDownstreamWatermarkCallbacks() override { downstream_watermark_callbacks_ = nullptr; }
 
   MetricsResult recordHistogramValue(MetricID id, uint64_t value,
-                                     absl::Span<const BufferView> tags_values) override {
+                                     std::span<const BufferView> tags_values) override {
     return static_cast<MetricsResult>(
         envoy_dynamic_module_callback_http_filter_record_histogram_value(
             host_plugin_ptr_, id,
@@ -545,7 +548,7 @@ public:
   }
 
   MetricsResult setGaugeValue(MetricID id, uint64_t value,
-                              absl::Span<const BufferView> tags_values) override {
+                              std::span<const BufferView> tags_values) override {
     return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_set_gauge(
         host_plugin_ptr_, id,
         const_cast<envoy_dynamic_module_type_module_buffer*>(
@@ -554,7 +557,7 @@ public:
   }
 
   MetricsResult incrementGaugeValue(MetricID id, uint64_t value,
-                                    absl::Span<const BufferView> tags_values) override {
+                                    std::span<const BufferView> tags_values) override {
     return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_increment_gauge(
         host_plugin_ptr_, id,
         const_cast<envoy_dynamic_module_type_module_buffer*>(
@@ -563,7 +566,7 @@ public:
   }
 
   MetricsResult decrementGaugeValue(MetricID id, uint64_t value,
-                                    absl::Span<const BufferView> tags_values) override {
+                                    std::span<const BufferView> tags_values) override {
     return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_decrement_gauge(
         host_plugin_ptr_, id,
         const_cast<envoy_dynamic_module_type_module_buffer*>(
@@ -572,7 +575,7 @@ public:
   }
 
   MetricsResult incrementCounterValue(MetricID id, uint64_t value,
-                                      absl::Span<const BufferView> tags_values) override {
+                                      std::span<const BufferView> tags_values) override {
     return static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_increment_counter(
         host_plugin_ptr_, id,
         const_cast<envoy_dynamic_module_type_module_buffer*>(
@@ -583,7 +586,7 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, absl::string_view message) override {
+  void log(LogLevel level, std::string_view message) override {
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
@@ -602,8 +605,8 @@ public:
 
   std::shared_ptr<SchedulerImpl> scheduler_;
 
-  absl::flat_hash_map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
-  absl::flat_hash_map<uint64_t, HttpStreamCallback*> stream_callbacks_;
+  std::map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
+  std::map<uint64_t, HttpStreamCallback*> stream_callbacks_;
 
   DownstreamWatermarkCallbacks* downstream_watermark_callbacks_ = nullptr;
 
@@ -618,7 +621,7 @@ public:
   HttpFilterConfigHandleImpl(void* host_config_ptr) : host_config_ptr_(host_config_ptr) {}
 
   std::pair<MetricID, MetricsResult>
-  defineHistogram(absl::string_view name, absl::Span<const BufferView> tags_keys) override {
+  defineHistogram(std::string_view name, std::span<const BufferView> tags_keys) override {
     size_t metric_id = 0;
     auto result = static_cast<MetricsResult>(
         envoy_dynamic_module_callback_http_filter_config_define_histogram(
@@ -629,8 +632,8 @@ public:
     return {metric_id, result};
   }
 
-  std::pair<MetricID, MetricsResult> defineGauge(absl::string_view name,
-                                                 absl::Span<const BufferView> tags_keys) override {
+  std::pair<MetricID, MetricsResult> defineGauge(std::string_view name,
+                                                 std::span<const BufferView> tags_keys) override {
     size_t metric_id = 0;
     auto result =
         static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_config_define_gauge(
@@ -641,8 +644,8 @@ public:
     return {metric_id, result};
   }
 
-  std::pair<MetricID, MetricsResult>
-  defineCounter(absl::string_view name, absl::Span<const BufferView> tags_keys) override {
+  std::pair<MetricID, MetricsResult> defineCounter(std::string_view name,
+                                                   std::span<const BufferView> tags_keys) override {
     size_t metric_id = 0;
     auto result =
         static_cast<MetricsResult>(envoy_dynamic_module_callback_http_filter_config_define_counter(
@@ -656,15 +659,16 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, absl::string_view message) override {
+  void log(LogLevel level, std::string_view message) override {
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
   }
 
-  std::pair<HttpCalloutInitResult, uint64_t>
-  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
-              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) override {
+  std::pair<HttpCalloutInitResult, uint64_t> httpCallout(std::string_view cluster,
+                                                         std::span<const HeaderView> headers,
+                                                         std::string_view body, uint64_t timeout_ms,
+                                                         HttpCalloutCallback& cb) override {
     uint64_t callout_id_out = 0;
     auto result = envoy_dynamic_module_callback_http_filter_config_http_callout(
         host_config_ptr_, &callout_id_out,
@@ -681,8 +685,8 @@ public:
   }
 
   std::pair<HttpCalloutInitResult, uint64_t>
-  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
-                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+  startHttpStream(std::string_view cluster, std::span<const HeaderView> headers,
+                  std::string_view body, bool end_of_stream, uint64_t timeout_ms,
                   HttpStreamCallback& cb) override {
     uint64_t stream_id_out = 0;
     auto result = envoy_dynamic_module_callback_http_filter_config_start_http_stream(
@@ -699,13 +703,13 @@ public:
     return {static_cast<HttpCalloutInitResult>(result), stream_id_out};
   }
 
-  bool sendHttpStreamData(uint64_t stream_id, absl::string_view body, bool end_of_stream) override {
+  bool sendHttpStreamData(uint64_t stream_id, std::string_view body, bool end_of_stream) override {
     return envoy_dynamic_module_callback_http_filter_config_stream_send_data(
         host_config_ptr_, stream_id,
         envoy_dynamic_module_type_module_buffer{body.data(), body.size()}, end_of_stream);
   }
 
-  bool sendHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {
+  bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) override {
     return envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
         host_config_ptr_, stream_id,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -724,8 +728,10 @@ public:
     return scheduler_;
   }
 
-  absl::flat_hash_map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
-  absl::flat_hash_map<uint64_t, HttpStreamCallback*> stream_callbacks_;
+  // Use map because we expect the number of concurrent callouts/streams to be
+  // very small.
+  std::map<uint64_t, HttpCalloutCallback*> callout_callbacks_;
+  std::map<uint64_t, HttpStreamCallback*> stream_callbacks_;
   std::shared_ptr<ConfigSchedulerImpl> scheduler_;
 
 private:
@@ -738,7 +744,7 @@ public:
     return envoy_dynamic_module_callback_log_enabled(
         static_cast<envoy_dynamic_module_type_log_level>(level));
   }
-  void log(LogLevel level, absl::string_view message) {
+  void log(LogLevel level, std::string_view message) {
     return envoy_dynamic_module_callback_log(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()});
@@ -775,8 +781,8 @@ envoy_dynamic_module_on_http_filter_config_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   auto config_handle = std::make_unique<HttpFilterConfigHandleImpl>(filter_config_envoy_ptr);
-  absl::string_view name_view(name.ptr, name.length);
-  absl::string_view config_view(config.ptr, config.length);
+  std::string_view name_view(name.ptr, name.length);
+  std::string_view config_view(config.ptr, config.length);
 
   auto config_factory = HttpFilterConfigFactoryRegistry::getRegistry().find(name_view);
   if (config_factory == HttpFilterConfigFactoryRegistry::getRegistry().end()) {
@@ -808,8 +814,8 @@ void envoy_dynamic_module_on_http_filter_config_destroy(
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_on_http_filter_per_route_config_new(
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  absl::string_view name_view(name.ptr, name.length);
-  absl::string_view config_view(config.ptr, config.length);
+  std::string_view name_view(name.ptr, name.length);
+  std::string_view config_view(config.ptr, config.length);
 
   auto config_factory = HttpFilterConfigFactoryRegistry::getRegistry().find(name_view);
   if (config_factory == HttpFilterConfigFactoryRegistry::getRegistry().end()) {
