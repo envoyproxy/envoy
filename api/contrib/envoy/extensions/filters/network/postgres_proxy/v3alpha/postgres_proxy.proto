@@ -83,7 +83,7 @@ message PostgresProxy {
 
   // Maximum TLS record size in bytes for the downstream connection. When set, the filter
   // configures the downstream TLS transport socket to limit the size of TLS records to this
-  // value via filter state. This is useful for working around bugs in clients like libpq
+  // value via filter state. This is useful for working around bugs in clients like ``libpq``
   // that cannot handle TLS records larger than a certain size (e.g. 8192 bytes).
   // If not specified, the default TLS maximum record size of 16384 bytes is used.
   google.protobuf.UInt32Value max_downstream_tls_record_size_bytes = 6;

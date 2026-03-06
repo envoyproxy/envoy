@@ -1005,7 +1005,6 @@ lenenc
 lexically
 libc
 libevent
-libpq
 libprotobuf
 librdkafka
 libtool

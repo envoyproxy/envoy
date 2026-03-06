@@ -612,6 +612,6 @@ new_features:
     Added :ref:`max_downstream_tls_record_size_bytes
     <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.max_downstream_tls_record_size_bytes>`
     to the postgres proxy filter to allow limiting TLS record sizes on the downstream connection via filter state.
-    This is useful for working around bugs in clients like libpq that cannot handle large TLS records.
+    This is useful for working around bugs in clients like ``libpq`` that cannot handle large TLS records.
 
 deprecated:

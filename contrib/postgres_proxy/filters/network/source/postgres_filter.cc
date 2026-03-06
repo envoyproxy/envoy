@@ -59,7 +59,7 @@ void PostgresFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
             config_->max_downstream_tls_record_size_bytes_.value()),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-    ENVOY_CONN_LOG(debug, "postgres_proxy: set TLS record size limit to {} bytes via filter state",
+    ENVOY_CONN_LOG(trace, "postgres_proxy: set TLS record size limit to {} bytes via filter state",
                    read_callbacks_->connection(),
                    config_->max_downstream_tls_record_size_bytes_.value());
   }
