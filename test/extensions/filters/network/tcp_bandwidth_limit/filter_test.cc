@@ -23,7 +23,7 @@ namespace TcpBandwidthLimit {
 class TcpBandwidthLimitFilterTest : public ::testing::Test {
 public:
   Buffer::WatermarkBuffer& getDownloadBuffer() { return filter_->download_buffer_; }
-  Buffer::OwnedImpl& getUploadBuffer() { return filter_->upload_buffer_; }
+  Buffer::WatermarkBuffer& getUploadBuffer() { return filter_->upload_buffer_; }
   Event::TimerPtr& getDownloadTimer() { return filter_->download_timer_; }
   Event::TimerPtr& getUploadTimer() { return filter_->upload_timer_; }
 
@@ -37,6 +37,7 @@ public:
 
     // Set a buffer limit so the WatermarkBuffer watermarks are active.
     ON_CALL(read_filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(1));
+    ON_CALL(write_filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(1));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }
@@ -88,6 +89,7 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadLimit) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data1, false));
 
   Buffer::OwnedImpl data2(std::string(512, 'b'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
 
   // Verify download passes through (no download limit configured)
@@ -135,6 +137,7 @@ TEST_F(TcpBandwidthLimitFilterTest, BothLimitsConfigured) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(download_data2, false));
 
   Buffer::OwnedImpl upload_data2(std::string(512, 'd'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(upload_data2, false));
 }
 
@@ -173,6 +176,7 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialConsumptionUpload) {
   Buffer::OwnedImpl large_data(std::string(2048, 'b'));
 
   Buffer::OwnedImpl written_data;
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
@@ -225,6 +229,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllUpload) {
   setup(yaml);
 
   Buffer::OwnedImpl data(std::string(1024, 'b'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
   EXPECT_EQ(0, data.length());
@@ -322,6 +327,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDataScenarios) {
   Buffer::OwnedImpl upload_data(std::string(2048, 'b'));
   Buffer::OwnedImpl written_data;
 
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
@@ -454,11 +460,14 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data1, false));
 
   Buffer::OwnedImpl data2(std::string(100, 'b'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   ON_CALL(*timer, enableTimer(std::chrono::milliseconds(50), _)).WillByDefault(testing::Return());
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
 
   ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillByDefault(testing::Return());
+  ON_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark())
       .WillByDefault(testing::Return());
 
   filter_->onUploadTokenTimer();
@@ -500,6 +509,7 @@ TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(download_data, false));
 
   Buffer::OwnedImpl upload_data(std::string(512, 'b'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   ON_CALL(*upload_timer, enableTimer(std::chrono::milliseconds(50), _))
       .WillByDefault(testing::Return());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(upload_data, false));
@@ -595,6 +605,7 @@ TEST_F(TcpBandwidthLimitFilterTest, StatsIncrement) {
                       .value());
 
   Buffer::OwnedImpl large_upload(std::string(2048, 'd'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   filter_->onWrite(large_upload, false);
   EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_enabled").value());
   EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_throttled").value());
@@ -709,6 +720,7 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionUpload) {
   Buffer::OwnedImpl data2(std::string(500, 'b'));
 
   Buffer::OwnedImpl written_data;
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(Invoke([&written_data](Buffer::Instance& data, bool) { written_data.move(data); }));
 
@@ -810,6 +822,33 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerDrainsBufferAndReEnablesRead) {
   EXPECT_EQ(nullptr, getDownloadTimer());
 }
 
+TEST_F(TcpBandwidthLimitFilterTest, UploadTimerDrainsBufferAndSignalsLowWatermark) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    upload_limit_kbps: 1
+    fill_interval:
+      seconds: 0
+      nanos: 50000000
+  )EOF";
+
+  setup(yaml);
+
+  Buffer::OwnedImpl data(std::string(2048, 'x'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  // Advance time so the token bucket refills
+  time_source_.advanceTimeWait(std::chrono::milliseconds(1100));
+
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
+  filter_->onUploadTokenTimer();
+
+  EXPECT_EQ(0, getUploadBuffer().length());
+  EXPECT_EQ(nullptr, getUploadTimer());
+}
+
 TEST_F(TcpBandwidthLimitFilterTest, UploadTimerResetPath) {
   const std::string yaml = R"EOF(
     stat_prefix: test
@@ -824,6 +863,7 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerResetPath) {
   // First trigger buffering
   Buffer::OwnedImpl data(std::string(2048, 'x'));
   auto* timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(50), nullptr));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
@@ -871,6 +911,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
 
   setup(yaml);
 
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   getUploadBuffer().add("test data");
   getUploadTimer().reset(new Event::MockTimer());
 
@@ -878,6 +919,7 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
 
   EXPECT_CALL(write_filter_callbacks_,
               injectWriteDataToFilterChain(BufferStringEqual("test data"), false));
+  EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
 
   filter_->onUploadTokenTimer();
 

@@ -102,6 +102,7 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
   void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
     write_callbacks_ = &callbacks;
+    upload_buffer_.setWatermarks(callbacks.connection().bufferLimit());
   }
 
   void onDownloadTokenTimer();
@@ -114,6 +115,8 @@ private:
   void processBufferedUploadData();
   void onDownloadBufferLowWatermark();
   void onDownloadBufferHighWatermark();
+  void onUploadBufferLowWatermark();
+  void onUploadBufferHighWatermark();
 
   FilterConfigSharedPtr config_;
 
@@ -122,7 +125,7 @@ private:
 
   // Buffered data waiting for tokens
   Buffer::WatermarkBuffer download_buffer_;
-  Buffer::OwnedImpl upload_buffer_;
+  Buffer::WatermarkBuffer upload_buffer_;
 
   // Timers for processing buffered data
   Event::TimerPtr download_timer_;

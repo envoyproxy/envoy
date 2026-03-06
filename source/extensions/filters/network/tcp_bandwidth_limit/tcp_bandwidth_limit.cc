@@ -44,7 +44,9 @@ TcpBandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, St
 TcpBandwidthLimitFilter::TcpBandwidthLimitFilter(FilterConfigSharedPtr config)
     : config_(config),
       download_buffer_([this]() { onDownloadBufferLowWatermark(); },
-                       [this]() { onDownloadBufferHighWatermark(); }, []() -> void {}) {}
+                       [this]() { onDownloadBufferHighWatermark(); }, []() -> void {}),
+      upload_buffer_([this]() { onUploadBufferLowWatermark(); },
+                     [this]() { onUploadBufferHighWatermark(); }, []() -> void {}) {}
 
 TcpBandwidthLimitFilter::~TcpBandwidthLimitFilter() {
   if (download_timer_) {
@@ -151,6 +153,14 @@ void TcpBandwidthLimitFilter::onDownloadBufferHighWatermark() {
 
 void TcpBandwidthLimitFilter::onDownloadBufferLowWatermark() {
   read_callbacks_->connection().readDisable(false);
+}
+
+void TcpBandwidthLimitFilter::onUploadBufferHighWatermark() {
+  write_callbacks_->onAboveWriteBufferHighWatermark();
+}
+
+void TcpBandwidthLimitFilter::onUploadBufferLowWatermark() {
+  write_callbacks_->onBelowWriteBufferLowWatermark();
 }
 
 void TcpBandwidthLimitFilter::processBufferedDownloadData() {

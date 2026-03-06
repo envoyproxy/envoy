@@ -105,7 +105,7 @@ public:
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
-  bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
+  bool aboveHighWatermark() const override { return above_high_watermark_count_ > 0; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
@@ -257,7 +257,6 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
-  bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
   bool read_end_stream_raised_ : 1;
