@@ -2032,6 +2032,23 @@ TEST(Utility, isValidRefererValue) {
   EXPECT_FALSE(
       Utility::isValidRefererValue(absl::string_view("http://www.example.com/?foo=bar#fragment")));
   EXPECT_FALSE(Utility::isValidRefererValue(absl::string_view("foo=bar#fragment")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://my-example.com")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("http://my_example.com")));
+  EXPECT_TRUE(Utility::isValidRefererValue(
+      absl::string_view("http://sub-domain.example.com/path")));
+  EXPECT_TRUE(Utility::isValidRefererValue(
+      absl::string_view("http://sub_domain.example.com/path")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/my-path/page")));
+  EXPECT_TRUE(
+      Utility::isValidRefererValue(absl::string_view("http://www.example.com/my_path/page")));
+  EXPECT_TRUE(Utility::isValidRefererValue(
+      absl::string_view("http://www.example.com/path?my-key=my-value")));
+  EXPECT_TRUE(Utility::isValidRefererValue(
+      absl::string_view("http://www.example.com/path?my_key=my_value")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("my-relative/path")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("my_relative/path")));
+  EXPECT_TRUE(Utility::isValidRefererValue(absl::string_view("/my-path/my_file.html")));
 };
 TEST(HeaderIsValidTest, SchemeIsValid) {
   EXPECT_TRUE(Utility::schemeIsValid("http"));
