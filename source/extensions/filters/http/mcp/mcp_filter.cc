@@ -275,42 +275,42 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return Http::FilterDataStatus::Continue;
   }
 
-  const size_t chunk_size = data.length();
-
-  ENVOY_LOG(trace, "decodeData: chunk_size={}, total_parsed={}, end_stream={}", chunk_size,
+  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
             bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
 
-  size_t to_parse = chunk_size;
-  if (max_size > 0) {
-    size_t remaining_limit = max_size - bytes_parsed_;
-    to_parse = std::min(chunk_size, remaining_limit);
-  }
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    const char* start = static_cast<const char*>(slice.mem_);
+    size_t len = slice.len_;
 
-  const char* linearized = static_cast<const char*>(data.linearize(to_parse));
-  absl::string_view parse_view(linearized, to_parse);
+    if (max_size > 0) {
+      len = std::min(len, static_cast<size_t>(max_size - bytes_parsed_));
+    }
 
-  // The partial parser will return an OK status if the requirements are not satisfied.
-  // It will potentially be a bad status due to the partial parse if all the requirements
-  // are extracted.
-  auto status = parser_->parse(parse_view);
-  bytes_parsed_ += to_parse;
+    if (len > 0) {
+      auto status = parser_->parse({start, len});
+      bytes_parsed_ += len;
 
-  if (parser_->isAllFieldsCollected()) {
-    ENVOY_LOG(debug, "mcp early parse termination: found all fields");
-    return completeParsing();
-  }
+      if (parser_->isAllFieldsCollected()) {
+        ENVOY_LOG(debug, "mcp early parse termination: found all fields");
+        return completeParsing();
+      }
 
-  // A non-JSON data is received
-  if (!status.ok()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                       absl::nullopt, "mcp_filter_not_jsonrpc");
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+      if (!status.ok()) {
+        config_->stats().invalid_json_.inc();
+        decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
+                                           absl::nullopt, "mcp_filter_not_jsonrpc");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+    }
+
+    if (max_size > 0 && bytes_parsed_ == max_size)
+      break;
   }
 
   // If we are here, we haven't collected all fields yet.
-  bool size_limit_hit = (max_size > 0 && bytes_parsed_ >= max_size);
+  bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {

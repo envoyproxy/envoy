@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -16,20 +17,24 @@ import (
 
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
-		"passthrough":               &PassthroughConfigFactory{},
-		"header_callbacks":          &HeaderCallbacksConfigFactory{},
-		"per_route_config":          &PerRouteConfigFactory{},
-		"body_callbacks":            &BodyCallbacksConfigFactory{},
-		"http_callouts":             &HttpCalloutsConfigFactory{},
-		"send_response":             &SendResponseConfigFactory{},
-		"http_filter_scheduler":     &HttpFilterSchedulerConfigFactory{},
-		"fake_external_cache":       &FakeExternalCacheConfigFactory{},
-		"stats_callbacks":           &StatsCallbacksConfigFactory{},
-		"streaming_terminal_filter": &StreamingTerminalConfigFactory{},
-		"http_stream_basic":         &HttpStreamBasicConfigFactory{},
-		"http_stream_bidirectional": &HttpStreamBidirectionalConfigFactory{},
-		"upstream_reset":            &UpstreamResetConfigFactory{},
-		"http_config_scheduler":     &ConfigSchedulerConfigFactory{},
+		"passthrough":                  &PassthroughConfigFactory{},
+		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
+		"header_callbacks":             &HeaderCallbacksConfigFactory{},
+		"per_route_config":             &PerRouteConfigFactory{},
+		"body_callbacks":               &BodyCallbacksConfigFactory{},
+		"http_callouts":                &HttpCalloutsConfigFactory{},
+		"send_response":                &SendResponseConfigFactory{},
+		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
+		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
+		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
+		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
+		"http_stream_bidirectional":    &HttpStreamBidirectionalConfigFactory{},
+		"upstream_reset":               &UpstreamResetConfigFactory{},
+		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
+		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
+		"http_config_stream":           &HttpConfigStreamConfigFactory{},
+		"http_struct_config":           &HttpStructConfigFactory{},
 	})
 }
 
@@ -52,11 +57,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 	sharedStatus := new(atomic.Bool)
 	sharedStatus.Store(false)
 
-	// TODO(wbpcode): to support the actual config scheduler in golang SDK.
-	go func() {
+	handle.GetScheduler().Schedule(func() {
 		time.Sleep(100 * time.Millisecond)
 		sharedStatus.Store(true)
-	}()
+	})
 
 	return &ConfigSchedulerFilterFactory{sharedStatus: sharedStatus}, nil
 }
@@ -64,6 +68,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 type ConfigSchedulerFilterFactory struct {
 	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
+}
+
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
 }
 
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
@@ -176,6 +184,40 @@ type HeaderCallbacksFilter struct {
 	reqTrailersCalled bool
 	resHeadersCalled  bool
 	resTrailersCalled bool
+}
+
+type HeaderCallbacksOnCreationConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HeaderCallbacksOnCreationConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	headersToAdd := make(map[string]string)
+	str := string(config)
+	parts := strings.Split(str, ",")
+	for _, part := range parts {
+		kv := strings.Split(part, ":")
+		if len(kv) == 2 {
+			headersToAdd[kv[0]] = kv[1]
+		}
+	}
+	return &HeaderCallbacksOnCreationFilterFactory{headersToAdd: headersToAdd}, nil
+}
+
+type HeaderCallbacksOnCreationFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	headersToAdd map[string]string
+}
+
+func (f *HeaderCallbacksOnCreationFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.headersToAdd {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &HeaderCallbacksOnCreationFilter{}
+}
+
+type HeaderCallbacksOnCreationFilter struct {
+	shared.EmptyHttpFilter
 }
 
 func assert(cond bool, msg string) {
@@ -1129,4 +1171,161 @@ func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64) {}
 func (p *UpstreamResetFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {
 	assertEq(id, p.streamID, "id")
 	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), "")
+}
+
+// -----------------------------------------------------------------------------
+// HttpConfigCallout: One-shot HTTP callout initiated at config creation time.
+// The callout result is stored in the factory and checked by each filter.
+// -----------------------------------------------------------------------------
+
+type HttpConfigCalloutConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpConfigCalloutConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	factory := &HttpConfigCalloutFilterFactory{
+		calloutDone: new(atomic.Bool),
+	}
+	res, _ := handle.HttpCallout(
+		string(config),
+		[][2]string{{":path", "/config-init"}, {":method", "GET"}, {"host", "example.com"}},
+		nil, 1000,
+		factory,
+	)
+	if res != shared.HttpCalloutInitSuccess {
+		return nil, fmt.Errorf("config callout init failed: %v", res)
+	}
+	return factory, nil
+}
+
+type HttpConfigCalloutFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	calloutDone *atomic.Bool
+}
+
+func (f *HttpConfigCalloutFilterFactory) OnHttpCalloutDone(calloutID uint64,
+	result shared.HttpCalloutResult,
+	headers [][2]shared.UnsafeEnvoyBuffer, body []shared.UnsafeEnvoyBuffer) {
+	if result == shared.HttpCalloutSuccess {
+		f.calloutDone.Store(true)
+	}
+}
+
+func (f *HttpConfigCalloutFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &HttpConfigCalloutFilter{handle: handle, calloutDone: f.calloutDone}
+}
+
+type HttpConfigCalloutFilter struct {
+	shared.EmptyHttpFilter
+	handle      shared.HttpFilterHandle
+	calloutDone *atomic.Bool
+}
+
+func (p *HttpConfigCalloutFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if p.calloutDone.Load() {
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, "")
+	} else {
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, "")
+	}
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
+// HttpConfigStream: HTTP stream initiated at config creation time.
+// The stream completion is stored and checked by each filter.
+// -----------------------------------------------------------------------------
+
+type HttpConfigStreamConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpConfigStreamConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	factory := &HttpConfigStreamFilterFactory{
+		streamDone: new(atomic.Bool),
+	}
+	res, _ := handle.StartHttpStream(
+		string(config),
+		[][2]string{{":path", "/config-stream"}, {":method", "GET"}, {"host", "example.com"}},
+		nil, true, 1000,
+		factory,
+	)
+	if res != shared.HttpCalloutInitSuccess {
+		return nil, fmt.Errorf("config stream init failed: %v", res)
+	}
+	return factory, nil
+}
+
+type HttpConfigStreamFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	streamDone *atomic.Bool
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamHeaders(id uint64,
+	headers [][2]shared.UnsafeEnvoyBuffer, end bool) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamData(id uint64,
+	body []shared.UnsafeEnvoyBuffer, end bool) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamTrailers(id uint64,
+	trailers [][2]shared.UnsafeEnvoyBuffer) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamComplete(id uint64) {
+	f.streamDone.Store(true)
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamReset(id uint64,
+	reason shared.HttpStreamResetReason) {
+}
+
+func (f *HttpConfigStreamFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &HttpConfigStreamFilter{handle: handle, streamDone: f.streamDone}
+}
+
+type HttpConfigStreamFilter struct {
+	shared.EmptyHttpFilter
+	handle     shared.HttpFilterHandle
+	streamDone *atomic.Bool
+}
+
+func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if p.streamDone.Load() {
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, "")
+	} else {
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
+	}
+	return shared.HeadersStatusStop
+}
+
+type HttpStructConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpStructConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// Parse config as JSON
+	var cfg map[string]string = make(map[string]string)
+	err := json.Unmarshal(config, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON config: %v", err)
+	}
+	return &HttpStructFilterFactory{cfg: cfg}, nil
+}
+
+type HttpStructFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cfg map[string]string
+}
+
+func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.cfg {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &shared.EmptyHttpFilter{}
 }

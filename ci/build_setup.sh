@@ -78,13 +78,9 @@ _bazel="$(which bazel)"
 case $CI_TARGET in
     config|docs|verify_examples)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-docs}"
-        # workaround rules_rust bug
-        export CARGO_BAZEL_REPIN=true
         ;;
     external)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
-        # workaround rules_rust bug
-        export CARGO_BAZEL_REPIN=true
         ;;
     *)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base}"

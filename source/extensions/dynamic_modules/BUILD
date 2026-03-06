@@ -32,6 +32,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ],
+    alwayslink = True,
 )
 
 go_library(
