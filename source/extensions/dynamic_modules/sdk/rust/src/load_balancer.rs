@@ -191,6 +191,11 @@ pub trait EnvoyLoadBalancer {
   /// `strict` is true, the load balancer should return no host if the override is not valid.
   /// Only valid during choose_host callback.
   fn context_get_override_host(&self) -> Option<(String, bool)>;
+
+  /// Adds a response header to be sent downstream after the upstream response is received.
+  /// Multiple calls will add multiple headers. The header values are copied.
+  /// Only valid during choose_host callback.
+  fn context_add_response_header(&self, key: &str, value: &str);
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -813,6 +818,28 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       }
     } else {
       None
+    }
+  }
+
+  fn context_add_response_header(&self, key: &str, value: &str) {
+    if self.context_ptr.is_null() {
+      return;
+    }
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let value_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_add_response_header(
+        self.lb_ptr,
+        self.context_ptr,
+        key_buf,
+        value_buf,
+      );
     }
   }
 }

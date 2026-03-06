@@ -836,6 +836,18 @@ TEST(CommonAbiImplTest, LbGetHostCounterStatEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for lb_context_add_response_header triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbContextAddResponseHeaderEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer key = {"x-test", 6};
+  envoy_dynamic_module_type_module_buffer value = {"val", 3};
+  EXPECT_ENVOY_BUG(
+      {
+        envoy_dynamic_module_callback_lb_context_add_response_header(nullptr, nullptr, key, value);
+      },
+      "not implemented in this context");
+}
+
 // =====================================================================
 // Matcher weak symbol stub tests
 // =====================================================================

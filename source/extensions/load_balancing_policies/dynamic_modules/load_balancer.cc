@@ -1,5 +1,7 @@
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
+#include "envoy/http/header_map.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -47,6 +49,19 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   uint32_t host_index = 0;
   bool selected = config_->on_choose_host_(this, in_module_lb_, context, &priority, &host_index);
 
+  // Apply any response headers accumulated during on_choose_host.
+  if (!pending_response_headers_.empty()) {
+    if (context != nullptr) {
+      context->setHeadersModifier([headers = std::move(pending_response_headers_)](
+                                      Http::ResponseHeaderMap& response_headers) {
+        for (const auto& [key, value] : headers) {
+          response_headers.addCopy(Http::LowerCaseString(key), value);
+        }
+      });
+    }
+    pending_response_headers_.clear();
+  }
+
   if (!selected) {
     return {nullptr};
   }
@@ -67,6 +82,10 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   return {healthy_hosts[host_index]};
+}
+
+void DynamicModuleLoadBalancer::addPendingResponseHeader(std::string key, std::string value) {
+  pending_response_headers_.emplace_back(std::move(key), std::move(value));
 }
 
 Upstream::HostConstSharedPtr
