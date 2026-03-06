@@ -1,7 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
-load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 
 # NOTE: This file is used to package the Envoy Mobile Python APIs for PyPI.
 # The core logic is in C++, and we use pybind11 to create a native extension.
@@ -14,6 +13,16 @@ package(default_visibility = ["//visibility:public"])
 string_flag(
     name = "python_platform",
     build_setting_default = "any",
+)
+
+string_flag(
+    name = "python_tag",
+    build_setting_default = "py3",
+)
+
+string_flag(
+    name = "abi_tag",
+    build_setting_default = "none",
 )
 
 config_setting(
@@ -99,7 +108,7 @@ py_package(
 # --//library/python:python_platform=manylinux2014_x86_64
 py_wheel(
     name = "envoy_mobile_wheel",
-    abi = abi_tag(),
+    abi = ":abi_tag",
     distribution = "envoy-mobile",
     platform = select({
         ":is_linux_x86_64": "manylinux2014_x86_64",
@@ -107,7 +116,7 @@ py_wheel(
         ":is_macos_arm64": "macosx_11_0_arm64",
         "//conditions:default": "any",
     }),
-    python_tag = python_tag(),
+    python_tag = ":python_tag",
     strip_path_prefixes = [
         "mobile/library/python",
         "library/python",
@@ -115,4 +124,29 @@ py_wheel(
     version = "0.5.0",
     visibility = ["//visibility:public"],
     deps = [":envoy_mobile_package"],
+)
+
+# Tests
+py_library(
+    name = "echo_test_server",
+    srcs = ["tests/echo_test_server.py"],
+)
+
+py_test(
+    name = "fetch_test",
+    srcs = ["tests/fetch_test.py"],
+    main = "tests/fetch_test.py",
+    deps = [
+        ":echo_test_server",
+        ":envoy_mobile_lib",
+    ],
+)
+
+py_test(
+    name = "lifecycle_test",
+    srcs = ["tests/lifecycle_test.py"],
+    main = "tests/lifecycle_test.py",
+    deps = [
+        ":envoy_mobile_lib",
+    ],
 )

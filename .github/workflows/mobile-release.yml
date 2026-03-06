@@ -93,9 +93,13 @@ jobs:
         include:
         - target: python-wheel-linux
           platform_flag: manylinux2014_x86_64
+          python_tag: cp312
+          abi_tag: cp312
           os: ubuntu-22.04
         - target: python-wheel-macos
           platform_flag: macosx_11_0_arm64
+          python_tag: cp312
+          abi_tag: cp312
           os: macos-12
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
@@ -106,6 +110,8 @@ jobs:
         --config=mobile-rbe
         --config=mobile-release
         --//library/python:python_platform=${{ matrix.platform_flag }}
+        --//library/python:python_tag=${{ matrix.python_tag }}
+        --//library/python:abi_tag=${{ matrix.abi_tag }}
         //library/python:envoy_mobile_wheel
       container: ${{ fromJSON(needs.env.outputs.build-image).mobile }}
       container-output: |
