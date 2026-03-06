@@ -69,6 +69,7 @@ public:
         : latency_(latency), call_status_(call_status) {}
     const std::chrono::microseconds latency_;
     const Grpc::Status::GrpcStatus call_status_;
+    uint32_t size_;
   };
 
   // gRPC call stats for body.
@@ -80,6 +81,7 @@ public:
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
           max_latency_(max_latency), min_latency_(min_latency) {}
     uint32_t call_count_;
+    uint32_t total_bytes_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
     std::chrono::microseconds max_latency_;
@@ -156,6 +158,41 @@ public:
 
   FieldType getField(absl::string_view field_name) const override;
 
+  // Struct to hold various traffic metrics for a request/response flow.
+  struct HttpEventTrafficStats {
+    // Request Headers
+    uint64_t request_header_bytes_sent = 0;
+    uint64_t request_header_bytes_received = 0;
+
+    // Response Headers
+    uint64_t response_header_bytes_sent = 0;
+    uint64_t response_header_bytes_received = 0;
+
+    // Request Body
+    uint64_t request_body_bytes_sent = 0;
+    uint64_t request_body_bytes_received = 0;
+    uint64_t request_body_chunks_sent = 0;
+    uint64_t request_body_chunks_received = 0;
+
+    // Response Body
+    uint64_t response_body_bytes_sent = 0;
+    uint64_t response_body_bytes_received = 0;
+    uint64_t response_body_chunks_sent = 0;
+    uint64_t response_body_chunks_received = 0;
+
+    // Request Trailers
+    uint64_t request_trailer_bytes_sent = 0;
+    uint64_t request_trailer_bytes_received = 0;
+
+    // Response Trailers
+    uint64_t response_trailer_bytes_sent = 0;
+    uint64_t response_trailer_bytes_received = 0;
+  };
+
+  HttpEventTrafficStats eventTrafficStats() const { return event_traffic_stats_; }
+  void setBytesReceived(uint64_t data, ProcessingResponse::ResponseCase response_case);
+  void setBytesSent(uint64_t data, ProcessingRequest::RequestCase request_case);
+
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
@@ -163,6 +200,7 @@ private:
   GrpcCalls encoding_processor_grpc_calls_;
   ProcessingEffects encoding_processor_effects_{};
   ProcessingEffects decoding_processor_effects_{};
+  HttpEventTrafficStats event_traffic_stats_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.

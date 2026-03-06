@@ -20,6 +20,7 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "ext_proc.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -416,6 +417,63 @@ const ExtProcLoggingInfo::ProcessingEffects& ExtProcLoggingInfo::processingEffec
   return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
              ? decoding_processor_effects_
              : encoding_processor_effects_;
+}
+
+void ExtProcLoggingInfo::setBytesSent(uint64_t data, ProcessingRequest::RequestCase request_case) {
+  ExtProcLoggingInfo::HttpEventTrafficStats byte_stats = eventTrafficStats();
+  switch (request_case) {
+  case ProcessingRequest::RequestCase::kRequestHeaders:
+    byte_stats.request_header_bytes_sent = data;
+    return;
+  case ProcessingRequest::RequestCase::kRequestBody:
+    byte_stats.request_body_bytes_sent += data;
+    byte_stats.request_body_chunks_sent++;
+    return;
+  case ProcessingRequest::RequestCase::kRequestTrailers:
+    byte_stats.request_trailer_bytes_sent = data;
+    return;
+  case ProcessingRequest::RequestCase::kResponseHeaders:
+    byte_stats.response_header_bytes_sent = data;
+    return;
+  case ProcessingRequest::RequestCase::kResponseBody:
+    byte_stats.response_body_bytes_sent += data;
+    byte_stats.response_body_chunks_sent++;
+    return;
+  case ProcessingRequest::RequestCase::kResponseTrailers:
+    byte_stats.response_trailer_bytes_sent = data;
+    return;
+  default:
+    return;
+  }
+}
+
+void ExtProcLoggingInfo::setBytesReceived(uint64_t data,
+                                          ProcessingResponse::ResponseCase response_case) {
+  ExtProcLoggingInfo::HttpEventTrafficStats byte_stats = eventTrafficStats();
+  switch (response_case) {
+  case ProcessingResponse::ResponseCase::kRequestHeaders:
+    byte_stats.request_header_bytes_received = data;
+    return;
+  case ProcessingResponse::ResponseCase::kRequestBody:
+    byte_stats.request_body_bytes_received += data;
+    byte_stats.request_body_chunks_received++;
+    return;
+  case ProcessingResponse::ResponseCase::kRequestTrailers:
+    byte_stats.request_trailer_bytes_received = data;
+    return;
+  case ProcessingResponse::ResponseCase::kResponseHeaders:
+    byte_stats.response_header_bytes_received = data;
+    return;
+  case ProcessingResponse::ResponseCase::kResponseBody:
+    byte_stats.response_body_bytes_received += data;
+    byte_stats.response_body_chunks_received++;
+    return;
+  case ProcessingResponse::ResponseCase::kResponseTrailers:
+    byte_stats.response_trailer_bytes_received = data;
+    return;
+  default:
+    return;
+  }
 }
 
 ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
@@ -925,6 +983,10 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (decoding_state_.sendHeaders()) {
     status = onHeaders(decoding_state_, headers, end_stream);
+    if (logging_info_ != nullptr) {
+      logging_info_->setBytesSent(headers.byteSize(),
+                                  ProcessingRequest::RequestCase::kRequestHeaders);
+    }
     ENVOY_STREAM_LOG(trace, "onHeaders returning {}", *decoder_callbacks_,
                      static_cast<int>(status));
   } else {
@@ -1252,6 +1314,9 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "decodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
   const auto status = onData(decoding_state_, data, end_stream);
+  if (logging_info_ != nullptr) {
+    logging_info_->setBytesSent(data.length(), ProcessingRequest::RequestCase::kRequestBody);
+  }
   ENVOY_STREAM_LOG(trace, "decodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
 }
@@ -1347,6 +1412,10 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(trace, "decodeTrailers", *decoder_callbacks_);
   const auto status = onTrailers(decoding_state_, trailers);
+  if (logging_info_ != nullptr) {
+    logging_info_->setBytesSent(trailers.byteSize(),
+                                ProcessingRequest::RequestCase::kRequestTrailers);
+  }
   ENVOY_STREAM_LOG(trace, "decodeTrailers returning {}", *decoder_callbacks_,
                    static_cast<int>(status));
   return status;
@@ -1368,6 +1437,10 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   FilterHeadersStatus status = FilterHeadersStatus::Continue;
   if (!processing_complete_ && encoding_state_.sendHeaders()) {
+    if (logging_info_ != nullptr) {
+      logging_info_->setBytesSent(headers.byteSize(),
+                                  ProcessingRequest::RequestCase::kResponseHeaders);
+    }
     status = onHeaders(encoding_state_, headers, end_stream);
     ENVOY_STREAM_LOG(trace, "onHeaders returns {}", *decoder_callbacks_, static_cast<int>(status));
   } else {
@@ -1396,6 +1469,9 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "encodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
   const auto status = onData(encoding_state_, data, end_stream);
+  if (logging_info_ != nullptr) {
+    logging_info_->setBytesSent(data.length(), ProcessingRequest::RequestCase::kResponseBody);
+  }
   ENVOY_STREAM_LOG(trace, "encodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
 }
@@ -1403,6 +1479,10 @@ FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
 FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   ENVOY_STREAM_LOG(trace, "encodeTrailers", *decoder_callbacks_);
   const auto status = onTrailers(encoding_state_, trailers);
+  if (logging_info_ != nullptr) {
+    logging_info_->setBytesSent(trailers.byteSize(),
+                                ProcessingRequest::RequestCase::kResponseTrailers);
+  }
   ENVOY_STREAM_LOG(trace, "encodeTrailers returning {}", *decoder_callbacks_,
                    static_cast<int>(status));
   return status;
@@ -1838,32 +1918,39 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;
+  uint64_t received_bytes = 0;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
+    received_bytes = response->request_headers().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
+    received_bytes = response->response_headers().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     eos_seen_in_body = eosSeenInBody(decoding_state_, response->request_body());
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
+    received_bytes = response->request_body().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     eos_seen_in_body = eosSeenInBody(encoding_state_, response->response_body());
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
+    received_bytes = response->response_body().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
+    received_bytes = response->request_trailers().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
+    received_bytes = response->response_trailers().ByteSize();
     break;
   case ProcessingResponse::ResponseCase::kStreamedImmediateResponse:
     setEncoderDynamicMetadata(*response);
@@ -1903,6 +1990,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
+    if (logging_info_ != nullptr && received_bytes != 0) {
+      logging_info_->setBytesReceived(received_bytes, response->response_case());
+    }
   } else if (absl::IsFailedPrecondition(processing_status)) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
