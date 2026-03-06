@@ -1,6 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 # NOTE: This file is used to package the Envoy Mobile Python APIs for PyPI.
 # The core logic is in C++, and we use pybind11 to create a native extension.
