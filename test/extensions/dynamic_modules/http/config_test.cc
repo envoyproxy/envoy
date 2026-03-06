@@ -151,9 +151,6 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  // RemoteAsyncDataProvider creates a retry timer in its constructor.
-  new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
-
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
@@ -180,8 +177,6 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchFailureFailOpen) {
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -229,8 +224,6 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
 
   // Set up cluster and HTTP client to return the module bytes on fetch.
   auto& cm = context_.server_factory_context_.cluster_manager_;
