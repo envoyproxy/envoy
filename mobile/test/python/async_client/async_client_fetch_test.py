@@ -194,6 +194,38 @@ class TestAsyncClientFetch(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_json_request(self):
+        """Send a POST request with JSON data."""
+
+        async def run():
+            async with AsyncClient(self._make_client_builder()) as client:
+                payload = {"foo": "bar", "baz": 123}
+                async with await client.post(
+                    f"{self._echo_server_url}/",
+                    json=payload,
+                ) as response:
+                    self.assertEqual(response.status_code, 200)
+                    resp_json = await response.json()
+                    # Echo server returns the body it received in the 'body' field
+                    self.assertEqual(json.loads(resp_json["body"]), payload)
+                    self.assertEqual(resp_json["headers"]["content-type"], "application/json")
+
+        asyncio.run(run())
+
+    def test_json_and_data_conflict(self):
+        """Verify ValueError when both json and data are supplied."""
+
+        async def run():
+            async with AsyncClient(self._make_client_builder()) as client:
+                with self.assertRaises(ValueError):
+                    await client.post(
+                        f"{self._echo_server_url}/",
+                        json={"foo": "bar"},
+                        data="some data",
+                    )
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

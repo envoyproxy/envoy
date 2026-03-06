@@ -62,15 +62,7 @@ class AsyncClient:
             self._engine.terminate()
 
     # The main request method, which all verb-specific methods delegate to.
-    async def request(
-        self,
-        method: str,
-        url: str,
-        *,
-        data: Any = None,
-        headers: Dict[str, Union[str, List[str]]] = None,
-        timeout: Optional[Union[int, float]] = None,
-    ) -> Response:
+    async def request(self, method: str, url: str, **kwargs) -> Response:
         """Send a single request and wait for either the response headers to arrive or an error to occur.
         It returns the Response object populated with response headers if no error occurs, and the caller can await response.body to get the response body once it's fully received.
         If an error occurs before the headers are received, it raises a ClientResponseError with the underlying Envoy error attached.
@@ -79,7 +71,7 @@ class AsyncClient:
         header_complete = asyncio.Event()
         response = Response(header_complete, stream_complete, self._executor)
         stream = response.attach(self._engine)
-        self._send_request(stream, method, url, data=data, headers=headers, timeout=timeout)
+        self._send_request(stream, method, url, **kwargs)
         # Wait for either the response headers to arrive or an error to occur.
         await asyncio.wait(
             [
@@ -98,13 +90,14 @@ class AsyncClient:
         method: str,
         url: str,
         *,
+        json: Any = None,
         data: Any = None,
         headers: Dict[str, Union[str, List[str]]] = None,
         timeout: Optional[Union[int, float]] = None,
     ) -> None:
         # Normalize the request and get headers and body
         header_dict, body = normalize_request(
-            method, url, data=data, headers=headers, timeout=timeout
+            method, url, json=json, data=data, headers=headers, timeout=timeout
         )
 
         # Send headers with end_stream flag based on whether we have a body

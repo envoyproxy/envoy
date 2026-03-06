@@ -6,6 +6,7 @@ but are refactored to stand alone rather than being buried in other
 functions.
 """
 
+import json as json_lib
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode, urlparse
@@ -72,6 +73,7 @@ def normalize_timeout_to_ms(timeout: Timeout) -> NormalTimeout:
 def normalize_request(
     method: str,
     url: str,
+    json: Any = None,
     data: Data = None,
     headers: Headers = None,
     timeout: Timeout = None,
@@ -81,7 +83,8 @@ def normalize_request(
     Args:
         method: HTTP method (e.g., "GET", "POST").
         url: Request URL.
-        data: Request body data (optional).
+        json: Request JSON body (optional). If provided, it will be serialized to JSON and the content-type header will be set to application/json.
+        data: Request body data (optional). If `data` is a dict or list, it will be form-encoded and the content-type header will be set to application/x-www-form-urlencoded. If `data` is a string, it will be encoded as UTF-8 bytes. Only one of `json` or `data` can be provided.
         headers: Request headers dict (optional).
         timeout: Request timeout (optional).
 
@@ -92,7 +95,16 @@ def normalize_request(
     """
     # normalize pieces that go into the header map
     norm_method = normalize_method(method)
-    norm_data, data_headers = normalize_data(data)
+    if json is not None:
+        if data is not None:
+            raise ValueError("Only one of 'data' or 'json' can be supplied.")
+        norm_data = json_lib.dumps(json).encode("utf-8")
+        data_headers = {
+            "content-type": ["application/json"],
+            "content-length": [str(len(norm_data))],
+        }
+    else:
+        norm_data, data_headers = normalize_data(data)
     norm_headers = {**data_headers, **normalize_headers(headers)}
     norm_timeout_ms = normalize_timeout_to_ms(timeout)
 
