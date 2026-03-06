@@ -987,7 +987,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_request_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_request_body()
   ///   .return_const(true);
@@ -1089,7 +1089,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_response_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_response_body()
   ///   .return_const(true);

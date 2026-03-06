@@ -174,6 +174,13 @@ pub trait EnvoyListenerFilter {
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
+  /// Get the number-typed dynamic metadata value with the given namespace and key value.
+  /// Returns None if the metadata is not found or is the wrong type.
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
+
+  /// Set the number-typed dynamic metadata value with the given namespace and key value.
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64);
+
   /// Get the maximum number of bytes to read from the socket.
   /// This is used to determine the buffer size for reading data.
   fn max_read_bytes(&self) -> usize;
@@ -739,6 +746,34 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
         str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
+    let mut result: f64 = 0.0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
       )
     }
   }
