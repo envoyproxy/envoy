@@ -2388,7 +2388,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (orca_load_report_received_) {
     return;
   }
-
+  // Check whether we need to send the load report to the LRS or invoke the ORCA
+  // callbacks.
   Upstream::HostDescriptionOptConstRef upstream_host = upstream_request.upstreamHost();
 
   // The upstream host should always be available because the upstream request has got
@@ -2397,9 +2398,16 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
 
-  // Check whether any consumer needs the ORCA load report.
   if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value() &&
       !cluster_->loadBalancerFactory().requiresOrcaLoadReports()) {
+    // If the cluster doesn't have LRS metric names configured then there is no need to
+    // extract the stats for LRS.
+    // If the host doesn't have LB policy data then that means the LB policy doesn't care
+    // about the ORCA load report.
+    // If the LB factory doesn't require ORCA load reports then the LB policy doesn't
+    // need per-host utilization data.
+    // Return early here to avoid parsing the ORCA load report because no one is interested
+    // in it.
     return;
   }
 
