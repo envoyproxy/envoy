@@ -84,6 +84,14 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
   EXPECT_EQ(resolved_b(0), 20);
 }
 
+// =============================================================================
+// Weak symbol stub tests for network filter, listener filter, access logger, and
+// UDP listener filter callbacks. These verify that the weak stubs installed in
+// abi_impl.cc trigger ENVOY_BUG when called from a context that does not compile
+// in the corresponding filter type.
+// =============================================================================
+
+// Macro to reduce copy-paste: verify each weak stub triggers ENVOY_BUG.
 #define WEAK_STUB(TestSuffix, call)                                                                \
   TEST(CommonAbiImplTest, TestSuffix##EnvoyBug) {                                                  \
     EXPECT_ENVOY_BUG({ call; }, "not implemented in this context");                                \
@@ -260,6 +268,27 @@ WEAK_STUB(LbGetMemberUpdateHostAddress,
 WEAK_STUB(LbGetHostCounterStat,
           envoy_dynamic_module_callback_lb_get_host_counter_stat(
               nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal))
+
+WEAK_STUB(LbConfigDefineCounter,
+          envoy_dynamic_module_callback_lb_config_define_counter(nullptr, {"counter", 7}, nullptr,
+                                                                 0, nullptr))
+WEAK_STUB(LbConfigIncrementCounter,
+          envoy_dynamic_module_callback_lb_config_increment_counter(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDefineGauge,
+          envoy_dynamic_module_callback_lb_config_define_gauge(nullptr, {"gauge", 5}, nullptr, 0,
+                                                               nullptr))
+WEAK_STUB(LbConfigSetGauge,
+          envoy_dynamic_module_callback_lb_config_set_gauge(nullptr, 0, nullptr, 0, 42))
+WEAK_STUB(LbConfigIncrementGauge,
+          envoy_dynamic_module_callback_lb_config_increment_gauge(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDecrementGauge,
+          envoy_dynamic_module_callback_lb_config_decrement_gauge(nullptr, 0, nullptr, 0, 1))
+WEAK_STUB(LbConfigDefineHistogram,
+          envoy_dynamic_module_callback_lb_config_define_histogram(nullptr, {"histogram", 9},
+                                                                   nullptr, 0, nullptr))
+WEAK_STUB(LbConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_lb_config_record_histogram_value(nullptr, 0, nullptr, 0,
+                                                                         100))
 
 WEAK_STUB(MatcherGetHeadersSize,
           envoy_dynamic_module_callback_matcher_get_headers_size(
