@@ -69,7 +69,6 @@ public:
         : latency_(latency), call_status_(call_status) {}
     const std::chrono::microseconds latency_;
     const Grpc::Status::GrpcStatus call_status_;
-    uint32_t size_;
   };
 
   // gRPC call stats for body.
@@ -81,7 +80,6 @@ public:
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
           max_latency_(max_latency), min_latency_(min_latency) {}
     uint32_t call_count_;
-    uint32_t total_bytes_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
     std::chrono::microseconds max_latency_;

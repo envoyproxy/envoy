@@ -20,7 +20,6 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
-#include "ext_proc.h"
 
 namespace Envoy {
 namespace Extensions {
