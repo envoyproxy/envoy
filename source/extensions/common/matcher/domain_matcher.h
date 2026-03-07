@@ -63,21 +63,20 @@ public:
   ActionMatchResult match(const DataType& data,
                           SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
-    if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
+    if (input.availability() != Envoy::Matcher::DataAvailability::AllDataAvailable) {
       return ActionMatchResult::insufficientData();
     }
 
-    if (absl::holds_alternative<absl::monostate>(input.data_)) {
+    absl::optional<absl::string_view> domain = input.stringData();
+    if (!domain) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
-
-    const auto& domain = absl::get<std::string>(input.data_);
-    if (domain.empty()) {
+    if (domain->empty()) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
     // 1. Try exact match first (highest priority).
-    auto exact_it = config_->exact_matches_.find(domain);
+    auto exact_it = config_->exact_matches_.find(*domain);
     if (exact_it != config_->exact_matches_.end()) {
       ActionMatchResult result =
           MatchTree<DataType>::handleRecursionAndSkips(*(exact_it->second), data, skipped_match_cb);
@@ -90,7 +89,7 @@ public:
 
     // 2. Try wildcard matches from longest suffix to shortest.
     // For "www.example.com", try "example.com", then "com".
-    auto wildcard_matches = findAllWildcardMatches(domain);
+    auto wildcard_matches = findAllWildcardMatches(*domain);
     for (const auto& wildcard_match : wildcard_matches) {
       ActionMatchResult result =
           MatchTree<DataType>::handleRecursionAndSkips(*wildcard_match, data, skipped_match_cb);
