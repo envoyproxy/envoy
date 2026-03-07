@@ -426,6 +426,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -864,6 +865,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup
