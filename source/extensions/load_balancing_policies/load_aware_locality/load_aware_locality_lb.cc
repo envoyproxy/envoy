@@ -1,6 +1,7 @@
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <memory>
 
@@ -17,13 +18,14 @@ LoadAwareLocalityLoadBalancer::LoadAwareLocalityLoadBalancer(
     OptRef<const Upstream::LoadBalancerConfig> lb_config, const Upstream::ClusterInfo& cluster_info,
     const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
     Envoy::Random::RandomGenerator& random, TimeSource& time_source)
-    : priority_set_(priority_set), stats_(cluster_info.lbStats()) {
+    : priority_set_(priority_set), stats_(cluster_info.lbStats()), time_source_(time_source) {
   const auto* typed_config = dynamic_cast<const LoadAwareLocalityLbConfig*>(lb_config.ptr());
   ASSERT(typed_config != nullptr);
 
   utilization_variance_threshold_ = typed_config->utilizationVarianceThreshold();
   ewma_alpha_ = typed_config->ewmaAlpha();
   probe_percentage_ = typed_config->probePercentage();
+  weight_expiration_period_ = typed_config->weightExpirationPeriod();
   weight_update_period_ = typed_config->weightUpdatePeriod();
 
   factory_ = std::make_shared<WorkerLocalLbFactory>(
@@ -60,6 +62,11 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
 
   const size_t locality_count = locality_hosts.size();
 
+  // Current monotonic time in milliseconds, used for weight expiration checks.
+  const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             time_source_.monotonicTime().time_since_epoch())
+                             .count();
+
   // Step 1: Compute raw per-locality utilization and healthy host counts.
   avg_utils_.assign(locality_count, 0.0);
   valid_counts_.assign(locality_count, 0);
@@ -81,10 +88,21 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
     if (has_healthy) {
       for (const auto& host : healthy_hosts_per_locality[i]) {
         const double util = host->orcaUtilization().get();
-        if (util > 0.0) {
-          util_sum += util;
-          valid_count++;
+        if (util <= 0.0) {
+          continue;
         }
+
+        // weight_expiration_period: if the host's last ORCA report is older than the
+        // expiration window, treat it as having no data.
+        if (weight_expiration_period_.count() > 0) {
+          const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
+          if (last_update_ms > 0 && (now_ms - last_update_ms) > weight_expiration_period_.count()) {
+            continue;
+          }
+        }
+
+        util_sum += util;
+        valid_count++;
       }
     }
 

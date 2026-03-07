@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the load_aware_locality LB policy which uses ORCA utilization data
 // to route traffic between localities based on available headroom.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message LoadAwareLocality {
   // The child LB policy to create for endpoint-picking within each locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1
@@ -60,4 +60,9 @@ message LoadAwareLocality {
   // ORCA data fresh. Applied even in all_local mode. Must be in [0, 1).
   // Set to 0 to disable. Defaults to 0.03 (3%).
   google.protobuf.DoubleValue probe_percentage = 6 [(validate.rules).double = {lt: 1.0 gte: 0.0}];
+
+  // If a given endpoint has not reported load metrics in this long, then we
+  // stop using the reported weight. This ensures that we do not continue to
+  // use very stale weights. Defaults to 3 minutes.
+  google.protobuf.Duration weight_expiration_period = 7;
 }

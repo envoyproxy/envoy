@@ -73,10 +73,9 @@ TEST(LoadAwareLocalityConfigTest, ValidateFailureWithoutEndpointPickingPolicy) {
             absl::InvalidArgumentError("No supported endpoint picking policy."));
 }
 
-// Test: The four config fields that config.cc actually parses are accepted and used.
-// Note: blackout_period, weight_expiration_period, error_utilization_penalty, and
-// metric_names_for_computing_utilization are proto fields but are NOT currently parsed
-// by config.cc — they exist for forward compatibility with future ORCA integration.
+// Test: The config fields that config.cc parses are accepted and used.
+// Note: metric_names_for_computing_utilization is a proto field that is NOT currently
+// parsed by config.cc — it exists for forward compatibility with future ORCA integration.
 TEST(LoadAwareLocalityConfigTest, CustomParsedParams) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<Upstream::MockClusterInfo> cluster_info;

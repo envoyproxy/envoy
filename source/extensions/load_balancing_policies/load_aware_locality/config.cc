@@ -60,10 +60,13 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
       const double probe_percentage =
           lb_config.has_probe_percentage() ? lb_config.probe_percentage().value() : 0.03;
 
+      auto weight_expiration_period = std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(lb_config, weight_expiration_period, 180000));
+
       return std::make_unique<LoadAwareLocalityLbConfig>(
           *endpoint_picking_policy_factory,
           LoadBalancerConfigSharedPtr(std::move(lb_config_or_error.value())), weight_update_period,
-          utilization_variance_threshold, ewma_alpha, probe_percentage,
+          utilization_variance_threshold, ewma_alpha, probe_percentage, weight_expiration_period,
           context.mainThreadDispatcher(), context.threadLocal());
     }
   }

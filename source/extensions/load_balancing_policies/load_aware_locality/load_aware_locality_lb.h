@@ -32,14 +32,16 @@ public:
                             LoadBalancerConfigSharedPtr endpoint_picking_policy_config,
                             std::chrono::milliseconds weight_update_period,
                             double utilization_variance_threshold, double ewma_alpha,
-                            double probe_percentage, Event::Dispatcher& main_thread_dispatcher,
+                            double probe_percentage,
+                            std::chrono::milliseconds weight_expiration_period,
+                            Event::Dispatcher& main_thread_dispatcher,
                             ThreadLocal::SlotAllocator& tls_slot_allocator)
       : endpoint_picking_policy_factory_(endpoint_picking_policy_factory),
         endpoint_picking_policy_config_(std::move(endpoint_picking_policy_config)),
         weight_update_period_(weight_update_period),
         utilization_variance_threshold_(utilization_variance_threshold), ewma_alpha_(ewma_alpha),
-        probe_percentage_(probe_percentage), main_thread_dispatcher_(main_thread_dispatcher),
-        tls_slot_allocator_(tls_slot_allocator) {}
+        probe_percentage_(probe_percentage), weight_expiration_period_(weight_expiration_period),
+        main_thread_dispatcher_(main_thread_dispatcher), tls_slot_allocator_(tls_slot_allocator) {}
 
   Upstream::TypedLoadBalancerFactory& endpointPickingPolicyFactory() const {
     return endpoint_picking_policy_factory_;
@@ -51,6 +53,7 @@ public:
   double utilizationVarianceThreshold() const { return utilization_variance_threshold_; }
   double ewmaAlpha() const { return ewma_alpha_; }
   double probePercentage() const { return probe_percentage_; }
+  std::chrono::milliseconds weightExpirationPeriod() const { return weight_expiration_period_; }
   Event::Dispatcher& mainThreadDispatcher() const { return main_thread_dispatcher_; }
   ThreadLocal::SlotAllocator& tlsSlotAllocator() const { return tls_slot_allocator_; }
 
@@ -61,6 +64,7 @@ private:
   double utilization_variance_threshold_;
   double ewma_alpha_;
   double probe_percentage_;
+  std::chrono::milliseconds weight_expiration_period_;
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
 };
@@ -240,9 +244,11 @@ private:
 
   const Upstream::PrioritySet& priority_set_;
   Upstream::ClusterLbStats& stats_;
+  TimeSource& time_source_;
   double utilization_variance_threshold_;
   double ewma_alpha_;
   double probe_percentage_;
+  std::chrono::milliseconds weight_expiration_period_;
   // Per-locality EWMA-smoothed utilization state (main thread only).
   std::vector<double> smoothed_utilizations_;
   // Scratch buffers reused across timer callback

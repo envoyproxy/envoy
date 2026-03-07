@@ -2427,7 +2427,10 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
     util = orca_load_report->cpu_utilization();
   }
   if (util > 0) {
-    upstream_host->orcaUtilization().set(util);
+    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               timeSource().monotonicTime().time_since_epoch())
+                               .count();
+    upstream_host->orcaUtilization().set(util, now_ms);
   }
 
   // 2. LRS (accumulator, destructive read by reporter).

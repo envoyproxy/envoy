@@ -69,7 +69,7 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.setOutlierDetector(std::move(detector_host));
 
   // Verify orcaUtilization() delegates to the logical host.
-  mock_host_->orca_utilization_store_.set(0.42);
+  mock_host_->orca_utilization_store_.set(0.42, 1000);
   EXPECT_NEAR(description_.orcaUtilization().get(), 0.42, 0.001);
 
   // Verify lbPolicyData() delegates to the logical host.

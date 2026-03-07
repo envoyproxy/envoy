@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdint>
 #include <limits>
 
@@ -49,7 +50,8 @@ protected:
 
   // Create the LB with given config and verify it initializes successfully.
   void createLb(double variance_threshold = 0.1, double ewma_alpha = 1.0,
-                double probe_percentage = 0.0) {
+                double probe_percentage = 0.0,
+                std::chrono::milliseconds weight_expiration_period = std::chrono::milliseconds(0)) {
     auto weight_update_period = std::chrono::milliseconds(1000);
 
     // Resolve the round robin factory.
@@ -69,7 +71,7 @@ protected:
 
     auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
         rr_factory, std::move(rr_lb_config), weight_update_period, variance_threshold, ewma_alpha,
-        probe_percentage, dispatcher_, context_.thread_local_);
+        probe_percentage, weight_expiration_period, dispatcher_, context_.thread_local_);
 
     thread_aware_lb_ = std::make_unique<LoadAwareLocalityLoadBalancer>(
         *lb_config, cluster_info_, priority_set_, context_.runtime_loader_, random_,
@@ -110,7 +112,20 @@ protected:
 
   // Set ORCA utilization on a host.
   void setHostUtilization(Upstream::MockHost& host, double utilization) {
-    host.orca_utilization_store_.set(utilization);
+    host.orca_utilization_store_.set(utilization, nowMs());
+  }
+
+  // Set ORCA utilization with an explicit monotonic timestamp (ms).
+  void setHostUtilizationWithTime(Upstream::MockHost& host, double utilization,
+                                  int64_t monotonic_time_ms) {
+    host.orca_utilization_store_.set(utilization, monotonic_time_ms);
+  }
+
+  // Return current monotonic time in ms from the test's TimeSource.
+  int64_t nowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               context_.time_system_.monotonicTime().time_since_epoch())
+        .count();
   }
 
   // Count how many times each host is selected over num_picks.
@@ -1370,6 +1385,84 @@ TEST_F(LoadAwareLocalityLbTest, StatsNoLocalLocality) {
   EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_all_directly_.value());
   EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_cross_zone_.value());
   EXPECT_EQ(0, cluster_info_.lbStats().lb_zone_routing_sampled_.value());
+}
+
+// --- weight_expiration_period tests ---
+
+// Test: Expired ORCA data is ignored, traffic distributes by host count.
+TEST_F(LoadAwareLocalityLbTest, WeightExpirationIgnoresStaleData) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  // Timestamp of 1ms (epoch + 1ms) is always older than the 5s expiration window
+  // regardless of how long the host has been running.
+  const int64_t stale_time_ms = 1;
+  setHostUtilizationWithTime(*h1, 0.9, stale_time_ms); // locality 0: high util (stale)
+  setHostUtilizationWithTime(*h2, 0.1, stale_time_ms); // locality 1: low util (stale)
+
+  // weight_expiration_period = 5s — both hosts' data is older than 5s.
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0,
+           /*weight_expiration_period=*/std::chrono::milliseconds(5000));
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // With expired data, both localities should have utilization 0 → equal weight.
+  // Traffic should be roughly 50/50.
+  const int num_picks = 1000;
+  auto counts = countPicks(*worker_lb, num_picks);
+  EXPECT_GT(counts[h1.get()], num_picks * 0.3);
+  EXPECT_GT(counts[h2.get()], num_picks * 0.3);
+}
+
+// Test: Fresh ORCA data within expiration window is used normally.
+TEST_F(LoadAwareLocalityLbTest, WeightExpirationFreshDataUsed) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  // Set ORCA data with a recent timestamp.
+  const int64_t fresh_time_ms = nowMs();
+  setHostUtilizationWithTime(*h1, 0.9, fresh_time_ms); // locality 0: high util
+  setHostUtilizationWithTime(*h2, 0.1, fresh_time_ms); // locality 1: low util
+
+  // weight_expiration_period = 5s — data is fresh.
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0,
+           /*weight_expiration_period=*/std::chrono::milliseconds(5000));
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Fresh data: locality 0 has 10% headroom, locality 1 has 90% headroom.
+  // Locality 1 should get the majority of traffic.
+  const int num_picks = 1000;
+  auto counts = countPicks(*worker_lb, num_picks);
+  EXPECT_GT(counts[h2.get()], num_picks * 0.7);
+}
+
+// Test: Disabled expiration (0ms) retains data indefinitely.
+TEST_F(LoadAwareLocalityLbTest, WeightExpirationDisabled) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  // Timestamp of 1ms — always in the distant past relative to monotonic clock.
+  const int64_t stale_time_ms = 1;
+  setHostUtilizationWithTime(*h1, 0.9, stale_time_ms);
+  setHostUtilizationWithTime(*h2, 0.1, stale_time_ms);
+
+  // weight_expiration_period = 0 (disabled).
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0,
+           /*weight_expiration_period=*/std::chrono::milliseconds(0));
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Even though data is old, it should still be used because expiration is disabled.
+  const int num_picks = 1000;
+  auto counts = countPicks(*worker_lb, num_picks);
+  EXPECT_GT(counts[h2.get()], num_picks * 0.7);
 }
 
 } // namespace

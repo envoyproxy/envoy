@@ -78,7 +78,9 @@ struct HostStats {
 class OrcaUtilizationStore {
 public:
   double get() const { return value_.load(std::memory_order_relaxed) / kScale; }
-  void set(double utilization) {
+
+  // Set utilization with a monotonic timestamp (milliseconds since epoch).
+  void set(double utilization, int64_t monotonic_time_ms) {
     // Reject NaN/Inf: std::clamp has UB with NaN, and the uint32 cast is UB for non-finite values.
     if (!std::isfinite(utilization)) {
       return;
@@ -88,11 +90,17 @@ public:
     // ORCA also defines utilization in [0, 1].
     utilization = std::clamp(utilization, 0.0, 1.0);
     value_.store(static_cast<uint32_t>(utilization * kScale), std::memory_order_relaxed);
+    last_update_time_ms_.store(monotonic_time_ms, std::memory_order_relaxed);
   }
+
+  // Returns the monotonic timestamp (ms since epoch) of the last set() call,
+  // or 0 if set() has never been called.
+  int64_t lastUpdateTimeMs() const { return last_update_time_ms_.load(std::memory_order_relaxed); }
 
 private:
   static constexpr double kScale = 10000.0;
   std::atomic<uint32_t> value_{0};
+  std::atomic<int64_t> last_update_time_ms_{0};
 };
 
 /**
