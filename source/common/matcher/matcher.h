@@ -87,10 +87,7 @@ private:
     explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
         : common_protocol_input_(std::move(common_protocol_input)) {}
 
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
-    }
+    DataInputGetResult get(const DataType&) const override { return common_protocol_input_->get(); }
 
   private:
     const CommonProtocolInputPtr common_protocol_input_;

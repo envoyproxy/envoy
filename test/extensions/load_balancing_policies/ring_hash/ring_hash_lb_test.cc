@@ -1185,6 +1185,73 @@ TEST(RingHashCoalesceDisabledTest, FallbackPathExercised) {
   EXPECT_NE(nullptr, worker_lb);
 }
 
+// Calls lb->initialize() from inside a PrioritySet batch update. This reproduces:
+// EDS batchUpdate -> updateHosts(P0) -> updateHosts(P1) -> onPreInitComplete -> initialize().
+class InitializeDuringBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  InitializeDuringBatchUpdateCb(std::shared_ptr<MockClusterInfo> info, RingHashLoadBalancer& lb)
+      : info_(info), lb_(lb) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    HostVectorSharedPtr hosts_p0 = std::make_shared<HostVector>();
+    hosts_p0->push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
+    HostsPerLocalitySharedPtr hosts_per_locality_p0 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        0,
+        updateHostsParams(hosts_p0, hosts_per_locality_p0,
+                          std::make_shared<const HealthyHostVector>(*hosts_p0),
+                          hosts_per_locality_p0),
+        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+
+    // Grow hostSetsPerPriority() to include P1 before initialize() is called.
+    HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
+    hosts_p1->push_back(makeTestHost(info_, "tcp://127.0.0.2:80"));
+    HostsPerLocalitySharedPtr hosts_per_locality_p1 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        1,
+        updateHostsParams(hosts_p1, hosts_per_locality_p1,
+                          std::make_shared<const HealthyHostVector>(*hosts_p1),
+                          hosts_per_locality_p1),
+        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+
+    EXPECT_TRUE(lb_.initialize().ok());
+  }
+
+  std::shared_ptr<MockClusterInfo> info_;
+  RingHashLoadBalancer& lb_;
+};
+
+TEST(RingHashMidBatchInitializeCrashTest, NoOobOnNewPriority) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update", "true"}});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats stats(stat_names, *stats_store.rootScope());
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  NiceMock<MockPrioritySet> worker_priority_set;
+  auto info = std::make_shared<NiceMock<MockClusterInfo>>();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config, context.regex_engine_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  RingHashLoadBalancer lb(priority_set, stats, *stats_store.rootScope(), context.runtime_loader_,
+                          context.api_.random_, 50, typed_config.lb_config_,
+                          typed_config.hash_policy_);
+
+  InitializeDuringBatchUpdateCb batch_update(info, lb);
+  priority_set.batchHostUpdate(batch_update);
+
+  LoadBalancerParams lb_params{worker_priority_set, {}};
+  auto worker_lb = lb.factory()->create(lb_params);
+  EXPECT_NE(nullptr, worker_lb);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

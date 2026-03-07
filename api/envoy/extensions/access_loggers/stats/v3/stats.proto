@@ -7,6 +7,7 @@ import "envoy/data/accesslog/v3/accesslog.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -38,8 +39,16 @@ message Config {
     // The name of the tag.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // The value of the tag, using :ref:`command operators <config_access_log_command_operators>`.
+    // The value of the tag, using :ref:`command operators
+    // <config_access_log_command_operators>`.
     string value_format = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The custom rules to generate the stat tags. Currently, the only
+    // supported input is
+    // :ref:`Stat tag value input <envoy_v3_api_msg_extensions.matching.common_inputs.stats.v3.StatTagValueInput>`.
+    // The supported actions are
+    // - :ref:`Transform stat action <envoy_v3_api_msg_extensions.matching.actions.transform_stat.v3.TransformStat>`.
+    xds.type.matcher.v3.Matcher rules = 3;
   }
 
   // Defines the name and tags of a stat.

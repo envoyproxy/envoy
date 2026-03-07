@@ -4,51 +4,22 @@ import (
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
-func isSameChunks(bufferedChunk []shared.UnsafeEnvoyBuffer, receivedChunk []shared.UnsafeEnvoyBuffer) bool {
-	if len(bufferedChunk) != len(receivedChunk) {
-		return false
-	}
-	for i := range bufferedChunk {
-		if bufferedChunk[i].Ptr != receivedChunk[i].Ptr {
-			return false
-		}
-	}
-	return true
-}
-
-func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
-	var bodySize int
-	if bufferedBody != nil {
-		bodySize += int(bufferedBody.GetSize())
-	}
-	if receivedBody != nil {
-		bodySize += int(receivedBody.GetSize())
+func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer, isBuffered bool) []byte {
+	var bodySize uint64 = bufferedBody.GetSize()
+	if !isBuffered {
+		bodySize += receivedBody.GetSize()
 	}
 	body := make([]byte, 0, bodySize)
 
-	var bufferedChunks []shared.UnsafeEnvoyBuffer
-
-	if bufferedBody != nil {
-		bufferedChunks = bufferedBody.GetChunks()
-		for _, chunk := range bufferedChunks {
-			body = append(body, chunk.ToUnsafeBytes()...)
-		}
+	for _, chunk := range bufferedBody.GetChunks() {
+		body = append(body, chunk.ToUnsafeBytes()...)
 	}
-	if receivedBody != nil {
-		receivedChunks := receivedBody.GetChunks()
-		// Because the the complex buffering logic in Envoy, it's possible that the
-		// latest received body are the same as the buffered body.
-		// This will happens when previous filter returns StopAndBuffer, and then this
-		// filter is called again with the buffered body as received body.
-		// TODO(wbpcode): optimize this by add a new ABI to directly check it.
-		if !isSameChunks(bufferedChunks, receivedChunks) {
-			// Avoid duplicate appending the same chunks
-			for _, chunk := range receivedChunks {
-				body = append(body, chunk.ToUnsafeBytes()...)
-			}
-		}
+	if isBuffered {
+		return body
 	}
-
+	for _, chunk := range receivedBody.GetChunks() {
+		body = append(body, chunk.ToUnsafeBytes()...)
+	}
 	return body
 }
 
@@ -59,7 +30,8 @@ func getBodyContent(bufferedBody, receivedBody shared.BodyBuffer) []byte {
 // This should only be called after we see the end of the request, which means the end_of_stream flag
 // is true in the OnRequestBody callback or we are in the OnRequestTrailers callback.
 func ReadWholeRequestBody(handle shared.HttpFilterHandle) []byte {
-	return getBodyContent(handle.BufferedRequestBody(), handle.ReceivedRequestBody())
+	return getBodyContent(handle.BufferedRequestBody(), handle.ReceivedRequestBody(),
+		handle.ReceivedBufferedRequestBody())
 }
 
 // ReadWholeResponseBody reads the whole response body by combining the buffered body and the
@@ -69,5 +41,6 @@ func ReadWholeRequestBody(handle shared.HttpFilterHandle) []byte {
 // This should only be called after we see the end of the response, which means the end_of_stream flag
 // is true in the OnResponseBody callback or we are in the OnResponseTrailers callback.
 func ReadWholeResponseBody(handle shared.HttpFilterHandle) []byte {
-	return getBodyContent(handle.BufferedResponseBody(), handle.ReceivedResponseBody())
+	return getBodyContent(handle.BufferedResponseBody(), handle.ReceivedResponseBody(),
+		handle.ReceivedBufferedResponseBody())
 }

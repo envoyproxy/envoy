@@ -261,7 +261,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -275,7 +275,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_listener_filter_config(
+  let result = listener::init_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -306,7 +306,7 @@ fn test_envoy_dynamic_module_on_listener_filter_config_destroy() {
     EnvoyListenerFilterConfigImpl,
     EnvoyListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
-  let config_ptr = init_listener_filter_config(
+  let config_ptr = listener::init_listener_filter_config(
     &mut EnvoyListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -341,7 +341,7 @@ fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let result = envoy_dynamic_module_on_listener_filter_new_impl(
+  let result = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -391,7 +391,7 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_listener_filter_new_impl(
+  let filter = listener::envoy_dynamic_module_on_listener_filter_new_impl(
     &mut EnvoyListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -838,7 +838,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
     EnvoyNetworkFilterConfigImpl,
     EnvoyNetworkFilterImpl,
   > = |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -852,7 +852,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_network_filter_config(
+  let result = network::init_network_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -881,7 +881,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_destroy() {
 
   let new_fn: NewNetworkFilterConfigFunction<EnvoyNetworkFilterConfigImpl, EnvoyNetworkFilterImpl> =
     |_, _, _| Some(Box::new(TestNetworkFilterConfig));
-  let config_ptr = init_network_filter_config(
+  let config_ptr = network::init_network_filter_config(
     &mut EnvoyNetworkFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -916,7 +916,7 @@ fn test_envoy_dynamic_module_on_network_filter_new_destroy() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let result = envoy_dynamic_module_on_network_filter_new_impl(
+  let result = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -983,7 +983,7 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1261,7 +1261,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -1275,7 +1275,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
 
   // None should result in null pointer.
   new_fn = |_, _, _| None;
-  let result = init_udp_listener_filter_config(
+  let result = udp_listener::init_udp_listener_filter_config(
     &mut envoy_filter_config,
     "test_name",
     b"test_config",
@@ -1306,7 +1306,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_config_destroy() {
     EnvoyUdpListenerFilterConfigImpl,
     EnvoyUdpListenerFilterImpl,
   > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
-  let config_ptr = init_udp_listener_filter_config(
+  let config_ptr = udp_listener::init_udp_listener_filter_config(
     &mut EnvoyUdpListenerFilterConfigImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1341,7 +1341,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_new_destroy() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let result = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let result = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -1377,7 +1377,7 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
   }
 
   let mut filter_config = TestUdpListenerFilterConfig;
-  let filter = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  let filter = udp_listener::envoy_dynamic_module_on_udp_listener_filter_new_impl(
     &mut EnvoyUdpListenerFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -2198,7 +2198,7 @@ fn test_network_filter_watermark_callbacks() {
   }
 
   let mut filter_config = TestNetworkFilterConfig;
-  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+  let filter = network::envoy_dynamic_module_on_network_filter_new_impl(
     &mut EnvoyNetworkFilterImpl {
       raw: std::ptr::null_mut(),
     },
@@ -2506,8 +2506,8 @@ fn test_bootstrap_extension_config_new_destroy() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2544,9 +2544,9 @@ fn test_bootstrap_extension_new_destroy() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
   assert!(!extension_ptr.is_null());
 
   envoy_dynamic_module_on_bootstrap_extension_destroy(extension_ptr);
@@ -2575,9 +2575,9 @@ fn test_bootstrap_extension_drain_started() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_drain_started(std::ptr::null_mut(), extension_ptr);
 
@@ -2619,9 +2619,9 @@ fn test_bootstrap_extension_shutdown() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_shutdown(
     std::ptr::null_mut(),
@@ -2662,9 +2662,9 @@ fn test_bootstrap_extension_shutdown_default_calls_completion() {
   }
 
   let config: Box<dyn BootstrapExtensionConfig> = Box::new(TestBootstrapExtensionConfig);
-  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
+  let mut envoy_extension = bootstrap::EnvoyBootstrapExtensionImpl::new(std::ptr::null_mut());
   let extension_ptr =
-    envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
+    bootstrap::envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, &*config);
 
   envoy_dynamic_module_on_bootstrap_extension_shutdown(
     std::ptr::null_mut(),
@@ -2711,8 +2711,8 @@ fn test_bootstrap_extension_admin_request() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2785,8 +2785,8 @@ fn test_bootstrap_extension_admin_request_default() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -2869,8 +2869,8 @@ fn test_bootstrap_extension_timer_fired_identity() {
     Some(Box::new(TestBootstrapExtensionConfig))
   }
 
-  let mut envoy_config = EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
-  let config_ptr = init_bootstrap_extension_config(
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
     &mut envoy_config,
     "test",
     b"config",
@@ -3220,4 +3220,279 @@ fn test_cert_validator_update_digest() {
   unsafe {
     envoy_dynamic_module_on_cert_validator_config_destroy(config_ptr);
   }
+}
+
+// =============================================================================
+// Load Balancer Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_lb_config_define_counter() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock_config.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_lb_config_define_gauge() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock_config.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_lb_config_define_histogram() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock_config.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_lb_config_increment_counter() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  let result = mock_config.increment_counter(EnvoyCounterId(1), 5);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_increment_counter_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  let result = mock_config.increment_counter(EnvoyCounterId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_lb_config_gauge_operations() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(100u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock_config
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock_config
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+
+  assert!(mock_config.set_gauge(EnvoyGaugeId(1), 100).is_ok());
+  assert!(mock_config.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock_config.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_lb_config_gauge_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+
+  assert!(mock_config.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock_config.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock_config.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  let result = mock_config.record_histogram_value(EnvoyHistogramId(1), 42);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  let result = mock_config.record_histogram_value(EnvoyHistogramId(999), 1);
+  assert!(result.is_err());
+}
+
+#[test]
+fn test_lb_config_define_all_metric_types_and_use() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock_config
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock_config
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock_config
+    .expect_increment_counter()
+    .returning(|_, _| Ok(()));
+  mock_config.expect_set_gauge().returning(|_, _| Ok(()));
+  mock_config
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock_config.define_counter("my_counter").unwrap();
+  let gauge_id = mock_config.define_gauge("my_gauge").unwrap();
+  let histogram_id = mock_config.define_histogram("my_histogram").unwrap();
+
+  assert!(mock_config.increment_counter(counter_id, 1).is_ok());
+  assert!(mock_config.set_gauge(gauge_id, 42).is_ok());
+  assert!(mock_config
+    .record_histogram_value(histogram_id, 100)
+    .is_ok());
+}
+
+#[test]
+fn test_lb_config_define_counter_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock_config.define_counter_vec("requests_total", &["method", "status"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_lb_config_define_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock_config.define_gauge_vec("connections", &["backend"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_lb_config_define_histogram_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock_config.define_histogram_vec("latency", &["endpoint", "method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_lb_config_increment_counter_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.increment_counter_vec(EnvoyCounterVecId(1), &["GET", "200"], 1);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_set_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.set_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 42);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_increase_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increase_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.increase_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 5);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_decrease_gauge_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_decrease_gauge_vec()
+    .returning(|_, _, _| Ok(()));
+  let result = mock_config.decrease_gauge_vec(EnvoyGaugeVecId(1), &["backend1"], 3);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_record_histogram_value_vec() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  let result =
+    mock_config.record_histogram_value_vec(EnvoyHistogramVecId(1), &["endpoint1", "GET"], 150);
+  assert!(result.is_ok());
+}
+
+#[test]
+fn test_lb_config_vec_metric_invalid_id() {
+  let mut mock_config = load_balancer::MockEnvoyLbConfig::new();
+  mock_config
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock_config
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+
+  assert!(mock_config
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock_config
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock_config
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
 }

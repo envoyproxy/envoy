@@ -134,6 +134,12 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
           processDirtyPriorities();
           refresh();
         });
+
+    // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
+    // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
+    // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
+    // current priorities before refresh() indexes into it.
+    processDirtyPriorities();
   } else {
     priority_update_cb_ = priority_set_.addPriorityUpdateCb(
         [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
@@ -157,6 +163,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
     // Copy panic flag from LoadBalancerBase. It is calculated when there is a change
     // in hosts set or hosts' health.
+    ASSERT(priority < per_priority_panic_.size());
     per_priority_state->global_panic_ = per_priority_panic_[priority];
 
     // Normalize host and locality weights such that the sum of all normalized weights is 1.

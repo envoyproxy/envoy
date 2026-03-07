@@ -20,8 +20,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.network.reverse_tunnel]
 
 // Validation configuration for reverse tunnel identifiers.
-// Validates the node ID and cluster ID extracted from reverse tunnel handshake headers
+// Validates the node ID, cluster ID, and tenant ID extracted from reverse tunnel handshake headers
 // against expected values specified using format strings.
+// [#next-free-field: 6]
 message Validation {
   // Format string to extract the expected node identifier for validation.
   // The formatted value is compared against the ``x-envoy-reverse-tunnel-node-id`` header
@@ -63,12 +64,24 @@ message Validation {
   //
   string cluster_id_format = 2 [(validate.rules).string = {max_len: 1024}];
 
+  // Format string to extract the expected tenant identifier for validation.
+  // The formatted value is compared against the ``x-envoy-reverse-tunnel-tenant-id`` header
+  // from the incoming handshake request. If they do not match, the connection is rejected
+  // with HTTP ``403 Forbidden``.
+  //
+  // Supports the same :ref:`command operators <config_access_log_command_operators>` as
+  // ``node_id_format``.
+  //
+  // If empty, tenant ID validation is skipped.
+  string tenant_id_format = 5 [(validate.rules).string = {max_len: 1024}];
+
   // Whether to emit validation results as dynamic metadata.
   // When enabled, the filter emits metadata under the namespace specified by
   // ``dynamic_metadata_namespace`` containing:
   //
   // * ``node_id``: The actual node ID from the handshake request.
   // * ``cluster_id``: The actual cluster ID from the handshake request.
+  // * ``tenant_id``: The actual tenant ID from the handshake request.
   // * ``validation_result``: Either ``allowed`` or ``denied``.
   //
   // This metadata can be used by subsequent filters or for access logging.
@@ -108,10 +121,11 @@ message ReverseTunnel {
   // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.
   config.core.v3.RequestMethod request_method = 4 [(validate.rules).enum = {defined_only: true}];
 
-  // Optional validation configuration for node and cluster identifiers.
-  // If specified, the filter validates the ``x-envoy-reverse-tunnel-node-id`` and
-  // ``x-envoy-reverse-tunnel-cluster-id`` headers against expected values extracted
-  // using format strings. Requests that fail validation are rejected with HTTP ``403 Forbidden``.
+  // Optional validation configuration for node, cluster, and tenant identifiers.
+  // If specified, the filter validates the ``x-envoy-reverse-tunnel-node-id``,
+  // ``x-envoy-reverse-tunnel-cluster-id``, and ``x-envoy-reverse-tunnel-tenant-id`` headers
+  // against expected values extracted using format strings. Requests that fail validation
+  // are rejected with HTTP ``403 Forbidden``.
   Validation validation = 5;
 
   // Required cluster name for validating reverse tunnel connection initiations.
