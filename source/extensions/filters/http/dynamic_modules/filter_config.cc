@@ -167,6 +167,16 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       "envoy_dynamic_module_on_http_filter_scheduled");
   RETURN_IF_NOT_OK_REF(on_scheduled.status());
 
+  auto on_downstream_above_write_buffer_high_watermark =
+      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamAboveWriteBufferHighWatermark>(
+          "envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark");
+  RETURN_IF_NOT_OK_REF(on_downstream_above_write_buffer_high_watermark.status());
+
+  auto on_downstream_below_write_buffer_low_watermark =
+      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamBelowWriteBufferLowWatermark>(
+          "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark");
+  RETURN_IF_NOT_OK_REF(on_downstream_below_write_buffer_low_watermark.status());
+
   // These are optional. Modules that don't need config-level scheduling or config-level
   // callouts/streams don't need to implement them.
   auto on_config_scheduled = dynamic_module->getFunctionPointer<OnHttpFilterConfigScheduled>(
@@ -190,19 +200,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       dynamic_module->getFunctionPointer<OnHttpFilterConfigHttpStreamResetType>(
           "envoy_dynamic_module_on_http_filter_config_http_stream_reset");
 
-  auto on_downstream_above_write_buffer_high_watermark =
-      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamAboveWriteBufferHighWatermark>(
-          "envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark");
-  RETURN_IF_NOT_OK_REF(on_downstream_above_write_buffer_high_watermark.status());
-
-  auto on_downstream_below_write_buffer_low_watermark =
-      dynamic_module->getFunctionPointer<OnHttpFilterDownstreamBelowWriteBufferLowWatermark>(
-          "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark");
-  RETURN_IF_NOT_OK_REF(on_downstream_below_write_buffer_low_watermark.status());
-
   auto on_local_reply = dynamic_module->getFunctionPointer<OnHttpFilterLocalReplyType>(
       "envoy_dynamic_module_on_http_filter_local_reply");
-  RETURN_IF_NOT_OK_REF(on_local_reply.status());
 
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
@@ -236,6 +235,10 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   config->on_http_filter_http_stream_complete_ = on_http_stream_complete.value();
   config->on_http_filter_http_stream_reset_ = on_http_stream_reset.value();
   config->on_http_filter_scheduled_ = on_scheduled.value();
+  config->on_http_filter_downstream_above_write_buffer_high_watermark_ =
+      on_downstream_above_write_buffer_high_watermark.value();
+  config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
+      on_downstream_below_write_buffer_low_watermark.value();
   if (on_config_scheduled.ok()) {
     config->on_http_filter_config_scheduled_ = on_config_scheduled.value();
   }
@@ -257,11 +260,10 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   if (on_config_http_stream_reset.ok()) {
     config->on_http_filter_config_http_stream_reset_ = on_config_http_stream_reset.value();
   }
-  config->on_http_filter_downstream_above_write_buffer_high_watermark_ =
-      on_downstream_above_write_buffer_high_watermark.value();
-  config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
-      on_downstream_below_write_buffer_low_watermark.value();
-  config->on_http_filter_local_reply_ = on_local_reply.value();
+
+  if (on_local_reply.ok()) {
+    config->on_http_filter_local_reply_ = on_local_reply.value();
+  }
   return config;
 }
 
