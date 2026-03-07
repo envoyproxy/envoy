@@ -613,5 +613,10 @@ new_features:
     check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
     [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
     validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
+- area: dfp
+  change: |
+    The upstream address resolved by the DFP filter, when DFP is configured with ``save_upstream_address: true``,
+    is now available for access logging through ``%FILTER_STATE(envoy.stream.upstream_address:PLAIN)%`` and attribute
+    access through ``filter_state['envoy.stream.upstream_address']``.
 
 deprecated:

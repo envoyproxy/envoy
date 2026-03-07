@@ -7,6 +7,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/context.h"
 
@@ -955,6 +956,18 @@ TEST(Context, FilterStateAttributes) {
     EXPECT_EQ(6666, port->Int64OrDie());
     auto other = map[CelValue::CreateStringView(address_key)];
     EXPECT_FALSE(other.has_value());
+  }
+
+  const std::string upstream_address_key = StreamInfo::UpstreamAddress::key();
+  auto upstream_addr = Network::Utility::parseInternetAddressNoThrow("192.168.1.1", 8080);
+  filter_state.setData(upstream_address_key,
+                       std::make_unique<StreamInfo::UpstreamAddress>(upstream_addr),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  {
+    auto value = wrapper[CelValue::CreateStringView(upstream_address_key)];
+    ASSERT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBytes());
+    EXPECT_EQ("192.168.1.1:8080", value.value().BytesOrDie().value());
   }
 }
 
