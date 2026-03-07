@@ -727,7 +727,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 
 	// Prepare headers.
 	headerViews := headersToModuleHttpHeaderSlice(headers)
-	C.envoy_dynamic_module_callback_http_send_response(
+	C.envoy_dynamic_module_callback_http_send_response_v2(
 		h.hostPluginPtr,
 		(C.uint32_t)(statusCode),
 		unsafe.SliceData(headerViews),

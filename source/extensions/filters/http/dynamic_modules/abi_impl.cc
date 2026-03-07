@@ -639,11 +639,14 @@ bool envoy_dynamic_module_callback_http_get_headers(
   return getHeadersImpl(getHeaderMapByType(filter, header_type), result_headers);
 }
 
-void envoy_dynamic_module_callback_http_send_response(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
-    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_module_buffer body, int32_t grpc_status,
-    envoy_dynamic_module_type_module_buffer details) {
+namespace {
+
+void sendResponseImpl(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                      uint32_t status_code,
+                      envoy_dynamic_module_type_module_http_header* headers_vector,
+                      size_t headers_vector_size, envoy_dynamic_module_type_module_buffer body,
+                      absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      envoy_dynamic_module_type_module_buffer details) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (filter->isDestroyed()) {
     return;
@@ -667,10 +670,29 @@ void envoy_dynamic_module_callback_http_send_response(
     details_view = "dynamic_module";
   }
 
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
+                         grpc_status, details_view);
+}
+
+} // namespace
+
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_module_buffer body, envoy_dynamic_module_type_module_buffer details) {
+  sendResponseImpl(filter_envoy_ptr, status_code, headers_vector, headers_vector_size, body,
+                   absl::nullopt, details);
+}
+
+void envoy_dynamic_module_callback_http_send_response_v2(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_module_buffer body, int32_t grpc_status,
+    envoy_dynamic_module_type_module_buffer details) {
   absl::optional<Grpc::Status::GrpcStatus> optional_grpc_status =
       grpc_status >= 0 ? absl::optional<Grpc::Status::GrpcStatus>(grpc_status) : absl::nullopt;
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
-                         optional_grpc_status, details_view);
+  sendResponseImpl(filter_envoy_ptr, status_code, headers_vector, headers_vector_size, body,
+                   optional_grpc_status, details);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(

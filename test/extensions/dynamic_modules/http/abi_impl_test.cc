@@ -406,7 +406,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
                              testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0}, -1,
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
                                                    {nullptr, 0});
 }
 
@@ -421,7 +421,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
                              testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
 
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0}, -1,
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
                                                    {nullptr, 0});
 }
 
@@ -450,7 +450,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
   }));
 
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(),
-                                                   header_count, {nullptr, 0}, -1, {nullptr, 0});
+                                                   header_count, {nullptr, 0}, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
@@ -478,9 +478,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(), 3,
-                                                   {body_str.data(), body_str.size()}, -1,
-                                                   {nullptr, 0});
+  envoy_dynamic_module_callback_http_send_response(
+      filter_.get(), 200, header_array.get(), 3, {body_str.data(), body_str.size()}, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
@@ -490,26 +489,34 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
               sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
                              testing::Eq(absl::nullopt), testing::Eq("test_details")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0,
-                                                   {body_str.data(), body_str.size()}, -1,
+                                                   {body_str.data(), body_str.size()},
                                                    {test_details.data(), test_details.size()});
 }
 
-TEST_F(DynamicModuleHttpFilterTest, SendResponseWithGrpcStatus) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithGrpcStatus) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(absl::optional<Grpc::Status::GrpcStatus>(14)),
                              testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 503, nullptr, 0, {nullptr, 0}, 14,
-                                                   {nullptr, 0});
+  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 503, nullptr, 0, {nullptr, 0},
+                                                      14, {nullptr, 0});
 }
 
-TEST_F(DynamicModuleHttpFilterTest, SendResponseWithGrpcStatusOk) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithGrpcStatusOk) {
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
                              testing::Eq(absl::optional<Grpc::Status::GrpcStatus>(0)),
                              testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0}, 0,
-                                                   {nullptr, 0});
+  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 200, nullptr, 0, {nullptr, 0},
+                                                      0, {nullptr, 0});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithNoGrpcStatus) {
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
+                             testing::Eq("dynamic_module")));
+  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 200, nullptr, 0, {nullptr, 0},
+                                                      -1, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {

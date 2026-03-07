@@ -2151,7 +2151,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
 
     unsafe {
-      abi::envoy_dynamic_module_callback_http_send_response(
+      abi::envoy_dynamic_module_callback_http_send_response_v2(
         self.raw_ptr,
         status_code,
         headers_ptr as *mut _,

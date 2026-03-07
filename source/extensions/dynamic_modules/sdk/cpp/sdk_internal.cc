@@ -386,7 +386,7 @@ public:
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
                          std::string_view body, int32_t grpc_status,
                          std::string_view detail) override {
-    envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_callback_http_send_response_v2(
         host_plugin_ptr_, status,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
             reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
