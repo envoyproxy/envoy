@@ -613,5 +613,11 @@ new_features:
     check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
     [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
     validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
+- area: matching
+  change: |
+    Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`
+    to distinguish Envoy generated local replies from upstream responses. This matcher input returns ``true``
+    for local replies and ``false`` for upstream responses, enabling ``custom_response`` filter policies to
+    selectively apply only to locally generated error responses.
 
 deprecated:
