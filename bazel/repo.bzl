@@ -102,6 +102,10 @@ def _envoy_repo_impl(repository_ctx):
     # RBE), as host environment variables are not directly passed to remote workers.
     local_sysroot = repository_ctx.os.environ.get("BAZEL_USE_HOST_SYSROOT", "False")
 
+    # Make sure to not pass the content of environment variable directly to the Bazel
+    # Starlark file - we should only accept a proper boolean value and nothing else.
+    local_sysroot = {"True": True, "False": False}.get(local_sysroot, False)
+
     repository_ctx.file("compiler.bzl", """
 LLVM_PATH = '%s'
 USE_LOCAL_SYSROOT = %s

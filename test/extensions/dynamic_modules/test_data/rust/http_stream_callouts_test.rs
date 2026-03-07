@@ -75,7 +75,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
     // Start an HTTP stream.
     let (result, handle) = envoy_filter.start_http_stream(
       &self.cluster_name,
-      vec![
+      &[
         (":path", b"/test"),
         (":method", b"GET"),
         ("host", b"example.com"),
@@ -86,7 +86,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -120,7 +120,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
     self.received_response = true;
     envoy_filter.send_response(
       200,
-      vec![("x-stream", b"success")],
+      &[("x-stream", b"success")],
       Some(b"stream_callout_success"),
       None,
     );
@@ -171,7 +171,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
     // Start an HTTP stream with POST method.
     let (result, handle) = envoy_filter.start_http_stream(
       &self.cluster_name,
-      vec![
+      &[
         (":path", b"/stream"),
         (":method", b"POST"),
         ("host", b"example.com"),
@@ -183,7 +183,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -200,7 +200,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
     assert!(success);
 
     // Send trailers to end the stream.
-    let trailers = vec![("x-trailer", b"value" as &[u8])];
+    let trailers = &[("x-trailer", b"value" as &[u8])];
     let success = unsafe { envoy_filter.send_http_stream_trailers(handle, trailers) };
     assert!(success);
 
@@ -223,7 +223,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
     let chunks_str = self.chunks_received.to_string();
     envoy_filter.send_response(
       200,
-      vec![("x-chunks-received", chunks_str.as_bytes())],
+      &[("x-chunks-received", chunks_str.as_bytes())],
       Some(b"bidirectional_success"),
       None,
     );
@@ -266,7 +266,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
       let path = format!("/stream{}", i);
       let (result, handle) = envoy_filter.start_http_stream(
         &self.cluster_name,
-        vec![
+        &[
           (":path", path.as_bytes()),
           (":method", b"GET"),
           ("host", b"example.com"),
@@ -282,7 +282,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     }
 
     if self.stream_handles.len() != 3 {
-      envoy_filter.send_response(500, vec![("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
     }
 
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
@@ -293,7 +293,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     self.completed_streams += 1;
 
     if self.completed_streams == 3 {
-      envoy_filter.send_response(200, vec![("x-stream", b"all_success")], None, None);
+      envoy_filter.send_response(200, &[("x-stream", b"all_success")], None, None);
     }
   }
 }
@@ -334,7 +334,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
     // Start a stream to a cluster that will be reset.
     let (result, handle) = envoy_filter.start_http_stream(
       &self.cluster_name,
-      vec![
+      &[
         (":path", b"/slow"),
         (":method", b"GET"),
         ("host", b"example.com"),
@@ -345,7 +345,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -381,7 +381,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
     // Send response indicating reset occurred.
     envoy_filter.send_response(
       200,
-      vec![("x-stream", b"reset_ok")],
+      &[("x-stream", b"reset_ok")],
       Some(b"stream_was_reset"),
       None,
     );
@@ -427,7 +427,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     // Start a stream that we expect to be reset by the upstream.
     let (result, handle) = envoy_filter.start_http_stream(
       &self.cluster_name,
-      vec![
+      &[
         (":path", b"/reset"),
         (":method", b"GET"),
         ("host", b"example.com"),
@@ -438,7 +438,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, vec![("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -453,11 +453,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
     assert_eq!(stream_handle, self.stream_handle);
-    envoy_filter.send_response(
-      200,
-      vec![("x-reset", b"true")],
-      Some(b"upstream_reset"),
-      None,
-    );
+    envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
   }
 }

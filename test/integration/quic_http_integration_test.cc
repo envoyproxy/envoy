@@ -103,8 +103,8 @@ TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages(
-          {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
+      Envoy::ExpectedLogMessages({{"trace", "Cert brotli compression successful"},
+                                  {"trace", "Cert brotli decompression successful"}}),
       { testRouterHeaderOnlyRequestAndResponse(); });
 }
 
