@@ -82,42 +82,6 @@ final class NetworkChangeMonitorTests: XCTestCase {
     wait(for: [expectation], timeout: 5.0)
   }
 
-  // MARK: - Engine Configuration Tests
-
-  func testEnableNetworkChangeMonitorConfiguration() {
-    let expectation = self.expectation(description: "Engine configured with network monitor")
-
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.enableNetworkChangeMonitor,
-                    "Network change monitor should be enabled")
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableNetworkChangeMonitor(true)
-      .build()
-
-    wait(for: [expectation], timeout: 1.0)
-  }
-
-  func testDisableNetworkChangeMonitorConfiguration() {
-    let expectation = self.expectation(description: "Engine configured without network monitor")
-
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertFalse(config.enableNetworkChangeMonitor,
-                     "Network change monitor should be disabled")
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .enableNetworkChangeMonitor(false)
-      .build()
-
-    wait(for: [expectation], timeout: 1.0)
-  }
-
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil

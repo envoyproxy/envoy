@@ -55,6 +55,7 @@ envoy_objc_library(
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
         "//library/cc:engine_builder_lib",
+        "//library/cc:network_change_monitor_interface",
         "//library/common:internal_engine_lib",
         "//library/common/api:c_types",
         "//library/common/bridge:utility_lib",
@@ -62,6 +63,7 @@ envoy_objc_library(
         "//library/common/network:apple_network_change_monitor_lib",
         "//library/common/network:apple_platform_cert_verifier",
         "//library/common/network:apple_proxy_resolution_lib",
+        "//library/common/system:system_helper_lib",
     ],
 )
 

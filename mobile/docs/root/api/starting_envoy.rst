@@ -275,20 +275,6 @@ Specify a closure to be called by Envoy to access arbitrary strings from Platfor
   // Swift
   builder.addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``enableNetworkChangeMonitor``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Specify whether to enable the network change monitor.
-
-**Example**::
-
-  // Kotlin
-  // N/A
-
-  // Swift
-  builder.enableNetworkChangeMonitor(true)
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableGzipDecompression``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
