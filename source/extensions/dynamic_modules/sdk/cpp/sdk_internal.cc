@@ -384,13 +384,14 @@ public:
   }
 
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
-                         std::string_view body, std::string_view detail) override {
+                         std::string_view body, int32_t grpc_status,
+                         std::string_view detail) override {
     envoy_dynamic_module_callback_http_send_response(
         host_plugin_ptr_, status,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
             reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
         headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
-        envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
+        grpc_status, envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
   }
 
   void sendResponseHeaders(std::span<const HeaderView> headers, bool end_stream) override {

@@ -846,11 +846,16 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
+  ///
+  /// The `grpc_status` parameter is the gRPC status code for gRPC requests. Use `None` to indicate
+  /// no gRPC status (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC
+  /// status codes. This is only meaningful when the downstream request is a gRPC request.
   fn send_response<'a>(
     &mut self,
     status_code: u32,
     headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
+    grpc_status: Option<i32>,
     details: Option<&'a str>,
   );
 
@@ -1215,6 +1220,14 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
+
+  /// Get the gRPC status code from the response.
+  ///
+  /// This checks response trailers, response headers, and infers from the HTTP status code.
+  /// Returns `None` if no gRPC status is available (e.g., the response is not a gRPC response).
+  fn get_response_grpc_status(&self) -> Option<i64> {
+    self.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseGrpcStatus)
+  }
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -2127,6 +2140,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     status_code: u32,
     headers: &[(&str, &[u8])],
     body: Option<&[u8]>,
+    grpc_status: Option<i32>,
     details: Option<&str>,
   ) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
@@ -2146,6 +2160,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
           ptr: body_ptr as *mut _,
           length: body_length,
         },
+        grpc_status.unwrap_or(-1),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: details_ptr as *mut _,
           length: details_length,

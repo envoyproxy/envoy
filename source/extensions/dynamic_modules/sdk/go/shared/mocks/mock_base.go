@@ -946,15 +946,15 @@ func (mr *MockHttpFilterHandleMockRecorder) SendHttpStreamTrailers(streamID, tra
 }
 
 // SendLocalResponse mocks base method.
-func (m *MockHttpFilterHandle) SendLocalResponse(status uint32, headers [][2]string, body []byte, detail string) {
+func (m *MockHttpFilterHandle) SendLocalResponse(status uint32, headers [][2]string, body []byte, grpcStatus int32, detail string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendLocalResponse", status, headers, body, detail)
+	m.ctrl.Call(m, "SendLocalResponse", status, headers, body, grpcStatus, detail)
 }
 
 // SendLocalResponse indicates an expected call of SendLocalResponse.
-func (mr *MockHttpFilterHandleMockRecorder) SendLocalResponse(status, headers, body, detail any) *gomock.Call {
+func (mr *MockHttpFilterHandleMockRecorder) SendLocalResponse(status, headers, body, grpcStatus, detail any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendLocalResponse", reflect.TypeOf((*MockHttpFilterHandle)(nil).SendLocalResponse), status, headers, body, detail)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendLocalResponse", reflect.TypeOf((*MockHttpFilterHandle)(nil).SendLocalResponse), status, headers, body, grpcStatus, detail)
 }
 
 // SendResponseData mocks base method.

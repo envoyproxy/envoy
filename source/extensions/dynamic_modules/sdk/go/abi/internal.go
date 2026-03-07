@@ -720,6 +720,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 	statusCode uint32,
 	headers [][2]string,
 	body []byte,
+	grpcStatus int32,
 	detail string,
 ) {
 	h.localResponseSent = true
@@ -732,6 +733,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 		unsafe.SliceData(headerViews),
 		(C.size_t)(len(headerViews)),
 		bytesToModuleBuffer(body),
+		(C.int32_t)(grpcStatus),
 		stringToModuleBuffer(detail),
 	)
 

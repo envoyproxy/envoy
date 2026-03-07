@@ -1566,6 +1566,10 @@ bool envoy_dynamic_module_callback_http_set_header(
  * the headers of the response.
  * @param headers_vector_size is the size of the headers_vector.
  * @param body is the body of the response.
+ * @param grpc_status is the gRPC status code for gRPC requests. Use -1 to indicate no gRPC status
+ * (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC status codes as
+ * defined in https://grpc.io/docs/guides/status-codes/. This is only meaningful when the
+ * downstream request is a gRPC request.
  * @param details is the response code details of the response.
  * The response code details is an optional short string that provides additional information about
  * why this response code was sent like "rate_limited". It is typically used for logging purposes.
@@ -1574,7 +1578,8 @@ bool envoy_dynamic_module_callback_http_set_header(
 void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_module_buffer body, envoy_dynamic_module_type_module_buffer details);
+    envoy_dynamic_module_type_module_buffer body, int32_t grpc_status,
+    envoy_dynamic_module_type_module_buffer details);
 
 /**
  * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
