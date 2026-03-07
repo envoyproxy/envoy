@@ -71,6 +71,15 @@ Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bo
 
   config_->stats().download_enabled_.inc();
 
+  // If there's already buffered data, we must buffer new data too to preserve byte ordering.
+  if (download_buffer_.length() > 0) {
+    config_->stats().download_throttled_.inc();
+    download_end_stream_ = end_stream;
+    download_buffer_.move(data);
+    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
+    return Network::FilterStatus::StopIteration;
+  }
+
   uint64_t data_size = data.length();
   uint64_t consumed = config_->downloadTokenBucket()->consume(data_size, true);
 
@@ -105,6 +114,15 @@ Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, b
   }
 
   config_->stats().upload_enabled_.inc();
+
+  // If there's already buffered data, we must buffer new data too to preserve byte ordering.
+  if (upload_buffer_.length() > 0) {
+    config_->stats().upload_throttled_.inc();
+    upload_end_stream_ = end_stream;
+    upload_buffer_.move(data);
+    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
+    return Network::FilterStatus::StopIteration;
+  }
 
   uint64_t data_size = data.length();
   uint64_t consumed = config_->uploadTokenBucket()->consume(data_size, true);

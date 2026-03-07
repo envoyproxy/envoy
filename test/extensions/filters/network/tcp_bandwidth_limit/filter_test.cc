@@ -465,7 +465,7 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
 
-  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
+  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _))
       .WillByDefault(testing::Return());
   ON_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark())
       .WillByDefault(testing::Return());
@@ -518,7 +518,7 @@ TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
       .WillByDefault(testing::Return());
   ON_CALL(read_filter_callbacks_.connection_, readDisable(false))
       .WillByDefault(testing::Return(Network::Connection::ReadDisableStatus::NoTransition));
-  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, false))
+  ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _))
       .WillByDefault(testing::Return());
 
   filter_->onDownloadTokenTimer();
@@ -926,6 +926,63 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
   // Verify buffer is now empty and timer is reset
   EXPECT_EQ(0, getUploadBuffer().length());
   EXPECT_EQ(nullptr, getUploadTimer());
+}
+
+// Test that new data is buffered when there's already pending data, to preserve byte ordering.
+TEST_F(TcpBandwidthLimitFilterTest, DownloadOrderingWithPendingBuffer) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    download_limit_kbps: 1
+    fill_interval:
+      seconds: 0
+      nanos: 50000000
+  )EOF";
+
+  setup(yaml);
+
+  // First call: consume all tokens
+  Buffer::OwnedImpl data1(std::string(1024, 'a'));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data1, false));
+
+  // Second call: partial consumption, buffer remainder
+  Buffer::OwnedImpl data2(std::string(512, 'b'));
+  EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+  EXPECT_EQ(512, getDownloadBuffer().length());
+
+  // Third call: buffer has pending data. New data must be appended without consuming tokens.
+  EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  Buffer::OwnedImpl data3(std::string(256, 'c'));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data3, false));
+  EXPECT_EQ(512 + 256, getDownloadBuffer().length());
+}
+
+TEST_F(TcpBandwidthLimitFilterTest, UploadOrderingWithPendingBuffer) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    upload_limit_kbps: 1
+    fill_interval:
+      seconds: 0
+      nanos: 50000000
+  )EOF";
+
+  setup(yaml);
+
+  // First call: consume all tokens
+  Buffer::OwnedImpl data1(std::string(1024, 'a'));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data1, false));
+
+  // Second call: partial consumption, buffer remainder
+  Buffer::OwnedImpl data2(std::string(512, 'b'));
+  EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
+  EXPECT_EQ(512, getUploadBuffer().length());
+
+  // Third call: buffer has pending data. New data must be appended without consuming tokens.
+  EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+  Buffer::OwnedImpl data3(std::string(256, 'c'));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data3, false));
+  EXPECT_EQ(512 + 256, getUploadBuffer().length());
 }
 
 } // namespace TcpBandwidthLimit

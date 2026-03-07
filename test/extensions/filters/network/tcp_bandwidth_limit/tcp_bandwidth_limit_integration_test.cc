@@ -88,6 +88,9 @@ typed_config:
   test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.download_throttled", 1);
   test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.download_bytes_buffered", 1024);
 
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.download_bytes_buffered", 0);
+
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
