@@ -243,10 +243,9 @@ new_features:
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
 - area: dynamic_modules
   change: |
-    Added gRPC status support for the HTTP dynamic module filter. A new ``send_response_v2`` callback
-    accepts an optional gRPC status code, and the ``ResponseGrpcStatus`` attribute is now implemented
-    to read gRPC status from responses. The original ``send_response`` callback is deprecated in favor
-    of ``send_response_v2``.
+    Added gRPC status support for the HTTP dynamic module filter SDKs. The ``send_response`` SDK
+    methods now accept an optional gRPC status code which is passed as a ``grpc-status`` header,
+    and the ``ResponseGrpcStatus`` attribute is now available to read gRPC status from responses.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.

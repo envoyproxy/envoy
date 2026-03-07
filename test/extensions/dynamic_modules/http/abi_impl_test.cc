@@ -493,30 +493,31 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
                                                    {test_details.data(), test_details.size()});
 }
 
-TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithGrpcStatus) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseWithGrpcStatusHeader) {
+  // Verify that grpc-status passed as a header is forwarded via modify_headers.
+  std::string grpc_status_key = "grpc-status";
+  std::string grpc_status_value = "14";
+  envoy_dynamic_module_type_module_http_header header_array[1];
+  header_array[0].key_ptr = grpc_status_key.data();
+  header_array[0].key_length = grpc_status_key.size();
+  header_array[0].value_ptr = grpc_status_value.data();
+  header_array[0].value_length = grpc_status_value.size();
+
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(absl::optional<Grpc::Status::GrpcStatus>(14)),
-                             testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 503, nullptr, 0, {nullptr, 0},
-                                                      14, {nullptr, 0});
-}
-
-TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithGrpcStatusOk) {
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                             testing::Eq(absl::optional<Grpc::Status::GrpcStatus>(0)),
-                             testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 200, nullptr, 0, {nullptr, 0},
-                                                      0, {nullptr, 0});
-}
-
-TEST_F(DynamicModuleHttpFilterTest, SendResponseV2WithNoGrpcStatus) {
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
-                             testing::Eq("dynamic_module")));
-  envoy_dynamic_module_callback_http_send_response_v2(filter_.get(), 200, nullptr, 0, {nullptr, 0},
-                                                      -1, {nullptr, 0});
+                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl headers;
+        if (modify_headers) {
+          modify_headers(headers);
+        }
+        EXPECT_EQ(headers.get(Http::LowerCaseString("grpc-status"))[0]->value().getStringView(),
+                  "14");
+      }));
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 503, header_array, 1,
+                                                   {nullptr, 0}, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {

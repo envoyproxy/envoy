@@ -2148,19 +2148,33 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
+    // picks it up via modify_headers without requiring an ABI change.
+    let grpc_status_str;
+    let merged_headers;
+    let (final_headers_ptr, final_headers_len) = if let Some(status) = grpc_status {
+      grpc_status_str = status.to_string();
+      let mut h: Vec<(&str, &[u8])> = Vec::with_capacity(headers.len() + 1);
+      h.extend_from_slice(headers);
+      h.push(("grpc-status", grpc_status_str.as_bytes()));
+      merged_headers = h;
+      let HeaderPairSlice(ptr, len) = merged_headers.as_slice().into();
+      (ptr, len)
+    } else {
+      let HeaderPairSlice(ptr, len) = headers.into();
+      (ptr, len)
+    };
 
     unsafe {
-      abi::envoy_dynamic_module_callback_http_send_response_v2(
+      abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr as *mut _,
-        headers_len,
+        final_headers_ptr as *mut _,
+        final_headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
         },
-        grpc_status.unwrap_or(-1),
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: details_ptr as *mut _,
           length: details_length,

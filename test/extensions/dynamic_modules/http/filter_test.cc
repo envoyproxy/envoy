@@ -604,10 +604,21 @@ TEST_P(DynamicModuleHttpLanguageTests, SendResponseWithGrpcStatus) {
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
+  // The SDK passes gRPC status as a grpc-status header via modify_headers rather than using an
+  // ABI-level gRPC status parameter.
   EXPECT_CALL(decoder_callbacks,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(absl::optional<Grpc::Status::GrpcStatus>(14)),
-                             testing::Eq("dynamic_module")));
+                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl headers;
+        if (modify_headers) {
+          modify_headers(headers);
+        }
+        EXPECT_EQ(headers.get(Http::LowerCaseString("grpc-status"))[0]->value().getStringView(),
+                  "14");
+      }));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, false));
