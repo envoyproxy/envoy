@@ -121,6 +121,10 @@ protected:
     host.orca_utilization_store_.set(utilization, monotonic_time_ms);
   }
 
+  // Clear ORCA data by writing sentinel values, simulating "never reported".
+  // Resets value to 0.0 and lastUpdateTimeMs to 0.
+  void clearHostUtilization(Upstream::MockHost& host) { host.orca_utilization_store_.set(0.0, 0); }
+
   // Return current monotonic time in ms from the test's TimeSource.
   int64_t nowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -426,8 +430,8 @@ TEST_F(LoadAwareLocalityLbTest, EwmaNoDataRetention) {
   setHostUtilization(*h2, 0.8);
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
-  // Second tick: remove ORCA data from h2 (simulate stale data by returning 0.0).
-  setHostUtilization(*h2, 0.0);
+  // Second tick: clear ORCA data from h2 (simulate no data by resetting the store).
+  clearHostUtilization(*h2);
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
@@ -436,6 +440,36 @@ TEST_F(LoadAwareLocalityLbTest, EwmaNoDataRetention) {
   // weight[1] = 1 * (1.0 - 0.8) = 0.2 (NOT decaying to 0)
   EXPECT_NEAR(weights->weights[1], 0.2, 0.05);
   EXPECT_GT(weights->weights[1], 0.0);
+}
+
+// Test: A host reporting 0.0 utilization (fully idle) is treated as valid data, not "no data".
+// This verifies the fix for the 0.0-vs-no-data ambiguity: lastUpdateTimeMs() > 0 means the
+// host has reported, even if the utilization value is 0.0.
+TEST_F(LoadAwareLocalityLbTest, ZeroUtilizationIsValidData) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+
+  // h1 reports 0.0 utilization (fully idle), h2 reports 0.9 (heavily loaded).
+  setHostUtilization(*h1, 0.0);
+  setHostUtilization(*h2, 0.9);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  auto weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+
+  // h1: weight = 1 * (1.0 - 0.0) = 1.0 (0.0 is valid data, not skipped)
+  // h2: weight = 1 * (1.0 - 0.9) = 0.1
+  EXPECT_NEAR(weights->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(weights->weights[1], 0.1, 0.01);
+
+  // h1 should get the vast majority of traffic.
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  auto counts = countPicks(*worker_lb, 1000);
+  EXPECT_GT(counts[h1.get()], 800);
 }
 
 // Test: Probe in all_local mode — remote gets ~3% even when all_local triggers.

@@ -87,21 +87,21 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
     uint32_t valid_count = 0;
     if (has_healthy) {
       for (const auto& host : healthy_hosts_per_locality[i]) {
-        const double util = host->orcaUtilization().get();
-        if (util <= 0.0) {
+        // Check if the host has ever reported ORCA data. lastUpdateTimeMs() == 0 means
+        // set() has never been called — skip hosts with no data.
+        const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
+        if (last_update_ms == 0) {
           continue;
         }
 
         // weight_expiration_period: if the host's last ORCA report is older than the
         // expiration window, treat it as having no data.
-        if (weight_expiration_period_.count() > 0) {
-          const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
-          if (last_update_ms > 0 && (now_ms - last_update_ms) > weight_expiration_period_.count()) {
-            continue;
-          }
+        if (weight_expiration_period_.count() > 0 &&
+            (now_ms - last_update_ms) > weight_expiration_period_.count()) {
+          continue;
         }
 
-        util_sum += util;
+        util_sum += host->orcaUtilization().get();
         valid_count++;
       }
     }

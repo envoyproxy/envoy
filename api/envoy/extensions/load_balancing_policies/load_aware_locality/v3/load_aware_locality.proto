@@ -63,6 +63,7 @@ message LoadAwareLocality {
 
   // If a given endpoint has not reported load metrics in this long, then we
   // stop using the reported weight. This ensures that we do not continue to
-  // use very stale weights. Defaults to 3 minutes.
-  google.protobuf.Duration weight_expiration_period = 7;
+  // use very stale weights. Set to 0s to disable expiration. Defaults to 3 minutes.
+  google.protobuf.Duration weight_expiration_period = 7
+      [(validate.rules).duration = {gte {}}];
 }

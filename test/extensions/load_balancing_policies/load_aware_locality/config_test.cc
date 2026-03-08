@@ -147,6 +147,98 @@ TEST(LoadAwareLocalityConfigTest, InvalidWeightUpdatePeriod) {
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
+// Test: Unset weight_expiration_period uses the 3-minute default and loads successfully.
+TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodDefaultWhenUnset) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
+
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig rr_config;
+  rr_config.set_name("envoy.load_balancing_policies.round_robin");
+  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = rr_config;
+  // weight_expiration_period intentionally left unset.
+
+  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
+  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
+  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  ASSERT_TRUE(result.ok());
+
+  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(result.value().get());
+  ASSERT_NE(nullptr, typed);
+  EXPECT_EQ(std::chrono::milliseconds(180000), typed->weightExpirationPeriod());
+}
+
+// Test: Explicitly set weight_expiration_period to 0s (disables expiration) loads successfully.
+TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodZeroDisables) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
+
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig rr_config;
+  rr_config.set_name("envoy.load_balancing_policies.round_robin");
+  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = rr_config;
+  load_aware_config_msg.mutable_weight_expiration_period()->set_seconds(0);
+
+  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
+  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
+  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  ASSERT_TRUE(result.ok());
+
+  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(result.value().get());
+  ASSERT_NE(nullptr, typed);
+  EXPECT_EQ(std::chrono::milliseconds(0), typed->weightExpirationPeriod());
+}
+
+// Test: Negative weight_expiration_period is rejected by proto validation.
+TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodNegativeRejected) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
+
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig rr_config;
+  rr_config.set_name("envoy.load_balancing_policies.round_robin");
+  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = rr_config;
+  load_aware_config_msg.mutable_weight_expiration_period()->set_seconds(-1);
+
+  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
+  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
+  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
+  // Proto validation should reject negative duration before loadConfig runs.
+  // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
+  EXPECT_THROW(
+      { auto result = factory.loadConfig(context, load_aware_config_msg); },
+      ProtoValidationException);
+}
+
 } // namespace
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies

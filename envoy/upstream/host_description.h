@@ -70,10 +70,11 @@ struct HostStats {
  * Lock-free, last-value store for per-host ORCA utilization.
  *
  * Written by worker threads in the router on every ORCA report; read by
- * LB policies during host selection..
+ * LB policies during host selection.
  *
- * set() clamps to [0, 1] and silently drops NaN/Inf.
- * The initial value is 0.0.
+ * set() clamps to [0, 1] and silently drops non-finite values.
+ * The initial value is 0.0. Use lastUpdateTimeMs() == 0 to distinguish
+ * "never reported" from "reported 0.0 utilization".
  */
 class OrcaUtilizationStore {
 public:
@@ -81,7 +82,7 @@ public:
 
   // Set utilization with a monotonic timestamp (milliseconds since epoch).
   void set(double utilization, int64_t monotonic_time_ms) {
-    // Reject NaN/Inf: std::clamp has UB with NaN, and the uint32 cast is UB for non-finite values.
+    // Reject non-finite values: std::clamp and the uint32 cast have undefined behavior for them.
     if (!std::isfinite(utilization)) {
       return;
     }
