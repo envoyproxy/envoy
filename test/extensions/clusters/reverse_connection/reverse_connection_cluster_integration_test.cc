@@ -60,6 +60,22 @@ typed_config:
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
+  uint32_t tunnelListenerPort() const {
+    return GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
+  }
+
+  std::string loopbackAddress() const {
+    return GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+  }
+
+  std::string formattedTunnelAddress(uint32_t tunnel_listener_port) const {
+    const std::string loopback_addr = loopbackAddress();
+    if (GetParam() == Network::Address::IpVersion::v6) {
+      return fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port);
+    }
+    return fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
+  }
+
   // LDS support for dynamic listener management.
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
@@ -307,11 +323,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseConnectionClusterIntegrationTest,
 TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for cleanup.
 
-  // Use a deterministic port for tunnel listener.
-  const uint32_t tunnel_listener_port =
-      GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
-  const std::string loopback_addr =
-      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
 
   // Configure the full reverse tunnel flow with cluster using helper.
   config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
@@ -343,15 +356,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   // Verify downstream initiator stats (with detailed stats enabled).
   ENVOY_LOG_MISC(info, "Verifying downstream reverse tunnel initiator stats.");
-  const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
-
-  // Wait for initiator connection stats - the stat name includes the actual address:port
-  // Format: reverse_tunnel_initiator.host.<address>:<port>.connected
-  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
-  const std::string formatted_tunnel_address =
-      (GetParam() == Network::Address::IpVersion::v6)
-          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
-          : tunnel_address;
+  // Wait for initiator connection stats - the stat name includes the actual address:port.
+  const std::string formatted_tunnel_address = formattedTunnelAddress(tunnel_listener_port);
   const std::string initiator_host_stat =
       fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
   test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(2000));
@@ -399,7 +405,6 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   ENVOY_LOG_MISC(info, "Testing concurrent requests with different headers.");
 
   // Create multiple concurrent requests using various tunnel identifiers.
-  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<Http::TestRequestHeaderMapImpl> test_headers;
 
@@ -437,9 +442,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
   ENVOY_LOG_MISC(info, "Sending {} concurrent requests.", test_headers.size());
   for (size_t i = 0; i < test_headers.size(); i++) {
     auto encoder_decoder = codec_client_->startRequest(test_headers[i]);
-    encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
-    codec_client_->sendData(*encoders[i], 0, true);
+    codec_client_->sendData(encoder_decoder.first, 0, true);
   }
 
   // Collect all upstream streams.
@@ -517,11 +521,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMutualTLS) {
   DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for cleanup.
 
-  // Use a deterministic port for tunnel listener.
-  const uint32_t tunnel_listener_port =
-      GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
-  const std::string loopback_addr =
-      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
 
   const std::string rundir = TestEnvironment::runfilesDirectory();
 
@@ -577,7 +578,6 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
           ->mutable_trusted_ca()
           ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
 
-      //
       tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
 
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
@@ -611,12 +611,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
 
   // Verify downstream initiator stats.
   ENVOY_LOG_MISC(info, "Verifying downstream reverse tunnel initiator stats.");
-  const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
-  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
-  const std::string formatted_tunnel_address =
-      (GetParam() == Network::Address::IpVersion::v6)
-          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
-          : tunnel_address;
+  const std::string formatted_tunnel_address = formattedTunnelAddress(tunnel_listener_port);
   const std::string initiator_host_stat =
       fmt::format("reverse_tunnel_initiator.host.{}.connected", formatted_tunnel_address);
   test_server_->waitForGaugeGe(initiator_host_stat, 1, std::chrono::milliseconds(1000));
@@ -1106,10 +1101,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Set concurrency to 4 to create 4 workers.
   concurrency_ = 4;
 
-  const uint32_t tunnel_listener_port =
-      GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
-  const std::string loopback_addr =
-      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+  const uint32_t tunnel_listener_port = tunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
 
   // Configure the reverse tunnel setup. Each worker will initiate its own connection.
   config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
@@ -1146,12 +1139,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   // Verify that each worker initiated exactly 1 connection (initiator side).
   ENVOY_LOG_MISC(info, "Verifying per-worker initiator connections.");
-  const std::string tunnel_address = fmt::format("{}:{}", loopback_addr, tunnel_listener_port);
-  // Note: IPv6 addresses use bracket notation [::1]:port in stat names
-  const std::string formatted_tunnel_address =
-      (GetParam() == Network::Address::IpVersion::v6)
-          ? fmt::format("[{}]:{}", loopback_addr, tunnel_listener_port)
-          : tunnel_address;
+  const std::string formatted_tunnel_address = formattedTunnelAddress(tunnel_listener_port);
 
   for (int worker_id = 0; worker_id < 4; worker_id++) {
     // Check per-worker host stat (connected to tunnel_cluster)
@@ -1206,7 +1194,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   // Allow a short post-handshake stabilization window before issuing data requests.
   // This exercises the contract that data is not sent during handshake completion.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(2000));
 
   ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
 
