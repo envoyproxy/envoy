@@ -102,7 +102,8 @@ protected:
                                    const std::string& cluster_id = "test-cluster-id",
                                    const std::string& tenant_id = "test-tenant-id",
                                    TunnelClusterModifier tunnel_cluster_modifier = nullptr,
-                                   TunnelListenerModifier tunnel_listener_modifier = nullptr) {
+                                   TunnelListenerModifier tunnel_listener_modifier = nullptr,
+                                   bool add_lua_host_id_filter = true) {
 
     // Clear existing listeners, but keep cluster_0 which will be auto-populated with
     // fake_upstreams_[0].
@@ -170,10 +171,11 @@ protected:
     egress_route->mutable_route()->set_cluster("reverse_connection_cluster");
 
     // Add Lua filter to compute x-computed-host-id from request headers.
-    auto* lua_filter = egress_hcm.add_http_filters();
-    lua_filter->set_name("envoy.filters.http.lua");
-    envoy::extensions::filters::http::lua::v3::Lua lua_config;
-    lua_config.set_inline_code(fmt::format(R"(
+    if (add_lua_host_id_filter) {
+      auto* lua_filter = egress_hcm.add_http_filters();
+      lua_filter->set_name("envoy.filters.http.lua");
+      envoy::extensions::filters::http::lua::v3::Lua lua_config;
+      lua_config.set_inline_code(fmt::format(R"(
       function envoy_on_request(request_handle)
         local headers = request_handle:headers()
         local node_id = headers:get("x-node-id")
@@ -196,8 +198,9 @@ protected:
         headers:add("x-computed-host-id", host_id)
       end
     )",
-                                           node_id));
-    lua_filter->mutable_typed_config()->PackFrom(lua_config);
+                                             node_id));
+      lua_filter->mutable_typed_config()->PackFrom(lua_config);
+    }
 
     auto* egress_router = egress_hcm.add_http_filters();
     egress_router->set_name("envoy.filters.http.router");
@@ -1108,7 +1111,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Configure the reverse tunnel setup. Each worker will initiate its own connection.
   config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port);
+    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port,
+                                "test-node-id", "test-cluster-id", "test-tenant-id",
+                                nullptr, nullptr, false /* add_lua_host_id_filter */);
   });
 
   // Initialize the test server with 4 workers.
@@ -1196,6 +1201,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
     ENVOY_LOG_MISC(info, "Worker {} has accepted 1 reverse connection.", worker_id);
   }
 
+  // Allow a short post-handshake stabilization window before issuing data requests.
+  // This exercises the contract that data is not sent during handshake completion.
+  std::this_thread::sleep_for(std::chrono::milliseconds(250));
+
   ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
 
   // Send multiple requests to verify load distribution across the 4 worker tunnels.
@@ -1208,7 +1217,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
     Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                            {":path", fmt::format("/test/path{}", i)},
                                            {":scheme", "http"},
-                                           {":authority", "host"}};
+                                           {":authority", "host"},
+                                           {"x-computed-host-id", "test-node-id"}};
     auto encoder_decoder = codec_client_->startRequest(headers);
     responses.push_back(std::move(encoder_decoder.second));
     codec_client_->sendData(encoder_decoder.first, 0, true);
