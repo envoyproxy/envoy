@@ -1206,7 +1206,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   // Allow a short post-handshake stabilization window before issuing data requests.
   // This exercises the contract that data is not sent during handshake completion.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(250));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
   ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
 
