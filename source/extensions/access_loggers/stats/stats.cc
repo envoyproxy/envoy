@@ -19,15 +19,18 @@ public:
 
   ~AccessLogState() override {
     for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      state.gauge_ref_->sub(state.value_);
+      state.gauge_ptr_->sub(state.value_);
+      state.gauge_ptr_->setEvictionDisabled(false);
     }
   }
 
   void addInflightGauge(const Stats::Gauge* gauge, uint64_t value) {
-    // We retain the raw pointer as a fast map key. The Gauge object lives in the
-    // central store and is prevented from evicting by the GaugeSharedPtr in State.
-    inflight_gauges_.try_emplace(
-        gauge, State{value, Stats::GaugeSharedPtr(const_cast<Stats::Gauge*>(gauge))});
+    auto& state = inflight_gauges_[gauge];
+    if (state.gauge_ptr_ == nullptr) {
+      state.gauge_ptr_ = const_cast<Stats::Gauge*>(gauge);
+      state.gauge_ptr_->setEvictionDisabled(true);
+    }
+    state.value_ += value;
   }
 
   absl::optional<uint64_t> removeInflightGauge(const Stats::Gauge* gauge) {
@@ -36,6 +39,7 @@ public:
       return absl::nullopt;
     }
     uint64_t value = it->second.value_;
+    it->second.gauge_ptr_->setEvictionDisabled(false);
     inflight_gauges_.erase(it);
     return value;
   }
@@ -44,8 +48,8 @@ public:
 
 private:
   struct State {
-    uint64_t value_;
-    Stats::GaugeSharedPtr gauge_ref_;
+    uint64_t value_{0};
+    Stats::Gauge* gauge_ptr_{nullptr};
   };
 
   Stats::ScopeSharedPtr scope_;

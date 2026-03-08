@@ -1119,7 +1119,7 @@ void ThreadLocalStoreImpl::evictUnused() {
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
           return [&unused_metrics](const auto& kv) {
             const auto& [name, metric] = kv;
-            if (metric.use_count() > 1) {
+            if (metric->evictionDisabled()) {
               return false;
             }
             if (metric->used()) {

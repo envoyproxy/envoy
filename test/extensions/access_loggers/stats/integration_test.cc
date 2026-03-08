@@ -347,9 +347,6 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeScopeEviction) {
       "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 0);
 }
 
-} // namespace
-} // namespace Envoy
-
 TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUnprotected) {
   const std::string config_yaml = R"(
               name: envoy.access_loggers.stats
@@ -399,8 +396,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUn
   // Wait for the second request to reach upstream.
   // We need to keep track of the second upstream request.
   FakeStreamPtr upstream_request2;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   // If the gauge was evicted, this `add` creates a new gauge starting at 0, making it 1.
@@ -416,3 +414,6 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUn
   upstream_request2->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
 }
+
+} // namespace
+} // namespace Envoy

@@ -95,6 +95,9 @@ public:
     helper_.iterateTagStatNames(fn);
   }
 
+  bool evictionDisabled() const override { return false; }
+  void setEvictionDisabled(bool) override {}
+
   const SymbolTable& constSymbolTable() const override {
     // Cast our 'this', which is of type `const MetricImpl*` to a non-const
     // pointer, so we can use it to call the subclass implementation of
