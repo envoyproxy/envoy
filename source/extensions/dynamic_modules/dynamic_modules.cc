@@ -3,7 +3,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 
-#include <fstream>
+#include <cerrno>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -157,32 +157,41 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   std::filesystem::path temp_file_path =
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
 
-  if (std::filesystem::exists(temp_file_path)) {
-    return newDynamicModule(temp_file_path, do_not_close, load_globally);
+  // Always write the (already SHA256-verified) bytes to disk via mkstemp + rename.
+  // No cache hit logic needed: if the module was already dlopened at this path,
+  // newDynamicModule's RTLD_NOLOAD check returns the existing handle without re-init.
+  std::string staging_template = temp_file_path.string() + ".XXXXXX";
+  int fd = mkstemp(staging_template.data());
+  if (fd == -1) {
+    return absl::InternalError(absl::StrCat(
+        "Failed to create temporary staging file for dynamic module: ", staging_template, ": ",
+        strerror(errno)));
   }
 
-  // Write to a pid-unique staging file, then atomically rename to the final path.
-  // This avoids corruption if two processes race on the same sha256.
-  std::filesystem::path staging_path = temp_file_path;
-  staging_path += fmt::format(".tmp.{}", getpid());
-  {
-    std::ofstream temp_file(staging_path, std::ios::binary);
-    if (!temp_file) {
-      return absl::InternalError(absl::StrCat(
-          "Failed to create temporary file for dynamic module: ", staging_path.string()));
+  size_t total_written = 0;
+  while (total_written < module_bytes.size()) {
+    ssize_t written =
+        write(fd, module_bytes.data() + total_written, module_bytes.size() - total_written);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      close(fd);
+      std::filesystem::remove(staging_template);
+      return absl::InternalError(
+          absl::StrCat("Failed to write to staging file for dynamic module: ", staging_template));
     }
-    temp_file.write(module_bytes.data(), module_bytes.size());
-    if (!temp_file) {
-      return absl::InternalError(absl::StrCat(
-          "Failed to write to temporary file for dynamic module: ", staging_path.string()));
-    }
+    total_written += written;
   }
+  close(fd);
+
+  std::filesystem::path staging_path(staging_template);
   std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::replace);
   std::filesystem::rename(staging_path, temp_file_path);
   auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
   if (!result.ok()) {
-    // Clean up so an invalid file doesn't get cached.
+    // Clean up the invalid file.
     std::filesystem::remove(temp_file_path);
   }
   return result;

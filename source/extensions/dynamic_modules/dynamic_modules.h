@@ -113,8 +113,8 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
  * format and the bytes should be exactly the same as the content of the shared object file. The
  * bytes are written to a temporary file and loaded via dlopen.
  * @param module_bytes the content of the shared object file.
- * @param sha256 the sha256 hash of the module bytes, used for temp file naming and caching.
- * The caller is responsible for verifying the hash before calling this function.
+ * @param sha256 the sha256 hash of the module bytes, used for temp file naming. The caller is
+ * responsible for verifying the hash before calling this function.
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated.

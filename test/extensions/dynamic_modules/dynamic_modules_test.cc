@@ -228,11 +228,11 @@ TEST(NewDynamicModuleFromBytes, InvalidBytes) {
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
 
-  // The invalid file should have been cleaned up to avoid poisoning the cache.
+  // The invalid file should have been cleaned up.
   EXPECT_FALSE(std::filesystem::exists(temp_path));
 }
 
-TEST(NewDynamicModuleFromBytes, ExistingFileSkipsWrite) {
+TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
   std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
   std::ifstream input(test_lib, std::ios::binary);
   ASSERT_TRUE(input.good());
@@ -244,21 +244,20 @@ TEST(NewDynamicModuleFromBytes, ExistingFileSkipsWrite) {
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
   std::filesystem::remove(temp_path);
 
-  // First load writes the file.
+  // First load writes and dlopens the module.
   absl::StatusOr<DynamicModulePtr> module1 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
   ASSERT_TRUE(module1.ok()) << module1.status().message();
   ASSERT_TRUE(std::filesystem::exists(temp_path));
-  auto mtime = std::filesystem::last_write_time(temp_path);
 
-  // Second load with same sha256 should skip writing (file already exists).
-  module1->reset();
+  // Second load with the same sha256 — writes again but dlopen returns the existing handle
+  // (RTLD_NOLOAD), so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
   ASSERT_TRUE(module2.ok()) << module2.status().message();
-  EXPECT_EQ(std::filesystem::last_write_time(temp_path), mtime);
 
   // Cleanup.
+  module1->reset();
   module2->reset();
   std::filesystem::remove(temp_path);
 }

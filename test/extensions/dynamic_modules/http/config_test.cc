@@ -257,7 +257,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_));
   cb_or_error.value()(filter_callbacks);
 
-  // Clean up the cached temp file.
+  // Clean up the temp file.
   std::filesystem::path temp_path =
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
   std::filesystem::remove(temp_path);
