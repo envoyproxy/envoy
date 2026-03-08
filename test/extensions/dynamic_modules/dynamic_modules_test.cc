@@ -244,14 +244,14 @@ TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
   std::filesystem::remove(temp_path);
 
-  // First load writes and dlopens the module.
+  // First load writes and loads the module.
   absl::StatusOr<DynamicModulePtr> module1 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
   ASSERT_TRUE(module1.ok()) << module1.status().message();
   ASSERT_TRUE(std::filesystem::exists(temp_path));
 
-  // Second load with the same sha256 — writes again but dlopen returns the existing handle
-  // (RTLD_NOLOAD), so the init function is not called twice.
+  // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
+  // newDynamicModule returns the existing handle, so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
   ASSERT_TRUE(module2.ok()) << module2.status().message();

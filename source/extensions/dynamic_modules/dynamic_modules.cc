@@ -8,6 +8,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/strings/str_cat.h"
@@ -157,15 +158,15 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   std::filesystem::path temp_file_path =
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
 
-  // Always write the (already SHA256-verified) bytes to disk via mkstemp + rename.
-  // No cache hit logic needed: if the module was already dlopened at this path,
-  // newDynamicModule's RTLD_NOLOAD check returns the existing handle without re-init.
+  // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
+  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
+  // returns the existing handle without re-init.
   std::string staging_template = temp_file_path.string() + ".XXXXXX";
   int fd = mkstemp(staging_template.data());
   if (fd == -1) {
     return absl::InternalError(absl::StrCat(
         "Failed to create temporary staging file for dynamic module: ", staging_template, ": ",
-        strerror(errno)));
+        errorDetails(errno)));
   }
 
   size_t total_written = 0;
