@@ -638,8 +638,8 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
 
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
 
-  // Called once on log() and once on destruction (because it looks up the gauge by name).
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  // Called once on log().
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
