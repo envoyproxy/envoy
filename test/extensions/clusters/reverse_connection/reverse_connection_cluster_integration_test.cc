@@ -1,6 +1,4 @@
 
-#include <thread>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
@@ -136,7 +134,7 @@ protected:
 
     // Configure the reverse tunnel filter.
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
-    rt_config.mutable_ping_interval()->set_seconds(2);
+    rt_config.mutable_ping_interval()->set_seconds(60);
     rt_config.set_auto_close_connections(false);
     rt_config.set_request_path("/reverse_connections/request");
     rt_config.set_request_method(envoy::config::core::v3::GET);
@@ -175,7 +173,7 @@ protected:
       auto* lua_filter = egress_hcm.add_http_filters();
       lua_filter->set_name("envoy.filters.http.lua");
       envoy::extensions::filters::http::lua::v3::Lua lua_config;
-      lua_config.set_inline_code(fmt::format(R"(
+      lua_config.mutable_default_source_code()->set_inline_string(fmt::format(R"(
       function envoy_on_request(request_handle)
         local headers = request_handle:headers()
         local node_id = headers:get("x-node-id")
@@ -198,7 +196,7 @@ protected:
         headers:add("x-computed-host-id", host_id)
       end
     )",
-                                             node_id));
+                                                                              node_id));
       lua_filter->mutable_typed_config()->PackFrom(lua_config);
     }
 
@@ -708,7 +706,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     lds_cluster->set_name("lds_cluster");
     lds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
     lds_cluster->mutable_connect_timeout()->set_seconds(5);
-    lds_cluster->mutable_http2_protocol_options();
+
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
+    lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    (*lds_cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(lds_http_options);
 
     auto* lds_load_assignment = lds_cluster->mutable_load_assignment();
     lds_load_assignment->set_cluster_name("lds_cluster");
@@ -787,7 +790,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
       rt_filter->set_name("envoy.filters.network.reverse_tunnel");
 
       envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
-      rt_config.mutable_ping_interval()->set_seconds(2);
+      rt_config.mutable_ping_interval()->set_seconds(60);
       rt_config.set_auto_close_connections(false);
       rt_config.set_request_path("/reverse_connections/request");
       rt_config.set_request_method(envoy::config::core::v3::GET);
@@ -825,7 +828,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     auto* lua_filter = egress_hcm.add_http_filters();
     lua_filter->set_name("envoy.filters.http.lua");
     envoy::extensions::filters::http::lua::v3::Lua lua_config;
-    lua_config.set_inline_code(R"(
+    lua_config.mutable_default_source_code()->set_inline_string(R"(
           function envoy_on_request(request_handle)
             local headers = request_handle:headers()
             local node_id = headers:get("x-node-id")
@@ -1111,9 +1114,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Configure the reverse tunnel setup. Each worker will initiate its own connection.
   config_helper_.addConfigModifier([this, tunnel_listener_port, loopback_addr](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port,
-                                "test-node-id", "test-cluster-id", "test-tenant-id",
-                                nullptr, nullptr, false /* add_lua_host_id_filter */);
+    configureReverseTunnelSetup(bootstrap, loopback_addr, tunnel_listener_port, "test-node-id",
+                                "test-cluster-id", "test-tenant-id", nullptr, nullptr,
+                                false /* add_lua_host_id_filter */);
   });
 
   // Initialize the test server with 4 workers.
@@ -1203,7 +1206,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   // Allow a short post-handshake stabilization window before issuing data requests.
   // This exercises the contract that data is not sent during handshake completion.
-  std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(250));
 
   ENVOY_LOG_MISC(info, "Sending multiple requests through the multi-worker tunnel.");
 
