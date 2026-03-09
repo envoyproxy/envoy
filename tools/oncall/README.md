@@ -34,5 +34,5 @@ name in `rotation.yaml` should be a maintainer in `reviewers.yaml`.
 To verify this, and that `rotation.ical` is synchronized with `rotation.yaml`,
 you can run
 ```
-bazel test //test/tools/oncall:oncall_rotation_test
+bazel test //tools/oncall:oncall_rotation_test
 ```
