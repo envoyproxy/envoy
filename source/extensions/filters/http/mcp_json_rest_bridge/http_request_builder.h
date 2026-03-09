@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 
-#include "nlohmann/json.hpp" // IWYU pragma: keep
 #include "absl/container/flat_hash_set.h"
+#include "nlohmann/json.hpp" // IWYU pragma: keep
 
 namespace Envoy {
 namespace Extensions {
