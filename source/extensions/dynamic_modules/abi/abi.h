@@ -7976,6 +7976,53 @@ void envoy_dynamic_module_on_cluster_scheduled(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
 
+/**
+ * envoy_dynamic_module_on_cluster_server_initialized is called when the server initialization is
+ * complete. This is called on the main thread during the PostInit lifecycle stage, after all
+ * clusters have finished initialization and before workers are started.
+ *
+ * This is the appropriate place to start background discovery tasks or establish connections that
+ * depend on the server being fully operational.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ */
+void envoy_dynamic_module_on_cluster_server_initialized(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_drain_started is called when Envoy begins draining.
+ *
+ * This is called on the main thread before workers are stopped. The module can still use cluster
+ * operations during drain. This is the appropriate place to stop accepting new hosts, close
+ * persistent connections, or de-register from service discovery.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ */
+void envoy_dynamic_module_on_cluster_drain_started(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_shutdown is called when Envoy is about to exit.
+ *
+ * This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+ * invoke the completion callback exactly once with the provided context when it has finished
+ * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
+ * flush batched data, close gRPC connections, or signal external systems.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param completion_callback is the callback that must be invoked when shutdown cleanup is done.
+ * @param completion_context is the opaque context pointer to pass to the completion callback.
+ */
+void envoy_dynamic_module_on_cluster_shutdown(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
+
 // =============================================================================
 // Cluster Dynamic Module Callbacks
 // =============================================================================
