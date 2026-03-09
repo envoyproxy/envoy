@@ -35,18 +35,20 @@ class TestIcal(unittest.TestCase):
         rotation = set(calendar.rotation)
         if maintainers - rotation:
             self.fail(
-                f"maintainers in reviewers.yaml include {maintainers - rotation}; missing from rotation.yaml"
+                f"maintainers in reviewers.yaml include {maintainers - rotation}; these are not present in rotation.yaml"
             )
         if rotation - maintainers:
             self.fail(
-                f"rotation.yaml includes {rotation - maintainers}; not maintainers in reviewers.yaml"
+                f"rotation.yaml includes {rotation - maintainers}; these are not tagged as maintainers in reviewers.yaml"
             )
 
     def test_ical_up_to_date(self):
         checked_in_ical = _ical_path().read_text()
         calendar = OncallCalendar.load(_rotation_path())
-        assert calendar.as_ical_file.strip() == checked_in_ical.strip(
-        ), "generated rotation and checked in rotation don't match - to fix run\n  bazel run //tools/oncall:rotation"
+        if calendar.as_ical_file.strip() != checked_in_ical.strip():
+            self.fail(
+                "generated rotation and checked in rotation don't match - to fix run\n  bazel run //tools/oncall:rotation"
+            )
 
 
 if __name__ == '__main__':
