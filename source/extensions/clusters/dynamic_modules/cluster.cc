@@ -50,12 +50,11 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 // DynamicModuleClusterConfig
 // =================================================================================================
 
-absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
-DynamicModuleClusterConfig::create(const std::string& cluster_name,
-                                   const std::string& cluster_config,
-                                   Envoy::Extensions::DynamicModules::DynamicModulePtr module) {
+absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
+    const std::string& cluster_name, const std::string& cluster_config,
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
   auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module)));
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -117,9 +116,10 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module)
-    : cluster_name_(cluster_name), cluster_config_(cluster_config),
-      dynamic_module_(std::move(module)) {}
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
+      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
+      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {
@@ -217,7 +217,7 @@ void DynamicModuleCluster::registerLifecycleCallbacks() {
 void DynamicModuleCluster::startPreInit() {
   // Call the module's init function. The module is expected to call
   // envoy_dynamic_module_callback_cluster_pre_init_complete when ready.
-  config_->on_cluster_init_(in_module_cluster_, this);
+  config_->on_cluster_init_(this, in_module_cluster_);
 }
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
@@ -421,7 +421,8 @@ DynamicModuleClusterFactory::createClusterWithConfig(
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()));
+      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

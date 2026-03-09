@@ -2,11 +2,19 @@ use crate::{
   abi,
   drop_wrapped_c_void_ptr,
   str_to_module_buffer,
+  strs_to_module_buffers,
   wrap_into_c_void_ptr,
   CompletionCallback,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
   NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::sync::Arc;
 
 /// The module-side cluster configuration.
 ///
@@ -160,6 +168,139 @@ pub trait EnvoyClusterScheduler: Send + Sync {
   fn commit(&self, event_id: u64);
 }
 
+/// Envoy-side metrics interface for the cluster dynamic module.
+///
+/// This trait provides the ability to define and record custom metrics (counters, gauges,
+/// histograms) scoped to the cluster configuration. Metrics should be defined during
+/// config creation and can be recorded at any point during the cluster lifecycle.
+///
+/// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
+#[automock]
+#[allow(clippy::needless_lifetimes)]
+pub trait EnvoyClusterMetrics: Send + Sync {
+  // -------------------------------------------------------------------------
+  // Define metrics (call during config creation).
+  // -------------------------------------------------------------------------
+
+  /// Define a new counter with the given name and no labels.
+  fn define_counter(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new counter vec with the given name and label names.
+  fn define_counter_vec<'a>(
+    &self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge with the given name and no labels.
+  fn define_gauge(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec with the given name and label names.
+  fn define_gauge_vec<'a>(
+    &self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram with the given name and no labels.
+  fn define_histogram(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec with the given name and label names.
+  fn define_histogram_vec<'a>(
+    &self,
+    name: &str,
+    labels: &[&'a str],
+  ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  // -------------------------------------------------------------------------
+  // Record metrics (call at runtime, e.g., during cluster lifecycle).
+  // -------------------------------------------------------------------------
+
+  /// Increment a previously defined counter by the given value.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment a previously defined counter vec by the given value with label values.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of a previously defined gauge.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of a previously defined gauge vec with label values.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase a previously defined gauge by the given value.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase a previously defined gauge vec by the given value with label values.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease a previously defined gauge by the given value.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease a previously defined gauge vec by the given value with label values.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in a previously defined histogram.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in a previously defined histogram vec with label values.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+}
+
 struct EnvoyClusterSchedulerImpl {
   raw_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
 }
@@ -288,25 +429,341 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
   }
 }
 
+/// Implementation of [`EnvoyClusterMetrics`] that calls into the Envoy ABI.
+pub struct EnvoyClusterMetricsImpl {
+  raw: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+}
+
+// The raw pointer references C++ DynamicModuleClusterConfig which is safe for metric operations
+// from any thread.
+unsafe impl Send for EnvoyClusterMetricsImpl {}
+unsafe impl Sync for EnvoyClusterMetricsImpl {}
+
+fn cluster_metric_result_to_rust(
+  res: abi::envoy_dynamic_module_type_metrics_result,
+) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+  if res == abi::envoy_dynamic_module_type_metrics_result::Success {
+    Ok(())
+  } else {
+    Err(res)
+  }
+}
+
+impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
+  fn define_counter(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterId(id))
+  }
+
+  fn define_counter_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_counter(
+        self.raw,
+        str_to_module_buffer(name),
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeId(id))
+  }
+
+  fn define_gauge_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_gauge(
+        self.raw,
+        str_to_module_buffer(name),
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut label_bufs = strs_to_module_buffers(labels);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_define_histogram(
+        self.raw,
+        str_to_module_buffer(name),
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_increment_counter(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_increment_counter(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        value,
+      )
+    })
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_set_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_set_gauge(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        value,
+      )
+    })
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_increment_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_increment_gauge(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        value,
+      )
+    })
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        value,
+      )
+    })
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+        self.raw,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let mut label_bufs = strs_to_module_buffers(labels);
+    cluster_metric_result_to_rust(unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+        self.raw,
+        id,
+        label_bufs.as_mut_ptr(),
+        labels.len(),
+        value,
+      )
+    })
+  }
+}
+
 // Cluster Event Hook Implementations
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_cluster_config_new(
-  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
-  let name_str = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ))
-  };
-  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
+  // SAFETY: Envoy guarantees name and config are valid UTF-8 per the ABI contract.
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
   let new_config_fn = NEW_CLUSTER_CONFIG_FUNCTION
     .get()
     .expect("NEW_CLUSTER_CONFIG_FUNCTION must be set");
-  match new_config_fn(name_str, config_slice) {
+  let envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics> = Arc::new(EnvoyClusterMetricsImpl {
+    raw: config_envoy_ptr,
+  });
+  match new_config_fn(name_str, config_slice, envoy_cluster_metrics) {
     Some(config) => wrap_into_c_void_ptr!(config),
     None => std::ptr::null(),
   }
@@ -341,8 +798,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_cluster_init(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
 ) {
   let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
   let cluster = unsafe { &mut *cluster };
