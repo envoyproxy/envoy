@@ -18,6 +18,14 @@ public:
   static const std::string& key() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stream.upstream_address");
   }
+
+  absl::optional<std::string> serializeAsString() const override {
+    auto ip = getIp();
+    if (ip.has_value()) {
+      return std::string(ip->asStringView());
+    }
+    return {};
+  }
 };
 
 } // namespace StreamInfo
