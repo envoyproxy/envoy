@@ -21,18 +21,23 @@ public:
     const auto maybe_headers = data.responseHeaders();
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
 
     if (maybe_status.has_value()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              absl::StrCat(*maybe_status)};
+      return Matcher::DataInputGetResult::CreateString(absl::StrCat(*maybe_status));
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
+
+inline constexpr absl::string_view Code1xx = "1xx";
+inline constexpr absl::string_view Code2xx = "2xx";
+inline constexpr absl::string_view Code3xx = "3xx";
+inline constexpr absl::string_view Code4xx = "4xx";
+inline constexpr absl::string_view Code5xx = "5xx";
 
 class HttpResponseStatusCodeClassInput : public Matcher::DataInput<HttpMatchingData> {
 public:
@@ -42,28 +47,28 @@ public:
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.responseHeaders();
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
     }
 
     const auto maybe_status = Http::Utility::getResponseStatusOrNullopt(*maybe_headers);
     if (maybe_status.has_value()) {
       if (*maybe_status >= 100 && *maybe_status < 200) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "1xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code1xx);
       }
       if (*maybe_status >= 200 && *maybe_status < 300) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "2xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code2xx);
       }
       if (*maybe_status >= 300 && *maybe_status < 400) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "3xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code3xx);
       }
       if (*maybe_status >= 400 && *maybe_status < 500) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "4xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code4xx);
       }
       if (*maybe_status >= 500 && *maybe_status < 600) {
-        return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "5xx"};
+        return Matcher::DataInputGetResult::CreateStringView(Code5xx);
       }
     }
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    return Matcher::DataInputGetResult::NoData();
   }
 };
 

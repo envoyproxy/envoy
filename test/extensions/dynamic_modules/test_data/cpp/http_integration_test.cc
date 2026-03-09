@@ -615,7 +615,7 @@ public:
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
     if (mode_ == "on_request_headers") {
       std::vector<HeaderView> h = {{"some_header", "some_value"}};
-      handle_.sendLocalResponse(200, h, "local_response_body_from_on_request_headers",
+      handle_.sendLocalResponse(200, h, "local_response_body_from_on_request_headers", -1,
                                 "test_details");
       return HeadersStatus::StopAllAndBuffer;
     }
@@ -625,7 +625,7 @@ public:
   BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
     if (mode_ == "on_request_body") {
       std::vector<HeaderView> h = {{"some_header", "some_value"}};
-      handle_.sendLocalResponse(200, h, "local_response_body_from_on_request_body", "");
+      handle_.sendLocalResponse(200, h, "local_response_body_from_on_request_body", -1, "");
       return BodyStatus::StopAndBuffer;
     }
     return BodyStatus::Continue;
@@ -634,7 +634,7 @@ public:
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
     if (mode_ == "on_response_headers") {
       std::vector<HeaderView> h = {{"some_header", "some_value"}};
-      handle_.sendLocalResponse(500, h, "local_response_body_from_on_response_headers", "");
+      handle_.sendLocalResponse(500, h, "local_response_body_from_on_response_headers", -1, "");
       return HeadersStatus::StopAllAndBuffer;
     }
     return HeadersStatus::Continue;
@@ -680,6 +680,122 @@ public:
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(SendResponseConfigFactory, "send_response");
 
 // -----------------------------------------------------------------------------
+// SendResponseGrpc
+// -----------------------------------------------------------------------------
+
+class SendResponseGrpcFilter : public HttpFilter {
+public:
+  SendResponseGrpcFilter(HttpFilterHandle& handle, int32_t grpc_status)
+      : handle_(handle), grpc_status_(grpc_status) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    std::vector<HeaderView> h = {{"x-grpc-test", "true"}};
+    handle_.sendLocalResponse(200, h, "grpc_response", grpc_status_, "");
+    return HeadersStatus::StopAllAndBuffer;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  int32_t grpc_status_;
+};
+
+class SendResponseGrpcFilterFactory : public HttpFilterFactory {
+public:
+  SendResponseGrpcFilterFactory(int32_t grpc_status) : grpc_status_(grpc_status) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<SendResponseGrpcFilter>(handle, grpc_status_);
+  }
+
+private:
+  int32_t grpc_status_;
+};
+
+class SendResponseGrpcConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    int32_t grpc_status = static_cast<int32_t>(std::stol(std::string(config_view)));
+    return std::make_unique<SendResponseGrpcFilterFactory>(grpc_status);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(SendResponseGrpcConfigFactory, "send_response_grpc");
+
+// -----------------------------------------------------------------------------
+// GrpcStatusAttribute
+// -----------------------------------------------------------------------------
+
+class GrpcStatusAttributeFilter : public HttpFilter {
+public:
+  GrpcStatusAttributeFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    auto grpc_status = handle_.getAttributeNumber(AttributeID::ResponseGrpcStatus);
+    if (grpc_status.has_value()) {
+      headers.set("x-grpc-status-from-attr", std::to_string(grpc_status.value()));
+    }
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class GrpcStatusAttributeFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<GrpcStatusAttributeFilter>(handle);
+  }
+};
+
+class GrpcStatusAttributeConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    return std::make_unique<GrpcStatusAttributeFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(GrpcStatusAttributeConfigFactory, "grpc_status_attribute");
+
+// -----------------------------------------------------------------------------
 // HttpCallouts
 // -----------------------------------------------------------------------------
 
@@ -697,7 +813,7 @@ public:
                                               // plugin and we stop, we should be fine.
     if (result.first != HttpCalloutInitResult::Success) {
       std::vector<HeaderView> h = {{"foo", "bar"}};
-      handle_.sendLocalResponse(500, h, "", "");
+      handle_.sendLocalResponse(500, h, "", -1, "");
     }
     callout_handle_ = result.second;
     return HeadersStatus::Stop;
@@ -727,7 +843,7 @@ public:
     assertEq(full_body, "response_body_from_callout", "resp body");
 
     std::vector<HeaderView> h = {{"some_header", "some_value"}};
-    handle_.sendLocalResponse(200, h, "local_response_body", "callout_success");
+    handle_.sendLocalResponse(200, h, "local_response_body", -1, "callout_success");
   }
 
   TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
@@ -867,7 +983,7 @@ public:
     if (key == "existing") {
       sched->schedule([this]() {
         std::vector<HeaderView> h = {{"cached", "yes"}};
-        handle_.sendLocalResponse(200, h, "cached_response_body", "");
+        handle_.sendLocalResponse(200, h, "cached_response_body", -1, "");
       });
     } else {
       sched->schedule([this]() {
@@ -1210,7 +1326,7 @@ public:
     auto result = handle_.startHttpStream(cluster_, h, "", true, 5000, *this);
     if (result.first != HttpCalloutInitResult::Success) {
       std::vector<HeaderView> rh = {{"x-error", "stream_init_failed"}};
-      handle_.sendLocalResponse(500, rh, "", "");
+      handle_.sendLocalResponse(500, rh, "", -1, "");
       return HeadersStatus::StopAllAndBuffer;
     }
     stream_id_ = result.second;
@@ -1244,7 +1360,7 @@ public:
     assertEq(stream_id, stream_id_, "stream id");
     complete_ = true;
     std::vector<HeaderView> h = {{"x-stream-test", "basic"}};
-    handle_.sendLocalResponse(200, h, "stream_callout_success", "");
+    handle_.sendLocalResponse(200, h, "stream_callout_success", -1, "");
   }
 
   void onHttpStreamReset(uint64_t stream_id, HttpStreamResetReason reason) override {}
@@ -1317,7 +1433,7 @@ public:
     auto result = handle_.startHttpStream(cluster_, h, "", false, 10000, *this);
     if (result.first != HttpCalloutInitResult::Success) {
       std::vector<HeaderView> rh = {{"x-error", "stream_init_failed"}};
-      handle_.sendLocalResponse(500, rh, "", "");
+      handle_.sendLocalResponse(500, rh, "", -1, "");
       return HeadersStatus::StopAllAndBuffer;
     }
     stream_id_ = result.second;
@@ -1354,7 +1470,7 @@ public:
         {"x-chunks-sent", std::to_string(sent_chunks_)},
         {"x-chunks-received", std::to_string(recv_chunks_)},
     };
-    handle_.sendLocalResponse(200, h, "bidirectional_success", "");
+    handle_.sendLocalResponse(200, h, "bidirectional_success", -1, "");
   }
 
   void onHttpStreamReset(uint64_t stream_id, HttpStreamResetReason reason) override {}
@@ -1431,7 +1547,7 @@ public:
     auto result = handle_.startHttpStream(cluster_, h, "", true, 5000, *this);
     if (result.first != HttpCalloutInitResult::Success) {
       std::vector<HeaderView> rh = {{"x-error", "stream_init_failed"}};
-      handle_.sendLocalResponse(500, rh, "", "");
+      handle_.sendLocalResponse(500, rh, "", -1, "");
       return HeadersStatus::StopAllAndBuffer;
     }
     stream_id_ = result.second;
@@ -1441,7 +1557,7 @@ public:
   void onHttpStreamReset(uint64_t stream_id, HttpStreamResetReason reason) override {
     assertEq(stream_id, stream_id_, "id");
     std::vector<HeaderView> rh = {{"x-reset", "true"}};
-    handle_.sendLocalResponse(200, rh, "upstream_reset", "");
+    handle_.sendLocalResponse(200, rh, "upstream_reset", -1, "");
   }
 
   void onHttpStreamHeaders(uint64_t stream_id, std::span<const HeaderView> headers,
@@ -1508,10 +1624,10 @@ public:
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
     if (callout_done_->load()) {
       std::vector<HeaderView> h = {{"x-config-callout", "success"}};
-      handle_.sendLocalResponse(200, h, "", "");
+      handle_.sendLocalResponse(200, h, "", -1, "");
     } else {
       std::vector<HeaderView> h = {{"x-config-callout", "pending"}};
-      handle_.sendLocalResponse(503, h, "", "");
+      handle_.sendLocalResponse(503, h, "", -1, "");
     }
     return HeadersStatus::Stop;
   }
@@ -1588,10 +1704,10 @@ public:
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
     if (stream_done_->load()) {
       std::vector<HeaderView> h = {{"x-config-stream", "success"}};
-      handle_.sendLocalResponse(200, h, "", "");
+      handle_.sendLocalResponse(200, h, "", -1, "");
     } else {
       std::vector<HeaderView> h = {{"x-config-stream", "pending"}};
-      handle_.sendLocalResponse(503, h, "", "");
+      handle_.sendLocalResponse(503, h, "", -1, "");
     }
     return HeadersStatus::Stop;
   }
