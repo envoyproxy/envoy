@@ -279,74 +279,6 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
-TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeScopeEviction) {
-  const std::string config_yaml = R"EOF(
-              name: envoy.access_loggers.stats
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
-                gauges:
-                  - stat:
-                      name: active_requests
-                      tags:
-                        - name: request_header_tag
-                          value_format: '%REQUEST_HEADER(tag-value)%'
-                    value_fixed: 1
-                    add_subtract:
-                      add_log_type: DownstreamStart
-                      sub_log_type: DownstreamEnd
-)EOF";
-
-  init(config_yaml, /*autonomous_upstream=*/false,
-       /*flush_access_log_on_new_request=*/true);
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"},  {":authority", "envoyproxy.io"},  {":path", "/"},
-      {":scheme", "http"}, {"tag-value", "my-eviction-tag"},
-  };
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-
-  // Wait for upstream to receive request.
-  waitForNextUpstreamRequest();
-
-  // After DownstreamStart is logged, gauge should be 1.
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 1);
-
-  // Simulate gauge eviction from the store.
-  // Calling evictUnused once clears the 'used' flag. Calling it twice attempts to evict
-  // unreferenced gauges in evictable scopes. Since we hold a GaugeSharedPtr in AccessLogState,
-  // the gauge's refcount is > 1. Our ThreadLocalStore modifications ensure that gauges with
-  // use_count > 1 are not evicted, preventing Use-After-Free or incorrect behavior on Destruction.
-  // Thus, this post sequence tests that the inflight gauge is protected from eviction.
-  absl::Notification evict_done;
-  test_server_->server().dispatcher().post([this, &evict_done]() {
-    test_server_->statStore().evictUnused();
-    test_server_->statStore().evictUnused();
-    evict_done.Notify();
-  });
-
-  // Re-wait for the dispatcher to complete the post tasks.
-  evict_done.WaitForNotification();
-  // wait we can't wait for counter of gauge. We just post and wait?
-  // We can just rely on the response sending sequence to yield time to dispatcher.
-
-  // Send response from upstream.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  // Wait for client to receive response.
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ(response->headers().getStatusValue(), "200");
-
-  // After DownstreamEnd is logged, the gauge is looked up again and decremented.
-  // It should be 0 (or appropriately handled if it was evicted).
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-eviction-tag", 0);
-}
-
 TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUnprotected) {
   const std::string config_yaml = R"(
               name: envoy.access_loggers.stats
@@ -401,9 +333,7 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUn
   ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
-  // If the gauge was evicted, this `add` creates a new gauge starting at 0, making it 1.
-  // If the gauge was protected (L1122-1124 in TLS), it finds the existing gauge (1), making it 2.
-  // The correct behavior is 2.
+  // The gauge should be kept even with eviction happened and the active request is 2.
   test_server_->waitForGaugeEq(
       "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 2);
 
@@ -411,8 +341,12 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUn
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response1->waitForEndStream());
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
   upstream_request2->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 0);
 }
 
 } // namespace
