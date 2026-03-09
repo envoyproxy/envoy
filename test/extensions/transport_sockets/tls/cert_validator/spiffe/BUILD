@@ -29,10 +29,12 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tls.cert_validator.spiffe"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/common/tls:ssl_test_utils",
         "//test/common/tls/cert_validator:test_common",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
@@ -60,6 +62,9 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         ":spiffe_validator_integration_test_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
