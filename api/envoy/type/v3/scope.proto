@@ -26,7 +26,7 @@ message ScopeSettings {
   // Whether the scope and its stats can be evicted from the store caches.
   // The eviction policy is a mark-and-sweep approach where stats are evicted
   // if they are not updated or accessed between two successive eviction sweeps.
-  // The eviction will happen only if the :ref:`stats_eviction <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction>` is configured in
+  // The eviction will happen only if the :ref:`stats_eviction_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>` is configured in
   // the bootstrap.
   bool evictable = 4;
 }
