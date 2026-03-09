@@ -3831,6 +3831,8 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
   proto_config_.mutable_request_attributes()->Add("request.size");    // tests int64
   proto_config_.mutable_request_attributes()->Add("connection.mtls"); // tests bool
   proto_config_.mutable_request_attributes()->Add("connection.id");   // tests uint64
+  proto_config_.mutable_request_attributes()->Add(
+      "connection.peer_certificate"); // tests string, not present without TLS
   proto_config_.mutable_request_attributes()->Add("response.code");
   proto_config_.mutable_response_attributes()->Add("response.code"); // tests int64
   proto_config_.mutable_response_attributes()->Add("response.code_details");
@@ -3855,6 +3857,8 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
         EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
         EXPECT_TRUE(proto_struct.fields().at("connection.id").has_number_value());
+        // connection.peer_certificate is not present without TLS
+        EXPECT_FALSE(proto_struct.fields().contains("connection.peer_certificate"));
         // Make sure we did not include the attribute which was not yet available.
         EXPECT_EQ(proto_struct.fields().size(), 6);
         EXPECT_FALSE(proto_struct.fields().contains("response.code"));

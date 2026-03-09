@@ -623,5 +623,9 @@ new_features:
     check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
     [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
     validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
+- area: attributes
+  change: |
+    Added ``connection.peer_certificate`` and ``upstream.peer_certificate`` attributes that provide the
+    URL-encoded PEM-encoded peer certificate for downstream and upstream TLS connections respectively.
 
 deprecated:
