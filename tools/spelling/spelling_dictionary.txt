@@ -1665,6 +1665,7 @@ cpuacct.usage
 cpufreq
 effective_cpus
 cpus
+shrinker
 ja3
 ja4
 jsonl

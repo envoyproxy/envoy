@@ -141,6 +141,68 @@ TEST_F(MemoryReleaseTest, BackgroundReleaseRateComputedCorrectly) {
 #endif
 }
 
+TEST_F(MemoryReleaseTest, MaxUnfreedMemoryBytesConfigured) {
+  EXPECT_EQ(DEFAULT_MAX_UNFREED_MEMORY_BYTES, maxUnfreedMemoryBytes());
+  const std::string yaml_config = R"EOF(
+  max_unfreed_memory_bytes: 52428800
+)EOF";
+  const auto proto_config =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
+  EXPECT_LOG_CONTAINS("info", "Set max unfreed memory threshold to 52428800 bytes.",
+                      allocator_manager_ =
+                          std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+  EXPECT_EQ(52428800, maxUnfreedMemoryBytes());
+  // Reset to default for other tests.
+  setMaxUnfreedMemoryBytes(DEFAULT_MAX_UNFREED_MEMORY_BYTES);
+}
+
+TEST_F(MemoryReleaseTest, MaxUnfreedMemoryBytesDefaultWhenZero) {
+  setMaxUnfreedMemoryBytes(DEFAULT_MAX_UNFREED_MEMORY_BYTES);
+  const std::string yaml_config = R"EOF(
+  max_unfreed_memory_bytes: 0
+)EOF";
+  const auto proto_config =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
+  EXPECT_LOG_NOT_CONTAINS("info", "Set max unfreed memory threshold",
+                          allocator_manager_ =
+                              std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+  EXPECT_EQ(DEFAULT_MAX_UNFREED_MEMORY_BYTES, maxUnfreedMemoryBytes());
+}
+
+TEST_F(MemoryReleaseTest, SoftMemoryLimitConfigured) {
+  const std::string yaml_config = R"EOF(
+  soft_memory_limit_bytes: 1073741824
+)EOF";
+  const auto proto_config =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
+#if defined(TCMALLOC)
+  EXPECT_LOG_CONTAINS("info", "Set tcmalloc soft memory limit to 1073741824 bytes.",
+                      allocator_manager_ =
+                          std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#else
+  EXPECT_LOG_CONTAINS(
+      "warn", "Soft memory limit is only supported with Google's tcmalloc, ignoring.",
+      allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#endif
+}
+
+TEST_F(MemoryReleaseTest, MaxPerCpuCacheSizeConfigured) {
+  const std::string yaml_config = R"EOF(
+  max_per_cpu_cache_size_bytes: 2097152
+)EOF";
+  const auto proto_config =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
+#if defined(TCMALLOC)
+  EXPECT_LOG_CONTAINS("info", "Set tcmalloc max per-CPU cache size to 2097152 bytes.",
+                      allocator_manager_ =
+                          std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#else
+  EXPECT_LOG_CONTAINS(
+      "warn", "Max per-CPU cache size is only supported with Google's tcmalloc, ignoring.",
+      allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#endif
+}
+
 } // namespace
 } // namespace Memory
 } // namespace Envoy
