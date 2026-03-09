@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     extension_names = ["envoy.filters.listener.set_filter_state"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/listener/set_filter_state:config",
