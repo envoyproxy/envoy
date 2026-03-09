@@ -36,7 +36,8 @@ private:
   // Rewrite the response body for locally specified bodies.
   void formatBody(const Envoy::Http::RequestHeaderMap& request_headers,
                   const Envoy::Http::ResponseHeaderMap& response_headers,
-                  const StreamInfo::StreamInfo& stream_info, std::string& body) const;
+                  const StreamInfo::StreamInfo& stream_info, const Tracing::Span& active_span,
+                  std::string& body) const;
 
   // Body read from local data source.
   const absl::optional<std::string> local_body_;
