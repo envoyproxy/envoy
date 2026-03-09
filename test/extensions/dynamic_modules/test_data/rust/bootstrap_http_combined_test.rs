@@ -208,6 +208,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for CombinedHttpFilter {
           503,
           &[("x-error-reason", b"function_not_registered")],
           Some(b"routing function not registered"),
+          None,
           Some("function_not_registered"),
         );
         return abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
@@ -243,6 +244,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for CombinedHttpFilter {
             503,
             &[("x-error-reason", b"service_not_onboarded")],
             Some(format!("service '{}' is not onboarded", svc).as_bytes()),
+            None,
             Some("service_not_onboarded"),
           );
           abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
