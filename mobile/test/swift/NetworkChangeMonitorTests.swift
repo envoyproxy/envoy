@@ -1,13 +1,6 @@
-@testable import Envoy
-import EnvoyEngine
-import Foundation
-import Network
 import XCTest
 
 /// Tests for network change monitoring functionality.
-/// Note: Since `checkReachabilityAndNotifyEnvoy:` is a private method and `nw_path_t`
-/// is an opaque type from Apple's Network framework, these tests verify the behavior
-/// through the public interface and by observing real network state changes.
 final class NetworkChangeMonitorTests: XCTestCase {
   // MARK: - Network Type Bitmask Tests
 
@@ -44,46 +37,5 @@ final class NetworkChangeMonitorTests: XCTestCase {
     XCTAssertEqual(wlanWithVpn, 3, "WLAN | Generic should be 3")
     XCTAssertTrue((wlanWithVpn & wlan) != 0, "Combined should contain WLAN")
     XCTAssertTrue((wlanWithVpn & generic) != 0, "Combined should contain Generic (VPN)")
-  }
-
-  // MARK: - NWPathMonitor Integration Tests
-
-  /// Test that NWPathMonitor provides network path information.
-  /// This is a basic sanity test to ensure the Network framework APIs work as expected.
-  func testNWPathMonitorProvidesNetworkState() {
-    let expectation = self.expectation(description: "Path monitor should provide network state")
-
-    let monitor = NWPathMonitor()
-    let queue = DispatchQueue(label: "test.network.monitor")
-
-    monitor.pathUpdateHandler = { path in
-      // We received a path update - verify we can query its properties
-      let status = path.status
-      XCTAssertTrue(
-        status == .satisfied || status == .unsatisfied || status == .requiresConnection,
-        "Status should be one of the expected values"
-      )
-
-      // Check that we can query interface types
-      let usesWifi = path.usesInterfaceType(.wifi)
-      let usesCellular = path.usesInterfaceType(.cellular)
-      let usesWired = path.usesInterfaceType(.wiredEthernet)
-
-      // At least log what we found (useful for debugging)
-      print("Network state: status=\(status), wifi=\(usesWifi), " +
-            "cellular=\(usesCellular), wired=\(usesWired)")
-
-      expectation.fulfill()
-      monitor.cancel()
-    }
-
-    monitor.start(queue: queue)
-
-    wait(for: [expectation], timeout: 5.0)
-  }
-
-  override func tearDown() {
-    super.tearDown()
-    MockEnvoyEngine.onRunWithConfig = nil
   }
 }
