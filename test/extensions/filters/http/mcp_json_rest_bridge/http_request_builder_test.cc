@@ -227,6 +227,30 @@ TEST(HttpRequestBuilderTest, FailToExtractBodyReturnError) {
   EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
+  json arguments = json::parse(R"json({
+    "parent": "projects/123456789",
+    "tableId": "table_A",
+    "datasetId": "dataset_B",
+    "projectId": "project_C"
+  })json");
+
+  // Single substitution.
+  EXPECT_THAT(*constructBaseUrl("/v1/{parent=projects/*}", {"parent"}, arguments),
+              StrEq("/v1/projects/123456789"));
+
+  // Multiple substitutions.
+  EXPECT_THAT(
+      *constructBaseUrl(
+          "/bigquery/v2/projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
+          {"projectId", "datasetId", "tableId"}, arguments),
+      StrEq("/bigquery/v2/projects/project_C/datasets/dataset_B/tables/table_A/insertAll"));
+
+  // Missing argument.
+  EXPECT_THAT(constructBaseUrl("/v1/{missing}", {"missing"}, arguments),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters

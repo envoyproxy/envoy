@@ -215,7 +215,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
                       generateErrorJsonResponse(-32602, "Tool name not found").dump());
     return;
   }
-  const std::string tool_name = name_it->get<std::string>();
+  const auto& tool_name = name_it->get<std::string>();
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
       config_->getHttpRule(tool_name);
@@ -227,15 +227,17 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   }
 
   const auto arguments_it = params.find(McpConstants::ARGUMENTS_FIELD);
-  if (arguments_it == params.end() || !arguments_it->is_object()) {
-    ENVOY_LOG(error, "Failed to get the arguments of the tool call request or it's not an object.");
-    sendErrorResponse(Http::Code::BadRequest,
-                      "mcp_json_rest_bridge_filter_tool_arguments_not_found",
-                      generateErrorJsonResponse(-32602, "Tool arguments not found").dump());
+  if (arguments_it != params.end() && !arguments_it->is_object()) {
+    ENVOY_LOG(error, "The arguments of the tool call request must be an object.");
+    sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_tool_arguments_invalid",
+                      generateErrorJsonResponse(-32602, "Tool arguments must be an object").dump());
     return;
   }
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, *arguments_it);
+  const nlohmann::json empty_arguments = nlohmann::json::object();
+  const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
+
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
   if (!http_request.ok()) {
     ENVOY_LOG(error, "Failed to build HTTP request for method: {} with status: {}", tool_name,
               http_request.status().message());
@@ -258,6 +260,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
                            Http::CustomHeaders::get().AcceptEncodingValues.Identity);
 
   Buffer::OwnedImpl new_body(request_body);
+  // TODO(guoyilin42): Using addDecodedData for request body injection is currently not working
+  // end-to-end. Investigate alternative mechanisms, such as injectDecodedDataToFilterChain, and
+  // implement corresponding integration tests.
   decoder_callbacks_->addDecodedData(new_body, true);
   decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
 }

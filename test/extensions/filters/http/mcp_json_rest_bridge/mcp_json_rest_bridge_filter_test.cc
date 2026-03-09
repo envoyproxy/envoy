@@ -41,6 +41,12 @@ public:
             get: "/v1/{parent=projects/*}/apiKeys"
           }
         }
+        tools {
+          name: "get_api_key"
+          http_rule: {
+            get: "/v1/apiKeys"
+          }
+        }
       }
     )pb");
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
@@ -392,21 +398,47 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsNotFoundReturnsError) {
+TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/mcp"}, {":method", "POST"}};
 
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::BadRequest,
-                             Eq(R"json({"code":-32602,"message":"Tool arguments not found"})json"),
-                             _, _, Eq("mcp_json_rest_bridge_filter_tool_arguments_not_found")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Envoy::Http::Code::BadRequest,
+                     Eq(R"json({"code":-32602,"message":"Tool arguments must be an object"})json"),
+                     _, _, Eq("mcp_json_rest_bridge_filter_tool_arguments_invalid")));
 
   Envoy::Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key"}})json");
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":123}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/mcp"}, {":method", "POST"}};
+  Envoy::Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"get_api_key"}})json");
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(Return(Envoy::Http::RequestHeaderMapOptRef(headers)));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillRepeatedly(Invoke(
+          [&request_body](Envoy::Buffer::Instance& data, bool) { request_body.move(data); }));
+
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(headers.getPathValue(), StrEq("/v1/apiKeys"));
+  EXPECT_THAT(headers.getMethodValue(), StrEq("GET"));
+  EXPECT_THAT(headers.getContentLengthValue(), StrEq("0"));
+
+  EXPECT_TRUE(request_body.toString().empty());
 }
 
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {

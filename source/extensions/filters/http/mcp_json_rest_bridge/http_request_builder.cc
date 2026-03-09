@@ -35,25 +35,6 @@ std::string jsonValueToString(const json& j) {
   return j.dump();
 }
 
-absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
-                                             const absl::flat_hash_set<std::string>& templates,
-                                             const json& arguments) {
-  std::string base_url = std::string(pattern);
-  for (const auto& element : templates) {
-    absl::StatusOr<json> template_value_json = getJsonValue(arguments, element);
-    if (!template_value_json.ok()) {
-      return template_value_json.status();
-    }
-    // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
-    // in addition to the specified reserved characters.
-    std::string value_str = Http::Utility::PercentEncoding::encode(
-        jsonValueToString(*template_value_json), ReservedChars);
-    std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
-    RE2::GlobalReplace(&base_url, var_pattern, value_str);
-  }
-  return base_url;
-}
-
 // Key and value for HTTP query parameter.
 struct QueryParam {
   std::string key;
@@ -161,11 +142,30 @@ absl::StatusOr<json> constructRequestBody(absl::string_view body_rule,
 
 } // namespace
 
+absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
+                                             const absl::flat_hash_set<std::string>& templates,
+                                             const nlohmann::json& arguments) {
+  std::string base_url = std::string(pattern);
+  for (const auto& element : templates) {
+    absl::StatusOr<nlohmann::json> template_value_json = getJsonValue(arguments, element);
+    if (!template_value_json.ok()) {
+      return template_value_json.status();
+    }
+    // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
+    // in addition to the specified reserved characters.
+    std::string value_str = Http::Utility::PercentEncoding::encode(
+        jsonValueToString(*template_value_json), ReservedChars);
+    std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
+    RE2::GlobalReplace(&base_url, var_pattern, value_str);
+  }
+  return base_url;
+}
+
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
     const nlohmann::json& arguments) {
   std::string pattern;
-  std::string method = "";
+  std::string method;
   // TODO(guoyilin42): Add validation to ensure exactly one HTTP method is specified.
   if (!http_rule.get().empty()) {
     method = "GET";
@@ -188,8 +188,8 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   absl::string_view url_template = pattern;
   absl::flat_hash_set<std::string> templates;
   std::string template_capture;
-  while (
-      RE2::FindAndConsume(&url_template, R"(\{([a-zA-Z0-9_.]+)(?:=.*?)?\})", &template_capture)) {
+  static const LazyRE2 template_regex = {R"(\{([a-zA-Z0-9_.]+)(?:=.*?)?\})"};
+  while (RE2::FindAndConsume(&url_template, *template_regex, &template_capture)) {
     templates.insert(template_capture);
   }
   absl::StatusOr<std::string> url = constructBaseUrl(pattern, templates, arguments);
@@ -199,7 +199,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
 
   std::vector<QueryParam> query_params;
   if (http_rule.body() != "*") {
-    std::string base_path = "";
+    std::string base_path;
     if (auto status =
             constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path);
         !status.ok()) {
