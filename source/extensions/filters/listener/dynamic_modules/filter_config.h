@@ -4,6 +4,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/statusor.h"
 #include "source/common/stats/utility.h"
@@ -24,6 +25,8 @@ using OnListenerFilterOnCloseType = decltype(&envoy_dynamic_module_on_listener_f
 using OnListenerFilterGetMaxReadBytesType =
     decltype(&envoy_dynamic_module_on_listener_filter_get_max_read_bytes);
 using OnListenerFilterDestroyType = decltype(&envoy_dynamic_module_on_listener_filter_destroy);
+using OnListenerFilterHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_listener_filter_http_callout_done);
 using OnListenerFilterScheduledType = decltype(&envoy_dynamic_module_on_listener_filter_scheduled);
 using OnListenerFilterConfigScheduledType =
     decltype(&envoy_dynamic_module_on_listener_filter_config_scheduled);
@@ -56,13 +59,16 @@ public:
    * @param filter_config the configuration for the module.
    * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
+   * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
    * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
    */
   DynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                     const absl::string_view filter_config,
                                     const absl::string_view metrics_namespace,
-                                    DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                    DynamicModulePtr dynamic_module,
+                                    Envoy::Upstream::ClusterManager& cluster_manager,
+                                    Stats::Scope& stats_scope,
                                     Event::Dispatcher& main_thread_dispatcher);
 
   ~DynamicModuleListenerFilterConfig();
@@ -85,9 +91,13 @@ public:
   OnListenerFilterOnCloseType on_listener_filter_on_close_ = nullptr;
   OnListenerFilterGetMaxReadBytesType on_listener_filter_get_max_read_bytes_ = nullptr;
   OnListenerFilterDestroyType on_listener_filter_destroy_ = nullptr;
+  // Optional: modules that don't need HTTP callout don't need to implement this.
+  OnListenerFilterHttpCalloutDoneType on_listener_filter_http_callout_done_ = nullptr;
   // Optional: modules that don't need config-level scheduling don't need to implement this.
   OnListenerFilterScheduledType on_listener_filter_scheduled_ = nullptr;
   OnListenerFilterConfigScheduledType on_listener_filter_config_scheduled_ = nullptr;
+
+  Envoy::Upstream::ClusterManager& cluster_manager_;
 
   // The main thread dispatcher for scheduling config-level events.
   Event::Dispatcher& main_thread_dispatcher_;
@@ -124,46 +134,49 @@ public:
     Stats::Histogram& histogram_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
@@ -175,7 +188,9 @@ private:
   newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                        const absl::string_view filter_config,
                                        const absl::string_view metrics_namespace,
-                                       DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                       DynamicModulePtr dynamic_module,
+                                       Envoy::Upstream::ClusterManager& cluster_manager,
+                                       Stats::Scope& stats_scope,
                                        Event::Dispatcher& main_thread_dispatcher);
 
   // The name of the filter passed in the constructor.
@@ -224,6 +239,7 @@ private:
  * @param filter_config the configuration for the module.
  * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
+ * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
  * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
@@ -231,7 +247,8 @@ private:
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace,
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
     Event::Dispatcher& main_thread_dispatcher);
 
 } // namespace ListenerFilters

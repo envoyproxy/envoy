@@ -7,7 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
 
@@ -39,15 +39,14 @@ public:
   // mutations fail, then effect will store value MutationsApplied if any
   // mutation was successful and None if nothing if no mutations occurred.
   // TODO(tyxia) Normalizing the headers to lower-case in ext_proc's header mutation.
-  static absl::Status
-  applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
-                       Http::HeaderMap& headers, bool replacing_message,
-                       const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations, ProcessingEffect::Effect& effect,
-                       bool remove_content_length = false);
+  static absl::Status applyHeaderMutations(
+      const envoy::service::ext_proc::v3::HeaderMutation& mutation, Http::HeaderMap& headers,
+      bool replacing_message, const Filters::Common::MutationRules::Checker& rule_checker,
+      Stats::Counter& rejected_mutations, Filters::Common::ProcessingEffect::Effect& effect,
+      bool remove_content_length = false);
 
   // Modify a buffer based on a set of mutations from a protobuf
-  static ProcessingEffect::Effect
+  static Filters::Common::ProcessingEffect::Effect
   applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
                      Buffer::Instance& buffer);
 

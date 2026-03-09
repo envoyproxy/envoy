@@ -28,7 +28,10 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/extensions/filters/common/mcp:filter_state_lib",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],
@@ -47,7 +50,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/http/sse:sse_parser_lib",
         "//source/common/json:json_loader_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

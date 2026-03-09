@@ -30,7 +30,7 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
 
   std::string extension_config_str;
   if (proto_config.has_extension_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.extension_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.extension_config());
     if (!config_or_error.ok()) {
       throwEnvoyExceptionOrPanic("Failed to parse extension config: " +
                                  std::string(config_or_error.status().message()));

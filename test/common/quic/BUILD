@@ -254,6 +254,7 @@ envoy_cc_test(
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
         "//source/common/listener_manager:connection_handler_lib",
+        "//source/common/http:session_idle_list_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_dispatcher_lib",
@@ -406,7 +407,7 @@ envoy_cc_test(
     name = "cert_compression_test",
     srcs = envoy_select_enable_http3(["cert_compression_test.cc"]),
     deps = envoy_select_enable_http3([
-        "//source/common/quic:cert_compression_lib",
+        "//source/common/tls:cert_compression_lib",
         "//test/test_common:logging_lib",
     ]),
 )

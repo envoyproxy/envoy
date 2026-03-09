@@ -33,7 +33,9 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * latched by LoadStatsReporter interface implementations, independent of the normal stats sink
+ * flushing.
+
  */
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
   COUNTER(cx_connect_fail)                                                                         \
@@ -142,6 +144,11 @@ public:
    * @return the metadata associated with this host
    */
   virtual MetadataConstSharedPtr metadata() const PURE;
+
+  /**
+   * @return the cached hash of the metadata associated with this host, or 0 if no metadata.
+   */
+  virtual std::size_t metadataHash() const PURE;
 
   /**
    * Set the current metadata.

@@ -8,6 +8,7 @@ PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy
 WINDOWS_SKIP_TARGETS = [
     "envoy.extensions.http.cache.file_system_http_cache",
     "envoy.extensions.http.cache_v2.file_system_http_cache",
+    "envoy.filters.http.file_server",
     "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
@@ -593,6 +594,7 @@ def _nghttp2():
         patches = [
             "@envoy//bazel/foreign_cc:nghttp2.patch",
             "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
+            "@envoy//bazel/foreign_cc:nghttp2_max_hd_nv.patch",
         ],
     )
 

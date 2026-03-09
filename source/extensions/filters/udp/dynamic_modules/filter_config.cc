@@ -13,7 +13,8 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
         config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
     : filter_name_(config.filter_name()),
-      filter_config_(MessageUtil::getJsonStringFromMessageOrError(config.filter_config())),
+      filter_config_(
+          THROW_OR_RETURN_VALUE(MessageUtil::knownAnyToBytes(config.filter_config()), std::string)),
       dynamic_module_(std::move(dynamic_module)),
       stats_scope_(stats_scope.createScope(
           absl::StrCat(config.dynamic_module_config().metrics_namespace().empty()

@@ -30,7 +30,7 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
 
   std::string filter_config_str;
   if (proto_config.has_filter_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     if (!config_or_error.ok()) {
       throw EnvoyException("Failed to parse filter config: " +
                            std::string(config_or_error.status().message()));
@@ -47,8 +47,8 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
           proto_config.filter_name(), filter_config_str, metrics_namespace,
-          std::move(dynamic_module.value()), context.listenerScope(),
-          context.serverFactoryContext().mainThreadDispatcher());
+          std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
+          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     throw EnvoyException("Failed to create filter config: " +

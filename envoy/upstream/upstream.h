@@ -171,7 +171,9 @@ public:
   /* The host failed active HC due to timeout. */                                \
   m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
   /* The host is currently marked as draining by EDS */                          \
-  m(EDS_STATUS_DRAINING, 0x200)
+  m(EDS_STATUS_DRAINING, 0x200)                                                  \
+  /* The host is currently marked as degraded by outlier detection */            \
+  m(DEGRADED_OUTLIER_DETECTION, 0x400)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -766,8 +768,9 @@ public:
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
  * stats sink. See envoy.config.endpoint.v3.ClusterStats for the definition of
  * total_dropped_requests and dropped_requests, which correspond to the upstream_rq_dropped and
- * upstream_rq_drop_overload counter here. These are latched by LoadStatsReporter, independent of
- * the normal stats sink flushing.
+ * upstream_rq_drop_overload counter here. These are latched by LoadStatsReporter interface
+ * implementations, independent of the normal stats sink flushing.
+
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
   COUNTER(upstream_rq_dropped)                                                                     \
