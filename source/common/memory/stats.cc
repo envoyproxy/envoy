@@ -1,5 +1,6 @@
 #include "source/common/memory/stats.h"
 
+#include <atomic>
 #include <cstdint>
 
 #include "source/common/common/assert.h"
@@ -13,6 +14,18 @@
 
 namespace Envoy {
 namespace Memory {
+
+namespace {
+std::atomic<uint64_t> max_unfreed_memory_bytes{DEFAULT_MAX_UNFREED_MEMORY_BYTES};
+} // namespace
+
+uint64_t maxUnfreedMemoryBytes() {
+  return max_unfreed_memory_bytes.load(std::memory_order_relaxed);
+}
+
+void setMaxUnfreedMemoryBytes(uint64_t value) {
+  max_unfreed_memory_bytes.store(value, std::memory_order_relaxed);
+}
 
 uint64_t Stats::totalCurrentlyAllocated() {
 #if defined(TCMALLOC)
@@ -145,6 +158,7 @@ AllocatorManager::AllocatorManager(
       background_release_rate_bytes_per_second_(
           computeBackgroundReleaseRate(bytes_to_release_, memory_release_interval_msec_)),
       api_(api) {
+  configureTcmallocOptions(config);
   configureBackgroundMemoryRelease();
 };
 
@@ -160,6 +174,36 @@ AllocatorManager::~AllocatorManager() {
     tcmalloc::MallocExtension::SetBackgroundReleaseRate(
         tcmalloc::MallocExtension::BytesPerSecond{0});
     tcmalloc::MallocExtension::SetBackgroundProcessActionsEnabled(true);
+  }
+#endif
+}
+
+void AllocatorManager::configureTcmallocOptions(
+    const envoy::config::bootstrap::v3::MemoryAllocatorManager& config) {
+  if (config.max_unfreed_memory_bytes() > 0) {
+    setMaxUnfreedMemoryBytes(config.max_unfreed_memory_bytes());
+    ENVOY_LOG_MISC(info, "Set max unfreed memory threshold to {} bytes.",
+                   config.max_unfreed_memory_bytes());
+  }
+#if defined(TCMALLOC)
+  if (config.has_soft_memory_limit_bytes()) {
+    tcmalloc::MallocExtension::SetMemoryLimit(config.soft_memory_limit_bytes().value(),
+                                              tcmalloc::MallocExtension::LimitKind::kSoft);
+    ENVOY_LOG_MISC(info, "Set tcmalloc soft memory limit to {} bytes.",
+                   config.soft_memory_limit_bytes().value());
+  }
+  if (config.has_max_per_cpu_cache_size_bytes()) {
+    tcmalloc::MallocExtension::SetMaxPerCpuCacheSize(config.max_per_cpu_cache_size_bytes().value());
+    ENVOY_LOG_MISC(info, "Set tcmalloc max per-CPU cache size to {} bytes.",
+                   config.max_per_cpu_cache_size_bytes().value());
+  }
+#else
+  if (config.has_soft_memory_limit_bytes()) {
+    ENVOY_LOG_MISC(warn, "Soft memory limit is only supported with Google's tcmalloc, ignoring.");
+  }
+  if (config.has_max_per_cpu_cache_size_bytes()) {
+    ENVOY_LOG_MISC(warn,
+                   "Max per-CPU cache size is only supported with Google's tcmalloc, ignoring.");
   }
 #endif
 }

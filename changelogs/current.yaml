@@ -235,6 +235,21 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls
+  change: |
+    Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
+    and added brotli and zlib to TCP TLS. Controlled by runtime flag
+    ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
+    When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: dynamic_modules
+  change: |
+    Added gRPC status support for the HTTP dynamic module filter SDKs. The ``send_response`` SDK
+    methods now accept an optional gRPC status code which is passed as a ``grpc-status`` header,
+    and the ``ResponseGrpcStatus`` attribute is now available to read gRPC status from responses.
+- area: dynamic_modules
+  change: |
+    Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
+    Modules can now define metrics during configuration and record them during host selection.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -259,6 +274,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: memory
+  change: |
+    Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
+    fields to :ref:`MemoryAllocatorManager <envoy_v3_api_msg_config.bootstrap.v3.MemoryAllocatorManager>`
+    for fine-grained control of tcmalloc memory management.
 - area: dynamic_modules
   change: |
     Added :ref:`TLS certificate validator

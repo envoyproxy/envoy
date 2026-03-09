@@ -1,3 +1,4 @@
+from .async_client.client import AsyncClient
 from .envoy_engine import (
     Engine,
     EngineBuilder,
@@ -12,6 +13,7 @@ from .envoy_engine import (
 )
 
 __all__ = [
+    "AsyncClient",
     "Engine",
     "EngineBuilder",
     "EnvoyError",

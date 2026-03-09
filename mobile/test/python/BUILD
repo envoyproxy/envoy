@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 py_library(
     name = "echo_test_server",
     srcs = ["echo_test_server.py"],
+    visibility = ["//visibility:public"],
 )
 
 py_test(

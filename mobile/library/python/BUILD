@@ -1,7 +1,11 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
+
+# NOTE: This file is used to package the Envoy Mobile Python APIs for PyPI.
+# The core logic is in C++, and we use pybind11 to create a native extension.
+# We then use rules_python to bundle this extension into a wheel (.whl).
 
 licenses(["notice"])  # Apache 2
 
@@ -82,6 +86,17 @@ genrule(
     cmd = "cp $< $@",
 )
 
+# pure-python asyncio helpers which sit on top of the envoy_engine module.
+# we place them in the envoy_mobile/ package directory for PyPI distribution.
+py_library(
+    name = "async_client",
+    srcs = glob(["async_client/**/*.py"]),
+    data = [
+        ":envoy_engine_so",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "envoy_mobile_lib",
     srcs = glob(["envoy_mobile/**/*.py"]),
@@ -92,6 +107,7 @@ py_library(
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
+    deps = [":async_client"],
 )
 
 py_package(
@@ -120,29 +136,4 @@ py_wheel(
     version = "0.5.0",
     visibility = ["//visibility:public"],
     deps = [":envoy_mobile_package"],
-)
-
-# Tests
-py_library(
-    name = "echo_test_server",
-    srcs = ["tests/echo_test_server.py"],
-)
-
-py_test(
-    name = "fetch_test",
-    srcs = ["tests/fetch_test.py"],
-    main = "tests/fetch_test.py",
-    deps = [
-        ":echo_test_server",
-        ":envoy_mobile_lib",
-    ],
-)
-
-py_test(
-    name = "lifecycle_test",
-    srcs = ["tests/lifecycle_test.py"],
-    main = "tests/lifecycle_test.py",
-    deps = [
-        ":envoy_mobile_lib",
-    ],
 )

@@ -555,6 +555,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   // Test member update host address callback with null.
   EXPECT_FALSE(
       envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0, true, &result));
+
+  // Test host counter stat callback with null.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
@@ -598,6 +603,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 999, 0), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 999, 0, nullptr, nullptr,
                                                                   nullptr));
+
+  // Test host counter stat with invalid priority.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 999, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
@@ -636,6 +646,11 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 999), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 999, nullptr, nullptr,
                                                                   nullptr));
+
+  // Test host counter stat with invalid host index.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 999, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
@@ -727,6 +742,15 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
   host2_->stats().rq_active_.set(10);
   host2_->stats().cx_active_.set(7);
 
+  // Set counter stats on hosts.
+  host1_->stats().cx_connect_fail_.inc();
+  host1_->stats().cx_connect_fail_.inc();
+  host1_->stats().cx_total_.add(100);
+  host1_->stats().rq_error_.add(3);
+  host1_->stats().rq_success_.add(42);
+  host1_->stats().rq_timeout_.inc();
+  host1_->stats().rq_total_.add(46);
+
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
@@ -770,6 +794,31 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
   EXPECT_TRUE(
       envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region, nullptr, nullptr));
   EXPECT_EQ(absl::string_view(region.ptr, region.length), "us-east");
+
+  // Verify host counter stats.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxConnectFail),
+            2);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxTotal),
+            100);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqError),
+            3);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqSuccess),
+            42);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTimeout),
+            1);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            46);
+
+  // Verify host2 counter stats are 0 (not set).
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
+                lb_ptr, 0, 1, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+            0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
@@ -1421,6 +1470,10 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksSuccess) {
   EXPECT_NE(addr_result.ptr, nullptr);
   EXPECT_GT(addr_result.length, 0);
 
+  // Test invalid host index within a valid locality.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_get_locality_host_address(lb_ptr, 0, 0, 999, &addr_result));
+
   // Test locality weights.
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 0), 70);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_locality_weight(lb_ptr, 0, 1), 30);
@@ -1664,6 +1717,473 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFailDoesNotRegisterCallback) {
   // chooseHost should return null since the module failed to initialize.
   auto response = lb->chooseHost(nullptr);
   EXPECT_EQ(response.host, nullptr);
+}
+
+// =============================================================================
+// Metrics Tests
+// =============================================================================
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterDefineAndIncrement) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  ASSERT_NE(typed_config, nullptr);
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a counter (no labels).
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter", .length = 12};
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, nullptr, 0,
+                                                                   &counter_id));
+  EXPECT_EQ(1, counter_id);
+
+  // Increment the counter via config pointer.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                      nullptr, 0, 5));
+
+  // Verify the counter value via stats store.
+  auto counter =
+      TestUtility::findCounter(factory_context_.store_, "dynamicmodulescustom.test_counter");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(5, counter->value());
+
+  // Increment again.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                      nullptr, 0, 3));
+  EXPECT_EQ(8, counter->value());
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeDefineAndManipulate) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a gauge (no labels).
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge", .length = 10};
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, nullptr, 0,
+                                                                 &gauge_id));
+  EXPECT_EQ(1, gauge_id);
+
+  // Set gauge.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_id, nullptr, 0, 100));
+
+  // Increment gauge.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_id, nullptr,
+                                                                    0, 10));
+
+  // Decrement gauge.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_id, nullptr, 0, 5));
+
+  // Verify: 100 + 10 - 5 = 105.
+  auto gauge = TestUtility::findGauge(factory_context_.store_, "dynamicmodulescustom.test_gauge");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(105, gauge->value());
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramDefineAndRecord) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a histogram (no labels).
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_histogram", .length = 14};
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, nullptr, 0,
+                                                                     &histogram_id));
+  EXPECT_EQ(1, histogram_id);
+
+  // Record a histogram value.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
+                                                                           nullptr, 0, 42));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsInvalidId) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Using invalid IDs should return MetricNotFound (no labels).
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, 999, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, 999, nullptr, 0, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, 999, nullptr, 0, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, 999, nullptr,
+                                                                           0, 1));
+
+  // ID 0 should also return MetricNotFound (1-based IDs).
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, 0, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, 0, nullptr, 0, 1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, 0, nullptr, 0, 1));
+
+  // Using invalid IDs with labels should also return MetricNotFound.
+  envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, 999, &label_val, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, 999, &label_val, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, 999,
+                                                                           &label_val, 1, 1));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsMultipleCounters) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define two counters.
+  envoy_dynamic_module_type_module_buffer name1 = {.ptr = "counter_a", .length = 9};
+  envoy_dynamic_module_type_module_buffer name2 = {.ptr = "counter_b", .length = 9};
+  size_t id1 = 0, id2 = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name1, nullptr, 0, &id1));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name2, nullptr, 0, &id2));
+  EXPECT_EQ(1, id1);
+  EXPECT_EQ(2, id2);
+
+  // Increment each counter independently.
+  envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, id1, nullptr, 0, 10);
+  envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, id2, nullptr, 0, 20);
+
+  auto counter_a =
+      TestUtility::findCounter(factory_context_.store_, "dynamicmodulescustom.counter_a");
+  auto counter_b =
+      TestUtility::findCounter(factory_context_.store_, "dynamicmodulescustom.counter_b");
+  ASSERT_NE(nullptr, counter_a);
+  ASSERT_NE(nullptr, counter_b);
+  EXPECT_EQ(10, counter_a->value());
+  EXPECT_EQ(20, counter_b->value());
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterVecWithLabels) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a counter vec with two labels.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "req_total", .length = 9};
+  envoy_dynamic_module_type_module_buffer label_names[2] = {{.ptr = "method", .length = 6},
+                                                            {.ptr = "status", .length = 6}};
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, label_names, 2,
+                                                                   &counter_id));
+  EXPECT_EQ(1, counter_id);
+
+  // Increment with matching label values.
+  envoy_dynamic_module_type_module_buffer label_values[2] = {{.ptr = "GET", .length = 3},
+                                                             {.ptr = "200", .length = 3}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                      label_values, 2, 1));
+
+  // Increment with different label values.
+  envoy_dynamic_module_type_module_buffer label_values2[2] = {{.ptr = "POST", .length = 4},
+                                                              {.ptr = "500", .length = 3}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                      label_values2, 2, 3));
+
+  // Wrong number of label values should return InvalidLabels.
+  envoy_dynamic_module_type_module_buffer single_val = {.ptr = "GET", .length = 3};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                      &single_val, 1, 1));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeVecWithLabels) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a gauge vec with one label.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "active_conns", .length = 12};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "backend", .length = 7};
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, &label_name, 1,
+                                                                 &gauge_id));
+  EXPECT_EQ(1, gauge_id);
+
+  // Set, increment, decrement with labels.
+  envoy_dynamic_module_type_module_buffer label_value = {.ptr = "host1", .length = 5};
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_id, &label_value, 1, 50));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_id,
+                                                                    &label_value, 1, 10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_id,
+                                                                    &label_value, 1, 5));
+
+  // Wrong label count should return InvalidLabels.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_InvalidLabels,
+      envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_id, nullptr, 0, 10));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a histogram vec with one label.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "latency", .length = 7};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "endpoint", .length = 8};
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, &label_name,
+                                                                     1, &histogram_id));
+  EXPECT_EQ(1, histogram_id);
+
+  // Record histogram values with labels.
+  envoy_dynamic_module_type_module_buffer label_value = {.ptr = "10.0.0.1", .length = 8};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
+                                                                           &label_value, 1, 42));
+
+  // Wrong label count should return InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
+                                                                           nullptr, 0, 10));
+
+  // Wrong label count (too many) should return InvalidLabels.
+  envoy_dynamic_module_type_module_buffer extra_labels[2] = {{.ptr = "a", .length = 1},
+                                                             {.ptr = "b", .length = 1}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, histogram_id,
+                                                                           extra_labels, 2, 10));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a counter vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer counter_name = {.ptr = "cv", .length = 2};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "lbl", .length = 3};
+  size_t counter_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(
+                config_ptr, counter_name, &label_name, 1, &counter_vec_id));
+
+  // Calling increment_counter with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_vec_id,
+                                                                      nullptr, 0, 1));
+
+  // Define a gauge vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gv", .length = 2};
+  size_t gauge_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, gauge_name,
+                                                                 &label_name, 1, &gauge_vec_id));
+
+  // Calling set_gauge, increment_gauge, decrement_gauge with 0 labels on a vec ID returns
+  // InvalidLabels.
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_InvalidLabels,
+      envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_vec_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_vec_id,
+                                                                    nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_vec_id,
+                                                                    nullptr, 0, 1));
+
+  // Define a histogram vec (ID 1 in vec space).
+  envoy_dynamic_module_type_module_buffer hist_name = {.ptr = "hv", .length = 2};
+  size_t hist_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, hist_name,
+                                                                     &label_name, 1, &hist_vec_id));
+
+  // Calling record_histogram_value with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_record_histogram_value(config_ptr, hist_vec_id,
+                                                                           nullptr, 0, 1));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecWrongLabelCount) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Define a gauge vec with one label.
+  envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gwl", .length = 3};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "lbl", .length = 3};
+  size_t gauge_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, gauge_name,
+                                                                 &label_name, 1, &gauge_vec_id));
+
+  // Providing wrong number of label values (2 instead of 1).
+  envoy_dynamic_module_type_module_buffer extra_vals[2] = {{.ptr = "a", .length = 1},
+                                                           {.ptr = "b", .length = 1}};
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_set_gauge(config_ptr, gauge_vec_id, extra_vals,
+                                                              2, 50));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, gauge_vec_id,
+                                                                    extra_vals, 2, 10));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, gauge_vec_id,
+                                                                    extra_vals, 2, 5));
+}
+
+TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+
+  // Using non-existent vec IDs with labels should return MetricNotFound.
+  envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_increment_gauge(config_ptr, 999, &label_val, 1, 10));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_MetricNotFound,
+      envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1, 5));
 }
 
 } // namespace
