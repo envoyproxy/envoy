@@ -79,6 +79,8 @@ public:
                  const std::chrono::microseconds min_latency)
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
           max_latency_(max_latency), min_latency_(min_latency) {}
+    // The number of completed GRPC calls. This will be the number of body responses sent by the
+    // external processor.
     uint32_t call_count_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
@@ -147,6 +149,10 @@ public:
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
+  void incrementRequestBodySentCount() { request_body_sent_++; }
+  void incrementResponseBodySentCount() { response_body_sent_++; }
+  int32_t requestBodySentCount() const { return request_body_sent_; }
+  int32_t responseBodySentCount() const { return response_body_sent_; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
 
@@ -156,41 +162,6 @@ public:
 
   FieldType getField(absl::string_view field_name) const override;
 
-  // Struct to hold various traffic metrics for a request/response flow.
-  struct HttpEventTrafficStats {
-    // Request Headers
-    uint64_t request_header_bytes_sent = 0;
-    uint64_t request_header_bytes_received = 0;
-
-    // Response Headers
-    uint64_t response_header_bytes_sent = 0;
-    uint64_t response_header_bytes_received = 0;
-
-    // Request Body
-    uint64_t request_body_bytes_sent = 0;
-    uint64_t request_body_bytes_received = 0;
-    uint64_t request_body_chunks_sent = 0;
-    uint64_t request_body_chunks_received = 0;
-
-    // Response Body
-    uint64_t response_body_bytes_sent = 0;
-    uint64_t response_body_bytes_received = 0;
-    uint64_t response_body_chunks_sent = 0;
-    uint64_t response_body_chunks_received = 0;
-
-    // Request Trailers
-    uint64_t request_trailer_bytes_sent = 0;
-    uint64_t request_trailer_bytes_received = 0;
-
-    // Response Trailers
-    uint64_t response_trailer_bytes_sent = 0;
-    uint64_t response_trailer_bytes_received = 0;
-  };
-
-  HttpEventTrafficStats eventTrafficStats() const { return event_traffic_stats_; }
-  void setBytesReceived(uint64_t data, ProcessingResponse::ResponseCase response_case);
-  void setBytesSent(uint64_t data, ProcessingRequest::RequestCase request_case);
-
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
@@ -198,11 +169,14 @@ private:
   GrpcCalls encoding_processor_grpc_calls_;
   ProcessingEffects encoding_processor_effects_{};
   ProcessingEffects decoding_processor_effects_{};
-  HttpEventTrafficStats event_traffic_stats_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
   uint64_t bytes_sent_{0}, bytes_received_{0};
+  // The number of body ProcessingRequests sent to the external processor. This number may not be
+  // equal to call_count_ if using FULL_DUPLEX_STREAMED_MODE.
+  int32_t request_body_sent_ = 0;
+  int32_t response_body_sent_ = 0;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
