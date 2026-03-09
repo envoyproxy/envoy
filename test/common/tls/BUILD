@@ -315,3 +315,18 @@ envoy_benchmark_test(
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],
 )
+
+envoy_cc_benchmark_binary(
+    name = "validated_chain_memory_benchmark",
+    srcs = ["validated_chain_memory_benchmark.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/memory:stats_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "validated_chain_memory_benchmark_test",
+    benchmark_binary = "validated_chain_memory_benchmark",
+)
