@@ -608,8 +608,12 @@ func (h *dymHttpFilterHandle) GetMetadataListString(source shared.MetadataSource
 	)
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
-	if !bool(ret) || valueView.ptr == nil || valueView.length == 0 {
+	if !bool(ret) {
 		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	// Handle the case where the value is empty string.
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
 	}
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }

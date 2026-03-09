@@ -381,8 +381,6 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   ASSERT_NE(key, ns_res_body->second.fields().end());
   EXPECT_EQ(key->second.string_value(), "value");
 
-  std::cout << metadata.DebugString() << std::endl;
-
   // Check list metadata set by the filter during on_response_body.
   auto ns_list = metadata.filter_metadata().find("ns_list");
   // Verify number list.
