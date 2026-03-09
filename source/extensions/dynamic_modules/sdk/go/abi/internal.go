@@ -727,12 +727,11 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 
 	// When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
 	// picks it up via modify_headers without requiring an ABI change.
-	finalHeaders := headers
 	if grpcStatus >= 0 {
-		finalHeaders = append(append([][2]string{}, headers...), [2]string{"grpc-status", strconv.Itoa(int(grpcStatus))})
+		headers = append(headers, [2]string{"grpc-status", strconv.Itoa(int(grpcStatus))})
 	}
 
-	headerViews := headersToModuleHttpHeaderSlice(finalHeaders)
+	headerViews := headersToModuleHttpHeaderSlice(headers)
 	C.envoy_dynamic_module_callback_http_send_response(
 		h.hostPluginPtr,
 		(C.uint32_t)(statusCode),
@@ -744,7 +743,7 @@ func (h *dymHttpFilterHandle) SendLocalResponse(
 
 	runtime.KeepAlive(body)
 	runtime.KeepAlive(detail)
-	runtime.KeepAlive(finalHeaders)
+	runtime.KeepAlive(headers)
 }
 
 func (h *dymHttpFilterHandle) SendResponseHeaders(

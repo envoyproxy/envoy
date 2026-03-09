@@ -388,26 +388,23 @@ public:
                          std::string_view detail) override {
     // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
     // picks it up via modify_headers without requiring an ABI change.
+    std::string grpc_status_str;
+    std::vector<HeaderView> merged_headers;
+    const HeaderView* headers_ptr = headers.data();
+    size_t headers_size = headers.size();
     if (grpc_status >= 0) {
-      std::string grpc_status_str = std::to_string(grpc_status);
-      std::vector<HeaderView> merged_headers(headers.begin(), headers.end());
+      grpc_status_str = std::to_string(grpc_status);
+      merged_headers.assign(headers.begin(), headers.end());
       merged_headers.emplace_back("grpc-status", grpc_status_str);
-      envoy_dynamic_module_callback_http_send_response(
-          host_plugin_ptr_, status,
-          const_cast<envoy_dynamic_module_type_module_http_header*>(
-              reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(
-                  merged_headers.data())),
-          merged_headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
-          envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
-    } else {
-      envoy_dynamic_module_callback_http_send_response(
-          host_plugin_ptr_, status,
-          const_cast<envoy_dynamic_module_type_module_http_header*>(
-              reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(
-                  headers.data())),
-          headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
-          envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
+      headers_ptr = merged_headers.data();
+      headers_size = merged_headers.size();
     }
+    envoy_dynamic_module_callback_http_send_response(
+        host_plugin_ptr_, status,
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers_ptr)),
+        headers_size, envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+        envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
   }
 
   void sendResponseHeaders(std::span<const HeaderView> headers, bool end_stream) override {
