@@ -230,6 +230,9 @@ bug_fixes:
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: redis
+  change: |
+    Added support for ``BITFIELD_RO`` in ``redis_proxy``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
