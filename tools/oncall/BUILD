@@ -1,7 +1,14 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 licenses(["notice"])  # Apache 2
+
+package(default_visibility = ["//test/tools/oncall:__pkg__"])
+
+exports_files([
+    "rotation.yaml",
+    "rotation.ical",
+])
 
 py_library(
     name = "oncall_calendar_lib",
@@ -23,19 +30,5 @@ py_binary(
     deps = [
         ":oncall_calendar_lib",
         requirement("aio.run.runner"),
-    ],
-)
-
-py_test(
-    name = "ensure_up_to_date_test",
-    srcs = ["ensure_up_to_date_test.py"],
-    data = [
-        "rotation.ical",
-        "rotation.yaml",
-        "//:reviewers.yaml",
-    ],
-    deps = [
-        ":oncall_calendar_lib",
-        requirement("pyyaml"),
     ],
 )
