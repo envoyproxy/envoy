@@ -92,6 +92,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
             "gazelle:resolve go golang.org/x/net/http2 @org_golang_x_net//http2",
             "gazelle:resolve go golang.org/x/net/http2/hpack @org_golang_x_net//http2/hpack",
             "gazelle:resolve go golang.org/x/net/trace @org_golang_x_net//trace",
+            "gazelle:resolve go golang.org/x/sys/unix @org_golang_x_sys//unix",
         ],
     )
     go_repository(
