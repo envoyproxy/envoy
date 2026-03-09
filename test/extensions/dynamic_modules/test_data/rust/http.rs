@@ -44,6 +44,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
+    "send_response_grpc" => Some(Box::new(SendResponseGrpcFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
@@ -446,6 +447,35 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
         ("header2", "value2".as_bytes()),
       ],
       Some(b"Hello, World!"),
+      None,
+      None,
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+/// A HTTP filter configuration to test `send_response()` with a gRPC status code.
+struct SendResponseGrpcFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseGrpcFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SendResponseGrpcFilter {})
+  }
+}
+
+struct SendResponseGrpcFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseGrpcFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.send_response(
+      503,
+      &[("grpc-message", b"service unavailable")],
+      None,
+      Some(14), // Unavailable.
       None,
     );
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration

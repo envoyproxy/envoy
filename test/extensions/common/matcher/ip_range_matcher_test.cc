@@ -31,7 +31,7 @@ using ::Envoy::Matcher::ActionConstSharedPtr;
 using ::Envoy::Matcher::ActionFactory;
 using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::CustomMatcherFactory;
-using ::Envoy::Matcher::DataInputGetResult;
+using ::Envoy::Matcher::DataAvailability;
 using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
@@ -215,8 +215,7 @@ on_no_match:
   }
   {
     // Input is nullopt.
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(DataAvailability::AllDataAvailable);
     EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
 }
@@ -506,27 +505,23 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(DataAvailability::AllDataAvailable);
     auto nested = TestDataInputBoolFactory("");
     EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
-    auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
+    auto nested = TestDataInputBoolFactory(DataAvailability::AllDataAvailable);
     EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(DataAvailability::NotAvailable);
     auto nested = TestDataInputBoolFactory("");
     EXPECT_THAT(doMatch(), HasInsufficientData());
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
-    auto nested = TestDataInputBoolFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
+    auto nested = TestDataInputBoolFactory(DataAvailability::NotAvailable);
     EXPECT_THAT(doMatch(), HasInsufficientData());
   }
 }

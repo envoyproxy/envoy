@@ -12,6 +12,7 @@ namespace InputMatchers {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::MatchResult;
 
 class DynamicModuleMatcherTest : public testing::Test {
@@ -58,8 +59,7 @@ TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
   ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
   match_data->request_headers_ = &request_headers;
 
-  ::Envoy::Matcher::MatchingDataType input =
-      std::shared_ptr<::Envoy::Matcher::CustomMatchData>(match_data);
+  auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
   // The no-op matcher always returns true.
   EXPECT_EQ(matcher->match(input), MatchResult::Matched);
@@ -100,8 +100,7 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
     ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test-header", "match"}};
     match_data->request_headers_ = &request_headers;
 
-    ::Envoy::Matcher::MatchingDataType input =
-        std::shared_ptr<::Envoy::Matcher::CustomMatchData>(match_data);
+    auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
     EXPECT_EQ(matcher->match(input), MatchResult::Matched);
   }
@@ -112,8 +111,7 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
     ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test-header", "no-match"}};
     match_data->request_headers_ = &request_headers;
 
-    ::Envoy::Matcher::MatchingDataType input =
-        std::shared_ptr<::Envoy::Matcher::CustomMatchData>(match_data);
+    auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
     EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
   }
@@ -124,8 +122,7 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
     ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"other-header", "match"}};
     match_data->request_headers_ = &request_headers;
 
-    ::Envoy::Matcher::MatchingDataType input =
-        std::shared_ptr<::Envoy::Matcher::CustomMatchData>(match_data);
+    auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
     EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
   }
@@ -153,9 +150,8 @@ TEST_F(DynamicModuleMatcherTest, SupportedDataInputTypes) {
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(module, on_config_destroy.value(),
                                                              on_match.value(), in_module_config);
 
-  auto types = matcher->supportedDataInputTypes();
-  EXPECT_EQ(1, types.size());
-  EXPECT_TRUE(types.contains("dynamic_module_data_input"));
+  EXPECT_TRUE(matcher->supportsDataInputType("dynamic_module_data_input"));
+  EXPECT_FALSE(matcher->supportsDataInputType("string"));
 }
 
 // A non-DynamicModuleMatchData CustomMatchData implementation for testing.
@@ -185,8 +181,7 @@ TEST_F(DynamicModuleMatcherTest, NonDynamicModuleCustomMatchDataReturnsFalse) {
 
   // Pass a CustomMatchData that is not DynamicModuleMatchData.
   auto other_data = std::make_shared<OtherCustomMatchData>();
-  ::Envoy::Matcher::MatchingDataType input =
-      std::shared_ptr<::Envoy::Matcher::CustomMatchData>(other_data);
+  auto input = DataInputGetResult::CreateCustom(std::move(other_data));
 
   EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
 }
@@ -214,7 +209,7 @@ TEST_F(DynamicModuleMatcherTest, NonCustomMatchDataReturnsFalse) {
                                                              on_match.value(), in_module_config);
 
   // Pass a string variant instead of CustomMatchData.
-  ::Envoy::Matcher::MatchingDataType input = std::string("not_custom_data");
+  auto input = DataInputGetResult::CreateString("not_custom_data");
   EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
 }
 
@@ -243,8 +238,7 @@ TEST_F(DynamicModuleMatcherTest, NullRequestHeaders) {
   // Create match data with no headers set.
   auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
 
-  ::Envoy::Matcher::MatchingDataType input =
-      std::shared_ptr<::Envoy::Matcher::CustomMatchData>(match_data);
+  auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
   EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
 }
