@@ -421,6 +421,10 @@ new_features:
     <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`
     support for dynamic modules, enabling custom service discovery and host management to be implemented
     in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added scheduler support for dynamic module custom clusters, allowing modules to safely dispatch
+    work to Envoy's main thread from background threads for thread-safe host updates.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field

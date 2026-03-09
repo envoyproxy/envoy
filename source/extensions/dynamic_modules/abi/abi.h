@@ -7848,6 +7848,21 @@ typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_scheduler_envoy_ptr is a raw pointer to the
+ * DynamicModuleClusterScheduler class in Envoy. This is used to schedule events to the main thread
+ * from background threads.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling cluster events is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_new and the scheduling and destruction is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_commit and
+ * envoy_dynamic_module_callback_cluster_scheduler_delete. Since its lifecycle is owned/managed by
+ * the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -7946,6 +7961,21 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_on_cluster_scheduled is called on the main thread when an event previously
+ * scheduled via envoy_dynamic_module_callback_cluster_scheduler_commit is dispatched. The module
+ * can use the event_id to distinguish between different scheduled events.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object. This can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the ID of the event that was scheduled with
+ * envoy_dynamic_module_callback_cluster_scheduler_commit.
+ */
+void envoy_dynamic_module_on_cluster_scheduled(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
 // =============================================================================
 // Cluster Dynamic Module Callbacks
 // =============================================================================
@@ -8021,6 +8051,42 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_new creates a new scheduler for the given
+ * cluster. The scheduler allows the module to dispatch events to the main thread from any thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @return envoy_dynamic_module_type_cluster_scheduler_module_ptr is the pointer to the scheduler.
+ * The module is responsible for deleting the scheduler via
+ * envoy_dynamic_module_callback_cluster_scheduler_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_cluster_scheduler_module_ptr
+envoy_dynamic_module_callback_cluster_scheduler_new(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_delete deletes a scheduler previously created by
+ * envoy_dynamic_module_callback_cluster_scheduler_new. After this call, the scheduler pointer is
+ * no longer valid.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler to delete.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_delete(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_commit schedules an event to be dispatched on
+ * the main thread. When the event is dispatched, envoy_dynamic_module_on_cluster_scheduled will be
+ * called with the same event_id.
+ *
+ * This function is thread-safe and can be called from any thread.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler.
+ * @param event_id is a module-defined identifier to distinguish different scheduled events.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_commit(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
