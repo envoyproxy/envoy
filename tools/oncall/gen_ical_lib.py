@@ -101,9 +101,9 @@ class IcalOverrideEvent(IcalEvent):
 
 
 def ical_file_format(events: list[IcalEvent]) -> str:
-    return f"""BEGIN:VCALENDAR
-PRODID:-//Envoy//On call rotation generator script//EN
-VERSION:2.0
-{"\n".join(f"{event}" for event in events)}
-END:VCALENDAR
-"""
+    return "\n".join([
+        "BEGIN:VCALENDAR",
+        "PRODID:-//Envoy//On call rotation generator script//EN", "VERSION:2.0",
+        *(str(event) for event in events),
+        "END:VCALENDAR\n",
+    ])
