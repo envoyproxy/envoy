@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     deps = [

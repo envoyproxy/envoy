@@ -41,7 +41,7 @@ directories:
   source/extensions/filters/http/a2a: 93  # TODO(tyxia) Under active development
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
-  source/extensions/filters/http/dynamic_modules: 95.0
+  source/extensions/filters/http/dynamic_modules: 95.2
   source/extensions/filters/http/decompressor: 95.9
   source/extensions/filters/http/ext_proc: 96.4
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
