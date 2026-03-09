@@ -143,6 +143,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "static_route_provider_impl_test",
+    srcs = ["static_route_provider_impl_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/router:route_provider_manager_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "scoped_config_impl_test",
     srcs = ["scoped_config_impl_test.cc"],
     rbe_pool = "6gig",
