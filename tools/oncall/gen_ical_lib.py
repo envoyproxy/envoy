@@ -1,95 +1,109 @@
-from datetime import date, timedelta
+from dataclasses import dataclass
+from datetime import date
 
-from tools.oncall.parsing import rotation_from_yaml, overrides_from_yaml, Override
 
-_HEADER = """BEGIN:VCALENDAR
+@dataclass
+class IcalEvent:
+    updated: date
+    start_date: date
+    uid: str
+    summary: str
+
+    @property
+    def lines(self) -> list[str]:
+        return [
+            self._dtstamp,
+            self._uid,
+            self._dtstart,
+            self._summary,
+            self.duration,
+            *self.extra_lines,
+        ]
+
+    @property
+    def _dtstamp(self) -> str:
+        """Edit timestamp, in 20220102T123456Z format"""
+        return f"DTSTAMP:{self.updated.strftime("%Y%m%dT%H%M%SZ")}"
+
+    @property
+    def _uid(self) -> str:
+        """Required UID"""
+        return f"UID:{self.uid}"
+
+    @property
+    def _dtstart(self) -> str:
+        """Event start date in 20220102 format"""
+        return f"DTSTART:{self.start_date.strftime("%Y%m%d")}"
+
+    @property
+    def _summary(self) -> str:
+        return f"SUMMARY:{self.summary}"
+
+    @property
+    def duration(self) -> str:
+        raise NotImplementedError("abstract class")
+
+    @property
+    def extra_lines(self) -> list[str]:
+        return []
+
+    def __str__(self) -> str:
+        return "\n".join(["BEGIN:VEVENT", *self.lines, "END:VEVENT"])
+
+
+@dataclass
+class IcalRecurringEvent(IcalEvent):
+    every_n_weeks: int
+    exclude_days: list[date]
+
+    def _intersects_day(self, d: date) -> list[date]:
+        if d < self.start_date:
+            # in the past
+            return False
+        diff_in_days = (d - self.start_date).days
+        diff_in_weeks = diff_in_days // 7
+        return diff_in_weeks % self.every_n_weeks == 0
+
+    @property
+    def _excluded_days(self) -> list[date]:
+        return [d for d in self.exclude_days if self._intersects_day(d)]
+
+    @property
+    def _exdates(self) -> str | None:
+        if self._excluded_days:
+            return f"\nEXDATE:{','.join([d.strftime("%Y%m%d") for d in self._excluded_days])}"
+        return None
+
+    @property
+    def _rrule(self) -> str:
+        return f"RRULE:FREQ=WEEKLY;INTERVAL={self.every_n_weeks};BYDAY=SU"
+
+    @property
+    def duration(self) -> str:
+        return "DURATION:P1W"
+
+    @property
+    def extra_lines(self) -> list[str]:
+        ret = [self._rrule]
+        exdates = self._exdates
+        if exdates:
+            ret.append(exdates)
+        return ret
+
+
+@dataclass
+class IcalOverrideEvent(IcalEvent):
+    duration_days: int
+
+    @property
+    def duration(self) -> str:
+        return f"DURATION:P{self.duration_days}D"
+
+
+def ical_file_format(events: list[IcalEvent]) -> str:
+    return f"""BEGIN:VCALENDAR
 PRODID:-//Envoy//On call rotation generator script//EN
-VERSION:2.0"""
-
-_FOOTER = "END:VCALENDAR\n"
-
-
-def _every_n_weeks(n: int) -> str:
-    return f"RRULE:FREQ=WEEKLY;INTERVAL={n};BYDAY=SU"
-
-
-def _date(t: date) -> str:
-    return t.strftime("%Y%m%d")
-
-
-def _date_with_zero_time(t: date) -> str:
-    return t.strftime("%Y%m%dT000000Z")
-
-
-def _date_intersects(seats: int, start_date: date, d: date) -> bool:
-    """Returns true if the date d occurs within a week specified by `start_date`
-    on a rotation of `seats` weeks, e.g. if seats was 3 and start_date was Jan 1,
-    would return true if d is in the week Jan 1 to Jan 7 or if d is in the week
-    Jan 22 to Jan 29, and so on."""
-    if d < start_date:
-        # in the past
-        return False
-    diff_in_days = (d - start_date).days
-    diff_in_weeks = diff_in_days // 7
-    return diff_in_weeks % seats == 0
-
-
-def _override_days(overrides: list[Override]) -> list[date]:
-    dates: list[date] = []
-    for override in overrides:
-        d = override.start
-        for _ in range(override.duration_days):
-            dates.append(d)
-            d += timedelta(days=1)
-    return dates
-
-
-def _exdates(seats: int, start_date: date, override_days: list[date]) -> str:
-    excluded_days = list(
-        filter(lambda d: _date_intersects(seats, start_date, d),
-               override_days))
-    if excluded_days:
-        return f"\nEXDATE:{','.join(map(_date, excluded_days))}"
-    return ""
-
-
-def _vevent_rotation(stamp: str, start_date: date, oncall: str, seats: int,
-                     override_days: list[date]) -> str:
-    return f"""BEGIN:VEVENT
-{stamp}
-UID:{oncall}
-DTSTART:{_date(start_date)}
-DURATION:P1W
-SUMMARY:Envoy on-call ({oncall})
-{_every_n_weeks(seats)}{_exdates(seats, start_date, override_days)}
-END:VEVENT"""
-
-
-def _vevent_override(stamp: str, override: Override) -> str:
-    return f"""BEGIN:VEVENT
-{stamp}
-UID:{override.oncall}-override-{_date(override.start)}
-DTSTART:{_date(override.start)}
-DURATION:P{override.duration_days}D
-SUMMARY: Envoy on-call (override -> {override.oncall})
-END:VEVENT"""
-
-
-def gen_ical() -> str:
-    start_date, updated, rotation = rotation_from_yaml()
-    overrides = overrides_from_yaml()
-    override_days: list[date] = _override_days(overrides)
-    events: list[str] = []
-    seats = len(rotation)
-    stamp = f"DTSTAMP:{_date_with_zero_time(updated)}"
-    for oncall in rotation:
-        events.append(
-            _vevent_rotation(stamp, start_date, oncall, seats, override_days))
-        start_date += timedelta(days=7)
-
-    for override in overrides:
-        assert override.oncall in rotation, f"override.oncall = {override.oncall} is not listed in rotation.yaml"
-        events.append(_vevent_override(stamp, override))
-    return f"""{_HEADER}
-{"\n".join(events)}
-{_FOOTER}"""
+VERSION:2.0
+{"\n".join(f"{event}" for event in events)}
+END:VCALENDAR
+"""
