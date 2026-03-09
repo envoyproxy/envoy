@@ -414,8 +414,10 @@ type HttpFilterHandle interface {
 	// @Param status the HTTP status code.
 	// @Param headers the response headers.
 	// @Param body the response body.
+	// @Param grpcStatus the gRPC status code for gRPC requests. Use -1 to indicate no gRPC status
+	// (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC status codes.
 	// @Param detail a short description to the response for debugging purposes.
-	SendLocalResponse(status uint32, headers [][2]string, body []byte, detail string)
+	SendLocalResponse(status uint32, headers [][2]string, body []byte, grpcStatus int32, detail string)
 
 	// SendResponseHeaders sends response headers to the client. This is used for
 	// streaming local replies.
@@ -717,4 +719,9 @@ type HttpFilterConfigHandle interface {
 	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.
 	// @Param streamID the ID of the HTTP stream.
 	ResetHttpStream(streamID uint64)
+
+	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
+	// This should be called only during the plugin configuration phase, and the returned
+	// Scheduler can be used later even outside of the callbacks and at other threads.
+	GetScheduler() Scheduler
 }

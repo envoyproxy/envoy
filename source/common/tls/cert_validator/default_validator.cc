@@ -33,7 +33,6 @@
 #include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -119,7 +118,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_trusted_ca_ = true;
 
       if (config_->allowExpiredCertificate()) {
-        CertValidatorUtil::setIgnoreCertificateExpiration(store);
+        X509_STORE_set_flags(store, X509_V_FLAG_NO_CHECK_TIME);
       }
     }
   }

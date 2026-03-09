@@ -93,6 +93,11 @@ minor_behavior_changes:
     Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
     headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
     collected and can be accesses via method requestProcessingEffect() and failedOpen().
+- area: dynamic_modules
+  change: |
+    Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
+    serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
+    dynamic module side as the configuration.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -105,6 +110,12 @@ bug_fixes:
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
     resolves an error when a dynamic modules network filter closes a connection that has an HTTP filter present.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module extensions do not handle the ``google.protobuf.Struct`` configuration
+    properly as the API definition requires.
+    The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
+    to the dynamic module side as the configuration.
 - area: tls
   change: |
     Fix on-demand TLS selector to enforce session resumption settings.
@@ -229,6 +240,21 @@ new_features:
     Added :ref:`max_datapoints_per_request
     <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_datapoints_per_request>`
     configuration to the OpenTelemetry stat sink to chunk metric export requests.
+- area: tls
+  change: |
+    Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
+    and added brotli and zlib to TCP TLS. Controlled by runtime flag
+    ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
+    When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: dynamic_modules
+  change: |
+    Added gRPC status support for the HTTP dynamic module filter SDKs. The ``send_response`` SDK
+    methods now accept an optional gRPC status code which is passed as a ``grpc-status`` header,
+    and the ``ResponseGrpcStatus`` attribute is now available to read gRPC status from responses.
+- area: dynamic_modules
+  change: |
+    Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
+    Modules can now define metrics during configuration and record them during host selection.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -253,6 +279,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: memory
+  change: |
+    Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
+    fields to :ref:`MemoryAllocatorManager <envoy_v3_api_msg_config.bootstrap.v3.MemoryAllocatorManager>`
+    for fine-grained control of tcmalloc memory management.
 - area: dynamic_modules
   change: |
     Added :ref:`TLS certificate validator
@@ -295,6 +326,9 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: access_log
+  change: |
+    Added customization support on stats in the stats :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
@@ -433,6 +467,10 @@ new_features:
     Added :ref:`load balancing policies
     <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
     support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added ``get_host_health_by_address`` ABI callback for dynamic module load balancers, providing O(1)
+    host health lookup by address string using the cross-priority host map.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
@@ -512,6 +550,11 @@ new_features:
     Added init manager integration to the dynamic modules bootstrap extension ABI. An init target
     is automatically registered for every bootstrap extension, blocking traffic until the module
     signals readiness via ``signal_init_complete``.
+- area: dynamic_modules
+  change: |
+    Added ``on_host_membership_update`` event hook and ``get_member_update_host_address`` callback
+    for dynamic module load balancers, enabling modules to receive notifications when hosts are
+    added or removed from the cluster and inspect the affected host addresses.
 - area: geoip
   change: |
     Added ``asn_org`` field to :ref:`geo_field_keys
@@ -557,6 +600,10 @@ new_features:
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
     standard JSON-REST HTTP requests.
+- area: http
+  change: |
+    Added :ref:`file_server http filter <config_http_filters_file_server>` to allow responding with
+    file contents from the filesystem.
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``prompts/list`` fanout aggregation.
@@ -570,5 +617,16 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
+    ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include the certificate's CRL Distribution Point (CRLDP) information when CRL
+    validation fails. For errors such as ``CRL for certificate was not provided``, ``CRL has expired``, ``CRL
+    is not yet valid``, or ``certificate revoked``, the error message now includes the certificate's
+    CRL distribution points (e.g., ``X509_verify_cert: certificate verification error at depth 0: certificate revocation
+    check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
+    [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
+    validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
 
 deprecated:

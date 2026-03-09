@@ -174,6 +174,47 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
   runHeaderCallbacksTest(true);
 }
 
+TEST_P(DynamicModulesIntegrationTest, StructConfig) {
+  if (GetParam() != "go") {
+    // The struct config test is only for Golang filter because it's easy to verify.
+    return;
+  }
+
+  initializeFilter("http_struct_config", R"({"dog":"cat"})", "",
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */, "",
                    "type.googleapis.com/google.protobuf.BytesValue");
@@ -375,6 +416,43 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, SendResponseWithGrpcStatus) {
+  initializeFilter("send_response_grpc", "\"14\"");
+
+  // Use a gRPC request via makeSingleRequest which handles the full request-response lifecycle.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/test/long/url", "", downstream_protocol_, version_,
+      "sni.lyft.com", Http::Headers::get().ContentTypeValues.Grpc);
+  ASSERT_TRUE(response->complete());
+  // gRPC trailers-only response always has HTTP status 200.
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, response->headers().getContentTypeValue());
+  // Verify the gRPC status is set in the response headers (trailers-only response).
+  EXPECT_EQ("14", response->headers().getGrpcStatusValue());
+}
+
+TEST_P(DynamicModulesIntegrationTest, ResponseGrpcStatusAttribute) {
+  initializeFilter("grpc_status_attribute", "");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"grpc-status", "7"}, {"content-type", "application/grpc"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // Verify the filter read the gRPC status from the response headers.
+  EXPECT_EQ("7", response->headers()
+                     .get(Http::LowerCaseString("x-grpc-status-from-attr"))[0]
+                     ->value()
+                     .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {

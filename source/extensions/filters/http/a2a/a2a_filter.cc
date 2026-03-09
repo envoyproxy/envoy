@@ -62,25 +62,28 @@ uint32_t A2aFilter::getMaxRequestBodySize() const { return config_->maxRequestBo
 
 Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
-  // TODO(tyxia): Only support GET and POST for now. Investigate if other methods should be
-  // supported in the future.
-  if (isValidA2aGetRequest(headers)) {
+  // According to RFC 7231, a payload body in a GET request has no defined semantics.
+  // In A2A filter here, GET with body will be rejected in REJECT mode, will pass through in
+  // PASS_THROUGH mode.
+  if (isValidA2aGetRequest(headers) && end_stream) {
     is_a2a_request_ = true;
     ENVOY_LOG(debug, "valid A2A GET request, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (isValidA2aPostRequest(headers)) {
-    is_json_post_request_ = true;
-    ENVOY_LOG(debug, "valid A2A POST request");
     if (end_stream) {
       is_a2a_request_ = false;
     } else {
-      // TODO(tyxia) Set the max request body size limit, depends on the way of handling the body
-      // data in decodeData.
+      // Set it to true first to perform the JSON-RPC 2.0 compliance check in decodeData() phase.
       is_a2a_request_ = true;
+      // Set the buffer limit
+      const uint32_t max_size = getMaxRequestBodySize();
+      if (max_size > 0) {
+        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
+      }
 
-      // Stop iteration to validate the body in decodeData (e.g., validate JSON-RPC 2.0).
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -97,8 +100,13 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance&, bool) {
-  if (!is_json_post_request_ || !is_a2a_request_) {
+Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (!is_a2a_request_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  // Early return if we have already completed parsing.
+  if (parsing_complete_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -106,7 +114,81 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance&, bool) {
     parser_ = std::make_unique<A2aJsonParser>(config_->parserConfig());
   }
 
-  // TODO(tyxia) Handle the data parsing.
+  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
+            bytes_parsed_, end_stream);
+
+  const uint32_t max_size = getMaxRequestBodySize();
+
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    const char* start = static_cast<const char*>(slice.mem_);
+    size_t len = slice.len_;
+
+    if (max_size > 0) {
+      len = std::min(len, static_cast<size_t>(max_size - bytes_parsed_));
+    }
+
+    if (len > 0) {
+      auto status = parser_->parse({start, len});
+      bytes_parsed_ += len;
+
+      if (parser_->isAllFieldsCollected()) {
+        ENVOY_LOG(debug, "a2a early parse termination: found all fields");
+        return completeParsing();
+      }
+
+      if (!status.ok()) {
+        config_->stats().invalid_json_.inc();
+        decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
+                                           absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+    }
+
+    if (max_size > 0 && bytes_parsed_ == max_size)
+      break;
+  }
+
+  // If we are here, we haven't collected all fields yet.
+  bool size_limit_hit = (max_size > 0 && bytes_parsed_ == max_size);
+  if (end_stream || size_limit_hit) {
+    auto final_status = parser_->finishParse();
+    if (!final_status.ok()) {
+      // TODO(tyxia) Support the case that size limit hit before optional fields.
+      if (size_limit_hit) {
+        config_->stats().body_too_large_.inc();
+        handleParseError("request body is too large.");
+      } else {
+        config_->stats().invalid_json_.inc();
+        handleParseError("not a valid JSON (incomplete).");
+      }
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    return completeParsing();
+  }
+
+  return Http::FilterDataStatus::StopIterationAndWatermark;
+}
+
+void A2aFilter::handleParseError(absl::string_view error_msg) {
+  ENVOY_LOG(debug, "parse error: {}", error_msg);
+  is_a2a_request_ = false;
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
+                                     "a2a_filter_parse_error");
+}
+
+Http::FilterDataStatus A2aFilter::completeParsing() {
+  parsing_complete_ = true;
+  is_a2a_request_ = parser_->isValidA2aRequest();
+
+  ENVOY_LOG(debug, "parsing complete: is_a2a={}, bytes_parsed={}", is_a2a_request_, bytes_parsed_);
+
+  if (!is_a2a_request_ && shouldRejectRequest()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       "request must be a valid JSON-RPC 2.0 message for A2A",
+                                       nullptr, absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   return Http::FilterDataStatus::Continue;
 }
 

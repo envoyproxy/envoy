@@ -532,7 +532,7 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
 
 Http::LocalErrorStatus
 DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) {
-  if (!in_module_filter_) {
+  if (!in_module_filter_ || config_->on_http_filter_local_reply_ == nullptr) {
     return Http::LocalErrorStatus::Continue;
   }
   envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};

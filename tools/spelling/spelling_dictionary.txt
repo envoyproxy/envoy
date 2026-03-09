@@ -429,6 +429,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -867,6 +868,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup
@@ -1549,6 +1551,7 @@ unref
 unreferenced
 unzigzag
 upcasts
+upsert
 upstreams
 uptime
 upvalue
@@ -1666,6 +1669,7 @@ cpuacct.usage
 cpufreq
 effective_cpus
 cpus
+shrinker
 ja3
 ja4
 jsonl

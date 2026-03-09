@@ -37,3 +37,15 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "a2a_filter_integration_test",
+    srcs = ["a2a_filter_integration_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/a2a:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/a2a/v3:pkg_cc_proto",
+    ],
+)

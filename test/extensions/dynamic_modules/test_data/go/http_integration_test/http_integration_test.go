@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -23,6 +24,8 @@ func init() {
 		"body_callbacks":               &BodyCallbacksConfigFactory{},
 		"http_callouts":                &HttpCalloutsConfigFactory{},
 		"send_response":                &SendResponseConfigFactory{},
+		"send_response_grpc":           &SendResponseGrpcConfigFactory{},
+		"grpc_status_attribute":        &GrpcStatusAttributeConfigFactory{},
 		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
@@ -33,6 +36,7 @@ func init() {
 		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
+		"http_struct_config":           &HttpStructConfigFactory{},
 	})
 }
 
@@ -55,11 +59,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 	sharedStatus := new(atomic.Bool)
 	sharedStatus.Store(false)
 
-	// TODO(wbpcode): to support the actual config scheduler in golang SDK.
-	go func() {
+	handle.GetScheduler().Schedule(func() {
 		time.Sleep(100 * time.Millisecond)
 		sharedStatus.Store(true)
-	}()
+	})
 
 	return &ConfigSchedulerFilterFactory{sharedStatus: sharedStatus}, nil
 }
@@ -67,6 +70,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 type ConfigSchedulerFilterFactory struct {
 	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
+}
+
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
 }
 
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
@@ -509,7 +516,7 @@ func (p *SendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 	if p.mode == "on_request_headers" {
 		p.handle.SendLocalResponse(200,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_request_headers"), "test_details")
+			[]byte("local_response_body_from_on_request_headers"), -1, "test_details")
 		return shared.HeadersStatusStop
 	}
 	return shared.HeadersStatusContinue
@@ -520,7 +527,7 @@ func (p *SendResponseFilter) OnRequestBody(body shared.BodyBuffer,
 	if p.mode == "on_request_body" {
 		p.handle.SendLocalResponse(200,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_request_body"), "")
+			[]byte("local_response_body_from_on_request_body"), -1, "")
 		return shared.BodyStatusStopAndBuffer
 	}
 	return shared.BodyStatusContinue
@@ -531,8 +538,82 @@ func (p *SendResponseFilter) OnResponseHeaders(headers shared.HeaderMap,
 	if p.mode == "on_response_headers" {
 		p.handle.SendLocalResponse(500,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_response_headers"), "")
+			[]byte("local_response_body_from_on_response_headers"), -1, "")
 		return shared.HeadersStatusStop
+	}
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// SendResponseGrpc
+// -----------------------------------------------------------------------------
+
+type SendResponseGrpcConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *SendResponseGrpcConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	grpcStatus, err := strconv.ParseInt(string(config), 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid grpc status config: %v", err)
+	}
+	return &SendResponseGrpcFilterFactory{grpcStatus: int32(grpcStatus)}, nil
+}
+
+type SendResponseGrpcFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	grpcStatus int32
+}
+
+func (f *SendResponseGrpcFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &SendResponseGrpcFilter{handle: handle, grpcStatus: f.grpcStatus}
+}
+
+type SendResponseGrpcFilter struct {
+	shared.EmptyHttpFilter
+	handle     shared.HttpFilterHandle
+	grpcStatus int32
+}
+
+func (p *SendResponseGrpcFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	p.handle.SendLocalResponse(200,
+		[][2]string{{"x-grpc-test", "true"}},
+		[]byte("grpc_response"), p.grpcStatus, "")
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
+// GrpcStatusAttribute
+// -----------------------------------------------------------------------------
+
+type GrpcStatusAttributeConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *GrpcStatusAttributeConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &GrpcStatusAttributeFilterFactory{}, nil
+}
+
+type GrpcStatusAttributeFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *GrpcStatusAttributeFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &GrpcStatusAttributeFilter{handle: handle}
+}
+
+type GrpcStatusAttributeFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (p *GrpcStatusAttributeFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if val, ok := p.handle.GetAttributeNumber(shared.AttributeIDResponseGrpcStatus); ok {
+		headers.Set("x-grpc-status-from-attr", strconv.FormatInt(int64(val), 10))
 	}
 	return shared.HeadersStatusContinue
 }
@@ -576,7 +657,7 @@ func (p *HttpCalloutsFilter) OnRequestHeaders(headers shared.HeaderMap,
 		p,
 	)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"foo", "bar"}}, nil, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"foo", "bar"}}, nil, -1, "")
 	}
 	p.calloutHandle = id
 	return shared.HeadersStatusStop
@@ -607,7 +688,7 @@ func (p *HttpCalloutsFilter) OnHttpCalloutDone(calloutID uint64, result shared.H
 	assertEq(fullBody, "response_body_from_callout", "resp body")
 
 	p.handle.SendLocalResponse(200, [][2]string{{"some_header", "some_value"}},
-		[]byte("local_response_body"), "callout_success")
+		[]byte("local_response_body"), -1, "callout_success")
 }
 
 // -----------------------------------------------------------------------------
@@ -723,7 +804,7 @@ func (p *FakeExternalCacheFilter) OnRequestHeaders(headers shared.HeaderMap, end
 		if key.ToUnsafeString() == "existing" {
 			// Simulate hit
 			sched.Schedule(func() {
-				p.handle.SendLocalResponse(200, [][2]string{{"cached", "yes"}}, []byte("cached_response_body"), "")
+				p.handle.SendLocalResponse(200, [][2]string{{"cached", "yes"}}, []byte("cached_response_body"), -1, "")
 			})
 		} else {
 			// Simulate miss
@@ -998,7 +1079,7 @@ func (p *HttpStreamBasicFilter) OnRequestHeaders(h shared.HeaderMap, end bool) s
 		nil, true, 5000, p)
 	if res != shared.HttpCalloutInitSuccess {
 		p.handle.SendLocalResponse(500,
-			[][2]string{{"x-error", "stream_init_failed"}}, nil, "")
+			[][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1029,7 +1110,7 @@ func (p *HttpStreamBasicFilter) OnHttpStreamComplete(id uint64) {
 	p.complete = true
 	p.handle.SendLocalResponse(200,
 		[][2]string{{"x-stream-test", "basic"}},
-		[]byte("stream_callout_success"), "")
+		[]byte("stream_callout_success"), -1, "")
 }
 func (p *HttpStreamBasicFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {}
 
@@ -1076,7 +1157,7 @@ func (p *HttpStreamBidiFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sh
 		[][2]string{{":path", "/stream"}, {":method", "POST"}, {"host", "example.com"}},
 		nil, false, 10000, p)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1107,7 +1188,7 @@ func (p *HttpStreamBidiFilter) OnHttpStreamComplete(id uint64) {
 		{"x-stream-test", "bidirectional"},
 		{"x-chunks-sent", strconv.Itoa(p.sentChunks)},
 		{"x-chunks-received", strconv.Itoa(p.recvChunks)},
-	}, []byte("bidirectional_success"), "")
+	}, []byte("bidirectional_success"), -1, "")
 }
 func (p *HttpStreamBidiFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {}
 
@@ -1150,7 +1231,7 @@ func (p *UpstreamResetFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sha
 		[][2]string{{":path", "/reset"}, {":method", "GET"}, {"host", "example.com"}},
 		nil, true, 5000, p)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1165,7 +1246,7 @@ func (p *UpstreamResetFilter) OnHttpStreamTrailers(id uint64, trailers [][2]shar
 func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64) {}
 func (p *UpstreamResetFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {
 	assertEq(id, p.streamID, "id")
-	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), "")
+	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), -1, "")
 }
 
 // -----------------------------------------------------------------------------
@@ -1220,9 +1301,9 @@ type HttpConfigCalloutFilter struct {
 func (p *HttpConfigCalloutFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if p.calloutDone.Load() {
-		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, "")
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, -1, "")
 	} else {
-		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, "")
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, -1, "")
 	}
 	return shared.HeadersStatusStop
 }
@@ -1291,9 +1372,36 @@ type HttpConfigStreamFilter struct {
 func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if p.streamDone.Load() {
-		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, "")
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, -1, "")
 	} else {
-		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, -1, "")
 	}
 	return shared.HeadersStatusStop
+}
+
+type HttpStructConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpStructConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// Parse config as JSON
+	var cfg map[string]string = make(map[string]string)
+	err := json.Unmarshal(config, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON config: %v", err)
+	}
+	return &HttpStructFilterFactory{cfg: cfg}, nil
+}
+
+type HttpStructFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cfg map[string]string
+}
+
+func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.cfg {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &shared.EmptyHttpFilter{}
 }
