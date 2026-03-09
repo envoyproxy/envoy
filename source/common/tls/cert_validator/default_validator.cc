@@ -328,6 +328,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   }
   Envoy::Ssl::ClientValidationStatus detailed_status =
       Envoy::Ssl::ClientValidationStatus::NotValidated;
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   ASSERT(leaf_cert);
   if (verify_trusted_ca_) {
@@ -365,6 +366,16 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
               Envoy::Ssl::ClientValidationStatus::Failed,
               SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
     }
+
+    STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(ctx.get());
+    if (verified_chain != nullptr) {
+      for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+        X509* cert = sk_X509_value(verified_chain, i);
+        X509_up_ref(cert);
+        validated_chain.emplace_back(cert);
+      }
+    }
+
     detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
   }
   std::string error_details;
@@ -373,7 +384,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
       verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(), context,
                                 detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                       detailed_status, absl::nullopt, absl::nullopt}
+                                       detailed_status, absl::nullopt, absl::nullopt,
+                                       std::move(validated_chain)}
                    : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
                                        tls_alert, error_details};
 }

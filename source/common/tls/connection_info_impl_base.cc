@@ -5,10 +5,8 @@
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
-#include "source/common/tls/context_impl.h"
 
 #include "absl/strings/str_replace.h"
-#include "openssl/err.h"
 #include "openssl/safestack.h"
 #include "openssl/x509v3.h"
 #include "utility.h"
@@ -22,59 +20,6 @@ namespace {
 // There must be an version of this function for each type possible in variant `CachedValue`.
 bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
 bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
-
-// Returns the direct issuer CA cert of the peer leaf certificate.
-//
-// Builds an X509_STORE_CTX with the peer-supplied chain as untrusted intermediates and the
-// Envoy trust store, calls X509_verify_cert to construct the verified chain, then returns
-// chain[1] (the direct issuer of the leaf).
-//
-// Returns nullptr if the chain was not validated yet, verification fails, or no issuer exists.
-// The returned UniquePtr holds a reference that must be released by the caller.
-bssl::UniquePtr<X509> getIssuerFromValidatedChain(SSL* ssl) {
-  auto* extended_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
-  if (!extended_info || extended_info->certificateValidationStatus() !=
-                          Envoy::Ssl::ClientValidationStatus::Validated) {
-    return nullptr;
-  }
-
-  STACK_OF(X509)* peer_chain = SSL_get_peer_full_cert_chain(ssl);
-  if (!peer_chain || sk_X509_num(peer_chain) == 0) {
-    return nullptr;
-  }
-  X509* leaf = sk_X509_value(peer_chain, 0);
-
-  X509_STORE* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(ssl));
-  if (store == nullptr) {
-    return nullptr;
-  }
-
-  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
-  // Pass peer_chain as untrusted intermediates; X509_verify_cert will build the full chain
-  // by traversing from leaf through intermediates up to a trust anchor in the store.
-  if (!ctx || !X509_STORE_CTX_init(ctx.get(), store, leaf, peer_chain)) {
-    return nullptr;
-  }
-
-  X509_STORE_CTX_set_default(ctx.get(), SSL_is_server(ssl) ? "ssl_client" : "ssl_server");
-  X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
-                         SSL_CTX_get0_param(SSL_get_SSL_CTX(ssl)));
-
-  if (X509_verify_cert(ctx.get()) != 1) {
-    return nullptr;
-  }
-
-  // chain[0] = leaf, chain[1] = direct issuer, ..., chain[n] = trust anchor.
-  STACK_OF(X509)* chain = X509_STORE_CTX_get0_chain(ctx.get());
-  if (!chain || sk_X509_num(chain) < 2) {
-    return nullptr;
-  }
-
-  X509* issuer = sk_X509_value(chain, 1);
-  X509_up_ref(issuer);
-  return bssl::UniquePtr<X509>(issuer);
-}
 
 bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
 bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
@@ -451,8 +396,8 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
 
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::Sha256PeerCertificateIssuerDigest, [](SSL* ssl) -> std::string {
-        auto issuer = getIssuerFromValidatedChain(ssl);
+      CachedValueTag::Sha256PeerCertificateIssuerDigest, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
         if (!issuer) {
           return std::string{};
         }
@@ -462,8 +407,8 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() c
 
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() const {
   return getCachedValueOrCreate<std::string>(
-      CachedValueTag::SerialNumberPeerCertificateIssuer, [](SSL* ssl) -> std::string {
-        auto issuer = getIssuerFromValidatedChain(ssl);
+      CachedValueTag::SerialNumberPeerCertificateIssuer, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
         if (!issuer) {
           return std::string{};
         }

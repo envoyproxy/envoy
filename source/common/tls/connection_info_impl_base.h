@@ -58,6 +58,10 @@ public:
 
   virtual SSL* ssl() const PURE;
 
+  // Returns the direct issuer cert from the validated chain, or nullptr if unavailable.
+  // Subclasses that store the validated chain should override this.
+  virtual X509* validatedPeerIssuer() const { return nullptr; }
+
 private:
   // Enum values should be the name of the calling function, but capitalized.
   enum class CachedValueTag : uint8_t {
