@@ -18,28 +18,27 @@ public:
   explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
   ~AccessLogState() override {
-    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      state.gauge_ptr_->sub(state.value_);
-      state.gauge_ptr_->setEvictionDisabled(false);
+    for (const auto& [gauge, value] : inflight_gauges_) {
+      gauge->sub(value);
+      gauge->setEvictionDisabled(false);
     }
   }
 
-  void addInflightGauge(const Stats::Gauge* gauge, uint64_t value) {
-    auto& state = inflight_gauges_[gauge];
-    if (state.gauge_ptr_ == nullptr) {
-      state.gauge_ptr_ = const_cast<Stats::Gauge*>(gauge);
-      state.gauge_ptr_->setEvictionDisabled(true);
+  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
+    auto [it, inserted] = inflight_gauges_.try_emplace(gauge, 0);
+    if (inserted) {
+      gauge->setEvictionDisabled(true);
     }
-    state.value_ += value;
+    it->second += value;
   }
 
-  absl::optional<uint64_t> removeInflightGauge(const Stats::Gauge* gauge) {
+  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.value_;
-    it->second.gauge_ptr_->setEvictionDisabled(false);
+    uint64_t value = it->second;
+    gauge->setEvictionDisabled(false);
     inflight_gauges_.erase(it);
     return value;
   }
@@ -47,16 +46,11 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  struct State {
-    uint64_t value_{0};
-    Stats::Gauge* gauge_ptr_{nullptr};
-  };
-
   Stats::ScopeSharedPtr scope_;
 
   // The map key holds a raw pointer to the gauge to enable fast O(1) lookups during
   // PAIRED_SUBTRACT.
-  absl::flat_hash_map<const Stats::Gauge*, State> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
