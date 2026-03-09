@@ -15,8 +15,6 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
-#include "google/protobuf/struct.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
