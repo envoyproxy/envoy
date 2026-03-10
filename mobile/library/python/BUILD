@@ -3,10 +3,6 @@ load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 
-# NOTE: This file is used to package the Envoy Mobile Python APIs for PyPI.
-# The core logic is in C++, and we use pybind11 to create a native extension.
-# We then use rules_python to bundle this extension into a wheel (.whl).
-
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])
