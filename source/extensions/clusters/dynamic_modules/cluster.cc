@@ -94,8 +94,7 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
 
   auto on_drain_started = config->dynamic_module_->getFunctionPointer<OnClusterDrainStartedType>(
       "envoy_dynamic_module_on_cluster_drain_started");
-  config->on_cluster_drain_started_ =
-      on_drain_started.ok() ? on_drain_started.value() : nullptr;
+  config->on_cluster_drain_started_ = on_drain_started.ok() ? on_drain_started.value() : nullptr;
 
   auto on_shutdown = config->dynamic_module_->getFunctionPointer<OnClusterShutdownType>(
       "envoy_dynamic_module_on_cluster_shutdown");
