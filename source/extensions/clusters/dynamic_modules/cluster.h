@@ -4,9 +4,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
@@ -37,6 +39,10 @@ using OnClusterLbNewType = decltype(&envoy_dynamic_module_on_cluster_lb_new);
 using OnClusterLbDestroyType = decltype(&envoy_dynamic_module_on_cluster_lb_destroy);
 using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_choose_host);
 using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
+using OnClusterServerInitializedType =
+    decltype(&envoy_dynamic_module_on_cluster_server_initialized);
+using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
+using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -68,6 +74,9 @@ public:
   OnClusterLbDestroyType on_cluster_lb_destroy_ = nullptr;
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
   OnClusterScheduledType on_cluster_scheduled_ = nullptr;
+  OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
+  OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
+  OnClusterShutdownType on_cluster_shutdown_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -142,6 +151,11 @@ protected:
   void startPreInit() override;
 
 private:
+  /**
+   * Registers server lifecycle callbacks (server_initialized, drain, shutdown).
+   */
+  void registerLifecycleCallbacks();
+
   friend class DynamicModuleClusterFactory;
   friend class DynamicModuleClusterScheduler;
   friend class DynamicModuleClusterTestPeer;
@@ -151,10 +165,20 @@ private:
   DynamicModuleClusterConfigSharedPtr config_;
   envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
   Event::Dispatcher& dispatcher_;
+  Server::Configuration::ServerFactoryContext& server_context_;
 
   // Map from raw host pointer to shared pointer for lookup in chooseHost.
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<void*, Upstream::HostSharedPtr> host_map_ ABSL_GUARDED_BY(host_map_lock_);
+
+  // Handle for the drain close callback registration. Dropped on destruction to unregister.
+  Envoy::Common::CallbackHandlePtr drain_handle_;
+
+  // Handle for the shutdown lifecycle callback registration.
+  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
+
+  // Handle for the server initialized lifecycle callback registration.
+  Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
 };
 
 /**
