@@ -80,25 +80,25 @@ void envoy_dynamic_module_on_cluster_scheduled(
 }
 
 void envoy_dynamic_module_on_cluster_server_initialized(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
-  (void)cluster_module_ptr;
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
   (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
 }
 
 void envoy_dynamic_module_on_cluster_drain_started(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
-  (void)cluster_module_ptr;
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
   (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
 }
 
 void envoy_dynamic_module_on_cluster_shutdown(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
     envoy_dynamic_module_type_event_cb completion_callback, void* completion_context) {
-  (void)cluster_module_ptr;
   (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
   // Immediately invoke the completion callback.
   completion_callback(completion_context);
 }

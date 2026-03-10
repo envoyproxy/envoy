@@ -414,8 +414,8 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
 ) {
   let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
   let cluster = unsafe { &mut *cluster };
@@ -424,8 +424,8 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
 ) {
   let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
   let cluster = unsafe { &mut *cluster };
@@ -434,8 +434,8 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
-  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   completion_callback: abi::envoy_dynamic_module_type_event_cb,
   completion_context: *mut std::os::raw::c_void,
 ) {

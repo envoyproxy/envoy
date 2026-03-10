@@ -82,14 +82,24 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
                  on_cluster_lb_choose_host_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_scheduled", OnClusterScheduledType,
                  on_cluster_scheduled_);
-  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_server_initialized",
-                 OnClusterServerInitializedType, on_cluster_server_initialized_);
-  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_drain_started", OnClusterDrainStartedType,
-                 on_cluster_drain_started_);
-  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_shutdown", OnClusterShutdownType,
-                 on_cluster_shutdown_);
 
 #undef RESOLVE_SYMBOL
+
+  // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
+  auto on_server_initialized =
+      config->dynamic_module_->getFunctionPointer<OnClusterServerInitializedType>(
+          "envoy_dynamic_module_on_cluster_server_initialized");
+  config->on_cluster_server_initialized_ =
+      on_server_initialized.ok() ? on_server_initialized.value() : nullptr;
+
+  auto on_drain_started = config->dynamic_module_->getFunctionPointer<OnClusterDrainStartedType>(
+      "envoy_dynamic_module_on_cluster_drain_started");
+  config->on_cluster_drain_started_ =
+      on_drain_started.ok() ? on_drain_started.value() : nullptr;
+
+  auto on_shutdown = config->dynamic_module_->getFunctionPointer<OnClusterShutdownType>(
+      "envoy_dynamic_module_on_cluster_shutdown");
+  config->on_cluster_shutdown_ = on_shutdown.ok() ? on_shutdown.value() : nullptr;
 
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
@@ -163,43 +173,46 @@ DynamicModuleCluster::~DynamicModuleCluster() {
 }
 
 void DynamicModuleCluster::registerLifecycleCallbacks() {
-  // Register for server initialized notifications via the lifecycle notifier.
-  server_initialized_handle_ = server_context_.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::PostInit, [this]() {
-        if (in_module_cluster_ != nullptr) {
-          ENVOY_LOG(debug, "dynamic module cluster server initialized");
-          config_->on_cluster_server_initialized_(in_module_cluster_, this);
-        }
-      });
+  if (config_->on_cluster_server_initialized_ != nullptr) {
+    server_initialized_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::PostInit, [this]() {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster server initialized");
+            config_->on_cluster_server_initialized_(this, in_module_cluster_);
+          }
+        });
+  }
 
-  // Register for drain notifications via the server-wide drain manager.
-  drain_handle_ = server_context_.drainManager().addOnDrainCloseCb(
-      Network::DrainDirection::All, [this](std::chrono::milliseconds) -> absl::Status {
-        if (in_module_cluster_ != nullptr) {
-          ENVOY_LOG(debug, "dynamic module cluster drain started");
-          config_->on_cluster_drain_started_(in_module_cluster_, this);
-        }
-        return absl::OkStatus();
-      });
+  if (config_->on_cluster_drain_started_ != nullptr) {
+    drain_handle_ = server_context_.drainManager().addOnDrainCloseCb(
+        Network::DrainDirection::All, [this](std::chrono::milliseconds) -> absl::Status {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster drain started");
+            config_->on_cluster_drain_started_(this, in_module_cluster_);
+          }
+          return absl::OkStatus();
+        });
+  }
 
-  // Register for shutdown notifications via the server lifecycle notifier.
-  shutdown_handle_ = server_context_.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this](Event::PostCb completion_cb) {
-        if (in_module_cluster_ != nullptr) {
-          ENVOY_LOG(debug, "dynamic module cluster shutdown started");
-          auto* completion = new Event::PostCb(std::move(completion_cb));
-          config_->on_cluster_shutdown_(
-              in_module_cluster_, this,
-              [](void* context) {
-                auto* cb = static_cast<Event::PostCb*>(context);
-                (*cb)();
-                delete cb;
-              },
-              static_cast<void*>(completion));
-        } else {
-          completion_cb();
-        }
-      });
+  if (config_->on_cluster_shutdown_ != nullptr) {
+    shutdown_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this](Event::PostCb completion_cb) {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster shutdown started");
+            auto* completion = new Event::PostCb(std::move(completion_cb));
+            config_->on_cluster_shutdown_(
+                this, in_module_cluster_,
+                [](void* context) {
+                  auto* cb = static_cast<Event::PostCb*>(context);
+                  (*cb)();
+                  delete cb;
+                },
+                static_cast<void*>(completion));
+          } else {
+            completion_cb();
+          }
+        });
+  }
 }
 
 void DynamicModuleCluster::startPreInit() {
