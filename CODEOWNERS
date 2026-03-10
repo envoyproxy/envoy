@@ -255,6 +255,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # set_filter_state extension
 /*/extensions/filters/common/set_filter_state @kyessenov @wbpcode
 /*/extensions/filters/http/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/listener/set_filter_state @kyessenov @wbpcode @agrawroh
 /*/extensions/filters/network/set_filter_state @kyessenov @wbpcode
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
