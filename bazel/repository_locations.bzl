@@ -709,8 +709,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
         # TODO(zhxie): Update to the next release version when it is released.
         version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
-        sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
-        strip_prefix = "colm-{version}",
+        sha256 = "f11e62f0e7fd8b26f75a9034af43fd4622a0829b29a7cfb70c0742959bd9cfec",
+        strip_prefix = "colm-suite-{version}",
         urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
@@ -1276,9 +1276,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
-        project_url = "https://github.com/google/quiche",
-        version = "9d155f645b33e283ca741ba16002a71ed382cbf0",
-        sha256 = "a5c60acfcf251210c2fcd7054419cab06b4637848ea514f75f4994557a5fb981",
+        project_url = "https://github.com/minseok1335/quiche",
+        version = "3469357e26a76229766444f9ebc5586196c43b0d",
+        sha256 = "67310a34349e6c3056bd2119d366d1c0e35643e80fa7d1bf40593ca2a947f06c",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],

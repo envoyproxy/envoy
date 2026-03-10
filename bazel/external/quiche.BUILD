@@ -1092,7 +1092,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_hpack_decoder_hpack_decoder_tables_lib",
     srcs = ["quiche/http2/hpack/decoder/hpack_decoder_tables.cc"],
-    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_tables.h"],
+    hdrs = ["quiche/http2/hpack/decoder/hpack_decoder_tables.h", "quiche/http2/hpack/hpack_entry.h", "quiche/http2/hpack/hpack_constants.h", "quiche/http2/hpack/hpack_header_table.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -1257,7 +1257,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_hpack_hpack_static_table_entries_lib",
-    hdrs = ["quiche/http2/hpack/hpack_static_table_entries.inc"],
+    hdrs = ["quiche/http2/hpack/hpack_static_table.h"],
     repository = "@envoy",
 )
 
@@ -2417,7 +2417,6 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_crypto_handshake_lib",
     srcs = [
         "quiche/quic/core/crypto/cert_compressor.cc",
-        "quiche/quic/core/crypto/channel_id.cc",
         "quiche/quic/core/crypto/crypto_framer.cc",
         "quiche/quic/core/crypto/crypto_handshake.cc",
         "quiche/quic/core/crypto/crypto_handshake_message.cc",
@@ -2431,7 +2430,6 @@ envoy_quic_cc_library(
     ],
     hdrs = [
         "quiche/quic/core/crypto/cert_compressor.h",
-        "quiche/quic/core/crypto/channel_id.h",
         "quiche/quic/core/crypto/crypto_framer.h",
         "quiche/quic/core/crypto/crypto_handshake.h",
         "quiche/quic/core/crypto/crypto_handshake_message.h",
@@ -3001,7 +2999,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
-    hdrs = ["quiche/common/quiche_stream.h"],
+    hdrs = ["quiche/quic/core/quic_stream.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
