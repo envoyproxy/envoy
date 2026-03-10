@@ -26,7 +26,9 @@ namespace {
 
 class LargeBufferListenerFilter : public Network::ListenerFilter {
 public:
-  static constexpr int BUFFER_SIZE = SSL_SELECT(512, 256);
+  // These differences in BUFFER_SIZE are required because BoringSSL and OpenSSL
+  // produce different sized client hello messages (514 and 394 respectively).
+  static constexpr int BUFFER_SIZE = SSL_SELECT(512, 392);
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
     ENVOY_LOG_MISC(debug, "LargeBufferListenerFilter::onAccept");
