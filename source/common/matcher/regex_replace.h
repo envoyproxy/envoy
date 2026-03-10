@@ -20,8 +20,6 @@ public:
   create(Regex::Engine& engine, const ::envoy::type::matcher::v3::RegexMatchAndSubstitute& proto);
 
   // Returns a string of the input string with the regex replace applied.
-  //
-  // Must not be called on a null RegexReplace.
   std::string apply(absl::string_view in) const;
 
 private:
