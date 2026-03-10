@@ -127,7 +127,7 @@ def envoy_directory_genrule(name, **kwargs):
             "//bazel:using_openssl": "@openssl//:libs",
             "//conditions:default": None,
         }),
-        **kwargs,
+        **kwargs
     )
 
 # External CMake C++ library targets should be specified with this function. This defaults

@@ -650,8 +650,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(
+      fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
@@ -683,8 +683,7 @@ tcp_logs:
       received_bytes: {1}
       sent_bytes: {1}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT(147, 172))));
+                  Network::Test::getLoopbackAddressString(ipVersion()), SSL_SELECT(147, 172))));
 
   cleanup();
 }
@@ -738,7 +737,7 @@ tcp_logs:
       sent_bytes: {2}
 )EOF",
       Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "cd865a85db6b1066e3af8cba28be21ee"),
+      SSL_SELECT("258098c50651a607e22864521af69746", "cd865a85db6b1066e3af8cba28be21ee"),
       SSL_SELECT(147, 172))));
 
   cleanup();
@@ -791,7 +790,7 @@ tcp_logs:
       sent_bytes: {2}
 )EOF",
       Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "bcab080434778b813a3903a51fdc90fc"),
+      SSL_SELECT("c68cd85633d6847f599328eb2df750b7", "bcab080434778b813a3903a51fdc90fc"),
       SSL_SELECT(135, 160))));
 
   cleanup();
