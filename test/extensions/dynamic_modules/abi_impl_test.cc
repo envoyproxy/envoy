@@ -228,6 +228,26 @@ WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_n
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
           envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
+                                                                      nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_config_increment_counter(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_config_define_gauge(nullptr, {nullptr, 0}, nullptr,
+                                                                    0, nullptr))
+WEAK_STUB(ClusterConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_config_increment_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_config_decrement_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_config_define_histogram(nullptr, {nullptr, 0},
+                                                                        nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
+                                                                              0, 0))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))

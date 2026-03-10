@@ -827,6 +827,353 @@ TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
 }
 
 // =============================================================================
+// Metrics Tests
+// =============================================================================
+
+// Test defining and incrementing a scalar counter via the ABI callbacks.
+TEST_F(DynamicModuleClusterTest, MetricsDefineAndIncrementCounter) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a scalar counter.
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("test_counter"),
+                                                  strlen("test_counter")};
+  auto define_result = envoy_dynamic_module_callback_cluster_config_define_counter(
+      config, name, nullptr, 0, &counter_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(counter_id, 0);
+
+  // Increment the counter.
+  auto inc_result = envoy_dynamic_module_callback_cluster_config_increment_counter(
+      config, counter_id, nullptr, 0, 5);
+  EXPECT_EQ(inc_result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test defining and using a scalar gauge via the ABI callbacks.
+TEST_F(DynamicModuleClusterTest, MetricsDefineAndUseGauge) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a scalar gauge.
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("test_gauge"),
+                                                  strlen("test_gauge")};
+  auto define_result = envoy_dynamic_module_callback_cluster_config_define_gauge(
+      config, name, nullptr, 0, &gauge_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(gauge_id, 0);
+
+  // Set, increment, and decrement the gauge.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_set_gauge(config, gauge_id, nullptr, 0, 42),
+      envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_gauge(config, gauge_id, nullptr,
+                                                                         0, 10),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, gauge_id, nullptr, 0, 5),
+      envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test defining and recording a scalar histogram via the ABI callbacks.
+TEST_F(DynamicModuleClusterTest, MetricsDefineAndRecordHistogram) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a scalar histogram.
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("test_histogram"),
+                                                  strlen("test_histogram")};
+  auto define_result = envoy_dynamic_module_callback_cluster_config_define_histogram(
+      config, name, nullptr, 0, &histogram_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(histogram_id, 0);
+
+  // Record a value.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+                config, histogram_id, nullptr, 0, 100),
+            envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test metric not found errors for invalid IDs.
+TEST_F(DynamicModuleClusterTest, MetricsNotFoundForInvalidId) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Increment a counter that was never defined.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_increment_counter(config, 999, nullptr, 0, 1),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Set a gauge that was never defined.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_set_gauge(config, 999, nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Increment a gauge that was never defined.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_increment_gauge(config, 999, nullptr, 0, 1),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Decrement a gauge that was never defined.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, 999, nullptr, 0, 1),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Record a histogram that was never defined.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(config, 999,
+                                                                                nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining and using a counter vec with labels.
+TEST_F(DynamicModuleClusterTest, MetricsCounterVecWithLabels) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a counter vec with two labels.
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("request_count"),
+                                                  strlen("request_count")};
+  envoy_dynamic_module_type_module_buffer label_names[2] = {
+      {const_cast<char*>("region"), strlen("region")},
+      {const_cast<char*>("status"), strlen("status")},
+  };
+  auto define_result = envoy_dynamic_module_callback_cluster_config_define_counter(
+      config, name, label_names, 2, &counter_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(counter_id, 0);
+
+  // Increment with correct label count.
+  envoy_dynamic_module_type_module_buffer label_values[2] = {
+      {const_cast<char*>("us-east-1"), strlen("us-east-1")},
+      {const_cast<char*>("200"), strlen("200")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_counter(config, counter_id,
+                                                                           label_values, 2, 1),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Increment with wrong label count should fail.
+  envoy_dynamic_module_type_module_buffer wrong_label_values[1] = {
+      {const_cast<char*>("us-east-1"), strlen("us-east-1")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_counter(
+                config, counter_id, wrong_label_values, 1, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+
+  // Increment with zero labels on a vec metric should fail.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_counter(config, counter_id,
+                                                                           nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test defining and using a gauge vec with labels.
+TEST_F(DynamicModuleClusterTest, MetricsGaugeVecWithLabels) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a gauge vec.
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("active_connections"),
+                                                  strlen("active_connections")};
+  envoy_dynamic_module_type_module_buffer label_names[1] = {
+      {const_cast<char*>("endpoint"), strlen("endpoint")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_gauge(config, name, label_names, 1,
+                                                                      &gauge_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  envoy_dynamic_module_type_module_buffer label_values[1] = {
+      {const_cast<char*>("10.0.0.1:80"), strlen("10.0.0.1:80")},
+  };
+
+  // Set, increment, and decrement the gauge vec.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_set_gauge(config, gauge_id, label_values,
+                                                                   1, 100),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_gauge(config, gauge_id,
+                                                                         label_values, 1, 10),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, gauge_id,
+                                                                         label_values, 1, 5),
+            envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test defining and using a histogram vec with labels.
+TEST_F(DynamicModuleClusterTest, MetricsHistogramVecWithLabels) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a histogram vec.
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("latency"), strlen("latency")};
+  envoy_dynamic_module_type_module_buffer label_names[1] = {
+      {const_cast<char*>("method"), strlen("method")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_histogram(config, name, label_names,
+                                                                          1, &histogram_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  envoy_dynamic_module_type_module_buffer label_values[1] = {
+      {const_cast<char*>("GET"), strlen("GET")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+                config, histogram_id, label_values, 1, 42),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Wrong label count should fail.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+                config, histogram_id, nullptr, 0, 42),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test that using a vec metric ID with zero labels returns InvalidLabels.
+TEST_F(DynamicModuleClusterTest, MetricsVecScalarIdConflictErrors) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  envoy_dynamic_module_type_module_buffer label_name = {const_cast<char*>("lbl"), strlen("lbl")};
+
+  // Define a counter vec.
+  size_t counter_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {const_cast<char*>("cv"), strlen("cv")};
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_counter(
+                config, counter_name, &label_name, 1, &counter_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Calling increment_counter with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_counter(config, counter_vec_id,
+                                                                           nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+
+  // Define a gauge vec.
+  size_t gauge_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("gv"), strlen("gv")};
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_gauge(
+                config, gauge_name, &label_name, 1, &gauge_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Calling set_gauge, increment_gauge, decrement_gauge with 0 labels on a vec ID returns
+  // InvalidLabels.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_set_gauge(config, gauge_vec_id, nullptr, 0, 1),
+      envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_gauge(config, gauge_vec_id,
+                                                                         nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, gauge_vec_id,
+                                                                         nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+
+  // Define a histogram vec.
+  size_t hist_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer hist_name = {const_cast<char*>("hv"), strlen("hv")};
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_histogram(
+                config, hist_name, &label_name, 1, &hist_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Calling record_histogram_value with 0 labels on a vec ID returns InvalidLabels.
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(config, hist_vec_id,
+                                                                                nullptr, 0, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test that providing wrong number of label values returns InvalidLabels.
+TEST_F(DynamicModuleClusterTest, MetricsVecWrongLabelCount) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  // Define a gauge vec with one label.
+  envoy_dynamic_module_type_module_buffer gauge_name = {const_cast<char*>("gwl"), strlen("gwl")};
+  envoy_dynamic_module_type_module_buffer label_name = {const_cast<char*>("lbl"), strlen("lbl")};
+  size_t gauge_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_gauge(
+                config, gauge_name, &label_name, 1, &gauge_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Providing wrong number of label values (2 instead of 1).
+  envoy_dynamic_module_type_module_buffer extra_vals[2] = {
+      {const_cast<char*>("a"), strlen("a")},
+      {const_cast<char*>("b"), strlen("b")},
+  };
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_set_gauge(config, gauge_vec_id, extra_vals,
+                                                                   2, 50),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_increment_gauge(config, gauge_vec_id,
+                                                                         extra_vals, 2, 10),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, gauge_vec_id,
+                                                                         extra_vals, 2, 5),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+
+  // Define a histogram vec with one label.
+  envoy_dynamic_module_type_module_buffer hist_name = {const_cast<char*>("hwl"), strlen("hwl")};
+  size_t hist_vec_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_define_histogram(
+                config, hist_name, &label_name, 1, &hist_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Providing wrong number of label values (2 instead of 1).
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(config, hist_vec_id,
+                                                                                extra_vals, 2, 42),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test that using non-existent vec IDs with labels returns MetricNotFound.
+TEST_F(DynamicModuleClusterTest, MetricsVecNotFoundWithLabels) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto* config = cluster->config().get();
+
+  envoy_dynamic_module_type_module_buffer label_val = {const_cast<char*>("val"), strlen("val")};
+
+  // Using non-existent vec IDs with labels should return MetricNotFound.
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_increment_counter(config, 999, &label_val, 1, 1),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_set_gauge(config, 999, &label_val, 1, 10),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_increment_gauge(config, 999, &label_val, 1, 10),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(
+      envoy_dynamic_module_callback_cluster_config_decrement_gauge(config, 999, &label_val, 1, 5),
+      envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_cluster_config_record_histogram_value(config, 999,
+                                                                                &label_val, 1, 42),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// =============================================================================
 // Cluster LB Context ABI Callback Tests
 // =============================================================================
 
