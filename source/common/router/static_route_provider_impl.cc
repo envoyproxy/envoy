@@ -82,6 +82,9 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
       route_config_provider_manager.protoTraits(), factory_context);
   config_update_info_->onRdsUpdate(config, "");
+  // TODO(adisuissa): Convert the THROW_OR_RETURN_VALUE to return an
+  // absl::StatusOr<> and propagate the result through a StaticRouteConfigProviderImpl
+  // create function.
   vhds_subscription_ = THROW_OR_RETURN_VALUE(
       VhdsSubscription::createVhdsSubscription(config_update_info_, factory_context, "", &parent),
       VhdsSubscriptionPtr);
