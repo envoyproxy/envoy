@@ -40,3 +40,14 @@ envoy_cc_test(
         "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "mcp_json_rest_bridge_integration_test",
+    srcs = ["mcp_json_rest_bridge_integration_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp_json_rest_bridge:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)

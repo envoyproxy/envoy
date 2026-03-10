@@ -127,7 +127,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  handleMcpMethod(request_body_json);
+  handleMcpMethod(request_body_json, data);
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
@@ -153,7 +153,8 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
-void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
+void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
+                                              Buffer::Instance& data) {
   ENVOY_LOG(info, "Handling MCP JSON-RPC: {}", json_rpc.dump());
   if (!validateJsonRpcIdAndMethod(json_rpc).ok()) {
     return;
@@ -188,7 +189,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
         Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_initialize_ack");
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
-    mapMcpToolToApiBackend(json_rpc);
+    mapMcpToolToApiBackend(json_rpc, data);
   } else {
     sendErrorResponse(
         Http::Code::BadRequest, "mcp_json_rest_bridge_filter_method_not_supported",
@@ -198,7 +199,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
   }
 }
 
-void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_rpc) {
+void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
+                                                     Buffer::Instance& data) {
   const auto params_it = json_rpc.find(McpConstants::PARAMS_FIELD);
   if (params_it == json_rpc.end() || !params_it->is_object()) {
     ENVOY_LOG(error, "The tool call request is missing 'params' field or it's not an object.");
@@ -259,11 +261,8 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
                            Http::CustomHeaders::get().AcceptEncodingValues.Identity);
 
-  Buffer::OwnedImpl new_body(request_body);
-  // TODO(guoyilin42): Using addDecodedData for request body injection is currently not working
-  // end-to-end. Investigate alternative mechanisms, such as injectDecodedDataToFilterChain, and
-  // implement corresponding integration tests.
-  decoder_callbacks_->addDecodedData(new_body, true);
+  data.add(request_body);
+
   decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
 }
 

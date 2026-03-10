@@ -259,9 +259,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackend) {
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
       .WillRepeatedly(Return(Envoy::Http::RequestHeaderMapOptRef(headers)));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillRepeatedly(Invoke(
-          [&request_body](Envoy::Buffer::Instance& data, bool) { request_body.move(data); }));
 
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
@@ -289,9 +286,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
       .WillRepeatedly(Return(Envoy::Http::RequestHeaderMapOptRef(headers)));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillRepeatedly(Invoke(
-          [&request_body](Envoy::Buffer::Instance& data, bool) { request_body.move(data); }));
 
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
@@ -313,9 +307,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithEscapedQueryParamKey) {
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
       .WillRepeatedly(Return(Envoy::Http::RequestHeaderMapOptRef(headers)));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillRepeatedly(Invoke(
-          [&request_body](Envoy::Buffer::Instance& data, bool) { request_body.move(data); }));
 
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
@@ -424,9 +415,6 @@ TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
       .WillRepeatedly(Return(Envoy::Http::RequestHeaderMapOptRef(headers)));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillRepeatedly(Invoke(
-          [&request_body](Envoy::Buffer::Instance& data, bool) { request_body.move(data); }));
 
   EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
