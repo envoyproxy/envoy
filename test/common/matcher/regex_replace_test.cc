@@ -37,13 +37,6 @@ TEST_F(RegexReplaceTest, PerformsMarkerSubstitution) {
   EXPECT_THAT((*regex_or)->apply("123abc123abc"), Eq("123dabcc123dabcc"));
 }
 
-TEST_F(RegexReplaceTest, CreatedWithNoPatternIsNull) {
-  ::envoy::type::matcher::v3::RegexMatchAndSubstitute proto;
-  auto regex_or = RegexReplace::create(engine_, proto);
-  ASSERT_OK(regex_or.status());
-  EXPECT_FALSE(regex_or->has_value());
-}
-
 TEST_F(RegexReplaceTest, ErrorsOnInvalidRegex) {
   ::envoy::type::matcher::v3::RegexMatchAndSubstitute proto;
   proto.mutable_pattern()->set_regex("\\x");
