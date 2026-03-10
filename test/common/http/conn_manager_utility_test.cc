@@ -2134,8 +2134,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
       std::string("spiffe://cluster.local/ns/\x01\x1f\x7f")};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::vector<std::string> expected_dns = {std::string("host\x02with\x03ctrl.com"),
-                                           std::string("mal\xc0\xfficious.com"),
-                                           "back\\slash.com"};
+                                           std::string("mal\xc0\xfficious.com"), "back\\slash.com"};
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
   // Cert PEM with quotes, backslashes, and newlines.
   std::string expected_pem(
