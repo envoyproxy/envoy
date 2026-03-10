@@ -3497,6 +3497,168 @@ fn test_lb_config_vec_metric_invalid_id() {
     .is_err());
 }
 
+// =============================================================================
+// Cluster Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _count: usize,
+  _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptrs: *const abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _count: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_new(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_delete(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_commit(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _hash_out: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  _optional_size: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _address: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _strict: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Cluster Extension Rust SDK tests.
+// =============================================================================
+
+#[test]
+fn test_cluster_scheduler_mock() {
+  let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_cluster_mock_envoy_cluster_new_scheduler() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster.expect_new_scheduler().times(1).returning(|| {
+    let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+    mock_scheduler.expect_commit().return_const(());
+    Box::new(mock_scheduler)
+  });
+  let scheduler = mock_cluster.new_scheduler();
+  scheduler.commit(100);
+}
+
 // =================================================================================================
 // ClusterLbContext tests
 // =================================================================================================
@@ -3653,7 +3815,6 @@ fn test_cluster_lb_choose_host_with_context() {
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
     ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-      // Verify context is available and can read headers.
       let ctx = context.expect("context should be Some");
       assert_eq!(ctx.get_host_selection_retry_count(), 3);
       assert_eq!(ctx.compute_hash_key(), Some(12345));
@@ -3693,7 +3854,6 @@ fn test_cluster_lb_choose_host_without_context() {
 
 #[test]
 fn test_cluster_lb_context_full_workflow() {
-  // Simulate a realistic LB workflow: read headers, check SNI, compute hash, select host.
   struct SniBasedLb;
   impl cluster::ClusterLb for SniBasedLb {
     fn choose_host(
@@ -3702,19 +3862,15 @@ fn test_cluster_lb_context_full_workflow() {
     ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
       let ctx = context?;
 
-      // Read SNI for routing.
       let sni = ctx.get_downstream_connection_sni()?;
       assert_eq!(sni, "backend.example.com");
 
-      // Read Host header for additional routing.
       let (host_header, _) = ctx.get_downstream_header("host", 0)?;
       assert_eq!(host_header, "backend.example.com");
 
-      // Compute hash for consistent hashing.
       let hash = ctx.compute_hash_key()?;
       assert_eq!(hash, 99999);
 
-      // Check if we should try another host.
       if ctx.should_select_another_host(0, 0) {
         return None;
       }

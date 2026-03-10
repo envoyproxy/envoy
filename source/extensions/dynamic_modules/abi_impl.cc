@@ -461,6 +461,25 @@ envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
   return false;
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_cluster_scheduler_module_ptr
+envoy_dynamic_module_callback_cluster_scheduler_new(envoy_dynamic_module_type_cluster_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_new: "
+               "not implemented in this context");
+  return nullptr;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_scheduler_delete(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_delete: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_scheduler_commit(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_scheduler_commit: "
+               "not implemented in this context");
+}
+
 // ---------------------- Load Balancer callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the load balancing policy extension abi_impl.cc when the extension is used.

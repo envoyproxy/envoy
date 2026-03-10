@@ -34,10 +34,10 @@ envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new
 }
 
 void envoy_dynamic_module_on_cluster_init(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
-  (void)cluster_module_ptr;
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
   (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
 }
 
 void envoy_dynamic_module_on_cluster_destroy(
@@ -64,4 +64,12 @@ envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
   return NULL;
+}
+
+void envoy_dynamic_module_on_cluster_scheduled(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+  (void)event_id;
 }
