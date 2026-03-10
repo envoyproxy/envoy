@@ -86,7 +86,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -122,6 +122,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BasicStreamLifecycleFilter {
       200,
       &[("x-stream", b"success")],
       Some(b"stream_callout_success"),
+      None,
       None,
     );
   }
@@ -183,7 +184,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -225,6 +226,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BidirectionalStreamingFilter {
       200,
       &[("x-chunks-received", chunks_str.as_bytes())],
       Some(b"bidirectional_success"),
+      None,
       None,
     );
   }
@@ -282,7 +284,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     }
 
     if self.stream_handles.len() != 3 {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
     }
 
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
@@ -293,7 +295,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     self.completed_streams += 1;
 
     if self.completed_streams == 3 {
-      envoy_filter.send_response(200, &[("x-stream", b"all_success")], None, None);
+      envoy_filter.send_response(200, &[("x-stream", b"all_success")], None, None, None);
     }
   }
 }
@@ -345,7 +347,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -383,6 +385,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamResetFilter {
       200,
       &[("x-stream", b"reset_ok")],
       Some(b"stream_was_reset"),
+      None,
       None,
     );
   }
@@ -438,7 +441,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -453,6 +456,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
     assert_eq!(stream_handle, self.stream_handle);
-    envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
+    envoy_filter.send_response(
+      200,
+      &[("x-reset", b"true")],
+      Some(b"upstream_reset"),
+      None,
+      None,
+    );
   }
 }

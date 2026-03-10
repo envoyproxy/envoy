@@ -552,6 +552,152 @@ TEST_F(DynamicModuleClusterTest, PreInitFlow) {
   EXPECT_TRUE(initialized);
 }
 
+// Test that the scheduler can be created and deleted via ABI callbacks.
+TEST_F(DynamicModuleClusterTest, SchedulerLifecycle) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Create a scheduler via the ABI callback.
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  // Delete the scheduler via the ABI callback.
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+}
+
+// Test that the scheduler commit posts to the dispatcher.
+TEST_F(DynamicModuleClusterTest, SchedulerCommit) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Create a scheduler via the ABI callback.
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  // Capture the posted callback from commit.
+  Event::PostCb captured_cb;
+  bool first_captured = false;
+  ON_CALL(server_context_.dispatcher_, post(_))
+      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
+        if (!first_captured) {
+          captured_cb = std::move(cb);
+          first_captured = true;
+        }
+      }));
+
+  // Commit an event via the ABI callback.
+  envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
+  ASSERT_TRUE(first_captured);
+
+  // Execute the callback to complete the flow.
+  captured_cb();
+
+  // Clean up the scheduler and destroy the result before ON_CALL locals go out of scope.
+  // The result destruction triggers DynamicModuleClusterHandle::~DynamicModuleClusterHandle which
+  // posts to the dispatcher, so the ON_CALL lambda's captured references must still be alive.
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+}
+
+// Test that onScheduled is called when the posted callback executes.
+TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Create a scheduler via the ABI callback.
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  // Capture the posted callback from commit.
+  Event::PostCb captured_cb;
+  bool first_captured = false;
+  ON_CALL(server_context_.dispatcher_, post(_))
+      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
+        if (!first_captured) {
+          captured_cb = std::move(cb);
+          first_captured = true;
+        }
+      }));
+
+  // Commit an event via the ABI callback.
+  envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 123);
+  ASSERT_TRUE(first_captured);
+
+  // Execute the captured callback to trigger onScheduled.
+  captured_cb();
+
+  // Clean up the scheduler and destroy the result before ON_CALL locals go out of scope.
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+}
+
+// Test that onScheduled handles the case when cluster is already destroyed.
+TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
+  Event::PostCb captured_cb;
+  bool first_captured = false;
+
+  {
+    auto result = createCluster(makeYamlConfig("cluster_no_op"));
+    ASSERT_TRUE(result.ok()) << result.status().message();
+
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+    ASSERT_NE(nullptr, cluster);
+
+    // Create a scheduler via the ABI callback.
+    auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+    EXPECT_NE(scheduler_ptr, nullptr);
+
+    // Capture the posted callback from commit.
+    ON_CALL(server_context_.dispatcher_, post(_))
+        .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
+          if (!first_captured) {
+            captured_cb = std::move(cb);
+            first_captured = true;
+          }
+        }));
+
+    // Commit an event via the ABI callback.
+    envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 456);
+    ASSERT_TRUE(first_captured);
+
+    // Delete the scheduler before the callback is executed.
+    envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+
+    // Explicitly destroy the result while ON_CALL locals are still alive.
+    // The destruction triggers DynamicModuleClusterHandle::~DynamicModuleClusterHandle which
+    // posts to the dispatcher.
+    cluster.reset();
+    result = absl::InternalError("cleanup");
+  }
+
+  // Execute the captured callback after cluster is destroyed.
+  // This should not crash - the weak_ptr should be expired.
+  captured_cb();
+}
+
+// Test calling onScheduled directly.
+TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Call onScheduled directly - this should call the in-module hook.
+  cluster->onScheduled(789);
+}
+
 // Test the DynamicModuleClusterHandle destructor dispatches to main thread.
 TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -565,6 +711,114 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   // The handle destructor should post to the dispatcher. The mock dispatcher will execute
   // the posted callback inline.
   handle.reset();
+}
+
+// Test that the server_initialized lifecycle callback is invoked.
+TEST_F(DynamicModuleClusterTest, ServerInitializedCallback) {
+  // Capture the PostInit callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallback captured_cb;
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured callback to exercise the server initialized path.
+  captured_cb();
+}
+
+// Test that the drain_started lifecycle callback is invoked.
+TEST_F(DynamicModuleClusterTest, DrainStartedCallback) {
+  // Capture the drain callback registered during cluster construction.
+  Server::DrainManager::DrainCloseCb captured_drain_cb;
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured drain callback to exercise the drain notification path.
+  EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
+}
+
+// Test that the shutdown lifecycle callback is invoked with completion.
+TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
+  // Capture the shutdown callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured shutdown callback with a completion callback.
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
+// Test that shutdown completion is still called when the in-module cluster is null.
+TEST_F(DynamicModuleClusterTest, ShutdownCallbackAfterClusterDestroy) {
+  // Capture the shutdown callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Destroy the cluster to null out the in-module pointer.
+  result->first.reset();
+
+  // Invoke the captured shutdown callback. Since the cluster is destroyed, the completion
+  // callback should still be invoked (the else branch).
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
+// Test that all lifecycle callbacks are registered during cluster creation.
+TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
+  // Verify that all three lifecycle callbacks are registered.
+  Server::ServerLifecycleNotifier::StageCallback captured_init_cb;
+  Server::DrainManager::DrainCloseCb captured_drain_cb;
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_init_cb), testing::Return(nullptr)));
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke all lifecycle callbacks to verify the full lifecycle flow.
+  captured_init_cb();
+  EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
 }
 
 } // namespace

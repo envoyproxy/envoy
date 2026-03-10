@@ -58,6 +58,7 @@ envoy_cc_library(
     deps = [
         ":filter_lib",
         "//envoy/registry",
+        "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/router:string_accessor_lib",
