@@ -3496,3 +3496,97 @@ fn test_lb_config_vec_metric_invalid_id() {
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
 }
+
+// =============================================================================
+// Cluster Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _count: usize,
+  _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptrs: *const abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _count: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_new(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_delete(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_commit(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+// =============================================================================
+// Cluster Extension Rust SDK tests.
+// =============================================================================
+
+#[test]
+fn test_cluster_scheduler_mock() {
+  let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_cluster_mock_envoy_cluster_new_scheduler() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster.expect_new_scheduler().times(1).returning(|| {
+    let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+    mock_scheduler.expect_commit().return_const(());
+    Box::new(mock_scheduler)
+  });
+  let scheduler = mock_cluster.new_scheduler();
+  scheduler.commit(100);
+}

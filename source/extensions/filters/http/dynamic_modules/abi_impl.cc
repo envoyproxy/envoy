@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -665,8 +666,8 @@ void envoy_dynamic_module_callback_http_send_response(
     details_view = "dynamic_module";
   }
 
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers, 0,
-                         details_view);
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
+                         absl::nullopt, details_view);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(
@@ -1422,6 +1423,22 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     if (connection) {
       *result = connection->id();
       ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus: {
+    auto* stream_info = filter->streamInfo();
+    if (stream_info) {
+      auto trailers = filter->responseTrailers();
+      auto headers = filter->responseHeaders();
+      auto grpc_status = Grpc::Common::getGrpcStatus(
+          trailers.has_value() ? *trailers : *Http::StaticEmptyHeaders::get().response_trailers,
+          headers.has_value() ? *headers : *Http::StaticEmptyHeaders::get().response_headers,
+          *stream_info);
+      if (grpc_status.has_value()) {
+        *result = grpc_status.value();
+        ok = true;
+      }
     }
     break;
   }

@@ -3,6 +3,7 @@ use crate::{
   drop_wrapped_c_void_ptr,
   str_to_module_buffer,
   wrap_into_c_void_ptr,
+  CompletionCallback,
   NEW_CLUSTER_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -42,6 +43,37 @@ pub trait Cluster: Send + Sync {
   /// Each worker thread gets its own load balancer instance. The `envoy_lb`
   /// provides thread-local access to the cluster's host set.
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb>;
+
+  /// Called on the main thread when a new event is scheduled via
+  /// [`EnvoyClusterScheduler::commit`] for this [`Cluster`].
+  ///
+  /// * `envoy_cluster` can be used to interact with the underlying Envoy cluster object.
+  /// * `event_id` is the ID of the event that was scheduled with [`EnvoyClusterScheduler::commit`]
+  ///   to distinguish multiple scheduled events.
+  fn on_scheduled(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
+
+  /// Called when the server initialization is complete (PostInit lifecycle stage).
+  ///
+  /// This is called on the main thread after all clusters have finished initialization and
+  /// before workers are started. This is the appropriate place to start background discovery
+  /// tasks or establish connections that depend on the server being fully operational.
+  fn on_server_initialized(&mut self, _envoy_cluster: &dyn EnvoyCluster) {}
+
+  /// Called when Envoy begins draining.
+  ///
+  /// This is called on the main thread before workers are stopped. The module can still use
+  /// cluster operations during drain. This is the appropriate place to stop accepting new hosts,
+  /// close persistent connections, or de-register from service discovery.
+  fn on_drain_started(&mut self, _envoy_cluster: &dyn EnvoyCluster) {}
+
+  /// Called when Envoy is about to exit (ShutdownExit lifecycle stage).
+  ///
+  /// The module must invoke [`CompletionCallback::done`] exactly once when it has finished
+  /// cleanup. Envoy will wait for the callback before terminating. This is the appropriate
+  /// place to flush batched data, close gRPC connections, or signal external systems.
+  fn on_shutdown(&mut self, _envoy_cluster: &dyn EnvoyCluster, completion: CompletionCallback) {
+    completion.done();
+  }
 }
 
 /// The module-side load balancer instance.
@@ -94,6 +126,11 @@ pub trait EnvoyCluster: Send + Sync {
   /// This must be called during or after [`Cluster::on_init`] to allow Envoy to start
   /// routing traffic to this cluster.
   fn pre_init_complete(&self);
+
+  /// Create a new implementation of the [`EnvoyClusterScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the cluster is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler>;
 }
 
 /// Envoy-side load balancer operations available to the module.
@@ -110,6 +147,46 @@ pub trait EnvoyClusterLoadBalancer: Send {
     priority: u32,
     index: usize,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+}
+
+/// Envoy-side scheduler that dispatches events to the main thread.
+///
+/// The scheduler can be used from any thread. When [`EnvoyClusterScheduler::commit`] is called,
+/// the event is posted to the main thread dispatcher and [`Cluster::on_scheduled`] will be
+/// invoked on the main thread with the corresponding `event_id`.
+#[automock]
+pub trait EnvoyClusterScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyClusterSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyClusterSchedulerImpl {}
+unsafe impl Sync for EnvoyClusterSchedulerImpl {}
+
+impl Drop for EnvoyClusterSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyClusterScheduler for EnvoyClusterSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_scheduler_commit(self.raw_ptr, event_id);
+    }
+  }
+}
+
+impl EnvoyClusterScheduler for Box<dyn EnvoyClusterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
 }
 
 // Implementations
@@ -163,6 +240,15 @@ impl EnvoyCluster for EnvoyClusterImpl {
   fn pre_init_complete(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler> {
+    unsafe {
+      let scheduler_ptr = abi::envoy_dynamic_module_callback_cluster_scheduler_new(self.raw);
+      Box::new(EnvoyClusterSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
     }
   }
 }
@@ -313,4 +399,48 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
     Some(host) => host,
     None => std::ptr::null_mut(),
   }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  event_id: u64,
+) {
+  let cluster = cluster_module_ptr as *const *const dyn Cluster;
+  let cluster = unsafe { &**cluster };
+  cluster.on_scheduled(&EnvoyClusterImpl::new(cluster_envoy_ptr), event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+) {
+  let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
+  let cluster = unsafe { &mut *cluster };
+  cluster.on_server_initialized(&EnvoyClusterImpl::new(cluster_envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+) {
+  let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
+  let cluster = unsafe { &mut *cluster };
+  cluster.on_drain_started(&EnvoyClusterImpl::new(cluster_envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  completion_callback: abi::envoy_dynamic_module_type_event_cb,
+  completion_context: *mut std::os::raw::c_void,
+) {
+  let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
+  let cluster = unsafe { &mut *cluster };
+  let completion = CompletionCallback::new(completion_callback, completion_context);
+  cluster.on_shutdown(&EnvoyClusterImpl::new(cluster_envoy_ptr), completion);
 }

@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -13,6 +14,18 @@
 
 namespace Envoy {
 namespace {
+
+// Test factory for ``filterState():set()`` integration tests.
+class LuaTestStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "lua.test.string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(LuaTestStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 class LuaIntegrationTest : public UpstreamDownstreamIntegrationTest {
 public:
@@ -2260,6 +2273,53 @@ typed_config:
                        .get(Http::LowerCaseString("another_missing"))[0]
                        ->value()
                        .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test ``filterState():set()`` functionality to set filter state from Lua.
+TEST_P(LuaIntegrationTest, FilterStateSet) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Set a filter state value using the factory.
+        stream_info:filterState():set("my_key", "lua.test.string", "my_value")
+
+        -- Read back the filter state value.
+        local result = stream_info:filterState():get("my_key")
+        if result then
+          request_handle:headers():add("filter_state_result", result)
+        else
+          request_handle:headers():add("filter_state_result", "not_found")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify the filter state was set and read back successfully.
+  EXPECT_EQ("my_value", upstream_request_->headers()
+                            .get(Http::LowerCaseString("filter_state_result"))[0]
+                            ->value()
+                            .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
