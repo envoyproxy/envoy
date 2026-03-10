@@ -24,6 +24,12 @@ def _reviewers_path() -> Path:
 
 class TestIcal(unittest.TestCase):
 
+    def test_no_unresolved_conflicts(self):
+        calendar = OncallCalendar.load(_rotation_path())
+        for override in calendar.overrides:
+            if "RESOLVE CONFLICT" in override.reason:
+                self.fail("Unresolved conflicts in rotation.yaml overrides")
+
     def test_reviewers_in_sync_with_oncall(self):
         calendar = OncallCalendar.load(_rotation_path())
         with open(_reviewers_path(), 'r') as file:

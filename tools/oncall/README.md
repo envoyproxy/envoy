@@ -2,14 +2,14 @@
 
 This folder is for generating the oncall rotation.
 
-`overrides.yaml` can be updated manually, after which you should run
+`overrides` in `rotation.yaml` can be updated manually, after which you should run
 ```
 bazel run //tools/oncall:rotation
 ```
 to generate the new ical.
 
-`rotation.yaml` can also potentially be updated manually, but it is recommended
-to use one of
+The rest of `rotation.yaml` can also potentially be updated manually, but it
+is recommended to use one of
 ```
 # Simple add - will put the new oncall at the end of the current cycle to
 # minimize disruption.
@@ -36,3 +36,25 @@ you can run
 ```
 bazel test //tools/oncall:oncall_rotation_test
 ```
+
+## Implementation details
+
+The goal of the update script is to avoid changing schedules within the next
+8 weeks. When removing someone from the rotation, if their shift is within
+the next 8 weeks, the `--substitute` option can be used to replace that person's
+next shift with a volunteer, leaving the rest of the schedule unchanged until
+the next time that oncall's shift would have been. Alternatively, the `--dirty`
+option can be used, which will allow disruption of the schedule from the very
+next shift.
+
+If the next shift of a removed oncall is more than 8 weeks out, they can be
+just removed directly, and the schedule will be changed from that shift on.
+
+When adding an oncall, they are added at the end of the current cycle, e.g.
+if Bob is the current oncall, the new oncall will be inserted before Bob's
+*next* shift - so the calendar will remain unchanged for one full cycle.
+
+In the ical format, repeated events have a "start date", and changing the
+length of the cycle without disrupting the upcoming schedule requires either
+moving that start date, or reordering the rotation list. To make changes more
+readable in the PR, this is implemented as moving the start date.
