@@ -149,6 +149,43 @@ fields {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
+TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
+  setUp(R"pb(
+    extractions_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        request_field_extractions: {
+          key: "key.display_name"
+          value: {}
+        }
+      }
+    })pb");
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest(R"pb(
+    parent: "project-id"
+  )pb");
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
+        const auto it = new_dynamic_metadata.fields().find("key.display_name");
+        EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
+        const auto& value = it->second;
+        EXPECT_EQ(value.kind_case(), Protobuf::Value::KindCase::kListValue);
+        EXPECT_EQ(value.list_value().values_size(), 0);
+      });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // No data modification.
+  checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+}
+
 TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   setUp();
   TestRequestHeaderMapImpl req_headers =

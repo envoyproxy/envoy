@@ -2,16 +2,16 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/jwt/status.h"
 
 #include "absl/strings/str_split.h"
-#include "jwt_verify_lib/status.h"
-
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+
+using JwtVerify::Status;
 
 namespace {
 constexpr absl::string_view InvalidTokenErrorString = ", error=\"invalid_token\"";
@@ -112,7 +112,7 @@ void Filter::clearRouteCache() { decoder_callbacks_->downstreamCallbacks()->clea
 
 void Filter::onComplete(const Status& status) {
   ENVOY_STREAM_LOG(debug, "Jwt authentication completed with: {}", *decoder_callbacks_,
-                   ::google::jwt_verify::getStatusString(status));
+                   JwtVerify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
@@ -125,13 +125,12 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     if (config_.get()->stripFailureResponse()) {
-      decoder_callbacks_->sendLocalReply(
-          code, "", nullptr, absl::nullopt,
-          generateRcDetails(::google::jwt_verify::getStatusString(status)));
+      decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt,
+                                         generateRcDetails(JwtVerify::getStatusString(status)));
       return;
     }
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status),
+        code, JwtVerify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
           std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
           if (status != Status::JwtMissed) {
@@ -139,7 +138,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        absl::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

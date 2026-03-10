@@ -697,13 +697,15 @@ The following optional features can be enabled on the Bazel build command-line:
   is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
-* BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
-  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details).
+* BoringSSL can be built in a FIPS-compliant mode with `--config=boringssl-fips`
+  (see [FIPS 140-2](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ssl#fips-140-2) for details,
+  and [SSL.md](SSL.md) more information about SSL BUILDS).
+* AWS-LC FIPS can be used with `--config=aws-lc-fips`. (see for [SSL.md](SSL.md) more information about SSL BUILDS).
 * ASSERT() can be configured to log failures and increment a stat counter in a release build with
   `--define log_fast_debug_assert_in_release=enabled`. SLOW_ASSERT()s can be included with `--define log_debug_assert_in_release=enabled`. The default behavior is to compile all debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL and
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS mode and
   tcmalloc is built from the sources of Gperftools.
 * Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
   `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.

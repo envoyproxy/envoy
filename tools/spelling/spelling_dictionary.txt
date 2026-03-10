@@ -48,6 +48,7 @@ CGROUP
 CROSSSLOT
 ECN
 ECS
+EdDSA
 EKS
 Millicores
 NID
@@ -282,16 +283,26 @@ Iters
 JSON
 JSONs
 jsonrpc
+jwk
+Jwk
 JWKS
 JWKs
 JWS
 JWT
 JWTs
+alg
+aud
+crv
+iat
+iss
+jti
 KB
 KDS
+keycloak
 Karlsson
 KiB
 Kille
+kty
 LBs
 LC
 LCOV
@@ -300,6 +311,7 @@ LEDS
 LEV
 LF
 LHS
+LLC
 hls
 hoo
 iframe
@@ -313,6 +325,7 @@ lang
 libcurl
 libsxg
 LLVM
+LLM
 LPT
 LRS
 Loggable
@@ -360,6 +373,7 @@ Oauth
 OCSP
 OD
 ODCDS
+OKP
 middlewildcard
 monostate
 mpd
@@ -412,6 +426,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -460,6 +475,7 @@ SIGABRT
 SIGBUS
 SIGFPE
 SIGILL
+SPDX
 SIGINT
 SIGPIPE
 SIGSEGV
@@ -483,6 +499,7 @@ SRDS
 SRV
 SS
 SSD
+SSE
 SSL
 STDSTRING
 STL
@@ -633,6 +650,7 @@ bitset
 bitwise
 blackhole
 blackholed
+bssl
 bookkeep
 bool
 boolean
@@ -848,6 +866,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup
@@ -950,6 +969,7 @@ interpretable
 intra
 ints
 invariance
+invariants
 invoker
 iov
 iovcnt
@@ -971,6 +991,7 @@ js
 kafka
 keepalive
 keepalives
+keyset
 ketama
 keyder
 kqueue
@@ -1057,6 +1078,7 @@ mmsg
 mmsghdr
 mongo
 moveable
+mru
 msec
 msg
 msghdr
@@ -1435,6 +1457,7 @@ subtrees
 subtype
 subtypes
 subzone
+sudo
 suf
 superclass
 superroot
@@ -1490,6 +1513,7 @@ tracestate
 transcode
 transcoded
 transcoder
+transcodes
 transcoding
 transferral
 trds
@@ -1524,6 +1548,7 @@ unref
 unreferenced
 unzigzag
 upcasts
+upsert
 upstreams
 uptime
 upvalue
@@ -1638,10 +1663,13 @@ nsec
 millicores
 cpuacct
 cpuacct.usage
+cpufreq
 effective_cpus
 cpus
+shrinker
 ja3
 ja4
+jsonl
 HBONE
 waypoint
 ztunnel
@@ -1650,3 +1678,10 @@ UIDs
 configurability
 WDS
 OIDC
+Bredband
+Bevtec
+doublings
+lcalpha
+nblk
+chr
+IWYU

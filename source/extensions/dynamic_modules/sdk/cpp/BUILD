@@ -8,12 +8,6 @@ cc_library(
     srcs = ["sdk.cc"],
     hdrs = ["sdk.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
     alwayslink = True,
 )
 
@@ -30,8 +24,6 @@ cc_library(
     deps = [
         ":sdk",
         "//source/extensions/dynamic_modules/abi",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/synchronization",
     ],
     alwayslink = True,
 )
@@ -42,17 +34,7 @@ cc_library(
     name = "sdk_fake",
     hdrs = ["sdk_fake.h"],
     visibility = ["//visibility:public"],
-    deps = [":sdk"],
-)
-
-# Mock implementations for plugin handle interfaces.
-# Used for testing.
-cc_library(
-    name = "sdk_mocks",
-    hdrs = ["sdk_mocks.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":sdk",
-        "@com_google_googletest//:gtest",
     ],
 )

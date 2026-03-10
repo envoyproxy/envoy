@@ -109,6 +109,9 @@ protected:
       void removeReadFilter(Network::ReadFilterSharedPtr) override {
         IS_ENVOY_BUG("Unexpected function call");
       }
+      void addAccessLogHandler(AccessLog::InstanceSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection

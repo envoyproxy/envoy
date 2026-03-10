@@ -28,8 +28,8 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
 } // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
-using ::google::jwt_verify::Status;
 using Http::FilterHeadersStatus;
+using JwtVerify::Status;
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
@@ -109,8 +109,7 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
       // Decode the tokens.
-      std::unique_ptr<::google::jwt_verify::Jwt> jwt =
-          std::make_unique<::google::jwt_verify::Jwt>();
+      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
       Status status = jwt->parseFromString(token_str);
       if (status == Status::Ok) {
         if (jwt_token_cache_ != nullptr) {

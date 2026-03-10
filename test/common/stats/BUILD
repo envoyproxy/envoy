@@ -84,7 +84,7 @@ envoy_cc_benchmark_binary(
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:recent_lookups_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -129,7 +129,7 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:global_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -177,7 +177,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/hash:hash_testing",
+        "@abseil-cpp//absl/hash:hash_testing",
     ],
 )
 
@@ -240,8 +240,8 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
     ],
 )
 
@@ -271,7 +271,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/exe:process_wide_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -298,8 +298,8 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -341,7 +341,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:tag_producer_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
@@ -391,8 +391,8 @@ envoy_cc_benchmark_binary(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )

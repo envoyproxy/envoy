@@ -613,6 +613,10 @@ public:
     ON_CALL(*this, shouldSchemeMatchUpstream())
         .WillByDefault(testing::ReturnPointee(&scheme_match_upstream_));
     ON_CALL(*this, addProxyProtocolConnectionState()).WillByDefault(testing::Return(true));
+    ON_CALL(*this, httpsDestinationPorts())
+        .WillByDefault(testing::ReturnRef(https_destination_ports_));
+    ON_CALL(*this, httpDestinationPorts())
+        .WillByDefault(testing::ReturnRef(http_destination_ports_));
   }
 
   // Http::ConnectionManagerConfig
@@ -701,6 +705,8 @@ public:
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
+  MOCK_METHOD((const absl::flat_hash_set<uint32_t>&), httpsDestinationPorts, (), (const));
+  MOCK_METHOD((const absl::flat_hash_set<uint32_t>&), httpDestinationPorts, (), (const));
 
   class AllowInternalAddressConfig : public Http::InternalAddressConfig {
   public:
@@ -714,6 +720,8 @@ public:
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
   bool scheme_match_upstream_;
+  absl::flat_hash_set<uint32_t> https_destination_ports_;
+  absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 class MockReceivedSettings : public ReceivedSettings {

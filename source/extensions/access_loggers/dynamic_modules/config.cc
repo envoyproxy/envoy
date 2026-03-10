@@ -28,10 +28,10 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
                          std::string(dynamic_module_or_error.status().message()));
   }
 
-  // Use anyToBytes() to properly handle StringValue/BytesValue/Struct types.
+  // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string logger_config_str;
   if (proto_config.has_logger_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.logger_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.logger_config());
     if (!config_or_error.ok()) {
       throw EnvoyException("Failed to parse logger config: " +
                            std::string(config_or_error.status().message()));

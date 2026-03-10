@@ -7,8 +7,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
-#include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #include "source/extensions/common/wasm/ext/sign.pb.h"
+#include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 
 #include "include/proxy-wasm/null_plugin.h"
 
@@ -37,10 +37,9 @@ using namespace proxy_wasm::null_plugin;
 
 inline WasmResult envoy_resolve_dns(const char* dns_address, size_t dns_address_size,
                                     uint32_t* token) {
-  return static_cast<WasmResult>(
-      ::Envoy::Extensions::Common::Wasm::resolve_dns(WR(dns_address),
-                                                     WS(dns_address_size), WR(token))
-          .u64_);
+  return static_cast<WasmResult>(::Envoy::Extensions::Common::Wasm::resolve_dns(
+                                     WR(dns_address), WS(dns_address_size), WR(token))
+                                     .u64_);
 }
 
 #undef WS

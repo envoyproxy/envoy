@@ -2,11 +2,12 @@
 #error "Linux platform file is part of non-Linux build."
 #endif
 
+#include "source/exe/platform_impl.h"
+
 #include <sys/prctl.h>
 
 #include "source/common/common/thread_impl.h"
 #include "source/common/filesystem/filesystem_impl.h"
-#include "source/exe/platform_impl.h"
 
 namespace Envoy {
 

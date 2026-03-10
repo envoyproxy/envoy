@@ -16,8 +16,8 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
-        "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
-        "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
+        "@hessian2-codec//hessian2:codec_impl_lib",
+        "@hessian2-codec//hessian2/basic_codec:object_codec_lib",
     ],
 )
 
@@ -121,7 +121,7 @@ envoy_cc_library(
         ":message_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

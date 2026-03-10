@@ -4,6 +4,8 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -11,10 +13,11 @@ namespace NetworkFilters {
 
 DynamicModuleNetworkFilterConfig::DynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    DynamicModulePtr dynamic_module, Envoy::Upstream::ClusterManager& cluster_manager,
-    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher)
+    const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+    Event::Dispatcher& main_thread_dispatcher)
     : cluster_manager_(cluster_manager), main_thread_dispatcher_(main_thread_dispatcher),
-      stats_scope_(stats_scope.createScope(std::string(NetworkFilterStatsNamespace) + ".")),
+      stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {}
 
@@ -32,8 +35,9 @@ DynamicModuleNetworkFilterConfig::~DynamicModuleNetworkFilterConfig() {
 
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    DynamicModulePtr dynamic_module, Envoy::Upstream::ClusterManager& cluster_manager,
-    Stats::Scope& stats_scope, Event::Dispatcher& main_thread_dispatcher) {
+    const absl::string_view metrics_namespace, DynamicModulePtr dynamic_module,
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+    Event::Dispatcher& main_thread_dispatcher) {
 
   // Resolve the symbols for the network filter using graceful error handling.
   auto on_config_new =
@@ -90,8 +94,8 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
           "envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark");
 
   auto config = std::make_shared<DynamicModuleNetworkFilterConfig>(
-      filter_name, filter_config, std::move(dynamic_module), cluster_manager, stats_scope,
-      main_thread_dispatcher);
+      filter_name, filter_config, metrics_namespace, std::move(dynamic_module), cluster_manager,
+      stats_scope, main_thread_dispatcher);
 
   // Store the resolved function pointers.
   config->on_network_filter_config_destroy_ = on_config_destroy.value();

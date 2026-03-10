@@ -39,22 +39,7 @@ envoy_cc_test(
         ":util",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "abi_version_test",
-    srcs = ["abi_version_test.cc"],
-    data = [
-        "//source/extensions/dynamic_modules/abi:abi.h",
-    ],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/common:hex_lib",
-        "//source/common/crypto:utility_lib",
-        "//source/extensions/dynamic_modules/abi:abi_version_lib",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
     ],
 )
 

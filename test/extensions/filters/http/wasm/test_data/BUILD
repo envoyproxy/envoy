@@ -136,7 +136,7 @@ envoy_cc_test_library(
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/common/wasm/ext:envoy_null_plugin",
         "//source/extensions/common/wasm/ext:sign_cc_proto",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_map",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )

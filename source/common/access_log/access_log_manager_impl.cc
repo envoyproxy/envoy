@@ -36,9 +36,9 @@ void AccessLogManagerImpl::reopen() {
 absl::StatusOr<AccessLogFileSharedPtr>
 AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_info) {
   auto file = api_.fileSystem().createFile(file_info);
-  std::string file_name = file->path();
-  if (access_logs_.count(file_name)) {
-    return access_logs_[file_name];
+  absl::string_view file_name = file->path();
+  if (const auto it = access_logs_.find(file_name); it != access_logs_.end()) {
+    return it->second;
   }
 
   Api::IoCallBoolResult open_result = file->open(default_flags);
@@ -47,10 +47,14 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
                                                   open_result.err_->getErrorDetails()));
   }
 
-  access_logs_[file_name] = std::make_shared<AccessLogFileImpl>(
-      std::move(file), dispatcher_, lock_, file_stats_, file_flush_interval_msec_,
-      file_min_flush_size_kb_, api_.threadFactory());
-  return access_logs_[file_name];
+  auto [it, insert_success] = access_logs_.emplace(
+      file_name, std::make_shared<AccessLogFileImpl>(
+                     std::move(file), dispatcher_, lock_, file_stats_, file_flush_interval_msec_,
+                     file_min_flush_size_kb_, api_.threadFactory()));
+  // Insertion was successful because the key wasn't found in the map or else
+  // the value would have been previously returned.
+  ASSERT(insert_success);
+  return it->second;
 }
 
 AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,

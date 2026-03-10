@@ -17,8 +17,7 @@ public:
 
 class PanicRootContext : public RootContext {
 public:
-  explicit PanicRootContext(uint32_t id, std::string_view root_id)
-      : RootContext(id, root_id) {}
+  explicit PanicRootContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
 };
 
 static RegisterContextFactory register_PanicContext(CONTEXT_FACTORY(PanicContext),

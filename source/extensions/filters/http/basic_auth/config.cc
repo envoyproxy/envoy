@@ -75,6 +75,19 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const BasicAuth& proto_config, const std::string& stats_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), false, context.api()), std::string));
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), proto_config.forward_username_header(),
+      proto_config.authentication_header(), stats_prefix, context.scope());
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     const BasicAuthPerRoute& proto_config, Server::Configuration::ServerFactoryContext& context,

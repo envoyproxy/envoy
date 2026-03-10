@@ -5,6 +5,11 @@ local_repository(
     path = "../../..",
 )
 
+local_repository(
+    name = "envoy-docs",
+    path = "../../../docs",
+)
+
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()
@@ -44,3 +49,15 @@ envoy_toolchains()
 load("@envoy//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
 
 envoy_dependency_imports_extra()
+
+load("@envoy-docs//bazel:repositories.bzl", "envoy_docs_repositories")
+
+envoy_docs_repositories()
+
+load("@envoy-docs//bazel:repositories_extra.bzl", "envoy_docs_repositories_extra")
+
+envoy_docs_repositories_extra()
+
+load("@envoy-docs//bazel:dependencies.bzl", "envoy_docs_dependencies")
+
+envoy_docs_dependencies()

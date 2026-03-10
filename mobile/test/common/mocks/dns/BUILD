@@ -22,7 +22,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":mock_dns_resolver_proto_cc_proto",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy//envoy/api:api_interface",
         "@envoy//envoy/event:dispatcher_interface",
         "@envoy//envoy/network:dns_interface",

@@ -651,6 +651,9 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
@@ -1065,6 +1068,9 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 

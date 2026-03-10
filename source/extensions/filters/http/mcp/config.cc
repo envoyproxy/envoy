@@ -21,6 +21,17 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+
+  auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix, context.scope());
+
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<McpFilter>(config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 McpFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::mcp::v3::McpOverride& proto_config,

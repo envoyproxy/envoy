@@ -14,12 +14,13 @@ public:
                               Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher, context) {}
 
-  bool match(const MatchingDataType& input) override {
-    if (absl::holds_alternative<std::string>(input)) {
-      return matcher_.match(absl::get<std::string>(input));
+  MatchResult match(const DataInputGetResult& input) override {
+    const auto data = input.stringData();
+    if (data && matcher_.match(*data)) {
+      return MatchResult::Matched;
     }
     // Return false when input is empty.(i.e., input is absl::monostate).
-    return false;
+    return MatchResult::NoMatch;
   }
 
 private:

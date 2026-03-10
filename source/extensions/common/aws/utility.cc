@@ -7,6 +7,8 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
 
+#include "openssl/crypto.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -323,6 +325,7 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
  */
 std::string Utility::getSTSEndpoint(absl::string_view region) {
   std::string single_region;
+  const bool fips_mode = FIPS_mode();
 
   // If we contain a comma or asterisk it looks like a region set.
   if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
@@ -331,11 +334,11 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
     // If we still have a * in the first element, then send them to us-east-1 fips or global
     // endpoint.
     if (absl::StrContains(region_v[0], '*')) {
-#ifdef ENVOY_SSL_FIPS
-      return "sts-fips.us-east-1.amazonaws.com";
-#else
-      return "sts.amazonaws.com";
-#endif
+      if (fips_mode) {
+        return "sts-fips.us-east-1.amazonaws.com";
+      } else {
+        return "sts.amazonaws.com";
+      }
     }
     single_region = region_v[0];
   } else {
@@ -346,19 +349,21 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
   if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
     return fmt::format("sts.{}.amazonaws.com.cn", single_region);
   }
-#ifdef ENVOY_SSL_FIPS
-  // Use AWS STS FIPS endpoints in FIPS mode https://docs.aws.amazon.com/general/latest/gr/sts.html.
-  // Note: AWS GovCloud doesn't have separate fips endpoints.
-  // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
-  if (single_region == "us-east-1" || single_region == "us-east-2" ||
-      single_region == "us-west-1" || single_region == "us-west-2") {
-    return fmt::format("sts-fips.{}.amazonaws.com", single_region);
+  if (fips_mode) {
+    // Use AWS STS FIPS endpoints in FIPS mode
+    // https://docs.aws.amazon.com/general/latest/gr/sts.html. Note: AWS GovCloud doesn't have
+    // separate fips endpoints.
+    // TODO(suniltheta): Include `ca-central-1` when sts supports a dedicated FIPS endpoint.
+    if (single_region == "us-east-1" || single_region == "us-east-2" ||
+        single_region == "us-west-1" || single_region == "us-west-2") {
+      return fmt::format("sts-fips.{}.amazonaws.com", single_region);
+    }
+    ENVOY_LOG(
+        warn,
+        "FIPS Support is enabled, but an STS FIPS endpoint is not available in the configured "
+        "region ({})",
+        region);
   }
-  ENVOY_LOG(warn,
-            "FIPS Support is enabled, but an STS FIPS endpoint is not available in the configured "
-            "region ({})",
-            region);
-#endif
   return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
@@ -373,20 +378,22 @@ std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_ar
   } else {
     region = arn_split[3];
   }
-#ifdef ENVOY_SSL_FIPS
-  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
-      region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
-    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+
+  if (FIPS_mode() == 1) {
+    if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
+        region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
+      return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+    } else {
+      ENVOY_LOG(
+          warn,
+          "FIPS Support is enabled, but a rolesanywhere FIPS endpoint is not available in the "
+          "configured region ({})",
+          region);
+      return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+    }
   } else {
-    ENVOY_LOG(warn,
-              "FIPS Support is enabled, but a rolesanywhere FIPS endpoint is not available in the "
-              "configured region ({})",
-              region);
     return fmt::format("rolesanywhere.{}.amazonaws.com", region);
   }
-#else
-  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
-#endif
 }
 
 envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(

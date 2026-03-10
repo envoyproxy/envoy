@@ -19,14 +19,15 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // Fuzz findEventEnd with end_stream = true
   Http::Sse::SseParser::findEventEnd(input, true);
 
-  auto [event_start, event_end, next_event] = Http::Sse::SseParser::findEventEnd(input, false);
-  if (event_start != absl::string_view::npos) {
-    absl::string_view event = input.substr(event_start, event_end - event_start);
+  auto result = Http::Sse::SseParser::findEventEnd(input, false);
+  if (result.event_start != absl::string_view::npos) {
+    absl::string_view event =
+        input.substr(result.event_start, result.event_end - result.event_start);
     Http::Sse::SseParser::parseEvent(event);
 
     // If there's more data after the event, continue parsing
-    if (next_event < input.size()) {
-      absl::string_view remaining = input.substr(next_event);
+    if (result.next_start < input.size()) {
+      absl::string_view remaining = input.substr(result.next_start);
       Http::Sse::SseParser::findEventEnd(remaining, false);
       Http::Sse::SseParser::findEventEnd(remaining, true);
     }
@@ -37,10 +38,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     std::string bom_input = std::string("\xEF\xBB\xBF") + std::string(input);
     Http::Sse::SseParser::findEventEnd(bom_input, false);
     Http::Sse::SseParser::findEventEnd(bom_input, true);
-    auto [bom_start, bom_end, bom_next] = Http::Sse::SseParser::findEventEnd(bom_input, false);
-    if (bom_start != absl::string_view::npos) {
-      absl::string_view bom_event =
-          absl::string_view(bom_input).substr(bom_start, bom_end - bom_start);
+    auto bom_result = Http::Sse::SseParser::findEventEnd(bom_input, false);
+    if (bom_result.event_start != absl::string_view::npos) {
+      absl::string_view bom_event = absl::string_view(bom_input).substr(
+          bom_result.event_start, bom_result.event_end - bom_result.event_start);
       Http::Sse::SseParser::parseEvent(bom_event);
     }
   }
@@ -64,10 +65,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
       // Test concatenation: typical chunked streaming pattern
       if (split > 0 && split < len) {
-        auto [chunk_event_start, chunk_event_end, chunk_next] =
-            Http::Sse::SseParser::findEventEnd(first_chunk, false);
+        auto chunk_result = Http::Sse::SseParser::findEventEnd(first_chunk, false);
         // If no complete event in first chunk, data carries over to second chunk
-        if (chunk_event_end == absl::string_view::npos) {
+        if (chunk_result.event_end == absl::string_view::npos) {
           std::string combined = std::string(first_chunk) + std::string(second_chunk);
           Http::Sse::SseParser::findEventEnd(combined, false);
           Http::Sse::SseParser::parseEvent(combined);

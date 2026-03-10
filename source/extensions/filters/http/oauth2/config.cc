@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
@@ -48,14 +49,34 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
 
   const auto& client_secret = credentials.token_secret();
   const auto& hmac_secret = credentials.hmac_secret();
+  const auto auth_type = proto_config.auth_type();
 
   auto& server_context = context.serverFactoryContext();
   auto& cluster_manager = context.serverFactoryContext().clusterManager();
 
-  auto secret_provider_client_secret =
-      secretsProvider(client_secret, server_context, context.initManager());
-  if (secret_provider_client_secret == nullptr) {
-    return absl::InvalidArgumentError("invalid token secret configuration");
+  // token_secret is required unless auth_type is TLS_CLIENT_AUTH
+  if (auth_type !=
+      envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH) {
+    if (!credentials.has_token_secret()) {
+      return absl::InvalidArgumentError(
+          "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
+    }
+  }
+  if (auth_type ==
+          envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH &&
+      credentials.has_token_secret()) {
+    ENVOY_LOG_MISC(debug,
+                   "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH");
+  }
+  Secret::GenericSecretConfigProviderSharedPtr secret_provider_client_secret = nullptr;
+  if (credentials.has_token_secret() &&
+      auth_type !=
+          envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH) {
+    secret_provider_client_secret =
+        secretsProvider(client_secret, server_context, context.initManager());
+    if (secret_provider_client_secret == nullptr) {
+      return absl::InvalidArgumentError("invalid token secret configuration");
+    }
   }
   auto secret_provider_hmac_secret =
       secretsProvider(hmac_secret, server_context, context.initManager());
