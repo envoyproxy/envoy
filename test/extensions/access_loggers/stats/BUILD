@@ -18,8 +18,10 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/stats:allocator_lib",
+        "//source/common/stats:stat_match_input_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/stats:stats_lib",
+        "//source/extensions/matching/actions/transform_stat:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:logging_lib",
@@ -34,6 +36,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stats:config",
+        "//source/extensions/matching/actions/transform_stat:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

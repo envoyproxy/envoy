@@ -48,11 +48,12 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
   Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
   auto result = data_input_->get(data);
-  if (!absl::holds_alternative<std::string>(result.data_)) {
+  auto string_data = result.stringData();
+  if (!string_data) {
     return false;
   }
-  if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
-    descriptor_entry = {descriptor_key_, std::string(str)};
+  if (!string_data->empty()) {
+    descriptor_entry = {descriptor_key_, std::string(*string_data)};
   }
   return true;
 }

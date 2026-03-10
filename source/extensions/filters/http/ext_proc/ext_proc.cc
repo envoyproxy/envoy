@@ -12,10 +12,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
@@ -39,6 +39,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Filters::Common::MutationRules::Checker;
+using Filters::Common::ProcessingEffect::Effect;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
@@ -304,7 +305,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
-      status_on_error_(toErrorCode(config.status_on_error().code())) {
+      status_on_error_(toErrorCode(config.status_on_error().code())),
+      allow_content_length_header_(config.allow_content_length_header()) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -371,9 +373,8 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 }
 
 // Handles the potential cases on when to update the effect field.
-ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
-                                                ProcessingEffect::Effect new_effect) {
-  if (new_effect != ProcessingEffect::Effect::None) {
+Effect updateProcessingEffect(Effect current_effect, Effect new_effect) {
+  if (new_effect != Effect::None) {
     // Do nothing. Default value is None and we want to log the most recent effect that is not none.
     return new_effect;
   }
@@ -382,8 +383,7 @@ ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current
 
 void ExtProcLoggingInfo::recordProcessingEffect(
     ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction,
-    ProcessingEffect::Effect processing_effect) {
+    envoy::config::core::v3::TrafficDirection traffic_direction, Effect processing_effect) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
   switch (callback_state) {
   case ProcessorState::CallbackState::HeadersCallback:
@@ -2078,7 +2078,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      ProcessingEffect::Effect imm_resp_effect = ProcessingEffect::Effect::None;
+      Effect imm_resp_effect = Effect::None;
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
           stats_.rejected_header_mutations_, imm_resp_effect);

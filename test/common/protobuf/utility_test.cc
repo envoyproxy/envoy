@@ -1441,6 +1441,38 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
   }
 }
 
+TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
+  {
+    Protobuf::StringValue source;
+    source.set_value("abc");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "abc");
+  }
+  {
+    Protobuf::BytesValue source;
+    source.set_value("\x01\x02\x03");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "\x01\x02\x03");
+  }
+  {
+    Protobuf::Struct source;
+    (*source.mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    auto result = MessageUtil::knownAnyToBytes(source_any);
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(*result, R"({"key":"value"})");
+  }
+  {
+    envoy::config::cluster::v3::Filter filter;
+    Protobuf::Any source_any;
+    source_any.PackFrom(filter);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), source_any.value());
+  }
+}
+
 // MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   Protobuf::Duration source_duration;
@@ -2459,6 +2491,22 @@ TEST_F(ProtobufUtilityTest, CompareMapFieldsWire) {
 
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, same_order));
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(message1, different_order));
+}
+
+TEST_F(ProtobufUtilityTest, ValidateRecurseIntoAnyUnresolvableType) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+  cluster->set_name("test_cluster");
+  cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  auto* cluster_type = cluster->mutable_cluster_type();
+  cluster_type->set_name("test");
+  Protobuf::Any any;
+  any.set_type_url("type.googleapis.com/some.nonexistent.Type");
+  any.set_value("some_bytes");
+  *cluster_type->mutable_typed_config() = any;
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(bootstrap, /*recurse_into_any=*/true),
+                          EnvoyException,
+                          "Invalid type_url.*some.nonexistent.Type.*during traversal");
 }
 
 } // namespace Envoy
