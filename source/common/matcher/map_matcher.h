@@ -17,8 +17,7 @@ public:
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
   ActionMatchResult doNoMatch(const DataType& data, SkippedMatchCb skipped_match_cb) {
-    if (data_input_->get(data).data_availability_ ==
-        DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+    if (data_input_->get(data).availability() == DataAvailability::MoreDataMightBeAvailable) {
       return ActionMatchResult::insufficientData();
     }
     return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
@@ -27,17 +26,18 @@ public:
   ActionMatchResult match(const DataType& data,
                           SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
-    ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
+    if (input.availability() == DataAvailability::NotAvailable) {
       return ActionMatchResult::insufficientData();
     }
 
     // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
-    if (absl::holds_alternative<absl::monostate>(input.data_)) {
+    auto string_data = input.stringData();
+    if (!string_data) {
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
-    return doMatch(data, absl::get<std::string>(input.data_), skipped_match_cb);
+    // This is safe to pass string_data because input remains alive.
+    return doMatch(data, *string_data, skipped_match_cb);
   }
 
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;

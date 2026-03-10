@@ -334,32 +334,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   // Extract cluster_config from the Any field.
   std::string cluster_config_bytes;
   if (proto_config.has_cluster_config()) {
-    const auto& any_config = proto_config.cluster_config();
-    const std::string& type_url = any_config.type_url();
-
-    // Handle well-known types that can be passed directly as bytes.
-    if (type_url == "type.googleapis.com/google.protobuf.StringValue") {
-      Protobuf::StringValue string_value;
-      if (!any_config.UnpackTo(&string_value)) {
-        return absl::InvalidArgumentError("Failed to unpack StringValue");
-      }
-      cluster_config_bytes = string_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.BytesValue") {
-      Protobuf::BytesValue bytes_value;
-      if (!any_config.UnpackTo(&bytes_value)) {
-        return absl::InvalidArgumentError("Failed to unpack BytesValue");
-      }
-      cluster_config_bytes = bytes_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.Struct") {
-      Protobuf::Struct struct_value;
-      if (!any_config.UnpackTo(&struct_value)) {
-        return absl::InvalidArgumentError("Failed to unpack Struct");
-      }
-      cluster_config_bytes = MessageUtil::getJsonStringFromMessageOrError(struct_value, false);
-    } else {
-      // For unknown types, use the serialized bytes.
-      cluster_config_bytes = any_config.value();
-    }
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.cluster_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    cluster_config_bytes = std::move(config_or_error.value());
   }
 
   // Load the dynamic module.

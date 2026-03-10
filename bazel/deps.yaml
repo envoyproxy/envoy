@@ -1109,6 +1109,7 @@ brotli:
   project_url: "https://brotli.org"
   release_date: "2025-10-27"
   use_category:
+  - dataplane_core
   - dataplane_ext
   extensions:
   - envoy.compression.brotli.compressor
