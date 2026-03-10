@@ -3496,3 +3496,756 @@ fn test_lb_config_vec_metric_invalid_id() {
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
 }
+
+// =============================================================================
+// Cluster Extension FFI stubs for testing.
+// =============================================================================
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _count: usize,
+  _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptrs: *const abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _count: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_new(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_delete(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_commit(
+  _scheduler_module_ptr: abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr,
+  _event_id: u64,
+) {
+}
+
+// Cluster config metrics FFI stubs for testing.
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_counter(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_increment_counter(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_set_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_increment_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_define_histogram(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  _histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+  _cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _hash_out: *mut u64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_headers: *mut abi::envoy_dynamic_module_type_envoy_http_header,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  _optional_size: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _address: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _strict: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+// =============================================================================
+// Cluster Extension Rust SDK tests.
+// =============================================================================
+
+#[test]
+fn test_cluster_scheduler_mock() {
+  let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_cluster_mock_envoy_cluster_new_scheduler() {
+  let mut mock_cluster = cluster::MockEnvoyCluster::new();
+  mock_cluster.expect_new_scheduler().times(1).returning(|| {
+    let mut mock_scheduler = cluster::MockEnvoyClusterScheduler::new();
+    mock_scheduler.expect_commit().return_const(());
+    Box::new(mock_scheduler)
+  });
+  let scheduler = mock_cluster.new_scheduler();
+  scheduler.commit(100);
+}
+
+// =============================================================================
+// Cluster Metrics Tests
+// =============================================================================
+
+#[test]
+fn test_cluster_metrics_define_counter() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_gauge() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_histogram() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.increment_counter(EnvoyCounterId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.increment_counter(EnvoyCounterId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_metrics_gauge_operations() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.set_gauge(EnvoyGaugeId(1), 42).is_ok());
+  assert!(mock.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_gauge_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.record_histogram_value(EnvoyHistogramId(1), 42).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .record_histogram_value(EnvoyHistogramId(999), 1)
+    .is_err());
+}
+
+#[test]
+fn test_cluster_metrics_define_all_metric_types_and_use() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock.expect_increment_counter().returning(|_, _| Ok(()));
+  mock.expect_set_gauge().returning(|_, _| Ok(()));
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock.define_counter("c").unwrap();
+  let gauge_id = mock.define_gauge("g").unwrap();
+  let histogram_id = mock.define_histogram("h").unwrap();
+  assert!(mock.increment_counter(counter_id, 1).is_ok());
+  assert!(mock.set_gauge(gauge_id, 100).is_ok());
+  assert!(mock.record_histogram_value(histogram_id, 50).is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_define_counter_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock.define_counter_vec("test_counter", &["region", "zone"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock.define_gauge_vec("test_gauge", &["env"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_define_histogram_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock.define_histogram_vec("test_histogram", &["method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_cluster_metrics_increment_counter_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(1), &["us-east-1"], 1)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_set_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_set_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 42)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_increase_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_increase_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increase_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 10)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_decrease_gauge_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock.expect_decrease_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .decrease_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 5)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_record_histogram_value_vec() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(1), &["GET"], 100)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_metrics_vec_metric_invalid_id() {
+  let mut mock = cluster::MockEnvoyClusterMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
+}
+
+// =================================================================================================
+// ClusterLbContext tests
+// =================================================================================================
+
+#[test]
+fn test_cluster_lb_context_compute_hash_key() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_compute_hash_key().returning(|| Some(42));
+  assert_eq!(mock_ctx.compute_hash_key(), Some(42));
+}
+
+#[test]
+fn test_cluster_lb_context_compute_hash_key_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_compute_hash_key().returning(|| None);
+  assert_eq!(mock_ctx.compute_hash_key(), None);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers_size() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_headers_size()
+    .returning(|| 3);
+  assert_eq!(mock_ctx.get_downstream_headers_size(), 3);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_downstream_headers().returning(|| {
+    Some(vec![
+      (":method".to_string(), "GET".to_string()),
+      ("host".to_string(), "example.com".to_string()),
+    ])
+  });
+  let headers = mock_ctx.get_downstream_headers().unwrap();
+  assert_eq!(headers.len(), 2);
+  assert_eq!(headers[0], (":method".to_string(), "GET".to_string()));
+  assert_eq!(headers[1], ("host".to_string(), "example.com".to_string()));
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_headers_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_downstream_headers().returning(|| None);
+  assert!(mock_ctx.get_downstream_headers().is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_header() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some(("example.com".to_string(), 1)));
+  let result = mock_ctx.get_downstream_header("host", 0).unwrap();
+  assert_eq!(result.0, "example.com");
+  assert_eq!(result.1, 1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_header_not_found() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_header()
+    .returning(|_, _| None);
+  assert!(mock_ctx.get_downstream_header("missing", 0).is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_host_selection_retry_count() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_host_selection_retry_count()
+    .returning(|| 5);
+  assert_eq!(mock_ctx.get_host_selection_retry_count(), 5);
+}
+
+#[test]
+fn test_cluster_lb_context_should_select_another_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_should_select_another_host()
+    .withf(|priority, index| *priority == 0 && *index == 1)
+    .returning(|_, _| true);
+  assert!(mock_ctx.should_select_another_host(0, 1));
+}
+
+#[test]
+fn test_cluster_lb_context_should_select_another_host_false() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_should_select_another_host()
+    .returning(|_, _| false);
+  assert!(!mock_ctx.should_select_another_host(0, 0));
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_override_host()
+    .returning(|| Some(("10.0.0.1:8080".to_string(), true)));
+  let result = mock_ctx.get_override_host().unwrap();
+  assert_eq!(result.0, "10.0.0.1:8080");
+  assert!(result.1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host_non_strict() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_override_host()
+    .returning(|| Some(("10.0.0.2:9090".to_string(), false)));
+  let result = mock_ctx.get_override_host().unwrap();
+  assert_eq!(result.0, "10.0.0.2:9090");
+  assert!(!result.1);
+}
+
+#[test]
+fn test_cluster_lb_context_get_override_host_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx.expect_get_override_host().returning(|| None);
+  assert!(mock_ctx.get_override_host().is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_connection_sni() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| Some("example.com".to_string()));
+  assert_eq!(
+    mock_ctx.get_downstream_connection_sni(),
+    Some("example.com".to_string())
+  );
+}
+
+#[test]
+fn test_cluster_lb_context_get_downstream_connection_sni_none() {
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| None);
+  assert!(mock_ctx.get_downstream_connection_sni().is_none());
+}
+
+#[test]
+fn test_cluster_lb_choose_host_with_context() {
+  struct TestClusterLb;
+  impl cluster::ClusterLb for TestClusterLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      let ctx = context.expect("context should be Some");
+      assert_eq!(ctx.get_host_selection_retry_count(), 3);
+      assert_eq!(ctx.compute_hash_key(), Some(12345));
+      Some(0x1234 as *mut _)
+    }
+  }
+
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_host_selection_retry_count()
+    .returning(|| 3);
+  mock_ctx.expect_compute_hash_key().returning(|| Some(12345));
+
+  let mut lb = TestClusterLb;
+  let result = lb.choose_host(Some(&mock_ctx));
+  assert!(result.is_some());
+  assert_eq!(result.unwrap(), 0x1234 as *mut _);
+}
+
+#[test]
+fn test_cluster_lb_choose_host_without_context() {
+  struct TestClusterLb;
+  impl cluster::ClusterLb for TestClusterLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      assert!(context.is_none());
+      None
+    }
+  }
+
+  let mut lb = TestClusterLb;
+  let result = lb.choose_host(None);
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_cluster_lb_context_full_workflow() {
+  struct SniBasedLb;
+  impl cluster::ClusterLb for SniBasedLb {
+    fn choose_host(
+      &mut self,
+      context: Option<&dyn cluster::ClusterLbContext>,
+    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      let ctx = context?;
+
+      let sni = ctx.get_downstream_connection_sni()?;
+      assert_eq!(sni, "backend.example.com");
+
+      let (host_header, _) = ctx.get_downstream_header("host", 0)?;
+      assert_eq!(host_header, "backend.example.com");
+
+      let hash = ctx.compute_hash_key()?;
+      assert_eq!(hash, 99999);
+
+      if ctx.should_select_another_host(0, 0) {
+        return None;
+      }
+
+      Some(0xABCD as *mut _)
+    }
+  }
+
+  let mut mock_ctx = cluster::MockClusterLbContext::new();
+  mock_ctx
+    .expect_get_downstream_connection_sni()
+    .returning(|| Some("backend.example.com".to_string()));
+  mock_ctx
+    .expect_get_downstream_header()
+    .withf(|key, index| key == "host" && *index == 0)
+    .returning(|_, _| Some(("backend.example.com".to_string(), 1)));
+  mock_ctx.expect_compute_hash_key().returning(|| Some(99999));
+  mock_ctx
+    .expect_should_select_another_host()
+    .returning(|_, _| false);
+
+  let mut lb = SniBasedLb;
+  let result = lb.choose_host(Some(&mock_ctx));
+  assert_eq!(result, Some(0xABCD as *mut _));
+}

@@ -181,6 +181,12 @@ bug_fixes:
     intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
     be reverted by setting runtime guard
     ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
+- area: ratelimit
+  change: |
+    Fixed a bug in the gRPC rate limit client where the client could get into a bad state if the
+    callbacks were not properly released after a request completion, leading to potential use-after-free
+    issues. The fix ensures that callbacks and request references are cleared after completion, and adds
+    assertions to enforce correct usage patterns.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
@@ -233,11 +239,26 @@ bug_fixes:
 - area: redis
   change: |
     Added support for ``BITFIELD_RO`` in ``redis_proxy``.
+- area: json
+  change: |
+    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
+    when the input string ends with a control character.
+- area: network
+  change: |
+    Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
+- area: rbac
+  change: |
+    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
+    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
+    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: filters
+  change: |
+    Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
@@ -424,6 +445,11 @@ new_features:
     <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`
     support for dynamic modules, enabling custom service discovery and host management to be implemented
     in dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added server lifecycle callbacks (``on_server_initialized``, ``on_drain_started``, ``on_shutdown``)
+    for dynamic module custom clusters, enabling modules to react to server readiness, drain, and
+    shutdown events.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
@@ -626,5 +652,16 @@ new_features:
     check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
     [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
     validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
+- area: lua
+  change: |
+    Added :ref:`set() <config_http_filters_lua_stream_info_filter_state_wrapper>` to the Lua filter
+    state API, allowing Lua scripts to create and store filter state objects dynamically using
+    registered object factories.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 
 deprecated:

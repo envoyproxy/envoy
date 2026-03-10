@@ -6,7 +6,6 @@ import "envoy/data/accesslog/v3/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
@@ -32,8 +31,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message Config {
-  option (xds.annotations.v3.message_status).work_in_progress = true;
-
   // Defines a tag on a stat.
   message Tag {
     // The name of the tag.

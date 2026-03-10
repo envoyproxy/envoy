@@ -2,6 +2,7 @@ use crate::{
   abi,
   drop_wrapped_c_void_ptr,
   str_to_module_buffer,
+  strs_to_module_buffers,
   wrap_into_c_void_ptr,
   EnvoyCounterId,
   EnvoyCounterVecId,
@@ -967,12 +968,7 @@ pub struct EnvoyLbConfigImpl {
 unsafe impl Send for EnvoyLbConfigImpl {}
 unsafe impl Sync for EnvoyLbConfigImpl {}
 
-/// Helper to convert a slice of string references into a vector of module buffers.
-fn strs_to_module_buffers(strs: &[&str]) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
-  strs.iter().map(|s| str_to_module_buffer(s)).collect()
-}
-
-/// Helper to call a metric recording ABI function and convert the result.
+/// Converts an ABI metrics result to a Rust Result for recording operations.
 fn metric_result_to_rust(
   res: abi::envoy_dynamic_module_type_metrics_result,
 ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
