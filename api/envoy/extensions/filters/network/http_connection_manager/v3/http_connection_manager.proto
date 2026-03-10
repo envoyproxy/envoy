@@ -141,6 +141,17 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
+  // The format to use when writing the
+  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) header value.
+  enum ForwardClientCertFormat {
+    // Use the :ref:`text format <config_http_conn_man_headers_x-forwarded-client-cert_text>`.
+    // This is the default.
+    TEXT = 0;
+
+    // Use the :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`.
+    JSON = 1;
+  }
+
   // [#next-free-field: 14]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
@@ -301,17 +312,6 @@ message HttpConnectionManager {
     // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
     // false.
     bool uri = 5;
-  }
-
-  // The format to use when writing the
-  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) header value.
-  enum ForwardClientCertFormat {
-    // Use the :ref:`text format <config_http_conn_man_headers_x-forwarded-client-cert_text>`.
-    // This is the default.
-    TEXT = 0;
-
-    // Use the :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`.
-    JSON = 1;
   }
 
   // The configuration for forwarding client cert details, used as the action config in a
