@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.h"
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.validate.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
