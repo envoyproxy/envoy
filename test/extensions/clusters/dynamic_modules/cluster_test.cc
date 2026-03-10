@@ -713,6 +713,114 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   handle.reset();
 }
 
+// Test that the server_initialized lifecycle callback is invoked.
+TEST_F(DynamicModuleClusterTest, ServerInitializedCallback) {
+  // Capture the PostInit callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallback captured_cb;
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured callback to exercise the server initialized path.
+  captured_cb();
+}
+
+// Test that the drain_started lifecycle callback is invoked.
+TEST_F(DynamicModuleClusterTest, DrainStartedCallback) {
+  // Capture the drain callback registered during cluster construction.
+  Server::DrainManager::DrainCloseCb captured_drain_cb;
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured drain callback to exercise the drain notification path.
+  EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
+}
+
+// Test that the shutdown lifecycle callback is invoked with completion.
+TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
+  // Capture the shutdown callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke the captured shutdown callback with a completion callback.
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
+// Test that shutdown completion is still called when the in-module cluster is null.
+TEST_F(DynamicModuleClusterTest, ShutdownCallbackAfterClusterDestroy) {
+  // Capture the shutdown callback registered during cluster construction.
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Destroy the cluster to null out the in-module pointer.
+  result->first.reset();
+
+  // Invoke the captured shutdown callback. Since the cluster is destroyed, the completion
+  // callback should still be invoked (the else branch).
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
+// Test that all lifecycle callbacks are registered during cluster creation.
+TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
+  // Verify that all three lifecycle callbacks are registered.
+  Server::ServerLifecycleNotifier::StageCallback captured_init_cb;
+  Server::DrainManager::DrainCloseCb captured_drain_cb;
+  Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
+
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_init_cb), testing::Return(nullptr)));
+  EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+      .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
+  EXPECT_CALL(
+      server_context_.lifecycle_notifier_,
+      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillOnce(
+          testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
+
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  // Invoke all lifecycle callbacks to verify the full lifecycle flow.
+  captured_init_cb();
+  EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
+  bool completion_called = false;
+  captured_shutdown_cb([&completion_called]() { completion_called = true; });
+  EXPECT_TRUE(completion_called);
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Clusters

@@ -423,8 +423,9 @@ new_features:
     in dynamic modules.
 - area: dynamic_modules
   change: |
-    Added scheduler support for dynamic module custom clusters, allowing modules to safely dispatch
-    work to Envoy's main thread from background threads for thread-safe host updates.
+    Added server lifecycle callbacks (``on_server_initialized``, ``on_drain_started``, ``on_shutdown``)
+    for dynamic module custom clusters, enabling modules to react to server readiness, drain, and
+    shutdown events.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
