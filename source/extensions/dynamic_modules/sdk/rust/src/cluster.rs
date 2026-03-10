@@ -51,12 +51,65 @@ pub trait Cluster: Send + Sync {
 pub trait ClusterLb: Send {
   /// Select a host for a request.
   ///
+  /// The `context` provides access to per-request information such as downstream headers,
+  /// hash keys, override host, and retry state. It may be `None` if no context is available
+  /// (e.g., health check requests).
+  ///
   /// Returns the raw host pointer obtained from [`EnvoyClusterLoadBalancer::get_healthy_host`],
   /// or `None` if no host is available.
   fn choose_host(
     &mut self,
-    context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+    context: Option<&dyn ClusterLbContext>,
   ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+}
+
+/// Per-request context available during [`ClusterLb::choose_host`].
+///
+/// This provides access to downstream request information for making load balancing decisions
+/// such as header-based routing, consistent hashing, and retry-aware host selection.
+#[automock]
+pub trait ClusterLbContext {
+  /// Compute a hash key from the request context for consistent hashing.
+  ///
+  /// Returns `Some(hash)` if a hash key was computed, `None` otherwise.
+  fn compute_hash_key(&self) -> Option<u64>;
+
+  /// Returns the number of downstream request headers.
+  fn get_downstream_headers_size(&self) -> usize;
+
+  /// Returns all downstream request headers as a vector of (key, value) pairs.
+  ///
+  /// Returns `None` if no headers are available.
+  fn get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
+
+  /// Returns a downstream request header value by key and index.
+  ///
+  /// Since a header key can have multiple values, the `index` parameter selects a specific value.
+  /// Returns `Some((value, total_count))` where `total_count` is the number of values for the key,
+  /// or `None` if the header was not found at the given index.
+  fn get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
+
+  /// Returns the maximum number of times host selection should be retried if the chosen host
+  /// is rejected by [`ClusterLbContext::should_select_another_host`].
+  fn get_host_selection_retry_count(&self) -> u32;
+
+  /// Checks whether the load balancer should reject the given host and retry selection.
+  ///
+  /// This is used during retries to avoid selecting hosts that were already attempted.
+  /// The host is identified by priority and index within the healthy host list at that priority.
+  fn should_select_another_host(&self, priority: u32, index: usize) -> bool;
+
+  /// Returns the override host address and strict mode flag from the context.
+  ///
+  /// Override host allows upstream filters to direct the load balancer to prefer a specific host
+  /// by address. Returns `Some((address, strict))` if an override host is set, `None` otherwise.
+  /// When `strict` is true, the load balancer should return no host if the override is not valid.
+  fn get_override_host(&self) -> Option<(String, bool)>;
+
+  /// Returns the requested server name (SNI) from the downstream connection.
+  ///
+  /// Returns `None` if the downstream connection or SNI is not available.
+  fn get_downstream_connection_sni(&self) -> Option<String>;
 }
 
 /// Envoy-side cluster operations available to the module.
@@ -202,6 +255,184 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
   }
 }
 
+struct ClusterLbContextImpl {
+  raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+}
+
+impl ClusterLbContextImpl {
+  fn new(
+    raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+    raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  ) -> Self {
+    Self {
+      raw_context,
+      raw_lb,
+    }
+  }
+}
+
+impl ClusterLbContext for ClusterLbContextImpl {
+  fn compute_hash_key(&self) -> Option<u64> {
+    let mut hash: u64 = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+        self.raw_context,
+        &mut hash,
+      )
+    };
+    if ok {
+      Some(hash)
+    } else {
+      None
+    }
+  }
+
+  fn get_downstream_headers_size(&self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+        self.raw_context,
+      )
+    }
+  }
+
+  fn get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
+    let size = self.get_downstream_headers_size();
+    if size == 0 {
+      return None;
+    }
+    let mut raw_headers = vec![
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: std::ptr::null_mut(),
+        key_length: 0,
+        value_ptr: std::ptr::null_mut(),
+        value_length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+        self.raw_context,
+        raw_headers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return None;
+    }
+    Some(
+      raw_headers
+        .iter()
+        .map(|h| unsafe {
+          let key = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            h.key_ptr as *const u8,
+            h.key_length,
+          ));
+          let value = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            h.value_ptr as *const u8,
+            h.value_length,
+          ));
+          (key.to_string(), value.to_string())
+        })
+        .collect(),
+    )
+  }
+
+  fn get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
+    let key_buf = str_to_module_buffer(key);
+    let mut result_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let mut total_size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+        self.raw_context,
+        key_buf,
+        &mut result_buffer,
+        index,
+        &mut total_size,
+      )
+    };
+    if !ok {
+      return None;
+    }
+    let value = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        result_buffer.ptr as *const u8,
+        result_buffer.length,
+      ))
+    };
+    Some((value.to_string(), total_size))
+  }
+
+  fn get_host_selection_retry_count(&self) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+        self.raw_context,
+      )
+    }
+  }
+
+  fn should_select_another_host(&self, priority: u32, index: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+        self.raw_lb,
+        self.raw_context,
+        priority,
+        index,
+      )
+    }
+  }
+
+  fn get_override_host(&self) -> Option<(String, bool)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let mut strict = false;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+        self.raw_context,
+        &mut address,
+        &mut strict,
+      )
+    };
+    if !ok {
+      return None;
+    }
+    let addr_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const u8,
+        address.length,
+      ))
+    };
+    Some((addr_str.to_string(), strict))
+  }
+
+  fn get_downstream_connection_sni(&self) -> Option<String> {
+    let mut result_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+        self.raw_context,
+        &mut result_buffer,
+      )
+    };
+    if !ok {
+      return None;
+    }
+    let sni = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        result_buffer.ptr as *const u8,
+        result_buffer.length,
+      ))
+    };
+    Some(sni.to_string())
+  }
+}
+
 // Cluster Event Hook Implementations
 
 #[no_mangle]
@@ -275,6 +506,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
   drop_wrapped_c_void_ptr!(cluster_module_ptr, Cluster);
 }
 
+/// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
+/// The `lb_envoy_ptr` is needed by [`ClusterLbContextImpl::should_select_another_host`] to
+/// resolve host pointers from the priority set.
+struct ClusterLbWrapper {
+  lb: Box<dyn ClusterLb>,
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+}
+
 /// # Safety
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
@@ -288,7 +527,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
   let cluster = &**cluster;
   let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
   let lb = cluster.new_load_balancer(&envoy_lb);
-  wrap_into_c_void_ptr!(lb)
+  let wrapper = Box::new(ClusterLbWrapper { lb, lb_envoy_ptr });
+  Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_cluster_lb_module_ptr
 }
 
 /// # Safety
@@ -299,7 +539,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(lb_module_ptr, ClusterLb);
+  let wrapper = lb_module_ptr as *mut ClusterLbWrapper;
+  let _ = Box::from_raw(wrapper);
 }
 
 #[no_mangle]
@@ -307,9 +548,19 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
-  let lb = lb_module_ptr as *mut Box<dyn ClusterLb>;
-  let lb = unsafe { &mut *lb };
-  match lb.choose_host(context_envoy_ptr) {
+  let wrapper = unsafe { &mut *(lb_module_ptr as *mut ClusterLbWrapper) };
+  let context = if context_envoy_ptr.is_null() {
+    None
+  } else {
+    Some(ClusterLbContextImpl::new(
+      context_envoy_ptr,
+      wrapper.lb_envoy_ptr,
+    ))
+  };
+  match wrapper
+    .lb
+    .choose_host(context.as_ref().map(|c| c as &dyn ClusterLbContext))
+  {
     Some(host) => host,
     None => std::ptr::null_mut(),
   }
