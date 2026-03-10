@@ -1,5 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
-load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_objc_test")
+
 
 licenses(["notice"])  # Apache 2
 
@@ -46,15 +46,22 @@ envoy_cc_test(
     ],
 )
 
-envoy_mobile_objc_test(
+envoy_cc_test(
     name = "apple_network_change_monitor_impl_test",
-    srcs = [
-        "apple_network_change_monitor_impl_test.mm",
-    ],
-    deps = [
-        "//test/test_common:utility_lib",
-        "//library/common/network:apple_network_change_monitor_lib",
-        "//library/common/api:c_types",
-        "@envoy//test/test_common:utility_lib",
-    ],
+    srcs = select({
+        "@envoy//bazel:apple": [
+            "apple_network_change_monitor_impl_test.mm",
+        ],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    deps = select({
+        "@envoy//bazel:apple": [
+            "//test/test_common:utility_lib",
+            "//library/common/network:apple_network_change_monitor_lib",
+            "//library/common/api:c_types",
+            "@envoy//test/test_common:utility_lib",
+        ],
+        "//conditions:default": [],
+    }),
 )
