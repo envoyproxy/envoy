@@ -69,7 +69,7 @@ TEST_P(SetFilterStateIntegrationTest, OnAccept) {
   });
   const std::string filter_config = R"EOF(
     "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
-    on_new_connection:
+    on_accept:
       - object_key: "early"
         factory_key: "foo"
         format_string:

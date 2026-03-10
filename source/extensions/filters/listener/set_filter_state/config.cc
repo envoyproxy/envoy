@@ -12,8 +12,8 @@ namespace ListenerFilters {
 namespace SetFilterState {
 
 Network::FilterStatus SetFilterState::onAccept(Network::ListenerFilterCallbacks& cb) {
-  if (on_new_connection_ != nullptr) {
-    on_new_connection_->updateFilterState({}, cb.streamInfo());
+  if (on_accept_ != nullptr) {
+    on_accept_->updateFilterState({}, cb.streamInfo());
   }
   return Network::FilterStatus::Continue;
 }
@@ -32,16 +32,16 @@ public:
         const envoy::extensions::filters::listener::set_filter_state::v3::Config&>(
         message, context.messageValidationVisitor());
 
-    Filters::Common::SetFilterState::ConfigSharedPtr on_new_connection_config;
-    if (!proto_config.on_new_connection().empty()) {
-      on_new_connection_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-          proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection, context);
+    Filters::Common::SetFilterState::ConfigSharedPtr on_accept_config;
+    if (!proto_config.on_accept().empty()) {
+      on_accept_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+          proto_config.on_accept(), StreamInfo::FilterState::LifeSpan::Connection, context);
     }
 
     return [listener_filter_matcher,
-            on_new_connection_config](Network::ListenerFilterManager& filter_manager) -> void {
+            on_accept_config](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(listener_filter_matcher,
-                                     std::make_unique<SetFilterState>(on_new_connection_config));
+                                     std::make_unique<SetFilterState>(on_accept_config));
     };
   }
 

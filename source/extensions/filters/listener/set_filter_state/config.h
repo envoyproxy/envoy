@@ -12,8 +12,8 @@ namespace SetFilterState {
 
 class SetFilterState : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  SetFilterState(Filters::Common::SetFilterState::ConfigSharedPtr on_new_connection)
-      : on_new_connection_(std::move(on_new_connection)) {}
+  SetFilterState(Filters::Common::SetFilterState::ConfigSharedPtr on_accept)
+      : on_accept_(std::move(on_accept)) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
@@ -23,7 +23,7 @@ public:
   }
 
 private:
-  const Filters::Common::SetFilterState::ConfigSharedPtr on_new_connection_;
+  const Filters::Common::SetFilterState::ConfigSharedPtr on_accept_;
 };
 
 } // namespace SetFilterState

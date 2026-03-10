@@ -25,9 +25,9 @@ public:
   void initialize(const std::string& yaml) {
     envoy::extensions::filters::listener::set_filter_state::v3::Config proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
-    on_new_connection_config_ = std::make_shared<Filters::Common::SetFilterState::Config>(
-        proto_config.on_new_connection(), StreamInfo::FilterState::LifeSpan::Connection, context_);
-    filter_ = std::make_unique<SetFilterState>(on_new_connection_config_);
+    on_accept_config_ = std::make_shared<Filters::Common::SetFilterState::Config>(
+        proto_config.on_accept(), StreamInfo::FilterState::LifeSpan::Connection, context_);
+    filter_ = std::make_unique<SetFilterState>(on_accept_config_);
     filter_->onAccept(cb_);
     EXPECT_EQ(0, filter_->maxReadBytes());
     {
@@ -40,14 +40,14 @@ public:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Filters::Common::SetFilterState::ConfigSharedPtr on_new_connection_config_;
+  Filters::Common::SetFilterState::ConfigSharedPtr on_accept_config_;
   std::unique_ptr<SetFilterState> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
 };
 
 TEST_F(SetFilterStateTest, SetFilterState) {
   const std::string yaml = R"EOF(
-on_new_connection:
+on_accept:
   - object_key: test_key
     factory_key: envoy.string
     format_string:
