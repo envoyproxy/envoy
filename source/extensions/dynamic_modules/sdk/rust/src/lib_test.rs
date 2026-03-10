@@ -1,6 +1,8 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
+use std::collections::HashMap;
+#[cfg(test)]
 use std::sync::atomic::{AtomicBool, AtomicUsize}; // These are used for testing, not for actual concurrency.
 
 #[test]
@@ -2473,6 +2475,58 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin
 }
 
 // =============================================================================
+// Function Registry FFI stubs for testing.
+// =============================================================================
+
+struct SendablePtr(*mut std::ffi::c_void);
+// Safety: the pointers stored in the test registry are static function pointers that are safe to
+// access from any thread.
+unsafe impl Send for SendablePtr {}
+
+static FUNCTION_REGISTRY: std::sync::Mutex<Option<HashMap<String, SendablePtr>>> =
+  std::sync::Mutex::new(None);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_register_function(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  function_ptr: *mut std::ffi::c_void,
+) -> bool {
+  if function_ptr.is_null() {
+    return false;
+  }
+  let key_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(key.ptr as *const u8, key.length))
+  };
+  let mut registry = FUNCTION_REGISTRY.lock().unwrap();
+  let map = registry.get_or_insert_with(HashMap::new);
+  if map.contains_key(key_str) {
+    return false;
+  }
+  map.insert(key_str.to_string(), SendablePtr(function_ptr));
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_get_function(
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  function_ptr_out: *mut *mut std::ffi::c_void,
+) -> bool {
+  let key_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(key.ptr as *const u8, key.length))
+  };
+  let registry = FUNCTION_REGISTRY.lock().unwrap();
+  if let Some(map) = registry.as_ref() {
+    if let Some(sendable) = map.get(key_str) {
+      unsafe {
+        *function_ptr_out = sendable.0;
+      }
+      return true;
+    }
+  }
+  false
+}
+
+// =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
 
@@ -3495,4 +3549,117 @@ fn test_lb_config_vec_metric_invalid_id() {
   assert!(mock_config
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
+}
+
+// =============================================================================
+// Shared State Tests
+// =============================================================================
+
+// These tests use unique keys to avoid collisions with parallel test execution, since the
+// shared state registry is process-wide.
+
+#[test]
+fn test_register_and_get_shared_state() {
+  let state = std::sync::Arc::new(42u64);
+  assert!(register_shared_state("ss_basic", state.clone()));
+
+  let retrieved = get_shared_state::<u64>("ss_basic");
+  assert!(retrieved.is_some());
+  assert_eq!(*retrieved.unwrap(), 42);
+}
+
+#[test]
+fn test_shared_state_duplicate_registration_returns_false() {
+  let state1 = std::sync::Arc::new(1u32);
+  let state2 = std::sync::Arc::new(2u32);
+  assert!(register_shared_state("ss_dup", state1));
+  assert!(!register_shared_state("ss_dup", state2));
+}
+
+#[test]
+fn test_shared_state_get_nonexistent_returns_none() {
+  let result = get_shared_state::<u64>("ss_nonexistent");
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_shared_state_type_safety() {
+  let state = std::sync::Arc::new(100u64);
+  assert!(register_shared_state("ss_typed", state));
+
+  // Same key but different type should return None.
+  let wrong_type = get_shared_state::<u32>("ss_typed");
+  assert!(wrong_type.is_none());
+
+  // Correct type should succeed.
+  let correct_type = get_shared_state::<u64>("ss_typed");
+  assert!(correct_type.is_some());
+  assert_eq!(*correct_type.unwrap(), 100);
+}
+
+#[test]
+fn test_shared_state_different_types_same_key() {
+  let u64_state = std::sync::Arc::new(64u64);
+  let u32_state = std::sync::Arc::new(32u32);
+
+  // Same key, different types should not collide.
+  assert!(register_shared_state("ss_multi_type", u64_state));
+  assert!(register_shared_state("ss_multi_type", u32_state));
+
+  let retrieved_u64 = get_shared_state::<u64>("ss_multi_type");
+  assert!(retrieved_u64.is_some());
+  assert_eq!(*retrieved_u64.unwrap(), 64);
+
+  let retrieved_u32 = get_shared_state::<u32>("ss_multi_type");
+  assert!(retrieved_u32.is_some());
+  assert_eq!(*retrieved_u32.unwrap(), 32);
+}
+
+#[test]
+fn test_shared_state_arc_refcount() {
+  let state = std::sync::Arc::new(String::from("shared"));
+  assert!(register_shared_state("ss_refcount", state));
+
+  // The registry holds one strong ref. Each retrieval clones the Arc, incrementing the refcount.
+  let retrieved = get_shared_state::<String>("ss_refcount").unwrap();
+  assert_eq!(*retrieved, "shared");
+  // 2 refs: one in the registry, one from this retrieval.
+  assert_eq!(std::sync::Arc::strong_count(&retrieved), 2);
+
+  let retrieved2 = get_shared_state::<String>("ss_refcount").unwrap();
+  // 3 refs: one in the registry, one from each retrieval.
+  assert_eq!(std::sync::Arc::strong_count(&retrieved2), 3);
+}
+
+#[test]
+fn test_shared_state_failed_registration_does_not_leak() {
+  let state1 = std::sync::Arc::new(vec![1, 2, 3]);
+  let state2 = std::sync::Arc::new(vec![4, 5, 6]);
+  let state2_clone = state2.clone();
+
+  assert!(register_shared_state("ss_leak", state1));
+  // Duplicate registration should fail and not leak the Arc.
+  assert!(!register_shared_state("ss_leak", state2));
+
+  // state2_clone should still be the only owner (the failed registration reclaimed the Arc).
+  assert_eq!(std::sync::Arc::strong_count(&state2_clone), 1);
+}
+
+#[test]
+fn test_shared_state_with_struct() {
+  #[derive(Debug, PartialEq)]
+  struct Config {
+    endpoint: String,
+    timeout_ms: u64,
+  }
+
+  let config = std::sync::Arc::new(Config {
+    endpoint: "http://localhost:8080".to_string(),
+    timeout_ms: 5000,
+  });
+  assert!(register_shared_state("ss_struct", config));
+
+  let retrieved = get_shared_state::<Config>("ss_struct").unwrap();
+  assert_eq!(retrieved.endpoint, "http://localhost:8080");
+  assert_eq!(retrieved.timeout_ms, 5000);
 }
