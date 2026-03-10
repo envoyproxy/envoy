@@ -11,19 +11,14 @@
 // Mock NetworkChangeListener to observe callbacks from EnvoyCxxNetworkMonitor
 class MockNetworkChangeListener : public Envoy::Platform::NetworkChangeListener {
 public:
-  MockNetworkChangeListener() : available_called_(0), unavailable_called_(0), change_event_network_(-1) {}
+  MockNetworkChangeListener() 
+      : available_called_(0), unavailable_called_(0), change_event_network_(-1) {}
 
-  void onDefaultNetworkChangeEvent(int network) override {
-    change_event_network_ = network;
-  }
+  void onDefaultNetworkChangeEvent(int network) override { change_event_network_ = network; }
 
-  void onDefaultNetworkAvailable() override {
-    available_called_++;
-  }
+  void onDefaultNetworkAvailable() override { available_called_++; }
 
-  void onDefaultNetworkUnavailable() override {
-    unavailable_called_++;
-  }
+  void onDefaultNetworkUnavailable() override { unavailable_called_++; }
 
   int available_called_;
   int unavailable_called_;
@@ -32,16 +27,16 @@ public:
 
 // Mock the provider to avoid actual system calls during testing.
 @interface MockNetworkMonitorProvider : NSObject <EnvoyNetworkMonitorProvider>
-@property(nonatomic, assign) nw_path_status_t status;
-@property(nonatomic, assign) BOOL hasWifiOrWired;
-@property(nonatomic, assign) BOOL hasCellular;
-@property(nonatomic, assign) BOOL hasOther;
+@property (nonatomic, assign) nw_path_status_t status;
+@property (nonatomic, assign) BOOL hasWifiOrWired;
+@property (nonatomic, assign) BOOL hasCellular;
+@property (nonatomic, assign) BOOL hasOther;
 #if (defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 260000) ||     \
     (defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000)
-@property(nonatomic, assign) nw_path_link_quality_t linkQuality;
+@property (nonatomic, assign) nw_path_link_quality_t linkQuality;
 #endif
-@property(nonatomic, assign) int cellularNetworkType;
-@property(nonatomic, copy) void (^updateHandler)(nw_path_t);
+@property (nonatomic, assign) int cellularNetworkType;
+@property (nonatomic, copy) void (^updateHandler)(nw_path_t);
 @end
 
 @implementation MockNetworkMonitorProvider
@@ -126,15 +121,13 @@ protected:
     mock_provider_ = [[MockNetworkMonitorProvider alloc] init];
   }
 
-  void TearDown() override {
-    [monitor_ stop];
-  }
+  void TearDown() override { [monitor_ stop]; }
 
   void createMonitor(BOOL ignoreUpdateOnSameNetwork) {
     monitor_ = [[EnvoyCxxNetworkMonitor alloc] initWithListener:mock_listener_
-                                         defaultDelegateQueue:dispatch_get_main_queue()
-                                    ignoreUpdateOnSameNetwork:ignoreUpdateOnSameNetwork
-                                                     provider:mock_provider_];
+                                           defaultDelegateQueue:dispatch_get_main_queue()
+                                      ignoreUpdateOnSameNetwork:ignoreUpdateOnSameNetwork
+                                                       provider:mock_provider_];
   }
 
   void simulateNetworkChange() {
@@ -245,7 +238,8 @@ TEST_F(AppleNetworkChangeMonitorImplTest, VpnNetworkOverlay) {
   createMonitor(NO);
 
   // VPN uses bitwise OR with Generic
-  int expectedType = static_cast<int>(Envoy::NetworkType::WLAN) | static_cast<int>(Envoy::NetworkType::Generic);
+  int expectedType =
+      static_cast<int>(Envoy::NetworkType::WLAN) | static_cast<int>(Envoy::NetworkType::Generic);
   EXPECT_EQ(mock_listener_->change_event_network_, expectedType);
 }
 

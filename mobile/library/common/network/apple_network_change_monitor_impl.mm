@@ -142,9 +142,9 @@ static NSString *RadioAccessTechnologyNR() {
     _networkPathMonitor = [_provider createMonitor];
     __weak EnvoyCxxNetworkMonitor *weakSelf = self;
     [_provider setUpdateHandler:_networkPathMonitor
-                         handler:^(nw_path_t path) {
-                           [weakSelf checkReachabilityAndNotifyEnvoy:path];
-                         }];
+                        handler:^(nw_path_t path) {
+                          [weakSelf checkReachabilityAndNotifyEnvoy:path];
+                        }];
     [_provider setQueue:_networkPathMonitor queue:defaultDelegateQueue];
     // Note that nw_path_monitor_start will call the update handler, which sets the initial
     // network properties.

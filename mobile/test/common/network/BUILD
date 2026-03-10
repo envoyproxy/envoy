@@ -1,6 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
 
-
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
@@ -57,9 +56,9 @@ envoy_cc_test(
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
-            "//test/test_common:utility_lib",
-            "//library/common/network:apple_network_change_monitor_lib",
             "//library/common/api:c_types",
+            "//library/common/network:apple_network_change_monitor_lib",
+            "//test/test_common:utility_lib",
             "@envoy//test/test_common:utility_lib",
         ],
         "//conditions:default": [],

@@ -24,7 +24,7 @@ class NetworkChangeListener;
 - (void)cancel:(nw_path_monitor_t)monitor;
 - (nw_path_status_t)extractStatus:(nw_path_t)path;
 - (BOOL)usesInterfaceType:(nw_path_t)path type:(nw_interface_type_t)type;
-#if (defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 260000) || \
+#if (defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 260000) ||     \
     (defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000)
 - (nw_path_link_quality_t)extractLinkQuality:(nw_path_t)path;
 #endif
@@ -48,7 +48,7 @@ class NetworkChangeListener;
                     (std::shared_ptr<Envoy::Platform::NetworkChangeListener>)networkChangeListener
             defaultDelegateQueue:(dispatch_queue_t)defaultDelegateQueue
        ignoreUpdateOnSameNetwork:(BOOL)ignoreUpdateOnSameNetwork
-                provider:(id<EnvoyNetworkMonitorProvider>)provider;
+                        provider:(id<EnvoyNetworkMonitorProvider>)provider;
 
 - (void)stop;
 @end
