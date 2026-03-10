@@ -1084,6 +1084,7 @@ TEST(ABIImpl, metadata_list) {
   const std::string num_key = "num_key";
   const std::string str_key = "str_key";
   const std::string bool_key = "bool_key";
+  const std::string non_list_key = "non_list_key";
 
   // No stream info: add operations are no-ops and get operations return false.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
@@ -1116,6 +1117,10 @@ TEST(ABIImpl, metadata_list) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {num_key.data(), num_key.size()}, &list_size));
 
+  // Add non-list value under the key.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, {ns.data(), ns.size()}, {non_list_key.data(), non_list_key.size()}, 42.0);
+
   // Add numbers and verify size and values.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
       &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 1.0));
@@ -1124,12 +1129,21 @@ TEST(ABIImpl, metadata_list) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
       &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 3.0));
 
+  // Get list size on a non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, &list_size));
+
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_size(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {num_key.data(), num_key.size()}, &list_size));
   EXPECT_EQ(list_size, 3);
 
   double num_result = 0;
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &num_result));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_number(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {num_key.data(), num_key.size()}, 0, &num_result));
@@ -1142,21 +1156,10 @@ TEST(ABIImpl, metadata_list) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {num_key.data(), num_key.size()}, 2, &num_result));
   EXPECT_EQ(num_result, 3.0);
-
   // Out-of-range index.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {num_key.data(), num_key.size()}, 3, &num_result));
-
-  // Type mismatch: try to get number list element as string/bool.
-  envoy_dynamic_module_type_envoy_buffer str_result = {nullptr, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
-      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
-      {num_key.data(), num_key.size()}, 0, &str_result));
-  bool bool_result = false;
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
-      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
-      {num_key.data(), num_key.size()}, 0, &bool_result));
 
   // Add strings and verify.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
@@ -1169,6 +1172,11 @@ TEST(ABIImpl, metadata_list) {
       {str_key.data(), str_key.size()}, &list_size));
   EXPECT_EQ(list_size, 2);
 
+  envoy_dynamic_module_type_envoy_buffer str_result = {nullptr, 0};
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &str_result));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_string(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {str_key.data(), str_key.size()}, 0, &str_result));
@@ -1177,6 +1185,10 @@ TEST(ABIImpl, metadata_list) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {str_key.data(), str_key.size()}, 1, &str_result));
   EXPECT_EQ(absl::string_view(str_result.ptr, str_result.length), "world");
+  // Out-of-range index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {str_key.data(), str_key.size()}, 2, &str_result));
 
   // Add bools and verify.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
@@ -1189,6 +1201,11 @@ TEST(ABIImpl, metadata_list) {
       {bool_key.data(), bool_key.size()}, &list_size));
   EXPECT_EQ(list_size, 2);
 
+  bool bool_result = false;
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &bool_result));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {bool_key.data(), bool_key.size()}, 0, &bool_result));
@@ -1197,6 +1214,21 @@ TEST(ABIImpl, metadata_list) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {bool_key.data(), bool_key.size()}, 1, &bool_result));
   EXPECT_FALSE(bool_result);
+  // Out-of-range index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 2, &bool_result));
+
+  // Type mismatch: try to get number list element as string/bool.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 0, &str_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 0, &bool_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 0, &num_result));
 
   // Cannot add to a key that already holds a non-list value.
   envoy_dynamic_module_callback_http_set_dynamic_metadata_number(&filter, {ns.data(), ns.size()},
