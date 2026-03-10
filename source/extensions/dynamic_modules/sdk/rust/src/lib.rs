@@ -32,8 +32,8 @@ pub use utility::*;
 mod mod_test;
 
 use crate::abi::envoy_dynamic_module_type_metrics_result;
-use std::any::Any;
-use std::sync::OnceLock;
+use std::any::{Any, TypeId};
+use std::sync::{Arc, OnceLock};
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
@@ -158,6 +158,49 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
   } else {
     None
   }
+}
+
+/// Register a typed shared state object accessible by all extensions in this process.
+///
+/// This is a type-safe convenience wrapper over [`register_function`] for sharing `Arc<T>` state
+/// between extension points (e.g., bootstrap and HTTP filters) within the same module. The key is
+/// combined with the concrete `TypeId` of `T`, so two registrations under the same key but
+/// different types will not collide.
+///
+/// The `Arc<T>` is stored as a raw pointer in the process-wide C++ function registry and lives for
+/// the lifetime of the process. Because the registry uses `NoDestructor`, these pointers remain
+/// reachable to LeakSanitizer at process exit, avoiding false-positive leak reports.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized`).
+/// Returns `false` if the key is already registered for the given type.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn register_shared_state<T: Send + Sync + 'static>(key: &str, state: Arc<T>) -> bool {
+  let combined_key = format!("{}:{:?}", key, TypeId::of::<T>());
+  let raw = Arc::into_raw(state);
+  let success = unsafe { register_function(&combined_key, raw as *const std::ffi::c_void) };
+  if !success {
+    unsafe { Arc::from_raw(raw) };
+  }
+  success
+}
+
+/// Retrieve a previously registered typed shared state object by key.
+///
+/// Returns an `Arc<T>` sharing ownership with the originally registered instance. The key is
+/// combined with the concrete `TypeId` of `T`, so lookups are type-safe — requesting the wrong
+/// type for a given key returns `None`.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_shared_state<T: Send + Sync + 'static>(key: &str) -> Option<Arc<T>> {
+  let combined_key = format!("{}:{:?}", key, TypeId::of::<T>());
+  let ptr = get_function(&combined_key)?;
+  let raw = ptr as *const T;
+  unsafe { Arc::increment_strong_count(raw) };
+  Some(unsafe { Arc::from_raw(raw) })
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be

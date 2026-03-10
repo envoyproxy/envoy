@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
@@ -19,8 +20,14 @@ namespace {
 
 // Process-wide function registry. Modules register function pointers by name during bootstrap,
 // and other modules resolve them by name during configuration creation.
-absl::Mutex function_registry_mutex;
-absl::flat_hash_map<std::string, void*> function_registry ABSL_GUARDED_BY(function_registry_mutex);
+//
+// Wrapped in NoDestructor so that the registry contents including any heap pointers stored as
+// void* values, remain reachable at process exit. Without this, the map destructor would run
+// during static cleanup, freeing the bucket storage before LeakSanitizer scans for reachable
+// allocations, causing false-positive leak reports for data intentionally stored here for the
+// lifetime of the process. For example, Arc<T> pointers from Rust shared state.
+absl::NoDestructor<absl::Mutex> function_registry_mutex;
+absl::NoDestructor<absl::flat_hash_map<std::string, void*>> function_registry;
 
 } // namespace
 
@@ -75,17 +82,17 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
     return false;
   }
   std::string key_str(key.ptr, key.length);
-  absl::WriterMutexLock lock(function_registry_mutex);
-  auto [it, inserted] = function_registry.try_emplace(key_str, function_ptr);
+  absl::WriterMutexLock lock(*function_registry_mutex);
+  auto [it, inserted] = function_registry->try_emplace(key_str, function_ptr);
   return inserted;
 }
 
 bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
                                                 void** function_ptr_out) {
   std::string key_str(key.ptr, key.length);
-  absl::ReaderMutexLock lock(function_registry_mutex);
-  auto it = function_registry.find(key_str);
-  if (it != function_registry.end()) {
+  absl::ReaderMutexLock lock(*function_registry_mutex);
+  auto it = function_registry->find(key_str);
+  if (it != function_registry->end()) {
     *function_ptr_out = it->second;
     return true;
   }
