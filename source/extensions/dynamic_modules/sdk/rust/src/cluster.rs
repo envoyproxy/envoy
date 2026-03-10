@@ -84,6 +84,51 @@ pub trait Cluster: Send + Sync {
   }
 }
 
+/// The result of a host selection operation.
+///
+/// This enum represents the three possible outcomes of [`ClusterLb::choose_host`]:
+/// synchronous success, synchronous failure, or async pending.
+pub enum HostSelectionResult {
+  /// A host was selected synchronously.
+  Selected(abi::envoy_dynamic_module_type_cluster_host_envoy_ptr),
+  /// No host is available and no async resolution will occur.
+  NoHost,
+  /// The module needs to perform async work (e.g., DNS resolution) before selecting a host.
+  /// The module must eventually call
+  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result,
+  /// unless [`AsyncHostSelectionHandle::cancel`] is called first.
+  AsyncPending(Box<dyn AsyncHostSelectionHandle>),
+}
+
+/// A handle for canceling an in-progress asynchronous host selection.
+///
+/// When the stream is destroyed before async host selection completes (e.g., due to a timeout),
+/// Envoy calls [`AsyncHostSelectionHandle::cancel`]. After cancellation, the module must not
+/// call the async completion callback for this operation.
+pub trait AsyncHostSelectionHandle: Send {
+  /// Cancel the async host selection. After this call, the module must not deliver a result
+  /// for this operation.
+  fn cancel(&mut self);
+}
+
+/// Envoy-side async host selection completion callback.
+///
+/// This is passed to [`ClusterLb::choose_host`] and must be stored by the module when returning
+/// [`HostSelectionResult::AsyncPending`]. The module calls
+/// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the async result.
+#[automock]
+pub trait EnvoyAsyncHostSelectionComplete: Send {
+  /// Deliver the result of an asynchronous host selection.
+  ///
+  /// `host` is the selected host pointer, or `None` if host selection failed.
+  /// `details` is an optional description of the resolution outcome (e.g., error reason).
+  fn async_host_selection_complete(
+    &self,
+    host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
+    details: &str,
+  );
+}
+
 /// The module-side load balancer instance.
 ///
 /// This trait must be implemented by the module to select hosts for requests.
@@ -95,12 +140,15 @@ pub trait ClusterLb: Send {
   /// hash keys, override host, and retry state. It may be `None` if no context is available
   /// (e.g., health check requests).
   ///
-  /// Returns the raw host pointer obtained from [`EnvoyClusterLoadBalancer::get_healthy_host`],
-  /// or `None` if no host is available.
+  /// The `async_completion` callback must be used when returning
+  /// [`HostSelectionResult::AsyncPending`]. The module stores it and later calls
+  /// [`EnvoyAsyncHostSelectionComplete::async_host_selection_complete`] to deliver the result.
+  /// For synchronous results, `async_completion` can be ignored.
   fn choose_host(
     &mut self,
     context: Option<&dyn ClusterLbContext>,
-  ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>;
+    async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult;
 }
 
 /// Per-request context available during [`ClusterLb::choose_host`].
@@ -792,6 +840,32 @@ impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
   }
 }
 
+struct EnvoyAsyncHostSelectionCompleteImpl {
+  raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+}
+
+unsafe impl Send for EnvoyAsyncHostSelectionCompleteImpl {}
+
+impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
+  fn async_host_selection_complete(
+    &self,
+    host: Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>,
+    details: &str,
+  ) {
+    let host_ptr = host.unwrap_or(std::ptr::null_mut());
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+        self.raw_lb,
+        self.raw_context,
+        host_ptr,
+        details.as_ptr() as *const _,
+        details.len(),
+      );
+    }
+  }
+}
+
 struct ClusterLbContextImpl {
   raw_context: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
   raw_lb: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -1086,12 +1160,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
   let _ = Box::from_raw(wrapper);
 }
 
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
-  let wrapper = unsafe { &mut *(lb_module_ptr as *mut ClusterLbWrapper) };
+  host_out: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  async_handle_out: *mut abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
+) {
+  let wrapper = &mut *(lb_module_ptr as *mut ClusterLbWrapper);
   let context = if context_envoy_ptr.is_null() {
     None
   } else {
@@ -1100,13 +1180,46 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
       wrapper.lb_envoy_ptr,
     ))
   };
-  match wrapper
-    .lb
-    .choose_host(context.as_ref().map(|c| c as &dyn ClusterLbContext))
-  {
-    Some(host) => host,
-    None => std::ptr::null_mut(),
+
+  let async_completion = Box::new(EnvoyAsyncHostSelectionCompleteImpl {
+    raw_lb: wrapper.lb_envoy_ptr,
+    raw_context: context_envoy_ptr,
+  });
+
+  let result = wrapper.lb.choose_host(
+    context.as_ref().map(|c| c as &dyn ClusterLbContext),
+    async_completion,
+  );
+
+  match result {
+    HostSelectionResult::Selected(host) => {
+      *host_out = host;
+      *async_handle_out = std::ptr::null_mut();
+    },
+    HostSelectionResult::NoHost => {
+      *host_out = std::ptr::null_mut();
+      *async_handle_out = std::ptr::null_mut();
+    },
+    HostSelectionResult::AsyncPending(handle) => {
+      *host_out = std::ptr::null_mut();
+      *async_handle_out = Box::into_raw(Box::new(handle))
+        as abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
+    },
   }
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
+  _lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
+  async_handle_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
+) {
+  let handle = async_handle_module_ptr as *mut Box<dyn AsyncHostSelectionHandle>;
+  let mut handle = Box::from_raw(handle);
+  handle.cancel();
 }
 
 #[no_mangle]
