@@ -2,6 +2,7 @@
 
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/type_to_endpoint.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
@@ -11,10 +12,35 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+std::string
+deltaGrpcCollectionMuxCacheKey(const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                               absl::string_view type_url) {
+  return absl::StrCat(MessageUtil::hash(api_config_source), "/", type_url);
+}
+} // namespace
+
 SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
     ConfigSubscriptionFactory::SubscriptionData& data) {
   const envoy::config::core::v3::ApiConfigSource& api_config_source =
       data.config_.api_config_source();
+
+  // Check the mux cache: reuse an existing mux for the same ApiConfigSource
+  // and type_url to avoid opening redundant gRPC streams (e.g. one per LEDS
+  // locality instead of one shared stream).
+  if (data.delta_grpc_mux_cache_ != nullptr) {
+    const std::string cache_key = deltaGrpcCollectionMuxCacheKey(api_config_source, data.type_url_);
+    auto it = data.delta_grpc_mux_cache_->find(cache_key);
+    if (it != data.delta_grpc_mux_cache_->end()) {
+      // The mux was already started by the first subscription that created it,
+      // so set is_aggregated=true to prevent calling grpc_mux_->start() again.
+      return std::make_unique<GrpcCollectionSubscriptionImpl>(
+          data.collection_locator_.value(), it->second, data.callbacks_, data.resource_decoder_,
+          data.stats_, data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_),
+          /*is_aggregated=*/true, data.options_);
+    }
+  }
+
   CustomConfigValidatorsPtr custom_config_validators = std::make_unique<CustomConfigValidatorsImpl>(
       data.validation_visitor_, data.server_, api_config_source.config_validators());
 
@@ -59,11 +85,17 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
       /*eds_resources_cache_=*/nullptr, // No EDS resources cache needed from collections.
       /*skip_subsequent_node_=*/api_config_source.set_node_on_first_message_only(),
       /*load_stats_reporter_factory_=*/lrs_factory};
+  GrpcMuxSharedPtr grpc_mux = std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
+
+  if (data.delta_grpc_mux_cache_ != nullptr) {
+    const std::string cache_key = deltaGrpcCollectionMuxCacheKey(api_config_source, data.type_url_);
+    data.delta_grpc_mux_cache_->emplace(cache_key, grpc_mux);
+  }
+
   return std::make_unique<GrpcCollectionSubscriptionImpl>(
-      data.collection_locator_.value(), std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context),
-      data.callbacks_, data.resource_decoder_, data.stats_, data.dispatcher_,
-      Utility::configSourceInitialFetchTimeout(data.config_), /*is_aggregated=*/false,
-      data.options_);
+      data.collection_locator_.value(), grpc_mux, data.callbacks_, data.resource_decoder_,
+      data.stats_, data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_),
+      /*is_aggregated=*/false, data.options_);
 }
 
 SubscriptionPtr AggregatedGrpcCollectionConfigSubscriptionFactory::create(

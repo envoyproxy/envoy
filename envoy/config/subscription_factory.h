@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_stats_reporter.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "xds/core/v3/resource_locator.pb.h"
 
 namespace Envoy {
@@ -130,6 +131,12 @@ public:
     // An optional ADS gRPC mux to be used. Must be provided if ADS
     // is used.
     GrpcMuxSharedPtr ads_grpc_mux_;
+    // Optional cache for sharing gRPC muxes across delta-xDS collection
+    // subscriptions with identical ApiConfigSource and type URL. When non-null,
+    // the delta gRPC collection factory checks this cache before creating a new
+    // mux, and stores newly created muxes for future reuse. Owned by
+    // SubscriptionFactoryImpl; null for non-collection subscription paths.
+    absl::flat_hash_map<std::string, GrpcMuxSharedPtr>* delta_grpc_mux_cache_ = nullptr;
   };
 
   std::string category() const override { return "envoy.config_subscription"; }

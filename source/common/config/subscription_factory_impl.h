@@ -14,6 +14,8 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -51,6 +53,12 @@ private:
   const Server::Instance& server_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+
+  // Shared mux cache for delta-xDS collection subscriptions.
+  // Key: StrCat(hash(ApiConfigSource), "/", type_url).
+  // Enables multiple collection subscriptions targeting the same control plane
+  // and resource type to share a single gRPC stream.
+  absl::flat_hash_map<std::string, GrpcMuxSharedPtr> delta_grpc_collection_mux_cache_;
 };
 
 } // namespace Config
