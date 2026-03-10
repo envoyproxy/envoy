@@ -24,6 +24,7 @@ namespace Clusters {
 namespace DynamicModules {
 
 class DynamicModuleCluster;
+class DynamicModuleClusterScheduler;
 class DynamicModuleClusterTestPeer;
 
 // Function pointer types for the cluster ABI event hooks.
@@ -35,6 +36,7 @@ using OnClusterDestroyType = decltype(&envoy_dynamic_module_on_cluster_destroy);
 using OnClusterLbNewType = decltype(&envoy_dynamic_module_on_cluster_lb_new);
 using OnClusterLbDestroyType = decltype(&envoy_dynamic_module_on_cluster_lb_destroy);
 using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_choose_host);
+using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -65,6 +67,7 @@ public:
   OnClusterLbNewType on_cluster_lb_new_ = nullptr;
   OnClusterLbDestroyType on_cluster_lb_destroy_ = nullptr;
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
+  OnClusterScheduledType on_cluster_scheduled_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -102,7 +105,8 @@ using DynamicModuleClusterHandleSharedPtr = std::shared_ptr<DynamicModuleCluster
  * The DynamicModuleCluster delegates host discovery and load balancing to a dynamic module.
  * The module manages hosts via add/remove callbacks and provides its own load balancer.
  */
-class DynamicModuleCluster : public Upstream::ClusterImplBase {
+class DynamicModuleCluster : public Upstream::ClusterImplBase,
+                             public std::enable_shared_from_this<DynamicModuleCluster> {
 public:
   ~DynamicModuleCluster() override;
 
@@ -117,6 +121,11 @@ public:
   size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   void preInitComplete();
+
+  /**
+   * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
+   */
+  void onScheduled(uint64_t event_id);
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
@@ -134,6 +143,7 @@ protected:
 
 private:
   friend class DynamicModuleClusterFactory;
+  friend class DynamicModuleClusterScheduler;
   friend class DynamicModuleClusterTestPeer;
   friend class DynamicModuleClusterHandle;
   friend class DynamicModuleLoadBalancer;
@@ -145,6 +155,38 @@ private:
   // Map from raw host pointer to shared pointer for lookup in chooseHost.
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<void*, Upstream::HostSharedPtr> host_map_ ABSL_GUARDED_BY(host_map_lock_);
+};
+
+/**
+ * This class is used to schedule a cluster event hook from a different thread than the main thread.
+ * This is created via envoy_dynamic_module_callback_cluster_scheduler_new and deleted via
+ * envoy_dynamic_module_callback_cluster_scheduler_delete.
+ */
+class DynamicModuleClusterScheduler {
+public:
+  /**
+   * Creates a new scheduler for the given cluster.
+   */
+  static DynamicModuleClusterScheduler* create(DynamicModuleCluster* cluster) {
+    return new DynamicModuleClusterScheduler(cluster->weak_from_this(), cluster->dispatcher_);
+  }
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([cluster = cluster_, event_id]() {
+      if (std::shared_ptr<DynamicModuleCluster> cluster_shared = cluster.lock()) {
+        cluster_shared->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster,
+                                Event::Dispatcher& dispatcher)
+      : cluster_(std::move(cluster)), dispatcher_(dispatcher) {}
+
+  // Using a weak pointer to avoid unnecessarily extending the lifetime of the cluster.
+  std::weak_ptr<DynamicModuleCluster> cluster_;
+  Event::Dispatcher& dispatcher_;
 };
 
 /**

@@ -87,4 +87,26 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return const_cast<Envoy::Upstream::Host*>(healthy_hosts[index].get());
 }
 
+envoy_dynamic_module_type_cluster_scheduler_module_ptr
+envoy_dynamic_module_callback_cluster_scheduler_new(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  return Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterScheduler::create(
+      getCluster(cluster_envoy_ptr));
+}
+
+void envoy_dynamic_module_callback_cluster_scheduler_delete(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterScheduler*>(
+      scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_cluster_scheduler_commit(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler =
+      static_cast<Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterScheduler*>(
+          scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
 } // extern "C"

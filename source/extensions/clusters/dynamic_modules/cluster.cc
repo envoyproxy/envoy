@@ -79,6 +79,8 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
                  on_cluster_lb_destroy_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_lb_choose_host", OnClusterLbChooseHostType,
                  on_cluster_lb_choose_host_);
+  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_scheduled", OnClusterScheduledType,
+                 on_cluster_scheduled_);
 
 #undef RESOLVE_SYMBOL
 
@@ -157,6 +159,12 @@ void DynamicModuleCluster::startPreInit() {
 }
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
+
+void DynamicModuleCluster::onScheduled(uint64_t event_id) {
+  if (in_module_cluster_ != nullptr && config_->on_cluster_scheduled_ != nullptr) {
+    config_->on_cluster_scheduled_(this, in_module_cluster_, event_id);
+  }
+}
 
 bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
                                     const std::vector<uint32_t>& weights,
