@@ -23,11 +23,16 @@ public:
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
                    bool upstream_filter = false) {
-    TestEnvironment::setEnvVar(
-        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
-                                    GetParam()),
-        1);
+    std::string module_name = "http_integration_test";
+    if (GetParam() != "rust_static") {
+      TestEnvironment::setEnvVar(
+          "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+          TestEnvironment::substitute(
+              "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam()),
+          1);
+    } else {
+      module_name += "_static";
+    }
     TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
     constexpr auto filter_config = R"EOF(
@@ -35,7 +40,7 @@ name: envoy.extensions.filters.http.dynamic_modules
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
   dynamic_module_config:
-    name: http_integration_test
+    name: {}
   filter_name: {}
   filter_config:
     "@type": {}
@@ -45,7 +50,7 @@ typed_config:
     if (!per_route_config.empty()) {
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
-  name: http_integration_test
+  name: {}
 per_route_config_name: {}
 filter_config:
   "@type": {}
@@ -53,9 +58,9 @@ filter_config:
 )EOF";
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
-      TestUtility::loadFromYaml(
-          fmt::format(filter_per_route_config, filter_name, type_url, per_route_config),
-          per_route_config_proto);
+      TestUtility::loadFromYaml(fmt::format(filter_per_route_config, module_name, filter_name,
+                                            type_url, per_route_config),
+                                per_route_config_proto);
 
       config_helper_.addConfigModifier(
           [per_route_config_proto](envoy::extensions::filters::network::http_connection_manager::
@@ -72,8 +77,8 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
-                                 !upstream_filter);
+    config_helper_.prependFilter(
+        fmt::format(filter_config, module_name, filter_name, type_url, config), !upstream_filter);
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
@@ -130,9 +135,9 @@ filter_config:
 #ifndef __SANITIZE_ADDRESS__
 // TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
 // and we need to figure out a way to fix it.
-auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go", "cpp");
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "rust_static", "go", "cpp");
 #else
-auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go");
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "rust_static", "go");
 #endif
 
 INSTANTIATE_TEST_SUITE_P(
@@ -167,6 +172,47 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
   runHeaderCallbacksTest(true);
+}
+
+TEST_P(DynamicModulesIntegrationTest, StructConfig) {
+  if (GetParam() != "go") {
+    // The struct config test is only for Golang filter because it's easy to verify.
+    return;
+  }
+
+  initializeFilter("http_struct_config", R"({"dog":"cat"})", "",
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
 }
 
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
@@ -370,6 +416,43 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, SendResponseWithGrpcStatus) {
+  initializeFilter("send_response_grpc", "\"14\"");
+
+  // Use a gRPC request via makeSingleRequest which handles the full request-response lifecycle.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/test/long/url", "", downstream_protocol_, version_,
+      "sni.lyft.com", Http::Headers::get().ContentTypeValues.Grpc);
+  ASSERT_TRUE(response->complete());
+  // gRPC trailers-only response always has HTTP status 200.
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, response->headers().getContentTypeValue());
+  // Verify the gRPC status is set in the response headers (trailers-only response).
+  EXPECT_EQ("14", response->headers().getGrpcStatusValue());
+}
+
+TEST_P(DynamicModulesIntegrationTest, ResponseGrpcStatusAttribute) {
+  initializeFilter("grpc_status_attribute", "");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"grpc-status", "7"}, {"content-type", "application/grpc"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // Verify the filter read the gRPC status from the response headers.
+  EXPECT_EQ("7", response->headers()
+                     .get(Http::LowerCaseString("x-grpc-status-from-attr"))[0]
+                     ->value()
+                     .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {

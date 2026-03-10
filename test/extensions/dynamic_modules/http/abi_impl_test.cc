@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <memory>
 #include <set>
@@ -402,8 +403,9 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
+                             testing::Eq("dynamic_module")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
                                                    {nullptr, 0});
 }
@@ -414,8 +416,9 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
       .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
 
   // Test with empty response.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
+                             testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
 
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
@@ -437,8 +440,9 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
     header_array[index].value_ptr = const_cast<char*>(value.c_str());
     ++index;
   }
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
+                             testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
@@ -466,8 +470,9 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
   }
 
   const std::string body_str = "body";
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
@@ -480,11 +485,39 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
   const std::string body_str = "body";
   absl::string_view test_details = "test_details";
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                                                 testing::Eq(0), testing::Eq("test_details")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                             testing::Eq(absl::nullopt), testing::Eq("test_details")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0,
                                                    {body_str.data(), body_str.size()},
                                                    {test_details.data(), test_details.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendResponseWithGrpcStatusHeader) {
+  // Verify that grpc-status passed as a header is forwarded via modify_headers.
+  std::string grpc_status_key = "grpc-status";
+  std::string grpc_status_value = "14";
+  envoy_dynamic_module_type_module_http_header header_array[1];
+  header_array[0].key_ptr = grpc_status_key.data();
+  header_array[0].key_length = grpc_status_key.size();
+  header_array[0].value_ptr = grpc_status_value.data();
+  header_array[0].value_length = grpc_status_value.size();
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl headers;
+        if (modify_headers) {
+          modify_headers(headers);
+        }
+        EXPECT_EQ(headers.get(Http::LowerCaseString("grpc-status"))[0]->value().getStringView(),
+                  "14");
+      }));
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 503, header_array, 1,
+                                                   {nullptr, 0}, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
@@ -1983,6 +2016,67 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_number, 8386);
 }
 
+TEST(ABIImpl, GetAttributeResponseGrpcStatus) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  uint64_t result = 0;
+
+  // Without response trailers or headers, gRPC status should be inferred from HTTP response code.
+  EXPECT_CALL(encoder_callbacks, responseTrailers())
+      .WillRepeatedly(testing::Return(ResponseTrailerMapOptRef()));
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillRepeatedly(testing::Return(ResponseHeaderMapOptRef()));
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(503));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  // HTTP 503 maps to gRPC Unavailable (14).
+  EXPECT_EQ(result, 14);
+}
+
+TEST(ABIImpl, GetAttributeResponseGrpcStatusFromTrailers) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  uint64_t result = 0;
+
+  // With grpc-status in response trailers, that should take precedence.
+  Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "7"}};
+  EXPECT_CALL(encoder_callbacks, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(trailers)));
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillRepeatedly(testing::Return(ResponseHeaderMapOptRef()));
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(200));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  // grpc-status: 7 = PermissionDenied.
+  EXPECT_EQ(result, 7);
+}
+
+TEST(ABIImpl, GetAttributeResponseGrpcStatusNotAvailable) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
+
+  uint64_t result = 0;
+
+  // Without callbacks, stream info is not available.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
+      &result));
+}
+
 TEST(ABIImpl, HttpCallout) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
@@ -2945,6 +3039,285 @@ TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
   auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
   // Should not crash when decoder_callbacks_ is nullptr.
   envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
+}
+
+// ----------------------------- Config-Level HTTP Callout ABI Tests -----------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_MissingRequiredHeaders) {
+  const std::string cluster = "some_cluster";
+  uint64_t callout_id = 0;
+  // Call with no headers (nullptr, size 0) — ABI wrapper returns MissingRequiredHeaders before
+  // reaching the cluster lookup.
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster.data(), cluster.size()}, nullptr, 0,
+                {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_ClusterNotFound) {
+  const std::string cluster_name = "missing_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_Success) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::Callbacks* captured_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientRequest> mock_request(&thread_local_cluster_.async_client_);
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cbs,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
+            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/");
+            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
+            EXPECT_EQ(options.timeout.value(), std::chrono::milliseconds(1000));
+            // body is present: content-length must be set
+            EXPECT_EQ(message->body().length(), 4u);
+            EXPECT_NE(message->headers().ContentLength(), nullptr);
+            EXPECT_EQ(message->headers().ContentLength()->value().getStringView(), "4");
+            captured_callbacks = &cbs;
+            return &mock_request;
+          }));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  char body_data[] = "body";
+  uint64_t callout_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_http_callout(
+                filter_config_.get(), &callout_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {body_data, strlen(body_data)}, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(callout_id, 0u);
+  ASSERT_NE(captured_callbacks, nullptr);
+
+  // Clean up: call onFailure to break the circular reference between the pending
+  // HttpCalloutCallback and the filter config.
+  captured_callbacks->onFailure(mock_request, Http::AsyncClient::FailureReason::Reset);
+}
+
+// ----------------------------- Config-Level HTTP Stream ABI Tests ----------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest,
+       HttpFilterConfigStartHttpStream_MissingRequiredHeaders) {
+  const std::string cluster = "some_cluster";
+  uint64_t stream_id = 0;
+  // Call with no headers — ABI wrapper returns MissingRequiredHeaders before cluster lookup.
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster.data(), cluster.size()}, nullptr, 0,
+                {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStartHttpStream_ClusterNotFound) {
+  const std::string cluster_name = "missing_cluster";
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStartHttpStream_Success) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::StreamCallbacks* captured_stream_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientStream> mock_stream;
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cbs,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_stream_callbacks = &cbs;
+        return &mock_stream;
+      }));
+  // No body, end_stream=true → sendHeaders(headers, true).
+  EXPECT_CALL(mock_stream, sendHeaders(_, true));
+
+  char method_key[] = ":method";
+  char method_val[] = "GET";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, true, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(stream_id, 0u);
+  ASSERT_NE(captured_stream_callbacks, nullptr);
+
+  // Clean up: call onComplete to remove the stream from http_stream_callouts_ and break
+  // the circular reference. The MockDispatcher will hold the deferred deletable.
+  captured_stream_callbacks->onComplete();
+}
+
+// ----------------------------- Config-Level Stream Control ABI Tests -------------------------
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigResetHttpStream_InvalidStream) {
+  // Resetting a non-existent stream ID should be a no-op and not crash.
+  envoy_dynamic_module_callback_http_filter_config_reset_http_stream(filter_config_.get(), 99999);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStreamSendData_InvalidStream) {
+  // Sending data on a non-existent stream ID should return false.
+  char data[] = "data";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+      filter_config_.get(), 99999, {data, strlen(data)}, false));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStreamSendTrailers_InvalidStream) {
+  // Sending trailers on a non-existent stream ID should return false.
+  char key[] = "x-custom";
+  char val[] = "value";
+  envoy_dynamic_module_type_module_http_header trailers[] = {{key, strlen(key), val, strlen(val)}};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+      filter_config_.get(), 99999, trailers, 1));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigStream_SendDataAndTrailers) {
+  const std::string cluster_name = "test_cluster";
+
+  Http::AsyncClient::StreamCallbacks* captured_stream_callbacks = nullptr;
+  NiceMock<Http::MockAsyncClientStream> mock_stream;
+  EXPECT_CALL(thread_local_cluster_.async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cbs,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_stream_callbacks = &cbs;
+        return &mock_stream;
+      }));
+  // end_stream=false: sendHeaders with end_stream=false (module will send body separately).
+  EXPECT_CALL(mock_stream, sendHeaders(_, false));
+
+  char method_key[] = ":method";
+  char method_val[] = "POST";
+  char path_key[] = ":path";
+  char path_val[] = "/";
+  char host_key[] = "host";
+  char host_val[] = "example.com";
+  envoy_dynamic_module_type_module_http_header headers[] = {
+      {method_key, strlen(method_key), method_val, strlen(method_val)},
+      {path_key, strlen(path_key), path_val, strlen(path_val)},
+      {host_key, strlen(host_key), host_val, strlen(host_val)},
+  };
+  uint64_t stream_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+                filter_config_.get(), &stream_id, {cluster_name.data(), cluster_name.size()},
+                headers, 3, {nullptr, 0}, false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(stream_id, 0u);
+
+  // Send data on the active stream.
+  char data[] = "hello";
+  EXPECT_CALL(mock_stream, sendData(_, false));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+      filter_config_.get(), stream_id, {data, strlen(data)}, false));
+
+  // Send trailers to finish the stream.
+  char trailer_key[] = "x-end";
+  char trailer_val[] = "true";
+  envoy_dynamic_module_type_module_http_header trailers[] = {
+      {trailer_key, strlen(trailer_key), trailer_val, strlen(trailer_val)}};
+  EXPECT_CALL(mock_stream, sendTrailers(_));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+      filter_config_.get(), stream_id, trailers, 1));
+
+  // Clean up: call onComplete to remove the stream and break the circular reference.
+  ASSERT_NE(captured_stream_callbacks, nullptr);
+  captured_stream_callbacks->onComplete();
+}
+
+TEST(ABIImpl, ReceivedBufferedRequestBody) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // No current body - should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+
+  Buffer::OwnedImpl current_body;
+  filter.current_request_body_ = &current_body;
+
+  // current_request_body_ set but decodingBuffer() returns a different pointer - not buffered.
+  Buffer::OwnedImpl other_buffer;
+  EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&other_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+
+  // current_request_body_ is the same as decodingBuffer() - received buffered body.
+  EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&current_body));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+}
+
+TEST(ABIImpl, ReceivedBufferedResponseBody) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setEncoderFilterCallbacks(callbacks);
+
+  // No current body - should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  Buffer::OwnedImpl current_body;
+  filter.current_response_body_ = &current_body;
+
+  // current_response_body_ set but encodingBuffer() returns a different pointer - not buffered.
+  Buffer::OwnedImpl other_buffer;
+  EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&other_buffer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  // current_response_body_ is the same as encodingBuffer() - received buffered body.
+  EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&current_body));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
 }
 
 } // namespace HttpFilters

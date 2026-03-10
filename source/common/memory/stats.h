@@ -11,6 +11,14 @@ namespace Envoy {
 namespace Memory {
 
 constexpr absl::string_view TCMALLOC_ROUTINE_THREAD_ID = "TcmallocProcessBackgroundActions";
+constexpr uint64_t DEFAULT_MAX_UNFREED_MEMORY_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Accessors for the configurable max unfreed memory threshold. This value controls when
+ * tryShrinkHeap releases memory back to the OS. Defaults to 100 MB.
+ */
+uint64_t maxUnfreedMemoryBytes();
+void setMaxUnfreedMemoryBytes(uint64_t value);
 
 /**
  * Runtime stats for process memory usage.
@@ -68,7 +76,8 @@ public:
  * When configured with a non-zero release rate, a dedicated thread is started that runs
  * tcmalloc's ProcessBackgroundActions, which handles per-CPU cache reclamation, cache shuffling,
  * size class resizing, transfer cache plundering, and memory release to the OS at the configured
- * rate.
+ * rate. Also supports configuring a soft memory limit, per-CPU cache size, and the threshold
+ * for tryShrinkHeap.
  */
 class AllocatorManager {
 public:
@@ -84,6 +93,7 @@ private:
   Api::Api& api_;
   Thread::ThreadPtr tcmalloc_thread_;
   void configureBackgroundMemoryRelease();
+  void configureTcmallocOptions(const envoy::config::bootstrap::v3::MemoryAllocatorManager& config);
   // Used for testing.
   friend class AllocatorManagerPeer;
 };

@@ -36,19 +36,13 @@ RequestMatchInputMatcher::RequestMatchInputMatcher(
   }
 }
 
-Matcher::MatchResult RequestMatchInputMatcher::match(const Matcher::MatchingDataType& input) {
-  if (!absl::holds_alternative<std::shared_ptr<Matcher::CustomMatchData>>(input)) {
+Matcher::MatchResult RequestMatchInputMatcher::match(const Matcher::DataInputGetResult& input) {
+  auto data = input.customData<RequestMatchData>();
+  if (!data) {
     return Matcher::MatchResult::NoMatch;
   }
 
-  const auto* typed_data = dynamic_cast<const RequestMatchData*>(
-      absl::get<std::shared_ptr<Matcher::CustomMatchData>>(input).get());
-
-  if (typed_data == nullptr) {
-    return Matcher::MatchResult::NoMatch;
-  }
-
-  return match(typed_data->data().requestHeader());
+  return match(data->data().requestHeader());
 }
 
 Matcher::MatchResult RequestMatchInputMatcher::match(const RequestHeaderFrame& request) {

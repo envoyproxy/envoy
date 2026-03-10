@@ -22,7 +22,6 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -310,7 +309,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
     return false;
   }
   if (allow_expired_certificate_) {
-    CertValidatorUtil::setIgnoreCertificateExpiration(new_store_ctx.get());
+    X509_STORE_CTX_set_flags(new_store_ctx.get(), X509_V_FLAG_NO_CHECK_TIME);
   }
   auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {

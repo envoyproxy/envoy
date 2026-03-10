@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/drain_decision.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -49,12 +50,11 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 // DynamicModuleClusterConfig
 // =================================================================================================
 
-absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
-DynamicModuleClusterConfig::create(const std::string& cluster_name,
-                                   const std::string& cluster_config,
-                                   Envoy::Extensions::DynamicModules::DynamicModulePtr module) {
+absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
+    const std::string& cluster_name, const std::string& cluster_config,
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
   auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module)));
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -79,8 +79,25 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
                  on_cluster_lb_destroy_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_lb_choose_host", OnClusterLbChooseHostType,
                  on_cluster_lb_choose_host_);
+  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_scheduled", OnClusterScheduledType,
+                 on_cluster_scheduled_);
 
 #undef RESOLVE_SYMBOL
+
+  // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
+  auto on_server_initialized =
+      config->dynamic_module_->getFunctionPointer<OnClusterServerInitializedType>(
+          "envoy_dynamic_module_on_cluster_server_initialized");
+  config->on_cluster_server_initialized_ =
+      on_server_initialized.ok() ? on_server_initialized.value() : nullptr;
+
+  auto on_drain_started = config->dynamic_module_->getFunctionPointer<OnClusterDrainStartedType>(
+      "envoy_dynamic_module_on_cluster_drain_started");
+  config->on_cluster_drain_started_ = on_drain_started.ok() ? on_drain_started.value() : nullptr;
+
+  auto on_shutdown = config->dynamic_module_->getFunctionPointer<OnClusterShutdownType>(
+      "envoy_dynamic_module_on_cluster_shutdown");
+  config->on_cluster_shutdown_ = on_shutdown.ok() ? on_shutdown.value() : nullptr;
 
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
@@ -99,9 +116,10 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module)
-    : cluster_name_(cluster_name), cluster_config_(cluster_config),
-      dynamic_module_(std::move(module)) {}
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
+      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
+      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {
@@ -130,7 +148,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
       in_module_cluster_(nullptr),
-      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {
+      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      server_context_(context.serverFactoryContext()) {
 
   // Create the in-module cluster instance.
   in_module_cluster_ = config_->on_cluster_new_(config_->in_module_config_, this);
@@ -141,6 +160,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
   // Initialize the priority set with an empty host set at priority 0.
   priority_set_.getOrCreateHostSet(0);
+
+  registerLifecycleCallbacks();
 }
 
 DynamicModuleCluster::~DynamicModuleCluster() {
@@ -150,13 +171,62 @@ DynamicModuleCluster::~DynamicModuleCluster() {
   }
 }
 
+void DynamicModuleCluster::registerLifecycleCallbacks() {
+  if (config_->on_cluster_server_initialized_ != nullptr) {
+    server_initialized_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::PostInit, [this]() {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster server initialized");
+            config_->on_cluster_server_initialized_(this, in_module_cluster_);
+          }
+        });
+  }
+
+  if (config_->on_cluster_drain_started_ != nullptr) {
+    drain_handle_ = server_context_.drainManager().addOnDrainCloseCb(
+        Network::DrainDirection::All, [this](std::chrono::milliseconds) -> absl::Status {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster drain started");
+            config_->on_cluster_drain_started_(this, in_module_cluster_);
+          }
+          return absl::OkStatus();
+        });
+  }
+
+  if (config_->on_cluster_shutdown_ != nullptr) {
+    shutdown_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this](Event::PostCb completion_cb) {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster shutdown started");
+            auto* completion = new Event::PostCb(std::move(completion_cb));
+            config_->on_cluster_shutdown_(
+                this, in_module_cluster_,
+                [](void* context) {
+                  auto* cb = static_cast<Event::PostCb*>(context);
+                  (*cb)();
+                  delete cb;
+                },
+                static_cast<void*>(completion));
+          } else {
+            completion_cb();
+          }
+        });
+  }
+}
+
 void DynamicModuleCluster::startPreInit() {
   // Call the module's init function. The module is expected to call
   // envoy_dynamic_module_callback_cluster_pre_init_complete when ready.
-  config_->on_cluster_init_(in_module_cluster_, this);
+  config_->on_cluster_init_(this, in_module_cluster_);
 }
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
+
+void DynamicModuleCluster::onScheduled(uint64_t event_id) {
+  if (in_module_cluster_ != nullptr && config_->on_cluster_scheduled_ != nullptr) {
+    config_->on_cluster_scheduled_(this, in_module_cluster_, event_id);
+  }
+}
 
 bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
                                     const std::vector<uint32_t>& weights,
@@ -334,32 +404,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   // Extract cluster_config from the Any field.
   std::string cluster_config_bytes;
   if (proto_config.has_cluster_config()) {
-    const auto& any_config = proto_config.cluster_config();
-    const std::string& type_url = any_config.type_url();
-
-    // Handle well-known types that can be passed directly as bytes.
-    if (type_url == "type.googleapis.com/google.protobuf.StringValue") {
-      Protobuf::StringValue string_value;
-      if (!any_config.UnpackTo(&string_value)) {
-        return absl::InvalidArgumentError("Failed to unpack StringValue");
-      }
-      cluster_config_bytes = string_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.BytesValue") {
-      Protobuf::BytesValue bytes_value;
-      if (!any_config.UnpackTo(&bytes_value)) {
-        return absl::InvalidArgumentError("Failed to unpack BytesValue");
-      }
-      cluster_config_bytes = bytes_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.Struct") {
-      Protobuf::Struct struct_value;
-      if (!any_config.UnpackTo(&struct_value)) {
-        return absl::InvalidArgumentError("Failed to unpack Struct");
-      }
-      cluster_config_bytes = MessageUtil::getJsonStringFromMessageOrError(struct_value, false);
-    } else {
-      // For unknown types, use the serialized bytes.
-      cluster_config_bytes = any_config.value();
-    }
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.cluster_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    cluster_config_bytes = std::move(config_or_error.value());
   }
 
   // Load the dynamic module.
@@ -374,7 +421,8 @@ DynamicModuleClusterFactory::createClusterWithConfig(
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()));
+      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

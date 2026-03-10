@@ -259,6 +259,31 @@ TEST_F(RateLimitGrpcClientTest, SendRequestAndDetach) {
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
     client_.onSuccess(std::move(response), span_);
   }
+
+  // Send request and then fail before detach, and than call the detach should be no-op.
+  {
+    envoy::service::ratelimit::v3::RateLimitRequest request;
+    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}}, 0);
+    EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
+        .WillOnce(
+            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
+                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                          const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+              std::string service_name = "envoy.service.ratelimit.v3.RateLimitService";
+              EXPECT_EQ(service_name, service_full_name);
+              EXPECT_EQ("ShouldRateLimit", method_name);
+              return &async_request_;
+            }));
+
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+                  stream_info_, 0);
+
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _));
+    client_.onFailure(Grpc::Status::Unknown, "", span_);
+
+    // Detach should be no-op since the request has already failed.
+    client_.detach();
+  }
 }
 
 } // namespace

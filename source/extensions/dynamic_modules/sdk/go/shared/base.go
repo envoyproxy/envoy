@@ -414,8 +414,10 @@ type HttpFilterHandle interface {
 	// @Param status the HTTP status code.
 	// @Param headers the response headers.
 	// @Param body the response body.
+	// @Param grpcStatus the gRPC status code for gRPC requests. Use -1 to indicate no gRPC status
+	// (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC status codes.
 	// @Param detail a short description to the response for debugging purposes.
-	SendLocalResponse(status uint32, headers [][2]string, body []byte, detail string)
+	SendLocalResponse(status uint32, headers [][2]string, body []byte, grpcStatus int32, detail string)
 
 	// SendResponseHeaders sends response headers to the client. This is used for
 	// streaming local replies.
@@ -496,6 +498,20 @@ type HttpFilterHandle interface {
 	// body chunk that triggers the callback. For other callbacks or outside of the callbacks, you
 	// should use BufferedResponseBody to get the currently buffered body in the chain.
 	ReceivedResponseBody() BodyBuffer
+
+	// ReceivedBufferedRequestBody returns true if the latest received request body is the
+	// previously buffered request body. This is true when a previous filter in the chain stopped
+	// and buffered the request body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnRequestBody callback.
+	ReceivedBufferedRequestBody() bool
+
+	// ReceivedBufferedResponseBody returns true if the latest received response body is the
+	// previously buffered response body. This is true when a previous filter in the chain stopped
+	// and buffered the response body, then resumed, and this filter is now receiving that buffered
+	// body.
+	// NOTE: This is only meaningful inside the OnResponseBody callback.
+	ReceivedBufferedResponseBody() bool
 
 	// ResponseTrailers retrieves the response trailers.
 	// @Return the response trailers.
@@ -660,4 +676,52 @@ type HttpFilterConfigHandle interface {
 	// @Return the counter metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineCounter(name string, tagKeys ...string) (MetricID, MetricsResult)
+
+	// HttpCallout performs an HTTP call to an external service from the config context.
+	// The call is asynchronous, and the response will be delivered via the provided callback.
+	// This is similar to HttpFilterHandle.HttpCallout but runs on the main thread rather than
+	// the worker thread.
+	// @Param cluster the cluster (target) name to which the HTTP call will be made.
+	// @Param headers the HTTP headers to be sent with the request.
+	// @Param body the HTTP body to be sent with the request.
+	// @Param timeoutMs the timeout in milliseconds for the HTTP call.
+	// @Param callback the callback function to be invoked when the response is received.
+	// @Return the result of the HTTP callout initialization and the callout ID.
+	HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64,
+		cb HttpCalloutCallback) (HttpCalloutInitResult, uint64)
+
+	// StartHttpStream starts a new HTTP stream to an external service from the config context.
+	// The stream is asynchronous, and the response will be delivered via the provided callback.
+	// This is similar to HttpFilterHandle.StartHttpStream but runs on the main thread.
+	// @Param cluster the cluster (target) name.
+	// @Param headers the initial HTTP headers.
+	// @Param body the initial HTTP body.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Param timeoutMs the timeout in milliseconds.
+	// @Param callback the callback interface to handle the stream events.
+	// @Return the result of the HTTP stream initialization and the stream ID.
+	StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool,
+		timeoutMs uint64, cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
+
+	// SendHttpStreamData sends data on an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	// @Param body the HTTP body to be sent.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return whether the data was successfully sent.
+	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
+
+	// SendHttpStreamTrailers sends trailers on an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	// @Param trailers the HTTP trailers to be sent.
+	// @Return whether the trailers were successfully sent.
+	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
+
+	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.
+	// @Param streamID the ID of the HTTP stream.
+	ResetHttpStream(streamID uint64)
+
+	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
+	// This should be called only during the plugin configuration phase, and the returned
+	// Scheduler can be used later even outside of the callbacks and at other threads.
+	GetScheduler() Scheduler
 }

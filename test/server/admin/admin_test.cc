@@ -147,7 +147,7 @@ TEST_P(AdminInstanceTest, Help) {
   /certs: print certs on machine
   /clusters: upstream cluster status
       filter: Regular expression (Google re2) for filtering clusters by name
-  /config_dump: dump current Envoy configs (experimental)
+  /config_dump: dump current Envoy configs
       resource: The resource to dump
       mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a Protobuf::FieldMask
       name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.

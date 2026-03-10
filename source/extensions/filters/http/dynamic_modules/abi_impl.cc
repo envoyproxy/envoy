@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -665,8 +666,8 @@ void envoy_dynamic_module_callback_http_send_response(
     details_view = "dynamic_module";
   }
 
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers, 0,
-                         details_view);
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
+                         absl::nullopt, details_view);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(
@@ -849,6 +850,24 @@ bool envoy_dynamic_module_callback_http_drain_body(
   }
   }
   return false;
+}
+
+bool envoy_dynamic_module_callback_http_received_buffered_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->current_request_body_ == nullptr) {
+    return false;
+  }
+  return filter->current_request_body_ == filter->decoder_callbacks_->decodingBuffer();
+}
+
+bool envoy_dynamic_module_callback_http_received_buffered_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->current_response_body_ == nullptr) {
+    return false;
+  }
+  return filter->current_response_body_ == filter->encoder_callbacks_->encodingBuffer();
 }
 
 void envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
@@ -1407,6 +1426,22 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus: {
+    auto* stream_info = filter->streamInfo();
+    if (stream_info) {
+      auto trailers = filter->responseTrailers();
+      auto headers = filter->responseHeaders();
+      auto grpc_status = Grpc::Common::getGrpcStatus(
+          trailers.has_value() ? *trailers : *Http::StaticEmptyHeaders::get().response_trailers,
+          headers.has_value() ? *headers : *Http::StaticEmptyHeaders::get().response_headers,
+          *stream_info);
+      if (grpc_status.has_value()) {
+        *result = grpc_status.value();
+        ok = true;
+      }
+    }
+    break;
+  }
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
@@ -1745,6 +1780,103 @@ void envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
   DynamicModuleHttpFilterConfigScheduler* scheduler =
       static_cast<DynamicModuleHttpFilterConfigScheduler*>(scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_config_http_callout(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+
+  absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
+
+  std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = &headers[i];
+    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+    const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                  header->value_length);
+    hdrs->addCopy(Http::LowerCaseString(key), value);
+  }
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+  if (body.length > 0) {
+    message->body().add(absl::string_view(static_cast<const char*>(body.ptr), body.length));
+    message->headers().setContentLength(body.length);
+  }
+  return filter_config->sendHttpCallout(callout_id_out, cluster_name_view, std::move(message),
+                                        timeout_milliseconds);
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t* stream_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, bool end_stream, uint64_t timeout_milliseconds) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+
+  absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
+
+  std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = &headers[i];
+    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+    const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                  header->value_length);
+    hdrs->addCopy(Http::LowerCaseString(key), value);
+  }
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+  if (body.length > 0) {
+    message->body().add(absl::string_view(body.ptr, body.length));
+  }
+  return filter_config->startHttpStream(stream_id_out, cluster_name_view, std::move(message),
+                                        end_stream, timeout_milliseconds);
+}
+
+void envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  filter_config->resetHttpStream(stream_id);
+}
+
+bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id, envoy_dynamic_module_type_module_buffer data, bool end_stream) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+
+  Buffer::OwnedImpl buffer;
+  if (data.length > 0) {
+    buffer.add(absl::string_view(data.ptr, data.length));
+  }
+  return filter_config->sendStreamData(stream_id, buffer, end_stream);
+}
+
+bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id, envoy_dynamic_module_type_module_http_header* trailers,
+    size_t trailers_size) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+
+  std::unique_ptr<RequestTrailerMapImpl> trailer_map = Http::RequestTrailerMapImpl::create();
+  for (size_t i = 0; i < trailers_size; i++) {
+    const auto& trailer = &trailers[i];
+    const absl::string_view key(static_cast<const char*>(trailer->key_ptr), trailer->key_length);
+    const absl::string_view value(static_cast<const char*>(trailer->value_ptr),
+                                  trailer->value_length);
+    trailer_map->addCopy(Http::LowerCaseString(key), value);
+  }
+  return filter_config->sendStreamTrailers(stream_id, std::move(trailer_map));
 }
 
 void envoy_dynamic_module_callback_http_filter_continue_decoding(

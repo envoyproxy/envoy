@@ -16,9 +16,10 @@ TEST(ValueInputMatcher, TestMatch) {
 
   StringInputMatcher matcher(matcher_proto, context);
 
-  EXPECT_EQ(matcher.match(MatchingDataType("exact")), Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher.match(MatchingDataType("not")), Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher.match(MatchingDataType(absl::monostate())), Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher.match(DataInputGetResult::CreateString("exact")),
+            Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher.match(DataInputGetResult::CreateString("not")), Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher.match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch);
 }
 
 } // namespace Matcher
