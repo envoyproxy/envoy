@@ -203,6 +203,51 @@ WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+WEAK_STUB(ClusterLbContextComputeHashKey,
+          envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeaders,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeader,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterLbContextGetHostSelectionRetryCount,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(nullptr))
+WEAK_STUB(ClusterLbContextShouldSelectAnotherHost,
+          envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(nullptr,
+                                                                                      nullptr, 0,
+                                                                                      0))
+WEAK_STUB(ClusterLbContextGetOverrideHost,
+          envoy_dynamic_module_callback_cluster_lb_context_get_override_host(nullptr, nullptr,
+                                                                             nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamConnectionSni,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(nullptr,
+                                                                                         nullptr))
+WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_new(nullptr))
+WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
+WEAK_STUB(ClusterSchedulerCommit,
+          envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
+                                                                      nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_config_increment_counter(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_config_define_gauge(nullptr, {nullptr, 0}, nullptr,
+                                                                    0, nullptr))
+WEAK_STUB(ClusterConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_config_increment_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_config_decrement_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_config_define_histogram(nullptr, {nullptr, 0},
+                                                                        nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
+                                                                              0, 0))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))
