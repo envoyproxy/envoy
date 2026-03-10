@@ -135,6 +135,26 @@ bool envoy_dynamic_module_on_lb_choose_host(
         lb_envoy_ptr, 0, 0);
     (void)active_cx;
 
+    // Test host counter stats.
+    uint64_t cx_total = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxTotal);
+    (void)cx_total;
+    uint64_t rq_total = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal);
+    (void)rq_total;
+    uint64_t rq_error = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqError);
+    (void)rq_error;
+    uint64_t rq_success = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqSuccess);
+    (void)rq_success;
+    uint64_t rq_timeout = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTimeout);
+    (void)rq_timeout;
+    uint64_t cx_fail = envoy_dynamic_module_callback_lb_get_host_counter_stat(
+        lb_envoy_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxConnectFail);
+    (void)cx_fail;
+
     envoy_dynamic_module_type_envoy_buffer region = {NULL, 0};
     envoy_dynamic_module_type_envoy_buffer zone = {NULL, 0};
     envoy_dynamic_module_type_envoy_buffer sub_zone = {NULL, 0};

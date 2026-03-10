@@ -576,6 +576,56 @@ TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   EXPECT_EQ(response_body.toString(), "barend");
 }
 
+TEST_P(DynamicModuleHttpLanguageTests, SendResponseWithGrpcStatus) {
+  const std::string filter_name = "send_response_grpc";
+  const std::string filter_config = "";
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // The SDK passes gRPC status as a grpc-status header via modify_headers rather than using an
+  // ABI-level gRPC status parameter.
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")))
+      .WillOnce(Invoke([](Http::Code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl headers;
+        if (modify_headers) {
+          modify_headers(headers);
+        }
+        EXPECT_EQ(headers.get(Http::LowerCaseString("grpc-status"))[0]->value().getStringView(),
+                  "14");
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, false));
+
+  filter->onDestroy();
+}
+
 TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_non_existing_cluster) {
   const std::string filter_name = "http_callouts";
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

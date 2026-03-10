@@ -401,7 +401,7 @@ pub trait EnvoyHttpFilterConfig {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
@@ -411,7 +411,7 @@ pub trait EnvoyHttpFilterConfig {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
@@ -439,7 +439,7 @@ pub trait EnvoyHttpFilterConfig {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool;
 
   /// Reset an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
@@ -580,13 +580,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -610,14 +610,14 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -658,9 +658,9 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
         self.raw_ptr,
@@ -846,11 +846,16 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
+  ///
+  /// The `grpc_status` parameter is the gRPC status code for gRPC requests. Use `None` to indicate
+  /// no gRPC status (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC
+  /// status codes. This is only meaningful when the downstream request is a gRPC request.
   fn send_response<'a>(
     &mut self,
     status_code: u32,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
+    grpc_status: Option<i32>,
     details: Option<&'a str>,
   );
 
@@ -858,7 +863,7 @@ pub trait EnvoyHttpFilter {
   /// Necessary pseudo headers such as :status should be present.
   ///
   /// The headers are passed as a list of key-value pairs.
-  fn send_response_headers<'a>(&mut self, headers: Vec<(&'a str, &'a [u8])>, end_stream: bool);
+  fn send_response_headers<'a>(&mut self, headers: &'a [(&'a str, &'a [u8])], end_stream: bool);
 
   /// Send response body data to the downstream, optionally indicating end of stream.
   fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
@@ -866,7 +871,7 @@ pub trait EnvoyHttpFilter {
   /// Send response trailers to the downstream. This implicitly ends the stream.
   ///
   /// The trailers are passed as a list of key-value pairs.
-  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
+  fn send_response_trailers<'a>(&mut self, trailers: &'a [(&'a str, &'a [u8])]);
 
   /// add a custom flag to indicate a noteworthy event of this stream. Mutliple flags could be added
   /// and will be concatenated with comma. It should not contain any empty or space characters (' ',
@@ -987,7 +992,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_request_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_request_body()
   ///   .return_const(true);
@@ -1089,7 +1094,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_response_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_response_body()
   ///   .return_const(true);
@@ -1216,6 +1221,14 @@ pub trait EnvoyHttpFilter {
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
 
+  /// Get the gRPC status code from the response.
+  ///
+  /// This checks response trailers, response headers, and infers from the HTTP status code.
+  /// Returns `None` if no gRPC status is available (e.g., the response is not a gRPC response).
+  fn get_response_grpc_status(&self) -> Option<i64> {
+    self.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseGrpcStatus)
+  }
+
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
   /// distinguished by the returned callout id.
@@ -1238,7 +1251,7 @@ pub trait EnvoyHttpFilter {
   fn send_http_callout<'a>(
     &mut self,
     _cluster_name: &'a str,
-    _headers: Vec<(&'a str, &'a [u8])>,
+    _headers: &'a [(&'a str, &'a [u8])],
     _body: Option<&'a [u8]>,
     _timeout_milliseconds: u64,
   ) -> (
@@ -1265,7 +1278,7 @@ pub trait EnvoyHttpFilter {
   fn start_http_stream<'a>(
     &mut self,
     _cluster_name: &'a str,
-    _headers: Vec<(&'a str, &'a [u8])>,
+    _headers: &'a [(&'a str, &'a [u8])],
     _body: Option<&'a [u8]>,
     _end_stream: bool,
     _timeout_milliseconds: u64,
@@ -1301,7 +1314,7 @@ pub trait EnvoyHttpFilter {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     _stream_handle: u64,
-    _trailers: Vec<(&'a str, &'a [u8])>,
+    _trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool;
 
   /// Reset (cancel) an active HTTP stream.
@@ -1625,7 +1638,7 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns `true` if the stream recreation was initiated successfully, `false` otherwise (e.g.,
   /// if the request body has not been fully received yet or if the stream cannot be recreated).
-  fn recreate_stream<'a>(&mut self, headers: Option<Vec<(&'a str, &'a [u8])>>) -> bool;
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool;
 
   /// Clear only the cluster selection for the current route without clearing the entire route
   /// cache.
@@ -2125,8 +2138,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn send_response(
     &mut self,
     status_code: u32,
-    headers: Vec<(&str, &[u8])>,
+    headers: &[(&str, &[u8])],
     body: Option<&[u8]>,
+    grpc_status: Option<i32>,
     details: Option<&str>,
   ) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
@@ -2134,14 +2148,29 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
+    // picks it up via modify_headers without requiring an ABI change.
+    let grpc_status_str;
+    let merged_headers;
+    let (final_headers_ptr, final_headers_len) = if let Some(status) = grpc_status {
+      grpc_status_str = status.to_string();
+      let mut h: Vec<(&str, &[u8])> = Vec::with_capacity(headers.len() + 1);
+      h.extend_from_slice(headers);
+      h.push(("grpc-status", grpc_status_str.as_bytes()));
+      merged_headers = h;
+      let HeaderPairSlice(ptr, len) = merged_headers.as_slice().into();
+      (ptr, len)
+    } else {
+      let HeaderPairSlice(ptr, len) = headers.into();
+      (ptr, len)
+    };
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr as *mut _,
-        headers_len,
+        final_headers_ptr as *mut _,
+        final_headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -2154,8 +2183,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+  fn send_response_headers(&mut self, headers: &[(&str, &[u8])], end_stream: bool) {
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_headers(
@@ -2177,8 +2206,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+  fn send_response_trailers(&mut self, trailers: &[(&str, &[u8])]) {
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_trailers(
@@ -2790,13 +2819,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -2820,14 +2849,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -2868,9 +2897,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
     unsafe {
       abi::envoy_dynamic_module_callback_http_stream_send_trailers(
         self.raw_ptr,
@@ -3351,10 +3380,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn recreate_stream<'a>(&mut self, headers: Option<Vec<(&'a str, &'a [u8])>>) -> bool {
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool {
     match headers {
-      Some(header_vec) => {
-        let HeaderPairSlice(headers_ptr, headers_len) = header_vec.as_slice().into();
+      Some(headers) => {
+        let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
         unsafe {
           abi::envoy_dynamic_module_callback_http_filter_recreate_stream(
             self.raw_ptr,
