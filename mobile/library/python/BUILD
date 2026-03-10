@@ -86,7 +86,7 @@ genrule(
 # we place them in the envoy_mobile/ package directory for PyPI distribution.
 py_library(
     name = "async_client",
-    srcs = glob(["async_client/**/*.py"]),
+    srcs = glob(["envoy_mobile/async_client/**/*.py"]),
     data = [
         ":envoy_engine_so",
     ],
@@ -99,7 +99,6 @@ py_library(
     data = [
         "envoy_mobile/py.typed",
         ":envoy_engine_so",
-        "//:pyproject.toml",
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
@@ -108,7 +107,7 @@ py_library(
 
 py_package(
     name = "envoy_mobile_package",
-    packages = ["library.python.envoy_mobile"],
+    packages = ["envoy_mobile"],
     deps = [":envoy_mobile_lib"],
 )
 
@@ -117,7 +116,7 @@ py_package(
 py_wheel(
     name = "envoy_mobile_wheel",
     abi = ":abi_tag",
-    distribution = "envoy-mobile",
+    distribution = "envoy-mobile-client",
     platform = select({
         ":is_linux_x86_64": "manylinux2014_x86_64",
         ":is_macos_x86_64": "macosx_10_15_x86_64",

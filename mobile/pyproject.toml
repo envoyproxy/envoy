@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "envoy-mobile"
+name = "envoy-mobile-client"
 version = "0.5.0"
 description = "Python APIs for Envoy Mobile"
 readme = "README.md"
@@ -24,10 +24,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/envoyproxy/envoy-mobile"
+Homepage = "https://github.com/envoyproxy/envoy"
 Documentation = "https://mobile.envoyproxy.io"
-Repository = "https://github.com/envoyproxy/envoy-mobile.git"
-Issues = "https://github.com/envoyproxy/envoy-mobile/issues"
+Repository = "https://github.com/envoyproxy/envoy.git"
+Issues = "https://github.com/envoyproxy/envoy/issues"
 
 [tool.black]
 line-length = 100
