@@ -846,11 +846,16 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
+  ///
+  /// The `grpc_status` parameter is the gRPC status code for gRPC requests. Use `None` to indicate
+  /// no gRPC status (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC
+  /// status codes. This is only meaningful when the downstream request is a gRPC request.
   fn send_response<'a>(
     &mut self,
     status_code: u32,
     headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
+    grpc_status: Option<i32>,
     details: Option<&'a str>,
   );
 
@@ -1215,6 +1220,14 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
+
+  /// Get the gRPC status code from the response.
+  ///
+  /// This checks response trailers, response headers, and infers from the HTTP status code.
+  /// Returns `None` if no gRPC status is available (e.g., the response is not a gRPC response).
+  fn get_response_grpc_status(&self) -> Option<i64> {
+    self.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseGrpcStatus)
+  }
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -2127,6 +2140,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     status_code: u32,
     headers: &[(&str, &[u8])],
     body: Option<&[u8]>,
+    grpc_status: Option<i32>,
     details: Option<&str>,
   ) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
@@ -2134,14 +2148,29 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
+    // picks it up via modify_headers without requiring an ABI change.
+    let grpc_status_str;
+    let merged_headers;
+    let (final_headers_ptr, final_headers_len) = if let Some(status) = grpc_status {
+      grpc_status_str = status.to_string();
+      let mut h: Vec<(&str, &[u8])> = Vec::with_capacity(headers.len() + 1);
+      h.extend_from_slice(headers);
+      h.push(("grpc-status", grpc_status_str.as_bytes()));
+      merged_headers = h;
+      let HeaderPairSlice(ptr, len) = merged_headers.as_slice().into();
+      (ptr, len)
+    } else {
+      let HeaderPairSlice(ptr, len) = headers.into();
+      (ptr, len)
+    };
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr as *mut _,
-        headers_len,
+        final_headers_ptr as *mut _,
+        final_headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,

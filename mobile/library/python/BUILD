@@ -1,4 +1,5 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+load("@rules_python//python:defs.bzl", "py_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -37,4 +38,15 @@ pybind_extension(
         "//library/common:engine_types_lib",
         "//library/common/types:c_types_lib",
     ],
+)
+
+# pure-python asyncio helpers which sit on top of the envoy_engine module.
+# the glob ensures all of the submodules added above are included.
+py_library(
+    name = "async_client",
+    srcs = glob(["async_client/**/*.py"]),
+    data = [
+        "//library/python:envoy_engine.so",
+    ],
+    visibility = ["//visibility:public"],
 )
