@@ -15,7 +15,9 @@ public:
   RegexReplace(Regex::CompiledMatcherPtr regex, std::string&& substitution)
       : regex_(std::move(regex)), substitution_(std::move(substitution)) {}
 
-  // If the proto has no pattern, returns a null RegexReplace.
+  // Create a RegexReplace from a RegexMatchAndSubstitute proto message.
+  //
+  // If the proto has no pattern, returns nullopt.
   static absl::StatusOr<absl::optional<RegexReplace>>
   create(Regex::Engine& engine, const ::envoy::type::matcher::v3::RegexMatchAndSubstitute& proto);
 
