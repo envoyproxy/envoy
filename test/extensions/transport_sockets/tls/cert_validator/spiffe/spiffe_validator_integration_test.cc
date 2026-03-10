@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "source/common/router/string_accessor_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 
@@ -36,7 +36,8 @@ void SslSPIFFECertValidatorIntegrationTest::TearDown() {
 }
 
 Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClientConnection(
-    const ClientSslTransportOptions& options, bool use_expired = false, absl::optional<std::string> workload_trust_domain = {}) {
+    const ClientSslTransportOptions& options, bool use_expired = false,
+    absl::optional<std::string> workload_trust_domain = {}) {
   ClientSslTransportOptions modified_options{options};
   modified_options.setTlsVersion(tls_version_);
   modified_options.use_expired_spiffe_cert_ = use_expired;
@@ -48,16 +49,18 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
   Network::TransportSocketOptionsConstSharedPtr socket_options;
   if (workload_trust_domain) {
     StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-    filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain", 
-          std::make_shared<Router::StringAccessorImpl>(*workload_trust_domain), StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection,
-          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
+                         std::make_shared<Router::StringAccessorImpl>(*workload_trust_domain),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::Connection,
+                         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
   }
 
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket(socket_options, nullptr), nullptr, nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket(socket_options, nullptr), nullptr,
+      nullptr);
 }
 
 void SslSPIFFECertValidatorIntegrationTest::checkVerifyErrorCouter(uint64_t value) {
@@ -308,14 +311,46 @@ typed_config:
   config_helper_.addListenerFilter(R"EOF(
 name: set_workload_trust_domain
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.
-  initial_read_buffer_size: 256
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.set_filter_state.v3.Config
+  on_accept:
+  - object_key: envoy.tls.cert_validator.spiffe.workload_trust_domain
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: mydomain.org
 )EOF");
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkVerifyErrorCouter(0);
+}
+
+TEST_P(SslSPIFFECertValidatorIntegrationTest, ServerRsaSPIFFEValidatorRejectedWorkloadTrustDomain) {
+  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+      workload_trust_domain: mydomain.org
+  )EOF"),
+                            *typed_conf);
+  custom_validator_config_ = typed_conf;
+  initialize();
+  auto conn = makeSslClientConnection({});
+  if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2) {
+    auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+    EXPECT_FALSE(codec->connected());
+  } else {
+    auto codec = makeHttpConnection(std::move(conn));
+    ASSERT_TRUE(codec->waitForDisconnect());
+    codec->close();
+  }
+  checkVerifyErrorCouter(1);
 }
 
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ClientSPIFFEValidatorAccepted) {

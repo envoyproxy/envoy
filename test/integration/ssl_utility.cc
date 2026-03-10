@@ -111,7 +111,7 @@ void initializeUpstreamTlsContextConfig(
 
 Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
-                                      ContextManager& context_manager, Api::Api& api)  {
+                                      ContextManager& context_manager, Api::Api& api) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   initializeUpstreamTlsContextConfig(options, tls_context);
 #ifdef ENVOY_ENABLE_YAML

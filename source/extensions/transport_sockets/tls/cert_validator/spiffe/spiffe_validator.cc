@@ -191,8 +191,9 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         it != spiffe_data_->trust_bundle_stores_.end()) {
       if (auto local_it = it->second.find(domain.workload_trust_domain());
           local_it != it->second.end()) {
-        creation_status = absl::InvalidArgumentError(absl::StrCat(
-            "Multiple trust bundles are given for one trust domain for ", domain.name(), ", workload: ", domain.workload_trust_domain()));
+        creation_status = absl::InvalidArgumentError(
+            absl::StrCat("Multiple trust bundles are given for one trust domain for ",
+                         domain.name(), ", workload: ", domain.workload_trust_domain()));
         return;
       }
     }
@@ -237,7 +238,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     if (has_crl) {
       X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
-    spiffe_data_->trust_bundle_stores_[domain.name()][domain.workload_trust_domain()] = std::move(store);
+    spiffe_data_->trust_bundle_stores_[domain.name()][domain.workload_trust_domain()] =
+        std::move(store);
   }
 
   initializeCertExpirationStats(scope, config->caCertName());
@@ -333,13 +335,14 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
   return san_match;
 }
 
-constexpr absl::string_view WorkloadTrustDomainKey = "envoy.tls.cert_validator.spiffe.workload_trust_domain";
+constexpr absl::string_view WorkloadTrustDomainKey =
+    "envoy.tls.cert_validator.spiffe.workload_trust_domain";
 
 ValidationResults SPIFFEValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& validation_context,
-    bool is_server, absl::string_view /*host_name*/) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
+    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
+    absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     stats_.fail_verify_error_.inc();
     return {ValidationResults::ValidationStatus::Failed,
@@ -365,8 +368,8 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   }
   absl::string_view workload_trust_domain = obj ? obj->asString() : "";
   std::string error_details;
-  bool verified = verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain,
-                                                       SSL_CTX_get0_param(&ssl_ctx), workload_trust_domain, error_details);
+  bool verified = verifyCertChainUsingTrustBundleStore(
+      *leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx), workload_trust_domain, error_details);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                       Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
                                       absl::nullopt}
@@ -375,7 +378,8 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
                                       error_details};
 }
 
-X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert, absl::string_view workload_trust_domain) {
+X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert,
+                                                 absl::string_view workload_trust_domain) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
       X509_get_ext_d2i(leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
   if (!san_names) {

@@ -10,14 +10,16 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/fmt.h"
 #include "source/common/event/real_time_system.h"
-#include "source/common/tls/stats.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
@@ -306,8 +308,8 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), ""));
 
   // Trust bundle provided.
-  validator().getSpiffeData()->trust_bundle_stores_["example.com"][""] = 
-                                                            X509StorePtr(X509_STORE_new());
+  validator().getSpiffeData()->trust_bundle_stores_["example.com"][""] =
+      X509StorePtr(X509_STORE_new());
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get(), ""));
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get(), "mydomain.org"));
 }
@@ -491,7 +493,7 @@ typed_config:
   NiceMock<Network::MockTransportSocketCallbacks> callbacks;
 
   {
-    // Trust domain has workload_trust_domain but connection does not.
+    SCOPED_TRACE("Trust domain has workload_trust_domain but connection does not (client).");
     auto cert = readCertFromFile(TestEnvironment::substitute(
         "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -499,16 +501,32 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {.callbacks =  &callbacks}, false, "")
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, false, "")
                   .status);
   }
 
-  callbacks.connection().streamInfo().filterState()->setData("envoy.tls.cert_validator.spiffe.workload_trust_domain", 
-      std::make_shared<Router::StringAccessorImpl>("mydomain.org"), StreamInfo::FilterState::StateType::ReadOnly,
-      StreamInfo::FilterState::LifeSpan::Connection);
+  {
+    SCOPED_TRACE("Trust domain has workload_trust_domain but connection does not (server).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
+                  .status);
+  }
+
+  callbacks.connection().streamInfo().filterState()->setData(
+      "envoy.tls.cert_validator.spiffe.workload_trust_domain",
+      std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   {
-    // Trust domain matches so should be accepted.
+    SCOPED_TRACE("Trust domain matches so should be accepted (server).");
     auto cert = readCertFromFile(TestEnvironment::substitute(
         "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -516,12 +534,14 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {.callbacks =  &callbacks}, false, "")
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
                   .status);
   }
 
   {
-    // Trust domain does not match because it's missing workload_trust_domain in the definition.
+    SCOPED_TRACE("Trust domain does not match because it's missing workload_trust_domain in the "
+                 "definition (server).");
     auto cert = readCertFromFile(TestEnvironment::substitute(
         "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
     bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
@@ -529,7 +549,43 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {.callbacks = &callbacks}, false, "")
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx,
+                                     {.callbacks = &callbacks}, true, "")
+                  .status);
+  }
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData("envoy.tls.cert_validator.spiffe.workload_trust_domain",
+                       std::make_shared<Router::StringAccessorImpl>("mydomain.org"),
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto socket_options = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+
+  {
+    SCOPED_TRACE("Trust domain matches so should be accepted (client).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     socket_options, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+
+  {
+    SCOPED_TRACE("Trust domain does not match because it's missing workload_trust_domain in the "
+                 "definition (client).");
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     socket_options, *ssl_ctx, {}, false, "")
                   .status);
   }
 }

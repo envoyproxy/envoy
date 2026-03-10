@@ -35,7 +35,9 @@ using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 struct SpiffeData {
   // Mapping for "peer trust domain" -> "local trust domain" -> certificate.
-  absl::flat_hash_map<std::string, absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>>> trust_bundle_stores_;
+  absl::flat_hash_map<std::string,
+                      absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>>>
+      trust_bundle_stores_;
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
 };
 

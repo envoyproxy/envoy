@@ -25,7 +25,8 @@ public:
   void TearDown() override;
 
   virtual Network::ClientConnectionPtr
-  makeSslClientConnection(const ClientSslTransportOptions& options, bool use_expired, absl::optional<std::string> workload_trust_domain);
+  makeSslClientConnection(const ClientSslTransportOptions& options, bool use_expired,
+                          absl::optional<std::string> workload_trust_domain);
   void checkVerifyErrorCouter(uint64_t value);
 
   static std::string ipClientVersionTestParamsToString(
