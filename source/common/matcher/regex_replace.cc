@@ -9,7 +9,7 @@ RegexReplace::create(Regex::Engine& engine,
   ASSERT(!proto.pattern().regex().empty(), "invalid RegexMatchAndSubstitute message");
   auto regex_or_status = Regex::Utility::parseRegex(proto.pattern(), engine);
   RETURN_IF_NOT_OK(regex_or_status.status());
-  return RegexReplace(std::move(regex_or_status.value()), std::string{proto.substitution()});
+  return RegexReplace(std::move(regex_or_status).value(), std::string{proto.substitution()});
 }
 
 std::string RegexReplace::apply(absl::string_view in) const {

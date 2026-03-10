@@ -26,7 +26,7 @@ public:
 
 private:
   Regex::CompiledMatcherPtr regex_{};
-  std::string substitution_{};
+  const std::string substitution_{};
 };
 
 } // namespace Matcher
