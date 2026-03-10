@@ -812,10 +812,7 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(
-///     &self,
-///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
-///   ) -> Box<dyn ClusterLb> {
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
 ///     Box::new(MyClusterLb {})
 ///   }
 /// }
@@ -825,8 +822,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// impl ClusterLb for MyClusterLb {
 ///   fn choose_host(
 ///     &mut self,
-///     _context: envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-///   ) -> Option<envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+///     _context: Option<&dyn ClusterLbContext>,
+///   ) -> Option<
+///     envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+///   > {
 ///     None
 ///   }
 /// }
