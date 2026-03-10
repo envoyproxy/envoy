@@ -257,6 +257,9 @@ new_features:
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
 - area: tls
+    Added a per-connection filter state object to select a workload trust domain in the SPIFFE validator in
+    the multi-tenant deployments.
+- area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
     and added brotli and zlib to TCP TLS. Controlled by runtime flag

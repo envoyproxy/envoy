@@ -47,7 +47,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // To support multi-tenant use cases, a filter state object ``envoy.tls.cert_validator.spiffe.workload_trust_domain``
 // should be used to define the per-connection _workload trust domain_. When matching a peer trust domain, both the
-// workload and the peer trust domains are used in selecting the validation certificate.
+// workload and the peer trust domains are used in selecting the validation certificate. The filter state object
+// should be shared with the upstream to be used in the upstream TLS context SPIFFE validation context.
 message SPIFFECertValidatorConfig {
   message TrustDomain {
     // Name of the trust domain, ``example.com``, ``foo.bar.gov`` for example.
