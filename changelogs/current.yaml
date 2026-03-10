@@ -278,7 +278,8 @@ new_features:
     to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
     ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
     instead of removed when compression is applied, allowing caches and conditional requests to
-    work while indicating the body was modified by compression.
+    work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
+    and ``disable_on_etag_header`` are true, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,

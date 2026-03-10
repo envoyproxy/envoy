@@ -118,9 +118,14 @@ ETag handling
 When a response has an ``ETag`` header, the filter's behavior depends on
 ``response_direction_config``:
 
-- **``disable_on_etag_header: true``** — Compression is *skipped* for responses that
-  contain an ``ETag``. The response is sent unchanged (including the original ``ETag``).
-  This avoids changing the entity tag when the body would be modified by compression.
+- **When both ``disable_on_etag_header`` and ``weaken_etag_on_compress`` are ``true``** —
+  ``weaken_etag_on_compress`` takes precedence. Compression is applied and the strong
+  ``ETag`` is weakened.
+
+- **``disable_on_etag_header: true``** (and ``weaken_etag_on_compress`` is ``false``) —
+  Compression is *skipped* for responses that contain an ``ETag``. The response is sent
+  unchanged (including the original ``ETag``). This avoids changing the entity tag when
+  the body would be modified by compression.
 
 - **``disable_on_etag_header: false``** (default) — Compression is allowed. When compression
   is applied:

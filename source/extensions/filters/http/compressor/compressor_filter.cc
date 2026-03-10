@@ -731,8 +731,13 @@ bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMa
 }
 
 bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
-  return !(config_->responseDirectionConfig().disableOnEtagHeader() &&
-           headers.getInline(etag_handle.handle()));
+  const auto& config = config_->responseDirectionConfig();
+  // When both disable_on_etag_header and weaken_etag_on_compress are true, the new field
+  // takes precedence so compression is applied and the ETag is weakened.
+  if (config.weakenEtagOnCompress()) {
+    return true;
+  }
+  return !(config.disableOnEtagHeader() && headers.getInline(etag_handle.handle()));
 }
 
 bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
