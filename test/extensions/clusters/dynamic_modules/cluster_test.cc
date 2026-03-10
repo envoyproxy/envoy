@@ -6,7 +6,9 @@
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/connection.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -32,6 +34,9 @@ public:
     return cluster.host_map_.size();
   }
 };
+
+using ::testing::_;
+using ::testing::Return;
 
 namespace {
 
@@ -819,6 +824,433 @@ TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
   bool completion_called = false;
   captured_shutdown_cb([&completion_called]() { completion_called = true; });
   EXPECT_TRUE(completion_called);
+}
+
+// =============================================================================
+// Cluster LB Context ABI Callback Tests
+// =============================================================================
+
+// Test compute_hash_key with a valid hash.
+TEST_F(DynamicModuleClusterTest, LbContextComputeHashKey) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  uint64_t hash = 0;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(context_ptr, &hash));
+  EXPECT_EQ(12345, hash);
+}
+
+// Test compute_hash_key when no hash is available.
+TEST_F(DynamicModuleClusterTest, LbContextComputeHashKeyNoHash) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::nullopt));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  uint64_t hash = 0;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(context_ptr, &hash));
+}
+
+// Test compute_hash_key with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextComputeHashKeyNullContext) {
+  uint64_t hash = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, &hash));
+}
+
+// Test compute_hash_key with nullptr output.
+TEST_F(DynamicModuleClusterTest, LbContextComputeHashKeyNullOutput) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(context_ptr, nullptr));
+}
+
+// Test get_downstream_headers_size with headers.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersSize) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test", "value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_EQ(
+      2, envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(context_ptr));
+}
+
+// Test get_downstream_headers_size with no headers.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersSizeNoHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_EQ(
+      0, envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(context_ptr));
+}
+
+// Test get_downstream_headers_size with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersSizeNullContext) {
+  EXPECT_EQ(0,
+            envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(nullptr));
+}
+
+// Test get_downstream_headers retrieves all headers.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test", "value"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  size_t size =
+      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(context_ptr);
+  ASSERT_EQ(2, size);
+
+  std::vector<envoy_dynamic_module_type_envoy_http_header> result(size);
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+      context_ptr, result.data()));
+
+  EXPECT_EQ(":method", absl::string_view(result[0].key_ptr, result[0].key_length));
+  EXPECT_EQ("GET", absl::string_view(result[0].value_ptr, result[0].value_length));
+  EXPECT_EQ("x-test", absl::string_view(result[1].key_ptr, result[1].key_length));
+  EXPECT_EQ("value", absl::string_view(result[1].value_ptr, result[1].value_length));
+}
+
+// Test get_downstream_headers with no headers available.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNoHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_http_header result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       &result));
+}
+
+// Test get_downstream_headers with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullContext) {
+  envoy_dynamic_module_type_envoy_http_header result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, &result));
+}
+
+// Test get_downstream_headers with nullptr result.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeadersNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(context_ptr,
+                                                                                       nullptr));
+}
+
+// Test get_downstream_header by key.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeader) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"x-custom", "val1"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "x-custom";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  size_t total_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+      context_ptr, key_buf, &result_buf, 0, &total_size));
+  EXPECT_EQ("val1", absl::string_view(result_buf.ptr, result_buf.length));
+  EXPECT_EQ(1, total_size);
+}
+
+// Test get_downstream_header with index out of bounds.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaderOutOfBounds) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"x-custom", "val1"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "x-custom";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+      context_ptr, key_buf, &result_buf, 1, nullptr));
+}
+
+// Test get_downstream_header with nonexistent key.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaderNotFound) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"x-custom", "val1"}};
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "x-missing";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  size_t total_size = 999;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+      context_ptr, key_buf, &result_buf, 0, &total_size));
+  EXPECT_EQ(0, total_size);
+}
+
+// Test get_downstream_header with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaderNullContext) {
+  std::string key = "x-custom";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  size_t total_size = 999;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+      nullptr, key_buf, &result_buf, 0, &total_size));
+  EXPECT_EQ(0, total_size);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+}
+
+// Test get_downstream_header with no headers.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamHeaderNoHeaders) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamHeaders()).WillByDefault(Return(nullptr));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string key = "x-custom";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf;
+  size_t total_size = 999;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+      context_ptr, key_buf, &result_buf, 0, &total_size));
+  EXPECT_EQ(0, total_size);
+}
+
+// Test get_host_selection_retry_count.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostSelectionRetryCount) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, hostSelectionRetryCount()).WillByDefault(Return(3));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+                   context_ptr));
+}
+
+// Test get_host_selection_retry_count with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetHostSelectionRetryCountNullContext) {
+  EXPECT_EQ(
+      0, envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(nullptr));
+}
+
+// Test should_select_another_host.
+TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 2}, hosts));
+
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, shouldSelectAnotherHost(_)).WillByDefault(Return(true));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      dm_lb, context_ptr, 0, 0));
+}
+
+// Test should_select_another_host returns false.
+TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostReturnsFalse) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001"}, {1}, hosts));
+
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, shouldSelectAnotherHost(_)).WillByDefault(Return(false));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      dm_lb, context_ptr, 0, 0));
+}
+
+// Test should_select_another_host with invalid priority and index.
+TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostInvalidArgs) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001"}, {1}, hosts));
+
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+
+  // Invalid priority.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      dm_lb, context_ptr, 99, 0));
+  // Invalid index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      dm_lb, context_ptr, 0, 99));
+}
+
+// Test should_select_another_host with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostNullContext) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      dm_lb, nullptr, 0, 0));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+      nullptr, nullptr, 0, 0));
+}
+
+// Test get_override_host with an override set.
+TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostPresent) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(
+          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer address;
+  bool strict = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+      context_ptr, &address, &strict));
+  EXPECT_EQ("10.0.0.1:8080", absl::string_view(address.ptr, address.length));
+  EXPECT_TRUE(strict);
+}
+
+// Test get_override_host non-strict.
+TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNonStrict) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(
+          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.2:9090", false})));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer address;
+  bool strict = true;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+      context_ptr, &address, &strict));
+  EXPECT_EQ("10.0.0.2:9090", absl::string_view(address.ptr, address.length));
+  EXPECT_FALSE(strict);
+}
+
+// Test get_override_host when not set.
+TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNotSet) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, overrideHostToSelect()).WillByDefault(Return(absl::nullopt));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer address;
+  bool strict = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+      context_ptr, &address, &strict));
+}
+
+// Test get_override_host with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNullContext) {
+  envoy_dynamic_module_type_envoy_buffer address;
+  bool strict = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(nullptr, &address,
+                                                                                  &strict));
+}
+
+// Test get_override_host with nullptr outputs.
+TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNullOutputs) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  // Null address.
+  bool strict = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+      context_ptr, nullptr, &strict));
+  // Null strict.
+  envoy_dynamic_module_type_envoy_buffer address;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+      context_ptr, &address, nullptr));
+}
+
+// Test get_downstream_connection_sni with SNI available.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSni) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(context, downstreamConnection()).WillByDefault(Return(&connection));
+  ON_CALL(connection, requestedServerName()).WillByDefault(Return("example.com"));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+      context_ptr, &result));
+  EXPECT_EQ("example.com", absl::string_view(result.ptr, result.length));
+}
+
+// Test get_downstream_connection_sni with empty SNI.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniEmpty) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(context, downstreamConnection()).WillByDefault(Return(&connection));
+  ON_CALL(connection, requestedServerName()).WillByDefault(Return(""));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+      context_ptr, &result));
+}
+
+// Test get_downstream_connection_sni with no downstream connection.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNoConnection) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  ON_CALL(context, downstreamConnection()).WillByDefault(Return(nullptr));
+
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+      context_ptr, &result));
+}
+
+// Test get_downstream_connection_sni with nullptr context.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullContext) {
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+      nullptr, &result));
+}
+
+// Test get_downstream_connection_sni with nullptr result buffer.
+TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullResult) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+      context_ptr, nullptr));
 }
 
 } // namespace

@@ -217,7 +217,7 @@ void DynamicModuleCluster::registerLifecycleCallbacks() {
 void DynamicModuleCluster::startPreInit() {
   // Call the module's init function. The module is expected to call
   // envoy_dynamic_module_callback_cluster_pre_init_complete when ready.
-  config_->on_cluster_init_(in_module_cluster_, this);
+  config_->on_cluster_init_(this, in_module_cluster_);
 }
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }

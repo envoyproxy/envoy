@@ -761,20 +761,14 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///   true
 /// }
 ///
-/// fn my_new_cluster_config_fn(
-///   _name: &str,
-///   _config: &[u8],
-/// ) -> Option<Box<dyn ClusterConfig>> {
+/// fn my_new_cluster_config_fn(_name: &str, _config: &[u8]) -> Option<Box<dyn ClusterConfig>> {
 ///   Some(Box::new(MyClusterConfig {}))
 /// }
 ///
 /// struct MyClusterConfig {}
 ///
 /// impl ClusterConfig for MyClusterConfig {
-///   fn new_cluster(
-///     &self,
-///     _envoy_cluster: &dyn EnvoyCluster,
-///   ) -> Box<dyn Cluster> {
+///   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
 ///     Box::new(MyCluster {})
 ///   }
 /// }
@@ -786,10 +780,7 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(
-///     &self,
-///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
-///   ) -> Box<dyn ClusterLb> {
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
 ///     Box::new(MyClusterLb {})
 ///   }
 /// }
@@ -799,8 +790,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// impl ClusterLb for MyClusterLb {
 ///   fn choose_host(
 ///     &mut self,
-///     _context: envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-///   ) -> Option<envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+///     _context: Option<&dyn ClusterLbContext>,
+///   ) -> Option<
+///     envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+///   > {
 ///     None
 ///   }
 /// }

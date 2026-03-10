@@ -7910,12 +7910,12 @@ envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new
  * should perform initial host discovery and call
  * envoy_dynamic_module_callback_cluster_pre_init_complete when the initial set of hosts is ready.
  *
- * @param cluster_module_ptr is the pointer to the in-module cluster.
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
  */
 void envoy_dynamic_module_on_cluster_init(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
 
 /**
  * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
@@ -8134,6 +8134,130 @@ void envoy_dynamic_module_callback_cluster_scheduler_delete(
  */
 void envoy_dynamic_module_callback_cluster_scheduler_commit(
     envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
+
+// =============================================================================
+// Cluster LB Context Callbacks
+// =============================================================================
+//
+// These callbacks allow the cluster load balancer to access per-request context
+// information during envoy_dynamic_module_on_cluster_lb_choose_host. They
+// provide the same capabilities as the standalone load balancer context
+// callbacks (envoy_dynamic_module_callback_lb_context_*), but operate on the
+// cluster_lb_context_envoy_ptr instead.
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key computes a hash key from the
+ * request context for consistent hashing.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param hash_out is the output hash value. Only valid when the function returns true.
+ * @return true if a hash key was computed, false if no hash key is available or the context is
+ * nullptr.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size returns the number
+ * of downstream request headers available in the context.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the number of headers, or 0 if the context is nullptr or no headers are available.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers retrieves all downstream
+ * request headers into a pre-allocated array.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_headers is the output array of header key-value pairs. Must be pre-allocated with
+ * at least the number of headers returned by
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size.
+ * @return true if the headers were retrieved, false if the context is nullptr or no headers are
+ * available.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header retrieves a single
+ * downstream request header value by key and index.
+ *
+ * Since a header key can have multiple values, the ``index`` parameter selects a specific value.
+ * The ``optional_size`` parameter can be used to retrieve the total number of values for the key.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the header key to look up. Owned by the module.
+ * @param result_buffer is the output buffer for the header value. Owned by Envoy and valid only
+ * during the current callback.
+ * @param index is the index of the header value (for multi-valued headers).
+ * @param optional_size is an optional output for the total number of values for this key. Can be
+ * nullptr if not needed.
+ * @return true if the header value was found at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count returns the
+ * maximum number of times host selection should be retried if the chosen host is rejected by
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the retry count, or 0 if the context is nullptr.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries to
+ * avoid selecting hosts that were already attempted.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer, used to access the host set.
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param priority is the priority level of the host.
+ * @param index is the index of the host within the healthy host list at the given priority.
+ * @return true if another host should be selected, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_override_host returns the override host
+ * address and strict mode flag from the context. Override host allows upstream filters to direct
+ * the load balancer to prefer a specific host by address.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param address is the output buffer for the override host address. Owned by Envoy and valid only
+ * during the current callback.
+ * @param strict is the output flag. When true, the load balancer should return no host if the
+ * override host is not valid.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni returns the
+ * requested server name (SNI) from the downstream connection associated with the request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_buffer is the output buffer for the SNI string. Owned by Envoy and valid only
+ * during the current callback.
+ * @return true if the SNI is available and non-empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
