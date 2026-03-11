@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "library/cc/network_change_monitor.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 
@@ -17,7 +19,7 @@ namespace Platform {
 class StreamClient;
 using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
 
-class Engine : public std::enable_shared_from_this<Engine> {
+class Engine : public std::enable_shared_from_this<Engine>, public NetworkChangeListener {
 public:
   // Creates a non-owning Engine wrapper around an existing InternalEngine handle.
   // The returned Engine will not auto-terminate the underlying InternalEngine in its destructor.
@@ -34,6 +36,7 @@ public:
   void onDefaultNetworkChanged(int network);
   void onDefaultNetworkUnavailable();
   void onDefaultNetworkAvailable();
+  void initializeNetworkChangeMonitor();
   envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
@@ -52,6 +55,7 @@ private:
   Envoy::InternalEngine* engine_;
   const bool handle_termination_;
   StreamClientSharedPtr stream_client_;
+  std::unique_ptr<NetworkChangeMonitor> network_change_monitor_;
 };
 
 } // namespace Platform
