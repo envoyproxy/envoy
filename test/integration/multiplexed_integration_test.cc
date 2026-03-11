@@ -9,8 +9,6 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "absl/synchronization/mutex.h"
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -30,6 +28,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 using ::testing::HasSubstr;

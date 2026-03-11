@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package envoy.extensions.content_parsers.json.v3;
+
+import "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.content_parsers.json.v3";
+option java_outer_classname = "JsonContentParserProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/content_parsers/json/v3;jsonv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: JSON Content Parser]
+//
+// Parses JSON content and extracts values using JSON path selectors.
+// This parser operates on raw JSON content strings provided by the caller.
+//
+// [#extension: envoy.content_parsers.json]
+
+// Configuration for the JSON content parser.
+message JsonContentParser {
+  // Configuration for a single rule with its processing behavior.
+  message RuleConfig {
+    // The json-to-metadata rule to apply for extracting values from JSON content.
+    // See :ref:`json_to_metadata rule <envoy_v3_api_msg_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule>`
+    // for available configuration options including selectors, on_present, on_missing, on_error actions.
+    filters.http.json_to_metadata.v3.JsonToMetadata.Rule rule = 1
+        [(validate.rules).message = {required: true}];
+
+    // Controls how many times this rule should successfully match before stopping evaluation
+    // of this rule for subsequent content items.
+    //
+    // - If set to 0 (default): This rule is evaluated against all content items provided.
+    //   Later matches may overwrite earlier values (unless
+    //   :ref:`preserve_existing_metadata_value <envoy_v3_api_field_extensions.filters.http.json_to_metadata.v3.JsonToMetadata.KeyValuePair.preserve_existing_metadata_value>`
+    //   is set in the rule), effectively extracting the LAST occurrence.
+    //
+    // - If set to 1: Stop evaluating this rule after the first successful match.
+    //   This is useful for extracting values that appear early in the stream
+    //   to avoid unnecessary processing of subsequent content.
+    //
+    // - If set to N > 1: Reserved for future use (e.g., aggregating multiple values).
+    //   Values > 1 are currently rejected to prevent behavioral changes when this feature is implemented.
+    //
+    // Example use cases:
+    //
+    // - Extract model name from early content: ``stop_processing_after_matches: 1``
+    //   (Stops checking this rule after first match, doesn't process remaining content for this rule)
+    //
+    // - Extract token usage from final content: ``stop_processing_after_matches: 0``
+    //   (Processes all content items, extracts value from the last one that contains it)
+    uint32 stop_processing_after_matches = 2 [(validate.rules).uint32 = {lte: 1}];
+  }
+
+  // The rules to apply for extracting values from JSON content.
+  // Rules are evaluated in order for each content item provided.
+  // At least one rule must be specified.
+  repeated RuleConfig rules = 1 [(validate.rules).repeated = {min_items: 1}];
+}

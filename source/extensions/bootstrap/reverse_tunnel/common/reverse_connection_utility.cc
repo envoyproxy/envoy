@@ -4,6 +4,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -57,6 +59,23 @@ bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_da
     return true;
   }
   return false;
+}
+
+ReverseConnectionUtility::TenantScopedIdentifierView
+ReverseConnectionUtility::splitTenantScopedIdentifier(absl::string_view value) {
+  const size_t pos = value.find(TENANT_SCOPE_DELIMITER);
+  if (pos == absl::string_view::npos) {
+    return {absl::string_view(), value};
+  }
+  return {value.substr(0, pos), value.substr(pos + TENANT_SCOPE_DELIMITER.size())};
+}
+
+std::string ReverseConnectionUtility::buildTenantScopedIdentifier(absl::string_view tenant,
+                                                                  absl::string_view identifier) {
+  if (tenant.empty()) {
+    return std::string(identifier);
+  }
+  return std::string(absl::StrCat(tenant, TENANT_SCOPE_DELIMITER, identifier));
 }
 
 std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {

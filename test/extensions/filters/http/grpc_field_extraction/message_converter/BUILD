@@ -17,7 +17,7 @@ envoy_cc_test_library(
         "//source/common/grpc:codec_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:stream_message_lib",
         "//test/proto:apikeys_proto_cc_proto",
-        "@com_google_protofieldextraction//:all_libs",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 
@@ -30,8 +30,8 @@ envoy_cc_test(
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_utility_lib",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:status_utility_lib",
-        "@com_google_protofieldextraction//:all_libs",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 
@@ -45,8 +45,8 @@ envoy_cc_test(
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_utility_lib",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:status_utility_lib",
-        "@com_google_protofieldextraction//:all_libs",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 

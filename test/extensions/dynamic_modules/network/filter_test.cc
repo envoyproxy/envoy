@@ -22,8 +22,8 @@ public:
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
-        main_thread_dispatcher_);
+        "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -58,9 +58,9 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onWrite(write_data, true));
 
-  // Verify buffer is cleared after callbacks.
-  EXPECT_EQ(nullptr, filter->currentReadBuffer());
-  EXPECT_EQ(nullptr, filter->currentWriteBuffer());
+  // Verify buffers persist after callbacks for access from on_scheduled and other callbacks.
+  EXPECT_NE(nullptr, filter->currentReadBuffer());
+  EXPECT_NE(nullptr, filter->currentWriteBuffer());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {
@@ -111,8 +111,8 @@ TEST_F(DynamicModuleNetworkFilterTest, FilterWithoutInModuleFilter) {
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
-      main_thread_dispatcher_);
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
   EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
   auto filter_config = filter_config_or_status.value();
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config);
@@ -228,8 +228,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "some_config", std::move(dynamic_module.value()), cluster_manager,
-      *stats.rootScope(), main_thread_dispatcher);
+      "test_filter", "some_config", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -252,8 +252,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
-      main_thread_dispatcher);
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
@@ -267,8 +267,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
-      main_thread_dispatcher);
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
@@ -283,8 +283,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
-      main_thread_dispatcher);
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager, *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -316,7 +316,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_counter(
       filter_config_.get(), name, &counter_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(counter_id, 0);
+  EXPECT_EQ(counter_id, 1);
 
   // Create filter and increment counter.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
@@ -339,7 +339,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_gauge(
       filter_config_.get(), name, &gauge_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_id, 0);
+  EXPECT_EQ(gauge_id, 1);
 
   // Create filter and manipulate gauge.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
@@ -367,7 +367,7 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
   auto result = envoy_dynamic_module_callback_network_filter_config_define_histogram(
       filter_config_.get(), name, &histogram_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(histogram_id, 0);
+  EXPECT_EQ(histogram_id, 1);
 
   // Create filter and record histogram value.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);

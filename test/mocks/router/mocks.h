@@ -76,6 +76,7 @@ public:
                const Http::ResponseHeaderMap& response_headers,
                const StreamInfo::StreamInfo& stream_info, std::string& body_out),
               (const));
+  MOCK_METHOD(absl::string_view, responseContentType, (), (const));
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -235,7 +236,8 @@ public:
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
   MOCK_METHOD(const Upstream::HealthyAndDegradedLoad&, priorityLoadForRetry,
-              (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
+              (StreamInfo::StreamInfo*, const Upstream::PrioritySet&,
+               const Upstream::HealthyAndDegradedLoad&,
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));

@@ -107,6 +107,7 @@ public:
                                const StreamInfo::StreamInfo&, std::string&) const override {
     return EMPTY_STRING;
   };
+  absl::string_view responseContentType() const override { return EMPTY_STRING; }
 };
 
 class CommonVirtualHostImpl;
@@ -738,6 +739,7 @@ public:
                                const Http::ResponseHeaderMap& response_headers,
                                const StreamInfo::StreamInfo& stream_info,
                                std::string& body_out) const override;
+  absl::string_view responseContentType() const override { return direct_response_content_type_; }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -913,6 +915,7 @@ private:
   const RouteTracingConstPtr route_tracing_;
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
+  std::string direct_response_content_type_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
