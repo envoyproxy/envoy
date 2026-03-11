@@ -41,6 +41,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:upstream_subject_alt_names_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:bool_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -62,6 +63,7 @@ envoy_extension_cc_test(
     rbe_pool = "4core",
     deps = [
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/lua:config",
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/filters/listener/proxy_protocol:config",

@@ -349,6 +349,13 @@ unsafe impl Send for CompletionCallback {}
 unsafe impl Sync for CompletionCallback {}
 
 impl CompletionCallback {
+  pub(crate) fn new(
+    callback: abi::envoy_dynamic_module_type_event_cb,
+    context: *mut std::os::raw::c_void,
+  ) -> Self {
+    Self { callback, context }
+  }
+
   /// Signal that the asynchronous operation is complete. This must be called exactly once.
   pub fn done(self) {
     unsafe {
@@ -1278,10 +1285,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
 ) {
   let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
   let extension = unsafe { &mut *extension };
-  let completion = CompletionCallback {
-    callback: completion_callback,
-    context: completion_context,
-  };
+  let completion = CompletionCallback::new(completion_callback, completion_context);
   extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
 }
 
