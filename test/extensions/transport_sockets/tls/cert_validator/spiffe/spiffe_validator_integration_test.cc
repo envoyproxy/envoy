@@ -354,7 +354,7 @@ typed_config:
 }
 
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ClientSPIFFEValidatorAccepted) {
-  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -364,9 +364,8 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
-                            *typed_conf);
-
-  client_validator_config_ = typed_conf;
+                            typed_conf);
+  client_validator_config_ = &typed_conf;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
@@ -374,7 +373,7 @@ typed_config:
 }
 
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ClientSPIFFEValidatorRejected) {
-  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -384,8 +383,8 @@ typed_config:
       trust_bundle:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
   )EOF"),
-                            *typed_conf);
-  client_validator_config_ = typed_conf;
+                            typed_conf);
+  client_validator_config_ = &typed_conf;
   initialize();
   auto conn = makeSslClientConnection({});
   auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
@@ -393,7 +392,7 @@ typed_config:
 }
 
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ClientSPIFFEValidatorAcceptedWorkloadTrustDomain) {
-  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -404,9 +403,9 @@ typed_config:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       workload_trust_domain: mydomain.org
   )EOF"),
-                            *typed_conf);
+                            typed_conf);
 
-  client_validator_config_ = typed_conf;
+  client_validator_config_ = &typed_conf;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({}, false, "mydomain.org");
   };
@@ -414,7 +413,7 @@ typed_config:
 }
 
 TEST_P(SslSPIFFECertValidatorIntegrationTest, ClientSPIFFEValidatorRejectedWorkloadTrustDomain) {
-  auto typed_conf = new envoy::config::core::v3::TypedExtensionConfig();
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -425,9 +424,9 @@ typed_config:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       workload_trust_domain: mydomain.org
   )EOF"),
-                            *typed_conf);
+                            typed_conf);
 
-  client_validator_config_ = typed_conf;
+  client_validator_config_ = &typed_conf;
   initialize();
   auto conn = makeSslClientConnection({});
   auto codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
