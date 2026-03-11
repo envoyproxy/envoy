@@ -7844,7 +7844,9 @@ typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
  * downstream headers.
  *
  * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
- * envoy_dynamic_module_on_cluster_lb_choose_host call.
+ * envoy_dynamic_module_on_cluster_lb_choose_host call, unless async host selection is used. When
+ * async host selection is used, the context remains valid until the async completion callback is
+ * called or the selection is canceled.
  */
 typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
 
@@ -7862,6 +7864,19 @@ typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
  * the module, this has _module_ptr suffix.
  */
 typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr is a pointer to an in-module async
+ * host selection handle. This is returned by the module during
+ * envoy_dynamic_module_on_cluster_lb_choose_host when the module needs to perform asynchronous
+ * work (e.g., DNS resolution) before selecting a host.
+ *
+ * OWNERSHIP: The module owns the pointer. The module must keep it valid until either
+ * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called or
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called. After either event, the
+ * module may release the handle.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
 
 // =============================================================================
 // Cluster Event Hooks
@@ -7952,19 +7967,49 @@ void envoy_dynamic_module_on_cluster_lb_destroy(
 /**
  * envoy_dynamic_module_on_cluster_lb_choose_host is called to select a host for a request.
  *
+ * The module can respond in one of three ways:
+ * 1. Synchronous success: Set ``*host_out`` to a valid host pointer and ``*async_handle_out`` to
+ *    nullptr.
+ * 2. Synchronous failure: Set ``*host_out`` to nullptr and ``*async_handle_out`` to nullptr.
+ * 3. Async pending: Set ``*host_out`` to nullptr and ``*async_handle_out`` to a valid in-module
+ *    async handle. In this case, the module must later call
+ *    envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete to deliver the result,
+ *    unless envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called first.
+ *
  * @param lb_module_ptr is the pointer to the in-module load balancer.
  * @param context_envoy_ptr is the per-request load balancer context. Can be nullptr.
- * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the selected host.
- * Returning nullptr means no host was selected.
+ * @param host_out is the output pointer for the selected host. Set to nullptr if no host is
+ * immediately available.
+ * @param async_handle_out is the output pointer for the async handle. Set to nullptr for
+ * synchronous results.
  */
-envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+void envoy_dynamic_module_on_cluster_lb_choose_host(
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called when the stream is destroyed
+ * before async host selection completes (e.g., stream timeout). After this call, the module must
+ * not call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+ *
+ * This is optional. Only modules that use asynchronous host selection need to implement this.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ * @param async_handle_module_ptr is the in-module async handle that was previously returned from
+ * envoy_dynamic_module_on_cluster_lb_choose_host.
+ */
+void envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_module_ptr);
 
 /**
  * envoy_dynamic_module_on_cluster_scheduled is called on the main thread when an event previously
  * scheduled via envoy_dynamic_module_callback_cluster_scheduler_commit is dispatched. The module
  * can use the event_id to distinguish between different scheduled events.
+ *
+ * This is optional. Only modules that use the scheduler need to implement this.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object. This can be used with
  * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
@@ -8428,6 +8473,27 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
 bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
+ * to deliver the result of an asynchronous host selection. This must be called exactly once for
+ * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection was called first.
+ *
+ * After calling this, the module must not use the ``lb_envoy_ptr`` for this async operation again.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
+ * the second parameter to envoy_dynamic_module_on_cluster_lb_new.
+ * @param context_envoy_ptr is the per-request load balancer context that was passed to the
+ * original envoy_dynamic_module_on_cluster_lb_choose_host call.
+ * @param host is the selected host, or nullptr if host selection failed.
+ * @param details is a description of the resolution outcome (e.g., error reason). Can be empty.
+ */
+void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
