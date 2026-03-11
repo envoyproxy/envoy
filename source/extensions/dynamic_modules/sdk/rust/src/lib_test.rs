@@ -3545,6 +3545,207 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_host_health {
+  abi::envoy_dynamic_module_type_host_health::Unhealthy
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _stat: abi::envoy_dynamic_module_type_host_stat,
+) -> u64 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _region: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _sub_zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_set_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+  _host_index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_scheduler_new(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_cluster_scheduler_module_ptr {
@@ -4167,11 +4368,12 @@ fn test_cluster_lb_choose_host_with_context() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
       let ctx = context.expect("context should be Some");
       assert_eq!(ctx.get_host_selection_retry_count(), 3);
       assert_eq!(ctx.compute_hash_key(), Some(12345));
-      Some(0x1234 as *mut _)
+      cluster::HostSelectionResult::Selected(0x1234 as *mut _)
     }
   }
 
@@ -4181,10 +4383,14 @@ fn test_cluster_lb_choose_host_with_context() {
     .returning(|| 3);
   mock_ctx.expect_compute_hash_key().returning(|| Some(12345));
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+
   let mut lb = TestClusterLb;
-  let result = lb.choose_host(Some(&mock_ctx));
-  assert!(result.is_some());
-  assert_eq!(result.unwrap(), 0x1234 as *mut _);
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0x1234 as *mut _),
+    _ => panic!("Expected Selected"),
+  }
 }
 
 #[test]
@@ -4194,15 +4400,64 @@ fn test_cluster_lb_choose_host_without_context() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
       assert!(context.is_none());
-      None
+      cluster::HostSelectionResult::NoHost
     }
   }
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   let mut lb = TestClusterLb;
-  let result = lb.choose_host(None);
-  assert!(result.is_none());
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::NoHost => {},
+    _ => panic!("Expected NoHost"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_choose_host_async_pending() {
+  struct TestAsyncHandle {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::AsyncHostSelectionHandle for TestAsyncHandle {
+    fn cancel(&mut self) {
+      self
+        .cancelled
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestAsyncLb {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::ClusterLb for TestAsyncLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      cluster::HostSelectionResult::AsyncPending(Box::new(TestAsyncHandle {
+        cancelled: self.cancelled.clone(),
+      }))
+    }
+  }
+
+  let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+  let mut lb = TestAsyncLb {
+    cancelled: cancelled.clone(),
+  };
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::AsyncPending(mut handle) => {
+      assert!(!cancelled.load(std::sync::atomic::Ordering::SeqCst));
+      handle.cancel();
+      assert!(cancelled.load(std::sync::atomic::Ordering::SeqCst));
+    },
+    _ => panic!("Expected AsyncPending"),
+  }
 }
 
 #[test]
@@ -4212,23 +4467,36 @@ fn test_cluster_lb_context_full_workflow() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-      let ctx = context?;
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      let ctx = match context {
+        Some(c) => c,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
 
-      let sni = ctx.get_downstream_connection_sni()?;
+      let sni = match ctx.get_downstream_connection_sni() {
+        Some(s) => s,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(sni, "backend.example.com");
 
-      let (host_header, _) = ctx.get_downstream_header("host", 0)?;
+      let (host_header, _) = match ctx.get_downstream_header("host", 0) {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(host_header, "backend.example.com");
 
-      let hash = ctx.compute_hash_key()?;
+      let hash = match ctx.compute_hash_key() {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(hash, 99999);
 
       if ctx.should_select_another_host(0, 0) {
-        return None;
+        return cluster::HostSelectionResult::NoHost;
       }
 
-      Some(0xABCD as *mut _)
+      cluster::HostSelectionResult::Selected(0xABCD as *mut _)
     }
   }
 
@@ -4245,7 +4513,92 @@ fn test_cluster_lb_context_full_workflow() {
     .expect_should_select_another_host()
     .returning(|_, _| false);
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   let mut lb = SniBasedLb;
-  let result = lb.choose_host(Some(&mock_ctx));
-  assert_eq!(result, Some(0xABCD as *mut _));
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0xABCD as *mut _),
+    _ => panic!("Expected Selected"),
+  }
+}
+
+// =================================================================================================
+// Async Host Selection Tests
+// =================================================================================================
+
+#[test]
+fn test_async_host_selection_complete_with_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_some() && details == "resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+}
+
+#[test]
+fn test_async_host_selection_complete_no_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details == "dns_failure")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "dns_failure");
+}
+
+#[test]
+fn test_async_host_selection_complete_empty_details() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details.is_empty())
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_with_stored_completion() {
+  struct DnsResolvingLb {
+    pending_completion: Option<Box<dyn cluster::EnvoyAsyncHostSelectionComplete>>,
+  }
+  impl cluster::ClusterLb for DnsResolvingLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      self.pending_completion = Some(async_completion);
+      struct NoOpHandle;
+      impl cluster::AsyncHostSelectionHandle for NoOpHandle {
+        fn cancel(&mut self) {}
+      }
+      cluster::HostSelectionResult::AsyncPending(Box::new(NoOpHandle))
+    }
+  }
+
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  let mut lb = DnsResolvingLb {
+    pending_completion: None,
+  };
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  assert!(matches!(
+    result,
+    cluster::HostSelectionResult::AsyncPending(_)
+  ));
+
+  // Simulate async DNS resolution completing.
+  let completion = lb.pending_completion.take().unwrap();
+  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
 }

@@ -13,7 +13,6 @@ func init() {
 		"stats_callbacks":            &statsCallbacksConfigFactory{},
 		"header_callbacks":           &headerCallbacksConfigFactory{},
 		"send_response":              &sendResponseConfigFactory{},
-		"send_response_grpc":         &sendResponseGrpcConfigFactory{},
 		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
 		"filter_state_callbacks":     &filterStateCallbacksConfigFactory{},
 		"body_callbacks":             &bodyCallbacksConfigFactory{},
@@ -224,35 +223,7 @@ func (f *sendResponseFactory) Create(handle shared.HttpFilterHandle) shared.Http
 func (p *sendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.SendLocalResponse(200, [][2]string{{"header1", "value1"}, {"header2", "value2"}},
-		[]byte("Hello, World!"), -1, "")
-	return shared.HeadersStatusStop
-}
-
-// --- send_response_grpc ---
-type sendResponseGrpcConfigFactory struct {
-	shared.EmptyHttpFilterConfigFactory
-}
-type sendResponseGrpcFactory struct {
-	shared.EmptyHttpFilterFactory
-}
-
-func (f *sendResponseGrpcConfigFactory) Create(handle shared.HttpFilterConfigHandle,
-	config []byte) (shared.HttpFilterFactory, error) {
-	return &sendResponseGrpcFactory{}, nil
-}
-
-type sendResponseGrpcFilter struct {
-	handle shared.HttpFilterHandle
-	shared.EmptyHttpFilter
-}
-
-func (f *sendResponseGrpcFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
-	return &sendResponseGrpcFilter{handle: handle}
-}
-
-func (p *sendResponseGrpcFilter) OnRequestHeaders(headers shared.HeaderMap,
-	endOfStream bool) shared.HeadersStatus {
-	p.handle.SendLocalResponse(503, [][2]string{{"grpc-message", "service unavailable"}}, nil, 14, "")
+		[]byte("Hello, World!"), "")
 	return shared.HeadersStatusStop
 }
 

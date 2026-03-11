@@ -403,9 +403,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
-                             testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
                                                    {nullptr, 0});
 }
@@ -416,9 +415,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
       .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
 
   // Test with empty response.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
-                             testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
 
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0, {nullptr, 0},
@@ -440,9 +438,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
     header_array[index].value_ptr = const_cast<char*>(value.c_str());
     ++index;
   }
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _, testing::Eq(absl::nullopt),
-                             testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
@@ -470,9 +467,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
   }
 
   const std::string body_str = "body";
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
@@ -485,39 +481,11 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
   const std::string body_str = "body";
   absl::string_view test_details = "test_details";
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                             testing::Eq(absl::nullopt), testing::Eq("test_details")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                                                 testing::Eq(0), testing::Eq("test_details")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 0,
                                                    {body_str.data(), body_str.size()},
                                                    {test_details.data(), test_details.size()});
-}
-
-TEST_F(DynamicModuleHttpFilterTest, SendResponseWithGrpcStatusHeader) {
-  // Verify that grpc-status passed as a header is forwarded via modify_headers.
-  std::string grpc_status_key = "grpc-status";
-  std::string grpc_status_value = "14";
-  envoy_dynamic_module_type_module_http_header header_array[1];
-  header_array[0].key_ptr = grpc_status_key.data();
-  header_array[0].key_length = grpc_status_key.size();
-  header_array[0].value_ptr = grpc_status_value.data();
-  header_array[0].value_length = grpc_status_value.size();
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(absl::nullopt), testing::Eq("dynamic_module")))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
-        Http::TestResponseHeaderMapImpl headers;
-        if (modify_headers) {
-          modify_headers(headers);
-        }
-        EXPECT_EQ(headers.get(Http::LowerCaseString("grpc-status"))[0]->value().getStringView(),
-                  "14");
-      }));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 503, header_array, 1,
-                                                   {nullptr, 0}, {nullptr, 0});
 }
 
 TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
@@ -2014,67 +1982,6 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
   EXPECT_EQ(result_number, 8386);
-}
-
-TEST(ABIImpl, GetAttributeResponseGrpcStatus) {
-  Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
-  filter.setDecoderFilterCallbacks(decoder_callbacks);
-  filter.setEncoderFilterCallbacks(encoder_callbacks);
-
-  uint64_t result = 0;
-
-  // Without response trailers or headers, gRPC status should be inferred from HTTP response code.
-  EXPECT_CALL(encoder_callbacks, responseTrailers())
-      .WillRepeatedly(testing::Return(ResponseTrailerMapOptRef()));
-  EXPECT_CALL(encoder_callbacks, responseHeaders())
-      .WillRepeatedly(testing::Return(ResponseHeaderMapOptRef()));
-  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(503));
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
-      &filter, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
-  // HTTP 503 maps to gRPC Unavailable (14).
-  EXPECT_EQ(result, 14);
-}
-
-TEST(ABIImpl, GetAttributeResponseGrpcStatusFromTrailers) {
-  Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
-  filter.setDecoderFilterCallbacks(decoder_callbacks);
-  filter.setEncoderFilterCallbacks(encoder_callbacks);
-
-  uint64_t result = 0;
-
-  // With grpc-status in response trailers, that should take precedence.
-  Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "7"}};
-  EXPECT_CALL(encoder_callbacks, responseTrailers())
-      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(trailers)));
-  EXPECT_CALL(encoder_callbacks, responseHeaders())
-      .WillRepeatedly(testing::Return(ResponseHeaderMapOptRef()));
-  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(200));
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
-      &filter, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
-  // grpc-status: 7 = PermissionDenied.
-  EXPECT_EQ(result, 7);
-}
-
-TEST(ABIImpl, GetAttributeResponseGrpcStatusNotAvailable) {
-  Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
-
-  uint64_t result = 0;
-
-  // Without callbacks, stream info is not available.
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
-      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
-      &result));
 }
 
 TEST(ABIImpl, HttpCallout) {
