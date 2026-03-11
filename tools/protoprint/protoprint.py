@@ -28,10 +28,11 @@ from tools.type_whisperer import type_whisperer, types_pb2
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
+from buf.validate import validate_pb2 as pv_validate_pb2
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2, versioning_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
-from validate import validate_pb2
+from validate import validate_pb2 as pgv_validate_pb2
 
 import envoy_repo
 
@@ -702,11 +703,18 @@ class ProtoFormatVisitor(visitor.Visitor):
         oneof_index = None
         for index, field in enumerate(msg_proto.field):
             if "/v3" in type_context.source_code_info.name:
-                if field.options.Extensions[validate_pb2.rules].string.min_bytes != 0:
-                    field.options.Extensions[
-                        validate_pb2.rules].string.min_len = field.options.Extensions[
-                            validate_pb2.rules].string.min_bytes
-                    field.options.Extensions[validate_pb2.rules].string.ClearField("min_bytes")
+                # Handle both pgv (validate.rules) and protovalidate (buf.validate.field)
+                if field.options.HasExtension(pv_validate_pb2.field):
+                    field_rules = field.options.Extensions[pv_validate_pb2.field]
+                    if field_rules.HasField('string') and field_rules.string.min_bytes != 0:
+                        field_rules.string.min_len = field_rules.string.min_bytes
+                        field_rules.string.ClearField("min_bytes")
+                elif field.options.HasExtension(pgv_validate_pb2.rules):
+                    if field.options.Extensions[pgv_validate_pb2.rules].string.min_bytes != 0:
+                        field.options.Extensions[
+                            pgv_validate_pb2.rules].string.min_len = field.options.Extensions[
+                                pgv_validate_pb2.rules].string.min_bytes
+                        field.options.Extensions[pgv_validate_pb2.rules].string.ClearField("min_bytes")
 
             if oneof_index is not None:
                 if not field.HasField('oneof_index') or field.oneof_index != oneof_index:

@@ -19,6 +19,7 @@ py_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":protovalidate_py_pb2",
         ":utils",
         ":validate_py_pb2",
         "//tools/api_versioning:utils",
@@ -39,6 +40,7 @@ py_library(
     srcs = ["utils.py"],
     visibility = ["//visibility:public"],
     deps = [
+        ":protovalidate_py_pb2",
         ":validate_py_pb2",
     ],
 )
@@ -46,6 +48,11 @@ py_library(
 py_proto_library(
     name = "validate_py_pb2",
     deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
+)
+
+py_proto_library(
+    name = "protovalidate_py_pb2",
+    deps = ["@protovalidate//proto/protovalidate/buf/validate:validate_proto"],
 )
 
 protoprint_rule(
