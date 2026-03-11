@@ -2,15 +2,19 @@
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -33,6 +37,10 @@ public:
   static size_t getHostMapSize(DynamicModuleCluster& cluster) {
     absl::ReaderMutexLock lock(&cluster.host_map_lock_);
     return cluster.host_map_.size();
+  }
+
+  static void clearInModuleCluster(DynamicModuleCluster& cluster) {
+    cluster.in_module_cluster_ = nullptr;
   }
 };
 
@@ -2131,6 +2139,351 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
                                                                          nullptr, {nullptr, 0});
+}
+
+// =============================================================================
+// HTTP Callout Tests
+// =============================================================================
+
+// Test HTTP callout with cluster not found.
+TEST_F(DynamicModuleClusterTest, HttpCalloutClusterNotFound) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  // Initialize and complete pre-init so cluster is ready.
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("nonexistent_cluster"))
+      .WillOnce(testing::Return(nullptr));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"nonexistent_cluster", 19};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
+}
+
+// Test HTTP callout with missing required headers.
+TEST_F(DynamicModuleClusterTest, HttpCalloutMissingHeaders) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  // Missing :method, :path, host.
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {"x-custom", 8, "value", 5},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result,
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+// Test HTTP callout success with response headers and body.
+TEST_F(DynamicModuleClusterTest, HttpCalloutSuccess) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  EXPECT_NE(callout_id, 0);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  // Simulate a successful response.
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add("response_body");
+  callbacks_captured->onSuccess(request, std::move(response));
+}
+
+// Test HTTP callout failure with reset.
+TEST_F(DynamicModuleClusterTest, HttpCalloutFailureReset) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test HTTP callout failure with exceed response buffer limit.
+TEST_F(DynamicModuleClusterTest, HttpCalloutFailureExceedBufferLimit) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  callbacks_captured->onFailure(request,
+                                Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
+}
+
+// Test HTTP callout when async client cannot create request.
+TEST_F(DynamicModuleClusterTest, HttpCalloutCannotCreateRequest) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Return(nullptr));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+}
+
+// Test HTTP callout with request body.
+TEST_F(DynamicModuleClusterTest, HttpCalloutWithBody) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            // Verify the body was attached.
+            EXPECT_EQ(message->body().toString(), "request_body");
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "POST", 4},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {"request_body", 12};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  // Simulate a successful response.
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  callbacks_captured->onSuccess(request, std::move(response));
+}
+
+// Test HTTP callout success after in-module cluster is cleared.
+TEST_F(DynamicModuleClusterTest, HttpCalloutSuccessAfterInModuleClusterCleared) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  // Clear the in-module cluster pointer to simulate the cluster being destroyed.
+  DynamicModuleClusterTestPeer::clearInModuleCluster(*cluster);
+
+  // The callback should not invoke on_cluster_http_callout_done and should just clean up.
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  callbacks_captured->onSuccess(request, std::move(response));
+}
+
+// Test HTTP callout failure after in-module cluster is cleared.
+TEST_F(DynamicModuleClusterTest, HttpCalloutFailureAfterInModuleClusterCleared) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(cluster, nullptr);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+  cluster->preInitComplete();
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  auto callout_result = envoy_dynamic_module_callback_cluster_http_callout(
+      cluster.get(), &callout_id, cluster_name, headers.data(), headers.size(), body, 5000);
+  EXPECT_EQ(callout_result, envoy_dynamic_module_type_http_callout_init_result_Success);
+  ASSERT_NE(callbacks_captured, nullptr);
+
+  // Clear the in-module cluster pointer to simulate the cluster being destroyed.
+  DynamicModuleClusterTestPeer::clearInModuleCluster(*cluster);
+
+  // The callback should not invoke on_cluster_http_callout_done and should just clean up.
+  callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 }
 
 } // namespace

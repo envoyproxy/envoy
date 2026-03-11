@@ -9,12 +9,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
+#include "envoy/http/async_client.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -49,6 +51,7 @@ using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
 using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown);
+using OnClusterHttpCalloutDoneType = decltype(&envoy_dynamic_module_on_cluster_http_callout_done);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -85,6 +88,7 @@ public:
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
+  OnClusterHttpCalloutDoneType on_cluster_http_callout_done_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -319,6 +323,20 @@ public:
    */
   void onScheduled(uint64_t event_id);
 
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   * This must be called on the main thread.
+   *
+   * @param callout_id_out is a pointer to a variable where the callout ID will be stored.
+   * @param cluster_name is the name of the cluster to which the callout is sent.
+   * @param message is the HTTP request message to send.
+   * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+   * @return the result of the callout initialization.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
   envoy_dynamic_module_type_cluster_module_ptr inModuleCluster() const {
@@ -345,6 +363,31 @@ private:
   friend class DynamicModuleClusterHandle;
   friend class DynamicModuleLoadBalancer;
 
+  /**
+   * This implementation of the AsyncClient::Callbacks handles the response from the HTTP callout.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
+        : cluster_(std::move(cluster)), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    const uint64_t callout_id_{};
+  };
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
   DynamicModuleClusterConfigSharedPtr config_;
   envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
   Event::Dispatcher& dispatcher_;
@@ -362,6 +405,10 @@ private:
 
   // Handle for the server initialized lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
+
+  // HTTP callout tracking.
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+  absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
 };
 
 /**

@@ -96,3 +96,19 @@ void envoy_dynamic_module_on_cluster_shutdown(
   // Immediately invoke the completion callback.
   completion_callback(completion_context);
 }
+
+void envoy_dynamic_module_on_cluster_http_callout_done(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+  (void)callout_id;
+  (void)result;
+  (void)headers;
+  (void)headers_size;
+  (void)body_chunks;
+  (void)body_chunks_size;
+}
