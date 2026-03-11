@@ -859,8 +859,7 @@ impl EnvoyAsyncHostSelectionComplete for EnvoyAsyncHostSelectionCompleteImpl {
         self.raw_lb,
         self.raw_context,
         host_ptr,
-        details.as_ptr() as *const _,
-        details.len(),
+        str_to_module_buffer(details),
       );
     }
   }

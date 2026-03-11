@@ -1670,7 +1670,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
   auto* context_ptr = static_cast<void*>(&context);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      lb_envoy_ptr, context_ptr, raw_host_ptr, "resolved", 8);
+      lb_envoy_ptr, context_ptr, raw_host_ptr, {"resolved", 8});
 }
 
 // Test async host selection complete callback with null host.
@@ -1694,7 +1694,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
   auto* context_ptr = static_cast<void*>(&context);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-      lb_envoy_ptr, context_ptr, nullptr, "dns_failure", 11);
+      lb_envoy_ptr, context_ptr, nullptr, {"dns_failure", 11});
 }
 
 // Test async host selection complete callback with empty details.
@@ -1718,7 +1718,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
   auto* context_ptr = static_cast<void*>(&context);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
-                                                                         nullptr, nullptr, 0);
+                                                                         nullptr, {nullptr, 0});
 }
 
 } // namespace

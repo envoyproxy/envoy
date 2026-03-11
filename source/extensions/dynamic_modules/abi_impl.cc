@@ -555,7 +555,7 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
 __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr,
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr, const char*, size_t) {
+    envoy_dynamic_module_type_cluster_host_envoy_ptr, envoy_dynamic_module_type_module_buffer) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete: "
                "not implemented in this context");
 }

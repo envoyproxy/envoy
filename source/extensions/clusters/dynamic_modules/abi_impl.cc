@@ -530,8 +530,8 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
 void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr host, const char* details,
-    size_t details_length) {
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details) {
   auto* lb = getLb(lb_envoy_ptr);
   auto* context = getContext(context_envoy_ptr);
 
@@ -541,8 +541,8 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   }
 
   std::string details_str;
-  if (details != nullptr && details_length > 0) {
-    details_str.assign(details, details_length);
+  if (details.ptr != nullptr && details.length > 0) {
+    details_str.assign(details.ptr, details.length);
   }
 
   context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));

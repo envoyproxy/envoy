@@ -447,6 +447,11 @@ new_features:
     Added server lifecycle callbacks (``on_server_initialized``, ``on_drain_started``, ``on_shutdown``)
     for dynamic module custom clusters, enabling modules to react to server readiness, drain, and
     shutdown events.
+- area: dynamic_modules
+  change: |
+    Changed the ``details`` parameter in ``cluster_lb_async_host_selection_complete`` ABI callback
+    from raw ``const char*`` and ``size_t`` to ``envoy_dynamic_module_type_module_buffer`` for
+    consistency with the ABI style guide.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field

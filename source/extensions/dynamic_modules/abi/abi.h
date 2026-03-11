@@ -8488,13 +8488,12 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_
  * original envoy_dynamic_module_on_cluster_lb_choose_host call.
  * @param host is the selected host, or nullptr if host selection failed.
  * @param details is a description of the resolution outcome (e.g., error reason). Can be empty.
- * @param details_length is the length of ``details``.
  */
 void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr host, const char* details,
-    size_t details_length);
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
