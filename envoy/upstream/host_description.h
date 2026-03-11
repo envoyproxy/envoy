@@ -91,12 +91,12 @@ public:
     // ORCA also defines utilization in [0, 1].
     utilization = std::clamp(utilization, 0.0, 1.0);
     value_.store(static_cast<uint32_t>(utilization * kScale), std::memory_order_relaxed);
-    last_update_time_ms_.store(monotonic_time_ms, std::memory_order_relaxed);
+    last_update_time_ms_.store(monotonic_time_ms, std::memory_order_release);
   }
 
   // Returns the monotonic timestamp (ms since epoch) of the last set() call,
   // or 0 if set() has never been called.
-  int64_t lastUpdateTimeMs() const { return last_update_time_ms_.load(std::memory_order_relaxed); }
+  int64_t lastUpdateTimeMs() const { return last_update_time_ms_.load(std::memory_order_acquire); }
 
 private:
   static constexpr double kScale = 10000.0;

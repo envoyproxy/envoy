@@ -148,12 +148,9 @@ public:
   Upstream::ClusterLbStats& lbStats() const { return cluster_info_.lbStats(); }
 
 private:
-  Upstream::TypedLoadBalancerFactory& child_factory_;
   LoadBalancerConfigSharedPtr child_config_;
   const Upstream::ClusterInfo& cluster_info_;
-  Runtime::Loader& runtime_;
   Envoy::Random::RandomGenerator& random_;
-  TimeSource& time_source_;
 
   // Single child ThreadAwareLoadBalancer created and initialized on the main thread.
   // Workers only call factory()->create() from it.

@@ -1,14 +1,10 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/extensions/load_balancing_policies/load_aware_locality/v3/load_aware_locality.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/common/logger.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
-#include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
 namespace Envoy {
 namespace Extensions {

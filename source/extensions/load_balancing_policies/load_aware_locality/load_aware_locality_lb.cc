@@ -234,12 +234,11 @@ WorkerLocalLbFactory::WorkerLocalLbFactory(
     const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet& cluster_priority_set,
     Runtime::Loader& runtime, Envoy::Random::RandomGenerator& random, TimeSource& time_source,
     ThreadLocal::SlotAllocator& tls_slot_allocator)
-    : child_factory_(child_factory), child_config_(std::move(child_config)),
-      cluster_info_(cluster_info), runtime_(runtime), random_(random), time_source_(time_source) {
+    : child_config_(std::move(child_config)), cluster_info_(cluster_info), random_(random) {
   auto child_config_ref =
       makeOptRefFromPtr<const Upstream::LoadBalancerConfig>(child_config_.get());
-  child_thread_aware_lb_ = child_factory_.create(
-      child_config_ref, cluster_info_, cluster_priority_set, runtime_, random_, time_source_);
+  child_thread_aware_lb_ = child_factory.create(
+      child_config_ref, cluster_info_, cluster_priority_set, runtime, random_, time_source);
   tls_ = ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(tls_slot_allocator);
   tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
 }

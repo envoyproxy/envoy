@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 
 #include "source/extensions/load_balancing_policies/load_aware_locality/config.h"
+#include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
