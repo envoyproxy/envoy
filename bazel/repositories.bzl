@@ -852,7 +852,15 @@ def _com_github_wamr():
     )
 
 def _toolchains_llvm():
-    external_http_archive(name = "toolchains_llvm")
+    external_http_archive(
+        name = "toolchains_llvm",
+        patch_args = ["-p1"],
+        patches = [
+            # Pinned copy of `@envoy_toolshed//:patches/toolchains_llvm.patch` from
+            # toolshed `bazel-v0.3.35`, matching `toolchains_llvm` 1.7.0 used here.
+            "@envoy//bazel:toolchains_llvm.patch",
+        ],
+    )
 
 def _wasmtime():
     external_http_archive(
