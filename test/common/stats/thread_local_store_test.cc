@@ -1488,37 +1488,6 @@ TEST_F(StatsMatcherTLSTest, ScopeMatcherReplacesGlobal) {
   EXPECT_EQ(out_global_rejected.name(), ""); // rejected by global matcher
 }
 
-// Tests that child scopes inherit the parent scope's matcher.
-// The scope matcher operates on full names; parent prefix "parent", child prefix "parent.child".
-// We set the parent's matcher to reject full names starting with "parent.child." so that stats
-// in the child scope (which has prefix "parent.child") are rejected via inheritance.
-TEST_F(StatsMatcherTLSTest, ScopeMatcherInheritedByChild) {
-  // scope_matcher rejects full stat names with prefix "parent.child." — these are stats in child.
-  StatsMatcherSharedPtr scope_matcher = makePrefixMatcher("parent.child.", symbol_table_, context_);
-  ScopeSharedPtr parent_scope =
-      store_->rootScope()->createScope("parent", false, {}, scope_matcher);
-
-  // Stats directly in parent (full name "parent.foo") are NOT rejected (doesn't start with
-  // "parent.child.").
-  Counter& parent_accepted = parent_scope->counterFromString("foo");
-  EXPECT_NE(parent_accepted.name(), "");
-
-  // Child created without explicit matcher inherits parent's matcher.
-  ScopeSharedPtr child_scope = parent_scope->createScope("child");
-
-  // Stats in child scope have full name "parent.child.bar" → rejected (starts with
-  // "parent.child.").
-  Counter& child_rejected = child_scope->counterFromString("bar");
-  EXPECT_EQ(child_rejected.name(), ""); // rejected via inherited scope matcher
-
-  // Stats with a different prefix in child scope are not rejected.
-  // (All stats in "parent.child" scope match the prefix, so use a grandchild for "accepted" test.)
-  ScopeSharedPtr grandchild_scope = child_scope->createScope("grandchild");
-  // "parent.child.grandchild.baz" also starts with "parent.child." → rejected.
-  Counter& grandchild_rejected = grandchild_scope->counterFromString("baz");
-  EXPECT_EQ(grandchild_rejected.name(), ""); // also rejected
-}
-
 // Tests that setStatsMatcher on the store does not remove stats from scopes
 // that have their own scope-level matcher.
 TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
@@ -1543,6 +1512,76 @@ TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
   EXPECT_EQ(c.value(), 1);
   c.inc();
   EXPECT_EQ(c.value(), 2);
+}
+
+// Tests that the scope matcher rejects all stat types (Counter, Gauge, Histogram, TextReadout),
+// that HiddenAccumulate gauges bypass the scope matcher, and that child scopes inherit the matcher.
+TEST_F(StatsMatcherTLSTest, ScopeMatcherRejectsAllStatTypesAndInheritsToChildren) {
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("myscope.rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+
+  // Gauge: rejected stat returns null gauge (empty name, NeverImport).
+  Gauge& rejected_gauge = my_scope->gaugeFromString("rejected.g", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("", rejected_gauge.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, rejected_gauge.importMode());
+
+  // Gauge: accepted stat is real.
+  Gauge& accepted_gauge = my_scope->gaugeFromString("accepted.g", Gauge::ImportMode::Accumulate);
+  EXPECT_NE("", accepted_gauge.name());
+  accepted_gauge.set(5);
+  EXPECT_EQ(5, accepted_gauge.value());
+
+  // HiddenAccumulate gauge is never rejected even if name matches.
+  Gauge& hidden_gauge =
+      my_scope->gaugeFromString("rejected.hidden", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ("myscope.rejected.hidden", hidden_gauge.name());
+
+  // Histogram: rejected stat returns null histogram (empty name, Unit::Null).
+  Histogram& rejected_histogram =
+      my_scope->histogramFromString("rejected.h", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", rejected_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Null, rejected_histogram.unit());
+
+  // Histogram: accepted stat is real.
+  Histogram& accepted_histogram =
+      my_scope->histogramFromString("accepted.h", Histogram::Unit::Milliseconds);
+  EXPECT_NE("", accepted_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, accepted_histogram.unit());
+
+  // TextReadout: rejected stat returns null text readout (empty name, value always "").
+  TextReadout& rejected_tr = my_scope->textReadoutFromString("rejected.tr");
+  EXPECT_EQ("", rejected_tr.name());
+  rejected_tr.set("hello");
+  EXPECT_EQ("", rejected_tr.value());
+
+  // TextReadout: accepted stat is real.
+  TextReadout& accepted_tr = my_scope->textReadoutFromString("accepted.tr");
+  EXPECT_NE("", accepted_tr.name());
+  accepted_tr.set("world");
+  EXPECT_EQ("world", accepted_tr.value());
+
+  // Counter: rejected stat returns null counter (empty name, value always 0).
+  Counter& rejected_counter = my_scope->counterFromString("rejected.c");
+  EXPECT_EQ("", rejected_counter.name());
+  rejected_counter.inc();
+  EXPECT_EQ(0, rejected_counter.value());
+
+  // Counter: accepted stat is real.
+  Counter& accepted_counter = my_scope->counterFromString("accepted.c");
+  EXPECT_NE("", accepted_counter.name());
+  accepted_counter.inc();
+  EXPECT_EQ(1, accepted_counter.value());
+
+  // Child scope "rejected" has prefix — all its stats are rejected.
+  ScopeSharedPtr child_scope = my_scope->createScope("rejected");
+  Counter& child_counter = child_scope->counterFromString("c");
+  EXPECT_EQ("", child_counter.name());
+
+  // Grandchild also inherits the matcher.
+  ScopeSharedPtr grandchild_scope = child_scope->createScope("grandchild");
+  Counter& grandchild_counter = grandchild_scope->counterFromString("c");
+  EXPECT_EQ("", grandchild_counter.name());
 }
 
 // Tests the logic for caching the stats-matcher results, and in particular the

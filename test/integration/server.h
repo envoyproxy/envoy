@@ -82,7 +82,7 @@ public:
                              StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->createScope(name, evictable, limits, matcher), store_);
+        lock_, wrapped_scope_->createScope(name, evictable, limits, std::move(matcher)), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
@@ -90,7 +90,8 @@ public:
                                    StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, matcher), store_);
+        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, std::move(matcher)),
+        store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
