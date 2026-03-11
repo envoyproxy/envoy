@@ -45,12 +45,13 @@ using UserMap = absl::flat_hash_map<std::string, User>;
 class FilterConfig {
 public:
   FilterConfig(UserMap&& users, const std::string& forward_username_header,
-               const std::string& authentication_header, const std::string& stats_prefix,
-               Stats::Scope& scope);
+               const std::string& authentication_header, bool allow_missing,
+               const std::string& stats_prefix, Stats::Scope& scope);
   const BasicAuthStats& stats() const { return stats_; }
   const std::string& forwardUsernameHeader() const { return forward_username_header_; }
   const UserMap& users() const { return users_; }
   const Http::LowerCaseString& authenticationHeader() const { return authentication_header_; }
+  bool allowMissing() const { return allow_missing_; }
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -60,6 +61,7 @@ private:
   const UserMap users_;
   const std::string forward_username_header_;
   const Http::LowerCaseString authentication_header_;
+  const bool allow_missing_;
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
@@ -92,6 +94,7 @@ public:
 private:
   Http::FilterHeadersStatus onDenied(absl::string_view body,
                                      absl::string_view response_code_details);
+  void setDynamicMetadata(absl::string_view username);
 
   // The callback function.
   FilterConfigConstSharedPtr config_;
