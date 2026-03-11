@@ -1,3 +1,4 @@
+use crate::buffer::EnvoyBuffer;
 use crate::{
   abi,
   drop_wrapped_c_void_ptr,
@@ -81,6 +82,24 @@ pub trait Cluster: Send + Sync {
   /// place to flush batched data, close gRPC connections, or signal external systems.
   fn on_shutdown(&mut self, _envoy_cluster: &dyn EnvoyCluster, completion: CompletionCallback) {
     completion.done();
+  }
+
+  /// Called on the main thread when an HTTP callout initiated by
+  /// [`EnvoyCluster::send_http_callout`] receives a response or fails.
+  ///
+  /// * `envoy_cluster` can be used to interact with the underlying Envoy cluster object.
+  /// * `callout_id` is the ID of the callout returned by [`EnvoyCluster::send_http_callout`].
+  /// * `result` is the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body chunks. This is optional.
+  fn on_http_callout_done(
+    &mut self,
+    _envoy_cluster: &dyn EnvoyCluster,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
   }
 }
 
@@ -240,6 +259,23 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// This can be used to schedule an event to the main thread where the cluster is running.
   fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler>;
+
+  /// Sends an HTTP request to the specified cluster and asynchronously delivers the response
+  /// via [`Cluster::on_http_callout_done`].
+  ///
+  /// This must be called on the main thread. The request requires `:method`, `:path`, and `host`
+  /// headers to be present. To call from other threads, use the scheduler mechanism to post an
+  /// event to the main thread first.
+  ///
+  /// Returns a tuple of the callout initialization result and the callout ID. The callout ID is
+  /// only valid if the result is `Success`.
+  fn send_http_callout<'a>(
+    &self,
+    cluster_name: &'a str,
+    headers: &[(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
 }
 
 /// Envoy-side load balancer operations available to the module.
@@ -608,6 +644,45 @@ impl EnvoyCluster for EnvoyClusterImpl {
         raw_ptr: scheduler_ptr,
       })
     }
+  }
+
+  fn send_http_callout<'a>(
+    &self,
+    cluster_name: &'a str,
+    headers: &[(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_http_callout(
+        self.raw,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+    (result, callout_id)
   }
 }
 
@@ -1746,4 +1821,44 @@ pub extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
   let cluster = unsafe { &mut *cluster };
   let completion = CompletionCallback::new(completion_callback, completion_context);
   cluster.on_shutdown(&EnvoyClusterImpl::new(cluster_envoy_ptr), completion);
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let cluster = cluster_module_ptr as *mut Box<dyn Cluster>;
+  let cluster = unsafe { &mut *cluster };
+
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_chunks_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
+  } else {
+    None
+  };
+
+  cluster.on_http_callout_done(
+    &EnvoyClusterImpl::new(cluster_envoy_ptr),
+    callout_id,
+    result,
+    headers,
+    body,
+  );
 }
