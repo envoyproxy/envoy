@@ -1,24 +1,17 @@
-date: March 10, 2026
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: oauth2
-  change: |
-    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original Host value.
-- area: http
-  change: |
-    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
-    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
-    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
-    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
-- area: json
-  change: |
-    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
-    when the input string ends with a control character.
-- area: network
-  change: |
-    Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
-- area: rbac
-  change: |
-    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
-    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
-    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
