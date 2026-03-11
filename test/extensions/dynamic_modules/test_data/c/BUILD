@@ -18,6 +18,8 @@ package(default_visibility = [
 
 test_program(name = "no_op")
 
+test_program(name = "no_op_no_optional_abi")
+
 test_program(name = "network_no_op")
 
 test_program(name = "network_config_new_fail")

@@ -441,7 +441,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.send_response(
       200,
-      vec![
+      &[
         ("header1", "value1".as_bytes()),
         ("header2", "value2".as_bytes()),
       ],

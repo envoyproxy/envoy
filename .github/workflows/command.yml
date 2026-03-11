@@ -55,3 +55,23 @@ jobs:
         pr-url: ${{ github.event.issue.pull_request.url }}
         args: ${{ steps.command.outputs.args }}
         app-owner: ci-envoy
+
+  # ACK /gemini commands with a rocket emoji reaction.
+  # The actual review/summary is handled natively by the Gemini Code Assist GitHub App.
+  gemini:
+    name: ACK Gemini command
+    runs-on: ubuntu-24.04
+    if: >-
+      ${{
+         github.event.issue.pull_request
+         && startsWith(github.event.comment.body, '/gemini')
+         && github.actor != 'gemini-code-assist[bot]'
+      }}
+    permissions:
+      pull-requests: write
+    steps:
+    - name: React with rocket emoji
+      uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043  # v4.0.0
+      with:
+        comment-id: ${{ github.event.comment.id }}
+        reactions: rocket

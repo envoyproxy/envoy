@@ -2,7 +2,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/drain_decision.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -49,12 +51,11 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 // DynamicModuleClusterConfig
 // =================================================================================================
 
-absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
-DynamicModuleClusterConfig::create(const std::string& cluster_name,
-                                   const std::string& cluster_config,
-                                   Envoy::Extensions::DynamicModules::DynamicModulePtr module) {
+absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
+    const std::string& cluster_name, const std::string& cluster_config,
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
   auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module)));
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -82,6 +83,37 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
 
 #undef RESOLVE_SYMBOL
 
+  // Optional hooks. Modules that don't need async host selection or scheduling don't need to
+  // implement these.
+  auto on_cancel = config->dynamic_module_->getFunctionPointer<OnClusterLbCancelHostSelectionType>(
+      "envoy_dynamic_module_on_cluster_lb_cancel_host_selection");
+  config->on_cluster_lb_cancel_host_selection_ = on_cancel.ok() ? on_cancel.value() : nullptr;
+
+  auto on_scheduled = config->dynamic_module_->getFunctionPointer<OnClusterScheduledType>(
+      "envoy_dynamic_module_on_cluster_scheduled");
+  config->on_cluster_scheduled_ = on_scheduled.ok() ? on_scheduled.value() : nullptr;
+
+  // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
+  auto on_server_initialized =
+      config->dynamic_module_->getFunctionPointer<OnClusterServerInitializedType>(
+          "envoy_dynamic_module_on_cluster_server_initialized");
+  config->on_cluster_server_initialized_ =
+      on_server_initialized.ok() ? on_server_initialized.value() : nullptr;
+
+  auto on_drain_started = config->dynamic_module_->getFunctionPointer<OnClusterDrainStartedType>(
+      "envoy_dynamic_module_on_cluster_drain_started");
+  config->on_cluster_drain_started_ = on_drain_started.ok() ? on_drain_started.value() : nullptr;
+
+  auto on_shutdown = config->dynamic_module_->getFunctionPointer<OnClusterShutdownType>(
+      "envoy_dynamic_module_on_cluster_shutdown");
+  config->on_cluster_shutdown_ = on_shutdown.ok() ? on_shutdown.value() : nullptr;
+
+  auto on_http_callout_done =
+      config->dynamic_module_->getFunctionPointer<OnClusterHttpCalloutDoneType>(
+          "envoy_dynamic_module_on_cluster_http_callout_done");
+  config->on_cluster_http_callout_done_ =
+      on_http_callout_done.ok() ? on_http_callout_done.value() : nullptr;
+
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
                                                         config->cluster_name_.size()};
@@ -99,9 +131,10 @@ DynamicModuleClusterConfig::create(const std::string& cluster_name,
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module)
-    : cluster_name_(cluster_name), cluster_config_(cluster_config),
-      dynamic_module_(std::move(module)) {}
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
+      stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
+      cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
 
 DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
   if (in_module_config_ != nullptr && on_cluster_config_destroy_ != nullptr) {
@@ -130,7 +163,8 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
       in_module_cluster_(nullptr),
-      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {
+      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      server_context_(context.serverFactoryContext()) {
 
   // Create the in-module cluster instance.
   in_module_cluster_ = config_->on_cluster_new_(config_->in_module_config_, this);
@@ -141,22 +175,81 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
   // Initialize the priority set with an empty host set at priority 0.
   priority_set_.getOrCreateHostSet(0);
+
+  registerLifecycleCallbacks();
 }
 
 DynamicModuleCluster::~DynamicModuleCluster() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Cancel any pending HTTP callouts before destroying the cluster.
+  for (auto& callout : http_callouts_) {
+    if (callout.second->request_ != nullptr) {
+      callout.second->request_->cancel();
+    }
+  }
+  http_callouts_.clear();
+
   if (in_module_cluster_ != nullptr && config_->on_cluster_destroy_ != nullptr) {
     config_->on_cluster_destroy_(in_module_cluster_);
+  }
+}
+
+void DynamicModuleCluster::registerLifecycleCallbacks() {
+  if (config_->on_cluster_server_initialized_ != nullptr) {
+    server_initialized_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::PostInit, [this]() {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster server initialized");
+            config_->on_cluster_server_initialized_(this, in_module_cluster_);
+          }
+        });
+  }
+
+  if (config_->on_cluster_drain_started_ != nullptr) {
+    drain_handle_ = server_context_.drainManager().addOnDrainCloseCb(
+        Network::DrainDirection::All, [this](std::chrono::milliseconds) -> absl::Status {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster drain started");
+            config_->on_cluster_drain_started_(this, in_module_cluster_);
+          }
+          return absl::OkStatus();
+        });
+  }
+
+  if (config_->on_cluster_shutdown_ != nullptr) {
+    shutdown_handle_ = server_context_.lifecycleNotifier().registerCallback(
+        Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this](Event::PostCb completion_cb) {
+          if (in_module_cluster_ != nullptr) {
+            ENVOY_LOG(debug, "dynamic module cluster shutdown started");
+            auto* completion = new Event::PostCb(std::move(completion_cb));
+            config_->on_cluster_shutdown_(
+                this, in_module_cluster_,
+                [](void* context) {
+                  auto* cb = static_cast<Event::PostCb*>(context);
+                  (*cb)();
+                  delete cb;
+                },
+                static_cast<void*>(completion));
+          } else {
+            completion_cb();
+          }
+        });
   }
 }
 
 void DynamicModuleCluster::startPreInit() {
   // Call the module's init function. The module is expected to call
   // envoy_dynamic_module_callback_cluster_pre_init_complete when ready.
-  config_->on_cluster_init_(in_module_cluster_, this);
+  config_->on_cluster_init_(this, in_module_cluster_);
 }
 
 void DynamicModuleCluster::preInitComplete() { onPreInitComplete(); }
+
+void DynamicModuleCluster::onScheduled(uint64_t event_id) {
+  if (in_module_cluster_ != nullptr && config_->on_cluster_scheduled_ != nullptr) {
+    config_->on_cluster_scheduled_(this, in_module_cluster_, event_id);
+  }
+}
 
 bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
                                     const std::vector<uint32_t>& weights,
@@ -276,6 +369,105 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
   return removed_hosts.size();
 }
 
+envoy_dynamic_module_type_http_callout_init_result
+DynamicModuleCluster::sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                                      Http::RequestMessagePtr&& message,
+                                      uint64_t timeout_milliseconds) {
+  if (config_->on_cluster_http_callout_done_ == nullptr) {
+    ENVOY_LOG(debug, "dynamic module cluster: HTTP callout requested but "
+                     "on_cluster_http_callout_done is not implemented.");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  Upstream::ThreadLocalCluster* cluster =
+      server_context_.clusterManager().getThreadLocalCluster(cluster_name);
+  if (!cluster) {
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
+  }
+  Http::AsyncClient::RequestOptions options;
+  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
+
+  const uint64_t callout_id = getNextCalloutId();
+  auto http_callout_callback =
+      std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(shared_from_this(), callout_id);
+  DynamicModuleCluster::HttpCalloutCallback& callback = *http_callout_callback;
+
+  auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
+  if (!request) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  callback.request_ = request;
+  http_callouts_.emplace(callout_id, std::move(http_callout_callback));
+  *callout_id_out = callout_id;
+
+  return envoy_dynamic_module_type_http_callout_init_result_Success;
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onSuccess(const Http::AsyncClient::Request&,
+                                                          Http::ResponseMessagePtr&& response) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
+  headers_vector.reserve(response->headers().size());
+  response->headers().iterate([&headers_vector](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    headers_vector.emplace_back(envoy_dynamic_module_type_envoy_http_header{
+        const_cast<char*>(header.key().getStringView().data()), header.key().getStringView().size(),
+        const_cast<char*>(header.value().getStringView().data()),
+        header.value().getStringView().size()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
+  cluster->config_->on_cluster_http_callout_done_(
+      cluster.get(), cluster->in_module_cluster_, callout_id,
+      envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
+      headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
+      body.size());
+  cluster->http_callouts_.erase(callout_id);
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClient::Request&,
+                                                          Http::AsyncClient::FailureReason reason) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  const uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  // request_ is not null if the callout is actually sent to the upstream cluster.
+  // This allows us to avoid inlined calls to onFailure() method (which results in a reentrant to
+  // the modules) when the async client immediately fails the callout.
+  if (request_) {
+    envoy_dynamic_module_type_http_callout_result result;
+    switch (reason) {
+    case Http::AsyncClient::FailureReason::Reset:
+      result = envoy_dynamic_module_type_http_callout_result_Reset;
+      break;
+    case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+      result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
+      break;
+    }
+    cluster->config_->on_cluster_http_callout_done_(cluster.get(), cluster->in_module_cluster_,
+                                                    callout_id, result, nullptr, 0, nullptr, 0);
+  }
+
+  cluster->http_callouts_.erase(callout_id);
+}
+
 // =================================================================================================
 // DynamicModuleLoadBalancer
 // =================================================================================================
@@ -299,7 +491,19 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  auto* host_ptr = handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context);
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
+                                                          &async_handle);
+
+  if (async_handle != nullptr) {
+    // Async pending: the module will call the completion callback later.
+    auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
+        async_handle, in_module_lb_,
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+  }
+
   if (host_ptr == nullptr) {
     return {nullptr};
   }
@@ -309,8 +513,50 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   return {host};
 }
 
+void DynamicModuleAsyncHostSelectionHandle::cancel() {
+  if (cancel_fn_ != nullptr) {
+    cancel_fn_(in_module_lb_, async_handle_);
+  }
+}
+
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
   return handle_->cluster_->prioritySet();
+}
+
+bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  if (data == 0) {
+    per_host_data_.erase({priority, index});
+  } else {
+    per_host_data_[{priority, index}] = data;
+  }
+  return true;
+}
+
+bool DynamicModuleLoadBalancer::getHostData(uint32_t priority, size_t index,
+                                            uintptr_t* data) const {
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  auto it = per_host_data_.find({priority, index});
+  if (it != per_host_data_.end()) {
+    *data = it->second;
+  } else {
+    *data = 0;
+  }
+  return true;
 }
 
 // =================================================================================================
@@ -334,32 +580,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   // Extract cluster_config from the Any field.
   std::string cluster_config_bytes;
   if (proto_config.has_cluster_config()) {
-    const auto& any_config = proto_config.cluster_config();
-    const std::string& type_url = any_config.type_url();
-
-    // Handle well-known types that can be passed directly as bytes.
-    if (type_url == "type.googleapis.com/google.protobuf.StringValue") {
-      Protobuf::StringValue string_value;
-      if (!any_config.UnpackTo(&string_value)) {
-        return absl::InvalidArgumentError("Failed to unpack StringValue");
-      }
-      cluster_config_bytes = string_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.BytesValue") {
-      Protobuf::BytesValue bytes_value;
-      if (!any_config.UnpackTo(&bytes_value)) {
-        return absl::InvalidArgumentError("Failed to unpack BytesValue");
-      }
-      cluster_config_bytes = bytes_value.value();
-    } else if (type_url == "type.googleapis.com/google.protobuf.Struct") {
-      Protobuf::Struct struct_value;
-      if (!any_config.UnpackTo(&struct_value)) {
-        return absl::InvalidArgumentError("Failed to unpack Struct");
-      }
-      cluster_config_bytes = MessageUtil::getJsonStringFromMessageOrError(struct_value, false);
-    } else {
-      // For unknown types, use the serialized bytes.
-      cluster_config_bytes = any_config.value();
-    }
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.cluster_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    cluster_config_bytes = std::move(config_or_error.value());
   }
 
   // Load the dynamic module.
@@ -374,7 +597,8 @@ DynamicModuleClusterFactory::createClusterWithConfig(
 
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()));
+      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }
