@@ -841,6 +841,65 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryNoReplic
       "zone-c");
 }
 
+// Tests for LOCAL_ZONE_AFFINITY when zone discovery fails - hosts have no zones set
+// Should fall back to any-replica behavior (same as PreferReplica)
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityZoneDiscoveryFailure) {
+  // Hosts without zone set - simulates zone discovery failure scenario
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"), // primary, no zone
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"), // replica, no zone
+  };
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 16383, hosts[0]->address()),
+  });
+  slots->at(0).addReplica(hosts[1]->address());
+
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  // Client has a zone, but hosts don't - should fall back to any replica
+  const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
+      {0, 1}, // falls back to any replica since no host zones match
+  };
+  validateAssignment(hosts, expected_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity,
+                     "zone-a");
+}
+
+// Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY - unhealthy local primary falls through
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryUnhealthyLocalPrimary) {
+  Upstream::HostVector hosts{
+      makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary, zone-a (same as client)
+      makeHostWithZone("tcp://127.0.0.2:90", "zone-b"), // replica, zone-b
+  };
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 16383, hosts[0]->address()),
+  });
+  slots->at(0).addReplica(hosts[1]->address());
+
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  // Mark primary unhealthy - should skip local primary even though zone matches
+  hosts[0]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  factory_->onHostHealthUpdate();
+
+  // Client is in zone-a, local primary is unhealthy, no local replica → fall back to any replica
+  const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments = {
+      {0, 1}, // falls back to replica in zone-b
+  };
+  validateAssignment(
+      hosts, expected_assignments, true,
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+      "zone-a");
+}
+
 // Tests for LOCAL_ZONE_AFFINITY with empty client zone - should behave like PreferReplica
 TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityEmptyClientZone) {
   Upstream::HostVector hosts{

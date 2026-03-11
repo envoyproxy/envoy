@@ -130,7 +130,7 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
   // Parse availability_zone from INFO response for zone discovery.
-  static std::string parseAvailabilityZone(const std::string& info_response);
+  static const std::string parseAvailabilityZone(const std::string& info_response);
 
   /// TimeSource& timeSource() const { return time_source_; }
 
@@ -172,13 +172,13 @@ private:
     static absl::StatusOr<std::unique_ptr<RedisHost>>
     create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-           const std::string& zone = "");
+           const absl::optional<std::string>& zone = absl::nullopt);
 
   protected:
     // Constructor with optional zone - creates locality with zone set if non-empty
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              const std::string& zone, absl::Status& creation_status)
+              const absl::optional<std::string>& zone, absl::Status& creation_status)
         : Upstream::HostImpl(
               creation_status, cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -195,11 +195,11 @@ private:
     bool isPrimary() const { return primary_; }
 
   private:
-    // Helper to create Locality proto with zone set if non-empty.
-    // Returns the base locality (as shared_ptr) if zone is empty.
+    // Helper to create Locality proto with zone set if provided.
+    // Returns shared copy of base locality if zone is nullopt.
     static std::shared_ptr<const envoy::config::core::v3::Locality>
     makeLocalityWithZone(const envoy::config::core::v3::Locality& base_locality,
-                         const std::string& zone);
+                         const absl::optional<std::string>& zone);
 
     const bool primary_;
   };
