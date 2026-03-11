@@ -470,15 +470,11 @@ public:
   /**
    * Sends a local response with status code, body, and detail.
    * @param status The HTTP status code.
-   * @param headers The response headers.
    * @param body The response body.
-   * @param grpc_status The gRPC status code for gRPC requests. Use -1 to indicate no gRPC status
-   * (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC status codes.
    * @param detail The response detail.
    */
   virtual void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
-                                 std::string_view body, int32_t grpc_status,
-                                 std::string_view detail) = 0;
+                                 std::string_view body, std::string_view detail) = 0;
 
   /**
    * Sends response headers. This is used for streaming local replies.

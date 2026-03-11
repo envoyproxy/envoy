@@ -1,6 +1,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 
+#include "source/common/config/metadata.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -447,6 +448,432 @@ TEST_F(DynamicModuleClusterTest, LbAbiCallbacks) {
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_healthy_host(dm_lb, 0, 2));
   // Invalid priority.
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_healthy_host(dm_lb, 99, 0));
+}
+
+// Test the LB host information ABI callbacks.
+TEST_F(DynamicModuleClusterTest, LbHostInformationCallbacks) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Add hosts with different weights.
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(cluster->addHosts({"127.0.0.1:10001", "127.0.0.1:10002", "127.0.0.1:10003"},
+                                {10, 20, 30}, hosts));
+  ASSERT_EQ(3, hosts.size());
+
+  // Create the LB.
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  // Test get_cluster_name.
+  envoy_dynamic_module_type_envoy_buffer name_buf = {};
+  envoy_dynamic_module_callback_cluster_lb_get_cluster_name(dm_lb, &name_buf);
+  EXPECT_GT(name_buf.length, 0);
+
+  // Test get_hosts_count.
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(dm_lb, 0));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(dm_lb, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(nullptr, 0));
+
+  // Test get_healthy_host_count (existing).
+  EXPECT_EQ(3, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(dm_lb, 0));
+
+  // Test get_degraded_hosts_count.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(dm_lb, 0));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(dm_lb, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(nullptr, 0));
+
+  // Test get_priority_set_size.
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(dm_lb));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(nullptr));
+
+  // Test get_healthy_host_address.
+  envoy_dynamic_module_type_envoy_buffer addr_buf = {};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(dm_lb, 0, 0, &addr_buf));
+  EXPECT_EQ("127.0.0.1:10001", std::string(addr_buf.ptr, addr_buf.length));
+  // Out of bounds.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(dm_lb, 0, 99, &addr_buf));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(dm_lb, 99, 0, &addr_buf));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(nullptr, 0, 0, &addr_buf));
+
+  // Test get_healthy_host_weight.
+  EXPECT_EQ(10, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(dm_lb, 0, 0));
+  EXPECT_EQ(20, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(dm_lb, 0, 1));
+  EXPECT_EQ(30, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(dm_lb, 0, 2));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(dm_lb, 0, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(nullptr, 0, 0));
+
+  // Test get_host_address.
+  envoy_dynamic_module_type_envoy_buffer host_addr_buf = {};
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_cluster_lb_get_host_address(dm_lb, 0, 1, &host_addr_buf));
+  EXPECT_EQ("127.0.0.1:10002", std::string(host_addr_buf.ptr, host_addr_buf.length));
+  // Out of bounds.
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_get_host_address(dm_lb, 0, 99, &host_addr_buf));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_lb_get_host_address(nullptr, 0, 0, &host_addr_buf));
+
+  // Test get_host_weight.
+  EXPECT_EQ(10, envoy_dynamic_module_callback_cluster_lb_get_host_weight(dm_lb, 0, 0));
+  EXPECT_EQ(20, envoy_dynamic_module_callback_cluster_lb_get_host_weight(dm_lb, 0, 1));
+  EXPECT_EQ(30, envoy_dynamic_module_callback_cluster_lb_get_host_weight(dm_lb, 0, 2));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_weight(dm_lb, 0, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_weight(nullptr, 0, 0));
+
+  // Test get_host_health.
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Healthy,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 0, 0));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 0, 99));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(nullptr, 0, 0));
+
+  // Test get_host_health_by_address.
+  envoy_dynamic_module_type_host_health health_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      nullptr, {nullptr, 0}, &health_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      dm_lb, {nullptr, 0}, &health_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      nullptr, {nullptr, 0}, nullptr));
+
+  // Test get_host_stat with all enum values (counters and gauges).
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_CxConnectFail));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_CxTotal));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_RqError));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_RqSuccess));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_RqTimeout));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_CxActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 0, envoy_dynamic_module_type_host_stat_RqActive));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 0, 99, envoy_dynamic_module_type_host_stat_RqTotal));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   nullptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal));
+
+  // Test get_host_locality.
+  envoy_dynamic_module_type_envoy_buffer region = {}, zone = {}, sub_zone = {};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(dm_lb, 0, 0, &region,
+                                                                         &zone, &sub_zone));
+  // Default locality is empty.
+  EXPECT_EQ(0, region.length);
+  // Out of bounds.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(dm_lb, 0, 99, &region,
+                                                                          &zone, &sub_zone));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(nullptr, 0, 0, &region,
+                                                                          &zone, &sub_zone));
+  // Null output parameters are allowed.
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(dm_lb, 0, 0, nullptr,
+                                                                         nullptr, nullptr));
+
+  // Test set_host_data and get_host_data.
+  uintptr_t data = 0;
+  // Initially no data.
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_data(dm_lb, 0, 0, &data));
+  EXPECT_EQ(0, data);
+  // Set data.
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_set_host_data(dm_lb, 0, 0, 12345));
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_data(dm_lb, 0, 0, &data));
+  EXPECT_EQ(12345, data);
+  // Clear data by setting to 0.
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_set_host_data(dm_lb, 0, 0, 0));
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_data(dm_lb, 0, 0, &data));
+  EXPECT_EQ(0, data);
+  // Out of bounds.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_set_host_data(dm_lb, 0, 99, 1));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_data(dm_lb, 0, 99, &data));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_set_host_data(nullptr, 0, 0, 1));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_data(nullptr, 0, 0, &data));
+
+  // Test get_host_metadata_string (no metadata set, should return false).
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer key = {"shard", 5};
+  envoy_dynamic_module_type_envoy_buffer meta_result = {};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 0, 0, filter_name, key, &meta_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      nullptr, 0, 0, filter_name, key, &meta_result));
+
+  // Test get_host_metadata_number.
+  double num_result = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+      dm_lb, 0, 0, filter_name, key, &num_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+      nullptr, 0, 0, filter_name, key, &num_result));
+
+  // Test get_host_metadata_bool.
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+      dm_lb, 0, 0, filter_name, key, &bool_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+      nullptr, 0, 0, filter_name, key, &bool_result));
+
+  // Test get_locality_count.
+  EXPECT_GE(envoy_dynamic_module_callback_cluster_lb_get_locality_count(dm_lb, 0), 0);
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_count(dm_lb, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_count(nullptr, 0));
+
+  // Test get_locality_host_count.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(dm_lb, 0, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(nullptr, 0, 0));
+
+  // Test get_locality_host_address.
+  envoy_dynamic_module_type_envoy_buffer locality_addr = {};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(dm_lb, 0, 99, 0,
+                                                                                  &locality_addr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(nullptr, 0, 0, 0,
+                                                                                  &locality_addr));
+
+  // Test get_locality_weight.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_weight(dm_lb, 0, 99));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_weight(nullptr, 0, 0));
+}
+
+// Test the LB host information callbacks with hosts that have metadata and locality data.
+// This exercises code paths not reachable via addHosts() which creates hosts without metadata
+// and with empty locality.
+TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Build metadata with string, number, and bool fields under filter "envoy.lb".
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "region_tag")
+      .set_string_value("us-east-1");
+  Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "shard_weight")
+      .set_number_value(42.5);
+  Config::Metadata::mutableMetadataValue(metadata, "envoy.lb", "is_canary").set_bool_value(true);
+
+  // Build locality data.
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_region("us-east");
+  zone_a.set_zone("us-east-1a");
+  zone_a.set_sub_zone("rack-1");
+
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_region("us-west");
+  zone_b.set_zone("us-west-2b");
+  zone_b.set_sub_zone("rack-2");
+
+  // Create hosts with metadata and locality using the test helper.
+  auto host_a1 =
+      Upstream::makeTestHost(cluster->info(), "tcp://10.0.0.1:8080", metadata, zone_a, 10);
+  auto host_a2 =
+      Upstream::makeTestHost(cluster->info(), "tcp://10.0.0.2:8080", metadata, zone_a, 20);
+  auto host_b1 =
+      Upstream::makeTestHost(cluster->info(), "tcp://10.0.0.3:8080", metadata, zone_b, 30);
+
+  // Group hosts by locality.
+  Upstream::HostVector zone_a_hosts = {host_a1, host_a2};
+  Upstream::HostVector zone_b_hosts = {host_b1};
+  std::vector<Upstream::HostVector> locality_hosts = {zone_a_hosts, zone_b_hosts};
+  auto hosts_per_locality =
+      std::make_shared<Upstream::HostsPerLocalityImpl>(std::move(locality_hosts), false);
+
+  // Build all-hosts vector.
+  auto all_hosts =
+      std::make_shared<Upstream::HostVector>(Upstream::HostVector{host_a1, host_a2, host_b1});
+
+  // Set up locality weights.
+  auto locality_weights =
+      std::make_shared<const Upstream::LocalityWeights>(Upstream::LocalityWeights{50, 50});
+
+  // Update the cluster's priority set directly with locality data.
+  cluster->prioritySet().updateHosts(
+      0, Upstream::HostSetImpl::partitionHosts(all_hosts, hosts_per_locality), locality_weights,
+      {host_a1, host_a2, host_b1}, {}, absl::nullopt, absl::nullopt);
+
+  // Create the LB.
+  auto& talb = result->second;
+  EXPECT_TRUE(talb->initialize().ok());
+  auto lb_factory = talb->factory();
+  NiceMock<Upstream::MockPrioritySet> mock_ps;
+  auto lb = lb_factory->create({mock_ps});
+  auto* dm_lb = dynamic_cast<DynamicModuleLoadBalancer*>(lb.get());
+  ASSERT_NE(nullptr, dm_lb);
+
+  // ---- Test get_cluster_name with nullptr lb. ----
+  envoy_dynamic_module_type_envoy_buffer name_buf = {};
+  envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, &name_buf);
+  EXPECT_EQ(nullptr, name_buf.ptr);
+  EXPECT_EQ(0, name_buf.length);
+
+  // ---- Test metadata string lookup (success path). ----
+  envoy_dynamic_module_type_module_buffer filter_name = {"envoy.lb", 8};
+  envoy_dynamic_module_type_module_buffer str_key = {"region_tag", 10};
+  envoy_dynamic_module_type_envoy_buffer meta_result = {};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 0, 0, filter_name, str_key, &meta_result));
+  EXPECT_EQ("us-east-1", std::string(meta_result.ptr, meta_result.length));
+
+  // Test metadata string with wrong key (key not found).
+  envoy_dynamic_module_type_module_buffer bad_key = {"nonexistent", 11};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 0, 0, filter_name, bad_key, &meta_result));
+
+  // Test metadata string with wrong filter name (filter not found).
+  envoy_dynamic_module_type_module_buffer bad_filter = {"wrong.filter", 12};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 0, 0, bad_filter, str_key, &meta_result));
+
+  // ---- Test metadata number lookup (success path). ----
+  envoy_dynamic_module_type_module_buffer num_key = {"shard_weight", 12};
+  double num_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+      dm_lb, 0, 0, filter_name, num_key, &num_result));
+  EXPECT_DOUBLE_EQ(42.5, num_result);
+
+  // Test metadata number with a key that has a string value (type mismatch).
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+      dm_lb, 0, 0, filter_name, str_key, &num_result));
+
+  // ---- Test metadata bool lookup (success path). ----
+  envoy_dynamic_module_type_module_buffer bool_key = {"is_canary", 9};
+  bool bool_result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+      dm_lb, 0, 0, filter_name, bool_key, &bool_result));
+  EXPECT_TRUE(bool_result);
+
+  // Test metadata bool with a key that has a string value (type mismatch).
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+      dm_lb, 0, 0, filter_name, str_key, &bool_result));
+
+  // ---- Test metadata with out-of-bounds priority and index. ----
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 99, 0, filter_name, str_key, &meta_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+      dm_lb, 0, 99, filter_name, str_key, &meta_result));
+
+  // ---- Test locality count. ----
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_locality_count(dm_lb, 0));
+
+  // ---- Test locality host count. ----
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(dm_lb, 0, 0));
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(dm_lb, 0, 1));
+  // Out of bounds locality index.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(dm_lb, 0, 99));
+  // Out of bounds priority.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(dm_lb, 99, 0));
+
+  // ---- Test locality host address (success path). ----
+  envoy_dynamic_module_type_envoy_buffer locality_addr = {};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(dm_lb, 0, 0, 0,
+                                                                                 &locality_addr));
+  EXPECT_EQ("10.0.0.1:8080", std::string(locality_addr.ptr, locality_addr.length));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(dm_lb, 0, 1, 0,
+                                                                                 &locality_addr));
+  EXPECT_EQ("10.0.0.3:8080", std::string(locality_addr.ptr, locality_addr.length));
+
+  // Out of bounds host_index within a locality.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(dm_lb, 0, 1, 99,
+                                                                                  &locality_addr));
+  // Out of bounds priority.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(dm_lb, 99, 0, 0,
+                                                                                  &locality_addr));
+
+  // ---- Test locality weight (success path). ----
+  EXPECT_EQ(50, envoy_dynamic_module_callback_cluster_lb_get_locality_weight(dm_lb, 0, 0));
+  EXPECT_EQ(50, envoy_dynamic_module_callback_cluster_lb_get_locality_weight(dm_lb, 0, 1));
+  // Out of bounds priority.
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_locality_weight(dm_lb, 99, 0));
+
+  // ---- Test host locality (verify region/zone/sub_zone data). ----
+  envoy_dynamic_module_type_envoy_buffer region = {}, zone = {}, sub_zone = {};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(dm_lb, 0, 0, &region,
+                                                                         &zone, &sub_zone));
+  EXPECT_EQ("us-east", std::string(region.ptr, region.length));
+  EXPECT_EQ("us-east-1a", std::string(zone.ptr, zone.length));
+  EXPECT_EQ("rack-1", std::string(sub_zone.ptr, sub_zone.length));
+  // Out of bounds priority.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_locality(dm_lb, 99, 0, &region,
+                                                                          &zone, &sub_zone));
+
+  // ---- Test host weight with out-of-bounds priority. ----
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_weight(dm_lb, 99, 0));
+
+  // ---- Test healthy host weight with out-of-bounds priority. ----
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(dm_lb, 99, 0));
+
+  // ---- Test host address with out-of-bounds priority. ----
+  envoy_dynamic_module_type_envoy_buffer addr_buf = {};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_address(dm_lb, 99, 0, &addr_buf));
+
+  // ---- Test host health with out-of-bounds priority. ----
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 99, 0));
+
+  // ---- Test host stat with out-of-bounds priority. ----
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                   dm_lb, 99, 0, envoy_dynamic_module_type_host_stat_RqTotal));
+
+  // ---- Test get_host_health_by_address using crossPriorityHostMap. ----
+  // The MainPrioritySetImpl populates the cross-priority host map when updateHosts is called.
+  envoy_dynamic_module_type_host_health health_result;
+  envoy_dynamic_module_type_module_buffer host_addr = {"10.0.0.1:8080", 13};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(dm_lb, host_addr,
+                                                                                  &health_result));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Healthy, health_result);
+
+  // Test with an address that does not exist in the host map.
+  envoy_dynamic_module_type_module_buffer unknown_addr = {"10.0.0.99:8080", 14};
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      dm_lb, unknown_addr, &health_result));
+
+  // ---- Test get_host_health with degraded and unhealthy hosts. ----
+  auto degraded_host = Upstream::makeTestHost(cluster->info(), "tcp://10.0.0.4:8080", zone_a, 1, 0,
+                                              envoy::config::core::v3::DEGRADED);
+  auto unhealthy_host = Upstream::makeTestHost(cluster->info(), "tcp://10.0.0.5:8080", zone_b, 1, 0,
+                                               envoy::config::core::v3::UNHEALTHY);
+
+  // Add degraded and unhealthy hosts to priority 1.
+  auto p1_hosts =
+      std::make_shared<Upstream::HostVector>(Upstream::HostVector{degraded_host, unhealthy_host});
+  auto p1_hosts_per_locality = std::make_shared<Upstream::HostsPerLocalityImpl>(
+      Upstream::HostVector{degraded_host, unhealthy_host});
+  cluster->prioritySet().updateHosts(
+      1, Upstream::HostSetImpl::partitionHosts(p1_hosts, p1_hosts_per_locality), nullptr,
+      {degraded_host, unhealthy_host}, {}, absl::nullopt, absl::nullopt);
+
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Degraded,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 1, 0));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
+            envoy_dynamic_module_callback_cluster_lb_get_host_health(dm_lb, 1, 1));
+
+  // Also verify get_host_health_by_address for degraded and unhealthy hosts.
+  envoy_dynamic_module_type_module_buffer degraded_addr = {"10.0.0.4:8080", 13};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      dm_lb, degraded_addr, &health_result));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Degraded, health_result);
+
+  envoy_dynamic_module_type_module_buffer unhealthy_addr = {"10.0.0.5:8080", 13};
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+      dm_lb, unhealthy_addr, &health_result));
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy, health_result);
 }
 
 // Test that a module missing cluster symbols fails with an error.
@@ -1598,6 +2025,112 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullResult) 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
       context_ptr, nullptr));
+}
+
+// =================================================================================================
+// Async Host Selection Tests
+// =================================================================================================
+
+// Test DynamicModuleAsyncHostSelectionHandle cancel calls the module's cancel function.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  handle.cancel();
+}
+
+// Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  // Should not crash with nullptr cancel function.
+  handle.cancel();
+}
+
+// Test async host selection complete callback with a valid host.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto& module_cluster = dynamic_cast<DynamicModuleCluster&>(*cluster);
+
+  // Add a host so we can find it later.
+  std::vector<Upstream::HostSharedPtr> result_hosts;
+  ASSERT_TRUE(module_cluster.addHosts({"127.0.0.1:8080"}, {1}, result_hosts));
+  ASSERT_EQ(result_hosts.size(), 1);
+  auto* raw_host_ptr = const_cast<Upstream::Host*>(result_hosts[0].get());
+
+  // Create a mock LB context that expects onAsyncHostSelection.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([&raw_host_ptr](Upstream::HostConstSharedPtr&& host, std::string&&) {
+        EXPECT_EQ(host.get(), raw_host_ptr);
+      });
+
+  // Create a handle for the async completion callback.
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      lb_envoy_ptr, context_ptr, raw_host_ptr, {"resolved", 8});
+}
+
+// Test async host selection complete callback with null host.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "dns_failure");
+      });
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      lb_envoy_ptr, context_ptr, nullptr, {"dns_failure", 11});
+}
+
+// Test async host selection complete callback with empty details.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_TRUE(details.empty());
+      });
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
+                                                                         nullptr, {nullptr, 0});
 }
 
 } // namespace

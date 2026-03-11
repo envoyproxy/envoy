@@ -262,38 +262,6 @@ uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
   return hosts[index]->weight();
 }
 
-uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
-  if (lb_envoy_ptr == nullptr) {
-    return 0;
-  }
-  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
-  if (priority >= host_sets.size()) {
-    return 0;
-  }
-  const auto& hosts = host_sets[priority]->hosts();
-  if (index >= hosts.size()) {
-    return 0;
-  }
-  return hosts[index]->stats().rq_active_.value();
-}
-
-uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
-  if (lb_envoy_ptr == nullptr) {
-    return 0;
-  }
-  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
-  if (priority >= host_sets.size()) {
-    return 0;
-  }
-  const auto& hosts = host_sets[priority]->hosts();
-  if (index >= hosts.size()) {
-    return 0;
-  }
-  return hosts[index]->stats().cx_active_.value();
-}
-
 bool envoy_dynamic_module_callback_lb_get_host_locality(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
@@ -628,9 +596,10 @@ bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
   return true;
 }
 
-uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
-    envoy_dynamic_module_type_host_counter_stat stat) {
+uint64_t
+envoy_dynamic_module_callback_lb_get_host_stat(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+                                               uint32_t priority, size_t index,
+                                               envoy_dynamic_module_type_host_stat stat) {
   if (lb_envoy_ptr == nullptr) {
     return 0;
   }
@@ -644,18 +613,22 @@ uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
   }
   const auto& host_stats = hosts[index]->stats();
   switch (stat) {
-  case envoy_dynamic_module_type_host_counter_stat_CxConnectFail:
+  case envoy_dynamic_module_type_host_stat_CxConnectFail:
     return host_stats.cx_connect_fail_.value();
-  case envoy_dynamic_module_type_host_counter_stat_CxTotal:
+  case envoy_dynamic_module_type_host_stat_CxTotal:
     return host_stats.cx_total_.value();
-  case envoy_dynamic_module_type_host_counter_stat_RqError:
+  case envoy_dynamic_module_type_host_stat_RqError:
     return host_stats.rq_error_.value();
-  case envoy_dynamic_module_type_host_counter_stat_RqSuccess:
+  case envoy_dynamic_module_type_host_stat_RqSuccess:
     return host_stats.rq_success_.value();
-  case envoy_dynamic_module_type_host_counter_stat_RqTimeout:
+  case envoy_dynamic_module_type_host_stat_RqTimeout:
     return host_stats.rq_timeout_.value();
-  case envoy_dynamic_module_type_host_counter_stat_RqTotal:
+  case envoy_dynamic_module_type_host_stat_RqTotal:
     return host_stats.rq_total_.value();
+  case envoy_dynamic_module_type_host_stat_CxActive:
+    return host_stats.cx_active_.value();
+  case envoy_dynamic_module_type_host_stat_RqActive:
+    return host_stats.rq_active_.value();
   }
   return 0;
 }

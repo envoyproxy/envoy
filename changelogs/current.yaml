@@ -181,6 +181,12 @@ bug_fixes:
     intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
     be reverted by setting runtime guard
     ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
+- area: ratelimit
+  change: |
+    Fixed a bug in the gRPC rate limit client where the client could get into a bad state if the
+    callbacks were not properly released after a request completion, leading to potential use-after-free
+    issues. The fix ensures that callbacks and request references are cleared after completion, and adds
+    assertions to enforce correct usage patterns.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
@@ -230,22 +236,32 @@ bug_fixes:
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: json
+  change: |
+    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
+    when the input string ends with a control character.
+- area: network
+  change: |
+    Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
+- area: rbac
+  change: |
+    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
+    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
+    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: filters
+  change: |
+    Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
-- area: dynamic_modules
-  change: |
-    Added gRPC status support for the HTTP dynamic module filter SDKs. The ``send_response`` SDK
-    methods now accept an optional gRPC status code which is passed as a ``grpc-status`` header,
-    and the ``ResponseGrpcStatus`` attribute is now available to read gRPC status from responses.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
@@ -426,6 +442,11 @@ new_features:
     Added server lifecycle callbacks (``on_server_initialized``, ``on_drain_started``, ``on_shutdown``)
     for dynamic module custom clusters, enabling modules to react to server readiness, drain, and
     shutdown events.
+- area: dynamic_modules
+  change: |
+    Changed the ``details`` parameter in ``cluster_lb_async_host_selection_complete`` ABI callback
+    from raw ``const char*`` and ``size_t`` to ``envoy_dynamic_module_type_module_buffer`` for
+    consistency with the ABI style guide.
 - area: stat_sinks
   change: |
     Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
@@ -518,6 +539,13 @@ new_features:
     :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
     field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
     via ``module.local.filename`` as an alternative to the name-based search path.
+- area: dynamic_modules
+  change: |
+    Added support for fetching dynamic module binaries from remote HTTP sources via
+    ``module.remote`` in ``DynamicModuleConfig``. The module is downloaded asynchronously during
+    listener initialization with SHA256 verification, written to a temporary file, and loaded
+    via ``dlopen``. If the remote fetch fails, the filter is not installed and requests pass
+    through (fail-open).
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
@@ -633,6 +661,12 @@ new_features:
     Added :ref:`set() <config_http_filters_lua_stream_info_filter_state_wrapper>` to the Lua filter
     state API, allowing Lua scripts to create and store filter state objects dynamically using
     registered object factories.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 - area: network_filter
   change: |
     Added support for

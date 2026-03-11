@@ -418,43 +418,6 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
-TEST_P(DynamicModulesIntegrationTest, SendResponseWithGrpcStatus) {
-  initializeFilter("send_response_grpc", "\"14\"");
-
-  // Use a gRPC request via makeSingleRequest which handles the full request-response lifecycle.
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/test/long/url", "", downstream_protocol_, version_,
-      "sni.lyft.com", Http::Headers::get().ContentTypeValues.Grpc);
-  ASSERT_TRUE(response->complete());
-  // gRPC trailers-only response always has HTTP status 200.
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, response->headers().getContentTypeValue());
-  // Verify the gRPC status is set in the response headers (trailers-only response).
-  EXPECT_EQ("14", response->headers().getGrpcStatusValue());
-}
-
-TEST_P(DynamicModulesIntegrationTest, ResponseGrpcStatusAttribute) {
-  initializeFilter("grpc_status_attribute", "");
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
-  auto response = std::move(encoder_decoder.second);
-
-  waitForNextUpstreamRequest();
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "200"}, {"grpc-status", "7"}, {"content-type", "application/grpc"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  // Verify the filter read the gRPC status from the response headers.
-  EXPECT_EQ("7", response->headers()
-                     .get(Http::LowerCaseString("x-grpc-status-from-attr"))[0]
-                     ->value()
-                     .getStringView());
-}
-
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   initializeFilter("http_callouts", "missing");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
