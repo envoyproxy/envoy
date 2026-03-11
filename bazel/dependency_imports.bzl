@@ -189,6 +189,9 @@ def envoy_dependency_imports(
         sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
         version = "v2.0.4-0.20230330145011-496ad1ac90a4",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go github.com/spf13/afero @com_github_spf13_afero//:afero",
+        ],
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
