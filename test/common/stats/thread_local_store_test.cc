@@ -1444,6 +1444,107 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
   EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
 }
 
+// Helper: build a StatsMatcherSharedPtr that rejects the given prefix.
+static StatsMatcherSharedPtr
+makePrefixMatcher(absl::string_view prefix, SymbolTable& symbol_table,
+                  Server::Configuration::MockServerFactoryContext& ctx) {
+  envoy::config::metrics::v3::StatsConfig cfg;
+  cfg.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      std::string(prefix));
+  return std::make_shared<StatsMatcherImpl>(cfg, symbol_table, ctx);
+}
+
+// Tests per-scope StatsMatcher: scope matcher replaces (not supplements) the
+// global store-level matcher for all stats created within that scope.
+// Note: the scope matcher operates on the FULL stat name (scope prefix + stat name).
+TEST_F(StatsMatcherTLSTest, ScopeMatcherReplacesGlobal) {
+  // Global matcher rejects prefix "global_rejected.".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "global_rejected.");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // Confirm global rejection works on root scope.
+  Counter& global_rejected = scope_.counterFromString("global_rejected.foo");
+  EXPECT_EQ(global_rejected.name(), ""); // rejected → null counter
+
+  // Create a scope "myscope" with its own matcher that rejects full names starting with
+  // "myscope.scope_rejected." (i.e. stat "scope_rejected.foo" inside "myscope").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("myscope.scope_rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+
+  // Within the scope, "scope_rejected.foo" has full name "myscope.scope_rejected.foo" → rejected.
+  Counter& scope_rejected = my_scope->counterFromString("scope_rejected.foo");
+  EXPECT_EQ(scope_rejected.name(), ""); // rejected by scope matcher
+
+  // Within the scope, "global_rejected.foo" has full name "myscope.global_rejected.foo".
+  // The scope matcher does NOT reject this (scope replaces global, not supplements it).
+  Counter& global_not_rejected = my_scope->counterFromString("global_rejected.foo");
+  EXPECT_NE(global_not_rejected.name(), ""); // accepted by scope matcher
+
+  // Counters outside the scope still use the global matcher.
+  Counter& out_global_rejected = scope_.counterFromString("global_rejected.bar");
+  EXPECT_EQ(out_global_rejected.name(), ""); // rejected by global matcher
+}
+
+// Tests that child scopes inherit the parent scope's matcher.
+// The scope matcher operates on full names; parent prefix "parent", child prefix "parent.child".
+// We set the parent's matcher to reject full names starting with "parent.child." so that stats
+// in the child scope (which has prefix "parent.child") are rejected via inheritance.
+TEST_F(StatsMatcherTLSTest, ScopeMatcherInheritedByChild) {
+  // scope_matcher rejects full stat names with prefix "parent.child." — these are stats in child.
+  StatsMatcherSharedPtr scope_matcher = makePrefixMatcher("parent.child.", symbol_table_, context_);
+  ScopeSharedPtr parent_scope =
+      store_->rootScope()->createScope("parent", false, {}, scope_matcher);
+
+  // Stats directly in parent (full name "parent.foo") are NOT rejected (doesn't start with
+  // "parent.child.").
+  Counter& parent_accepted = parent_scope->counterFromString("foo");
+  EXPECT_NE(parent_accepted.name(), "");
+
+  // Child created without explicit matcher inherits parent's matcher.
+  ScopeSharedPtr child_scope = parent_scope->createScope("child");
+
+  // Stats in child scope have full name "parent.child.bar" → rejected (starts with
+  // "parent.child.").
+  Counter& child_rejected = child_scope->counterFromString("bar");
+  EXPECT_EQ(child_rejected.name(), ""); // rejected via inherited scope matcher
+
+  // Stats with a different prefix in child scope are not rejected.
+  // (All stats in "parent.child" scope match the prefix, so use a grandchild for "accepted" test.)
+  ScopeSharedPtr grandchild_scope = child_scope->createScope("grandchild");
+  // "parent.child.grandchild.baz" also starts with "parent.child." → rejected.
+  Counter& grandchild_rejected = grandchild_scope->counterFromString("baz");
+  EXPECT_EQ(grandchild_rejected.name(), ""); // also rejected
+}
+
+// Tests that setStatsMatcher on the store does not remove stats from scopes
+// that have their own scope-level matcher.
+TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
+  // Create a scope with its own matcher (rejects "scope.rejected").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.rejected", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+
+  // Create a counter that is accepted by the scope matcher.
+  Counter& c = my_scope->counterFromString("accepted.foo");
+  EXPECT_NE(c.name(), "");
+  c.inc();
+  EXPECT_EQ(c.value(), 1);
+
+  // Now apply a global matcher that would reject "myscope.accepted.foo".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "myscope");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // The counter should still exist and be usable (scope matcher shields it from global changes).
+  EXPECT_EQ(c.value(), 1);
+  c.inc();
+  EXPECT_EQ(c.value(), 2);
+}
+
 // Tests the logic for caching the stats-matcher results, and in particular the
 // private impl method checkAndRememberRejection(). That method behaves
 // differently depending on whether TLS is enabled or not, so we parameterize
