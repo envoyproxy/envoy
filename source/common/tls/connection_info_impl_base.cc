@@ -20,7 +20,6 @@ namespace {
 // There must be an version of this function for each type possible in variant `CachedValue`.
 bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
 bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
-
 bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
 bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
   return ptr == nullptr;

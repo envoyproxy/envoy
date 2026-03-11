@@ -368,12 +368,9 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     }
 
     STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(ctx.get());
-    if (verified_chain != nullptr) {
-      for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
-        X509* cert = sk_X509_value(verified_chain, i);
-        X509_up_ref(cert);
-        validated_chain.emplace_back(cert);
-      }
+    for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+      X509* cert = sk_X509_value(verified_chain, i);
+      validated_chain.emplace_back(bssl::UpRef(cert));
     }
 
     detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;

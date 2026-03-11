@@ -326,8 +326,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
   if (verified_chain != nullptr) {
     for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
       X509* cert = sk_X509_value(verified_chain, i);
-      X509_up_ref(cert);
-      validated_chain.emplace_back(cert);
+      validated_chain.emplace_back(bssl::UpRef(cert));
     }
   }
 
