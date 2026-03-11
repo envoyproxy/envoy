@@ -441,10 +441,23 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_local_overload_(config.append_local_overload()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
+      https_destination_ports_(
+          config.has_forward_proto_config()
+              ? absl::flat_hash_set<uint32_t>(
+                    config.forward_proto_config().https_destination_ports().begin(),
+                    config.forward_proto_config().https_destination_ports().end())
+              : absl::flat_hash_set<uint32_t>{}),
+      http_destination_ports_(
+          config.has_forward_proto_config()
+              ? absl::flat_hash_set<uint32_t>(
+                    config.forward_proto_config().http_destination_ports().begin(),
+                    config.forward_proto_config().http_destination_ports().end())
+              : absl::flat_hash_set<uint32_t>{}) {
   if (!creation_status.ok()) {
     return;
   }
+
   auto local_reply_or_error = LocalReply::Factory::create(config.local_reply_config(), context);
   SET_AND_RETURN_IF_NOT_OK(local_reply_or_error.status(), creation_status);
   local_reply_ = std::move(*local_reply_or_error);
@@ -454,6 +467,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       config.stream_error_on_invalid_http_message());
   SET_AND_RETURN_IF_NOT_OK(options_or_error.status(), creation_status);
   http2_options_ = options_or_error.value();
+
+  if (http2_options_.has_max_header_field_size_kb() &&
+      http2_options_.max_header_field_size_kb().value() > max_request_headers_kb_) {
+    creation_status = absl::InvalidArgumentError(
+        "max_header_field_size_kb must not exceed max_request_headers_kb");
+    return;
+  }
+
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -582,9 +603,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
       return;
     }
-    scoped_routes_config_provider_ =
-        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
-                                           *scoped_routes_config_provider_manager_);
+    scoped_routes_config_provider_ = srds_factory->createConfigProvider(
+        config, context_.serverFactoryContext(), context_.initManager(), stats_prefix_,
+        *scoped_routes_config_provider_manager_);
     scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

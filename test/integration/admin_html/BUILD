@@ -21,7 +21,7 @@ envoy_cc_test_binary(
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/server/admin:admin_html_util",
-        "@com_google_absl//absl/debugging:symbolize",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 

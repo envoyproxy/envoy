@@ -40,7 +40,8 @@ absl::Status AsyncContextConfig::loadCert() {
   return absl::OkStatus();
 }
 
-const Ssl::TlsContext& AsyncContext::tlsContext() const { return tls_contexts_[0]; }
+const Ssl::TlsContext& ServerAsyncContext::tlsContext() const { return tls_contexts_[0]; }
+const Ssl::TlsContext& ClientAsyncContext::tlsContext() const { return tls_contexts_[0]; }
 
 void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
@@ -67,11 +68,11 @@ CertSelectionStatsSharedPtr generateCertSelectionStats(Stats::Scope& store) {
 
 SecretManager::SecretManager(const ConfigProto& config,
                              Server::Configuration::GenericFactoryContext& factory_context,
-                             const Ssl::ServerContextConfig& tls_config)
+                             AsyncContextFactory&& context_factory)
     : stats_scope_(factory_context.scope().createScope("on_demand_secret.")),
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
-      config_source_(config.config_source()), tls_config_(tls_config),
+      config_source_(config.config_source()), context_factory_(std::move(context_factory)),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   for (const auto& name : config.prefetch_secret_names()) {
@@ -110,8 +111,8 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
                                               const Ssl::TlsCertificateConfig& cert_config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   absl::Status creation_status = absl::OkStatus();
-  auto cert_context = std::make_shared<AsyncContext>(*stats_scope_, factory_context_, tls_config_,
-                                                     cert_config, creation_status);
+  auto cert_context =
+      context_factory_(*stats_scope_, factory_context_, cert_config, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
   // Update the future lookups and notify pending callbacks.
@@ -138,8 +139,8 @@ absl::Status SecretManager::updateAll() {
     // Refresh only if there is a certificate present and skip notifying.
     if (cert_config) {
       absl::Status creation_status = absl::OkStatus();
-      entry.cert_context_ = std::make_shared<AsyncContext>(
-          *stats_scope_, factory_context_, tls_config_, *cert_config, creation_status);
+      entry.cert_context_ =
+          context_factory_(*stats_scope_, factory_context_, *cert_config, creation_status);
       setContext(secret_name, entry.cert_context_);
       RETURN_IF_NOT_OK(creation_status);
     }
@@ -225,10 +226,9 @@ SecretManager::getContext(absl::string_view secret_name) const {
   return {};
 }
 
-Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
-                                                     Ssl::CertificateSelectionCallbackPtr cb) {
-  const std::string name = mapper_(ssl_client_hello);
-  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+Ssl::SelectionResult
+BaseAsyncSelector::doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
+                                      Ssl::CertificateSelectionCallbackPtr cb) {
   auto current_context = secret_manager_->getContext(name);
   if (current_context) {
     ENVOY_LOG(trace, "Using an existing certificate '{}'", name);
@@ -250,14 +250,60 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl
   };
 }
 
+Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
+                                                     Ssl::CertificateSelectionCallbackPtr cb) {
+  const std::string name = mapper_->deriveFromClientHello(ssl_client_hello);
+  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
+  return doSelectTlsContext(name, client_ocsp_capable, std::move(cb));
+}
+
+Ssl::SelectionResult UpstreamAsyncSelector::selectTlsContext(
+    const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
+    Ssl::CertificateSelectionCallbackPtr cb) {
+  const std::string name = mapper_->deriveFromServerHello(ssl, options);
+  return doSelectTlsContext(name, false, std::move(cb));
+}
+
 Ssl::TlsCertificateSelectorPtr
 OnDemandTlsCertificateSelectorFactory::create(Ssl::TlsCertificateSelectorContext&) {
   return std::make_unique<AsyncSelector>(mapper_factory_(), secret_manager_);
 }
 
-absl::Status OnDemandTlsCertificateSelectorFactory::onConfigUpdate() {
+Ssl::UpstreamTlsCertificateSelectorPtr
+UpstreamOnDemandTlsCertificateSelectorFactory::createUpstreamTlsCertificateSelector(
+    Ssl::TlsCertificateSelectorContext&) {
+  return std::make_unique<UpstreamAsyncSelector>(mapper_factory_(), secret_manager_);
+}
+
+absl::Status BaseCertificateSelectorFactory::onConfigUpdate() {
   return secret_manager_->updateAll();
 }
+
+namespace {
+template <typename MapperFactory, typename SelectorFactory>
+absl::StatusOr<std::unique_ptr<SelectorFactory>>
+createCertificateSelectorFactory(const Protobuf::Message& proto_config,
+                                 Server::Configuration::GenericFactoryContext& factory_context,
+                                 AsyncContextFactory&& context_factory) {
+  const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
+      proto_config, factory_context.messageValidationVisitor());
+  MapperFactory& mapper_config =
+      Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      config.certificate_mapper().typed_config(), factory_context.messageValidationVisitor(),
+      mapper_config);
+  auto mapper_factory = mapper_config.createTlsCertificateMapperFactory(*message, factory_context);
+  RETURN_IF_NOT_OK(mapper_factory.status());
+  // Doing this last since it can kick-start SDS fetches.
+  // Envoy ensures that per-worker TLS sockets are destroyed before the filter
+  // chain holding the TLS socket factory using a completion. This means the
+  // TLS context config in the lambda will outlive each AsyncSelector, and it
+  // is safe to refer to TLS context config by reference.
+  auto secret_manager =
+      std::make_shared<SecretManager>(config, factory_context, std::move(context_factory));
+  return std::make_unique<SelectorFactory>(*std::move(mapper_factory), std::move(secret_manager));
+}
+} // namespace
 
 absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
 OnDemandTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFactory(
@@ -276,24 +322,38 @@ OnDemandTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFactory
     return absl::InvalidArgumentError(
         "On demand certificates are not integrated with session resumption support.");
   }
-  const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
-      proto_config, factory_context.messageValidationVisitor());
-  Ssl::TlsCertificateMapperConfigFactory& mapper_config =
-      Config::Utility::getAndCheckFactory<Ssl::TlsCertificateMapperConfigFactory>(
-          config.certificate_mapper());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      config.certificate_mapper().typed_config(), factory_context.messageValidationVisitor(),
-      mapper_config);
-  auto mapper_factory = mapper_config.createTlsCertificateMapperFactory(*message, factory_context);
-  RETURN_IF_NOT_OK(mapper_factory.status());
-  // Doing this last since it can kick-start SDS fetches.
-  auto secret_manager = std::make_shared<SecretManager>(config, factory_context, tls_config);
-  return std::make_unique<OnDemandTlsCertificateSelectorFactory>(*std::move(mapper_factory),
-                                                                 std::move(secret_manager));
+  return createCertificateSelectorFactory<Ssl::TlsCertificateMapperConfigFactory,
+                                          OnDemandTlsCertificateSelectorFactory>(
+      proto_config, factory_context,
+      [&tls_config](Stats::Scope& scope,
+                    Server::Configuration::ServerFactoryContext& server_factory_context,
+                    const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status) {
+        return std::make_shared<ServerAsyncContext>(scope, server_factory_context, tls_config,
+                                                    cert_config, creation_status);
+      });
+}
+
+absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+UpstreamOnDemandTlsCertificateSelectorConfigFactory::createUpstreamTlsCertificateSelectorFactory(
+    const Protobuf::Message& proto_config,
+    Server::Configuration::GenericFactoryContext& factory_context,
+    const Ssl::ClientContextConfig& tls_config) {
+  return createCertificateSelectorFactory<Ssl::UpstreamTlsCertificateMapperConfigFactory,
+                                          UpstreamOnDemandTlsCertificateSelectorFactory>(
+      proto_config, factory_context,
+      [&tls_config](Stats::Scope& scope,
+                    Server::Configuration::ServerFactoryContext& server_factory_context,
+                    const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status) {
+        return std::make_shared<ClientAsyncContext>(scope, server_factory_context, tls_config,
+                                                    cert_config, creation_status);
+      });
 }
 
 REGISTER_FACTORY(OnDemandTlsCertificateSelectorConfigFactory,
                  Ssl::TlsCertificateSelectorConfigFactory);
+
+REGISTER_FACTORY(UpstreamOnDemandTlsCertificateSelectorConfigFactory,
+                 Ssl::UpstreamTlsCertificateSelectorConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors

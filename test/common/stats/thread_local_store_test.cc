@@ -94,11 +94,11 @@ public:
     bool done = false;
     ThreadLocalStoreTestingPeer::numTlsHistograms(
         *store_, [&mutex, &done, &num_tls_histograms](uint32_t num) {
-          absl::MutexLock lock(&mutex);
+          absl::MutexLock lock(mutex);
           num_tls_histograms = num;
           done = true;
         });
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     mutex.Await(absl::Condition(&done));
     return num_tls_histograms;
   }
@@ -500,6 +500,79 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  {
+    Counter& c1 = scope->counterFromString("c1");
+    EXPECT_EQ("scope.c1", c1.name());
+    Counter& c2 = scope->counterFromString("c2");
+    EXPECT_EQ(&c2, &store_->nullCounter());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+    Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ("scope.g1", g1.name());
+    Gauge& g2 = scope->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(&g2, &store_->nullGauge());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+    Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_EQ("scope.h1", h1.name());
+    Histogram& h2 = scope->histogramFromString("h2", Histogram::Unit::Unspecified);
+    EXPECT_EQ("", h2.name());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+    // c1, g1, h1 are used.
+    c1.inc();
+    g1.set(1);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+    h1.recordValue(1);
+    store_->mergeHistograms([]() -> void {});
+
+    // First eviction marks stats as unused.
+    store_->evictUnused();
+    EXPECT_FALSE(c1.used());
+    EXPECT_FALSE(g1.used());
+    EXPECT_FALSE(h1.used());
+  }
+
+  // Second eviction removes stats.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // After eviction, we should be able to create new stats.
+  Counter& c3 = scope->counterFromString("c3");
+  EXPECT_EQ("scope.c3", c3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  Counter& c4 = scope->counterFromString("c4");
+  EXPECT_EQ(&c4, &store_->nullCounter());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+  Gauge& g3 = scope->gaugeFromString("g3", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.g3", g3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  Gauge& g4 = scope->gaugeFromString("g4", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g4, &store_->nullGauge());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+  Histogram& h3 = scope->histogramFromString("h3", Histogram::Unit::Unspecified);
+  EXPECT_EQ("scope.h3", h3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+  Histogram& h4 = scope->histogramFromString("h4", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", h4.name());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_scopes = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
@@ -680,6 +753,63 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     Histogram& h2 = scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
     EXPECT_EQ(&h1, &h2);
   }
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->rootScope()->createScope("scope.", /*evictable=*/true);
+
+  // 1. Create gauge and PAIRED_ADD (add)
+  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  g1.add(10);
+  EXPECT_EQ(10, g1.value());
+  EXPECT_TRUE(g1.used());
+
+  // Hold a reference to prevent destruction upon eviction
+  GaugeSharedPtr g1_ref = TestUtility::findGauge(*store_, "scope.g1");
+  ASSERT_NE(g1_ref, nullptr);
+
+  // 2. MarkUnused / Evict
+  // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
+  // Since we just used it (g1.add(10)), the first call will only mark it as unused.
+  store_->evictUnused();
+  EXPECT_FALSE(g1.used());
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // Second pass evicts from scope cache because it is now unused.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // Verify removed from scope
+  StatNameManagedStorage g1_name("scope.g1", symbol_table_);
+  EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
+
+  // Verify still in store (allocator) due to held ref
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // 3. Interleaved PAIRED_ADD (add) on the held reference
+  g1_ref->add(5);
+  EXPECT_EQ(15, g1_ref->value());
+  EXPECT_TRUE(g1_ref->used());
+
+  // 4. Re-resolve and PAIRED_SUBTRACT (sub)
+  Gauge& g1_resurrected = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+
+  // Should be the same object
+  EXPECT_EQ(g1_ref.get(), &g1_resurrected);
+
+  // Value should be preserved
+  EXPECT_EQ(15, g1_resurrected.value());
+
+  // Perform subtract
+  g1_resurrected.sub(15);
+  EXPECT_EQ(0, g1_resurrected.value());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();

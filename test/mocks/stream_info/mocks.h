@@ -66,6 +66,10 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setUpstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, upstreamDetectedCloseType, (), (const));
+  MOCK_METHOD(void, setUpstreamLocalCloseReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, upstreamLocalCloseReason, (), (const));
   MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
@@ -74,7 +78,13 @@ public:
   MOCK_METHOD(uint64_t, upstreamNumStreams, (), (const));
   MOCK_METHOD(void, setUpstreamProtocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<Http::Protocol>, upstreamProtocol, (), (const));
+  MOCK_METHOD(void, addUpstreamHostAttempted, (Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(const std::vector<Upstream::HostDescriptionConstSharedPtr>&, upstreamHostsAttempted,
+              (), (const));
+  MOCK_METHOD(const std::vector<uint64_t>&, upstreamConnectionIdsAttempted, (), (const));
 
+  std::vector<Upstream::HostDescriptionConstSharedPtr> upstream_hosts_attempted_;
+  std::vector<uint64_t> upstream_connection_ids_attempted_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<absl::string_view> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_connection_info_;
@@ -82,6 +92,8 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   std::string failure_reason_;
+  DetectedCloseType upstream_detected_close_type_ = DetectedCloseType::Normal;
+  std::string local_close_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;
   uint64_t num_streams_ = 0;
@@ -169,6 +181,10 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setDownstreamLocalCloseReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamLocalCloseReason, (), (const));
+  MOCK_METHOD(void, setDownstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, downstreamDetectedCloseType, (), (const));
   MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
   MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
@@ -205,6 +221,8 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
+  std::string downstream_local_close_reason_;
+  DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   std::string stream_flags_;
   Router::VirtualHostConstSharedPtr virtual_host_;
 };

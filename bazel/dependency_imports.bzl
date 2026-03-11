@@ -2,9 +2,8 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "regis
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
-load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
+load("@cel-cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
-load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
@@ -23,6 +22,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@shellcheck//:deps.bzl", "shellcheck_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
@@ -102,6 +102,13 @@ def envoy_dependency_imports(
         sum = "h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=",
         version = "v1.68.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
+            "gazelle:resolve go golang.org/x/net/http2 @org_golang_x_net//http2",
+            "gazelle:resolve go golang.org/x/net/http2/hpack @org_golang_x_net//http2/hpack",
+            "gazelle:resolve go golang.org/x/net/trace @org_golang_x_net//trace",
+            "gazelle:resolve go golang.org/x/sys/unix @org_golang_x_sys//unix",
+        ],
     )
     go_repository(
         name = "org_golang_x_net",
@@ -109,6 +116,11 @@ def envoy_dependency_imports(
         sum = "h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=",
         version = "v0.34.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/secure/bidirule @org_golang_x_text//secure/bidirule",
+            "gazelle:resolve go golang.org/x/text/unicode/bidi @org_golang_x_text//unicode/bidi",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "org_golang_x_text",
@@ -123,6 +135,9 @@ def envoy_dependency_imports(
         sum = "h1:+2XxjfsAu6vqFxwGBRcHiMaDCuZiqXGDUDVWVtrFAnE=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
+        ],
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_rpc",
@@ -140,11 +155,14 @@ def envoy_dependency_imports(
         build_external = "external",
     )
     go_repository(
-        name = "com_github_cncf_xds_go",
+        name = "xds_go",
         importpath = "github.com/cncf/xds/go",
         sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
         version = "v0.0.0-20251110193048-8bfbf64dc13e",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go google.golang.org/genproto/googleapis/api/expr/v1alpha1 @org_golang_google_genproto_googleapis_api//expr/v1alpha1",
+        ],
     )
     go_repository(
         name = "dev_cel_expr",
@@ -159,6 +177,11 @@ def envoy_dependency_imports(
         sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
         version = "v1.10.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes",
+            "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star_v2",
@@ -166,6 +189,9 @@ def envoy_dependency_imports(
         sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
         version = "v2.0.4-0.20230330145011-496ad1ac90a4",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go github.com/spf13/afero @com_github_spf13_afero//:afero",
+        ],
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
@@ -222,6 +248,20 @@ def crates_repositories():
     crates_repository(
         name = "dynamic_modules_rust_sdk_crate_index",
         cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
+        # TODO: Ideally we should uncomment the below to make using the Rust SDK via rules_rust reproducible.
+        # However, rules_rust has a bug that when this Envoy repo is used as a dependency in another Bazel workspace,
+        # the lockfile is not properly propagated, which causes the build to fail without CARGO_BAZEL_REPIN=true, which
+        # ends up changing the content of this Envoy repository.
+        #
+        # In practice, the Rust SDK is only used in the tests in our repository (i.e. non main code) as well as
+        # people usually use the native cargo toolchain, which already uses the Cargo.lock file, so this comment-out
+        # is not an issue for now.
+        #
+        # Please refer to the following issues and PR for more details:
+        # * https://github.com/bazelbuild/rules_rust/issues/3521
+        # * https://github.com/envoyproxy/envoy/issues/38951
+        # * https://github.com/bazelbuild/rules_rust/pull/3866
+        #
+        # lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
         manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )

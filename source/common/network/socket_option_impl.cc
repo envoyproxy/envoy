@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -23,6 +24,13 @@ bool SocketOptionImpl::setOption(Socket& socket,
 
     if (socket_type_.has_value() && *socket_type_ != socket.socketType()) {
       ENVOY_LOG(info, "Skipping inapplicable socket option {}", optname_.name());
+      return true;
+    }
+
+    if (socket_ip_version_.has_value() && socket.ipVersion().has_value() &&
+        *socket_ip_version_ != *socket.ipVersion()) {
+      ENVOY_LOG(info, "Skipping inapplicable socket option {}, because of IP version mismatch",
+                optname_.name());
       return true;
     }
 
@@ -62,6 +70,10 @@ SocketOptionImpl::getOptionDetails(const Socket&,
 bool SocketOptionImpl::isSupported() const { return optname_.hasValue(); }
 
 absl::optional<Socket::Type> SocketOptionImpl::socketType() const { return socket_type_; }
+
+absl::optional<Address::IpVersion> SocketOptionImpl::socketIpVersion() const {
+  return socket_ip_version_;
+}
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
                                                         const Network::SocketOptionName& optname,

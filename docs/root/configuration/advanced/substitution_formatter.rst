@@ -549,6 +549,30 @@ Current supported substitution commands include:
   Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
   the main address of the upstream host (e.g., ip for TCP connections) will be used.
 
+.. _config_access_log_format_upstream_hosts_attempted:
+
+``%UPSTREAM_HOSTS_ATTEMPTED%``
+  Comma-separated list of upstream host addresses (e.g., ip:port) that were attempted during the request,
+  including retries. This is useful for debugging retry behavior and understanding which hosts were tried
+  before a successful connection or final failure.
+
+.. _config_access_log_format_upstream_hosts_attempted_without_port:
+
+``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOSTS_ATTEMPTED%`` but without port components.
+
+.. _config_access_log_format_upstream_host_names_attempted:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED%``
+  Comma-separated list of upstream host names (e.g., DNS names) that were attempted during the request,
+  including retries. If no DNS name is available for a host, its main address (e.g., ip:port) will be used.
+  This is useful for debugging retry behavior with human-readable host names.
+
+.. _config_access_log_format_upstream_host_names_attempted_without_port:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOST_NAMES_ATTEMPTED%`` but without port components.
+
 ``%UPSTREAM_CLUSTER%``
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
@@ -561,9 +585,20 @@ Current supported substitution commands include:
   Local address of the upstream connection. If the address is an IP address, it includes both
   address and port.
 
-``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Local address of the upstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for source IP ``10.1.10.23``
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for source IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for source IP ``10.1.10.23``
 
 ``%UPSTREAM_LOCAL_PORT%``
   Local port of the upstream connection.
@@ -576,9 +611,20 @@ Current supported substitution commands include:
   address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
   host only has one address and connection is established successfully.
 
-``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Remote address of the upstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for upstream IP ``10.1.10.23``
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for upstream IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for upstream IP ``10.1.10.23``
 
 ``%UPSTREAM_REMOTE_PORT%``
   Remote port of the upstream connection.
@@ -600,6 +646,21 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+.. _config_access_log_format_upstream_detected_close_type:
+
+``%UPSTREAM_DETECTED_CLOSE_TYPE%``
+    The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+
+.. _config_access_log_format_upstream_local_close_reason:
+
+``%UPSTREAM_LOCAL_CLOSE_REASON%``
+  HTTP/TCP
+    If upstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
 .. _config_access_log_format_downstream_transport_failure_reason:
 
 ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%``
@@ -610,6 +671,22 @@ Current supported substitution commands include:
 
     .. note::
       It only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+.. _config_access_log_format_downstream_local_close_reason:
+
+``%DOWNSTREAM_LOCAL_CLOSE_REASON%``
+  HTTP/TCP
+    If downstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_detected_close_type:
+
+``%DOWNSTREAM_DETECTED_CLOSE_TYPE%``
+  HTTP/TCP
+    The detected close type of the downstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -624,9 +701,20 @@ Current supported substitution commands include:
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
-``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Remote address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for client IP ``10.1.10.23``
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for client IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for client IP ``10.1.10.23``
 
   .. note::
 
@@ -654,9 +742,20 @@ Current supported substitution commands include:
     been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
-``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Direct remote address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for client IP ``10.1.10.23``
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for client IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for client IP ``10.1.10.23``
 
   .. note::
 
@@ -697,17 +796,39 @@ Current supported substitution commands include:
     This is always the physical local address even if the downstream remote address has been inferred from
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
-``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for local IP ``10.1.10.23``
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for local IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for local IP ``10.1.10.23``
 
   .. note::
 
     This may not be the physical local address if the downstream local address has been inferred from
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
-``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Direct local address of the downstream connection, without any port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for local IP ``10.1.10.23``
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for local IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for local IP ``10.1.10.23``
 
   .. note::
 
@@ -769,6 +890,12 @@ Current supported substitution commands include:
   cross-reference timer-based reports for the same connection. The identifier
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
+
+.. _config_access_log_format_upstream_connection_ids_attempted:
+
+``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``
+  Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
+  This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.
 
 .. _config_access_log_format_stream_id:
 
@@ -1389,6 +1516,7 @@ Current supported substitution commands include:
   * ``TcpUpstreamConnected`` - When TCP Proxy filter has successfully established an upstream connection.
   * ``TcpPeriodic`` - On any TCP Proxy filter periodic log record.
   * ``TcpConnectionEnd`` - When a TCP connection is ended on TCP Proxy filter.
+  * ``TcpConnectionStart`` - When a TCP connection is accepted by the TCP Proxy filter.
   * ``DownstreamStart`` - When HTTP Connection Manager filter receives a new HTTP request.
   * ``DownstreamTunnelSuccessfullyEstablished`` - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.
   * ``DownstreamPeriodic`` - On any HTTP Connection Manager periodic log record.
@@ -1422,6 +1550,21 @@ Current supported substitution commands include:
   HTTP
     The value of the query parameter ``X``. If the query parameter ``X`` is not present, ``"-"`` symbol will be used.
     ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%QUERY_PARAMS(X):Z%``
+  HTTP
+    All of the query parameters. The parameter ``X`` is used to specify how the query parameters are presented
+    and is optional, with ``ORIG`` then being the default.
+
+    The ``X`` parameter can be:
+
+    * ``ORIG``: The output will be original query params string part of the path with no treatment.
+    * ``DECODED``: The query params will be URL decoded.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

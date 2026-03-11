@@ -257,6 +257,15 @@ struct ResponseCodeDetailValues {
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
 /**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
+};
+
+/**
  * Constants for the locally closing a connection. This is used in response code
  * details field of StreamInfo for details sent by core (non-extension) code.
  * This is incomplete as some details may be
@@ -629,6 +638,27 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
+   * @param close_type the upstream detected close type.
+   */
+  virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return StreamInfo::DetectedCloseType the upstream detected close type.
+   */
+  virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
+
+  /**
+   * @param reason the upstream local close reason.
+   */
+  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the upstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view upstreamLocalCloseReason() const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -657,6 +687,26 @@ public:
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+
+  /**
+   * Add a host to the list of upstream hosts that were attempted for this request.
+   * This is useful for tracking retry behavior in access logs.
+   * @param host the host description that was attempted.
+   */
+  virtual void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return the list of all upstream hosts that were attempted for this request,
+   * in the order they were attempted. This includes both successful and failed attempts.
+   */
+  virtual const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const PURE;
+
+  /**
+   * @return the list of all upstream connection IDs that were attempted for this request,
+   * in the order they were attempted. This helps identify connection reuse patterns.
+   */
+  virtual const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const PURE;
 };
 
 /**
@@ -1016,6 +1066,27 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @param reason the downstream local close reason.
+   */
+  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the downstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view downstreamLocalCloseReason() const PURE;
+
+  /**
+   * @param close_type the downstream detected close type.
+   */
+  virtual void setDownstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return DetectedCloseType the downstream detected close type.
+   */
+  virtual DetectedCloseType downstreamDetectedCloseType() const PURE;
 
   /**
    * Checked by routing filters before forwarding a request upstream.

@@ -87,6 +87,11 @@ absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& s
              : absl::nullopt;
 }
 
+bool usesFileWatching(const ProtoDataSource& source, const ProviderOptions& options) {
+  return ((source.has_watched_directory() || options.modify_watch) &&
+          source.specifier_case() == envoy::config::core::v3::DataSource::kFilename);
+}
+
 } // namespace DataSource
 } // namespace Config
 } // namespace Envoy

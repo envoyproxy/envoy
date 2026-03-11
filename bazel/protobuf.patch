@@ -99,3 +99,15 @@ diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
      ],
  })
 
+diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
+--- a/src/google/protobuf/io/BUILD.bazel
++++ b/src/google/protobuf/io/BUILD.bazel
+@@ -160,7 +160,7 @@ cc_library(
+         "@abseil-cpp//absl/log:absl_log",
+     ] + select({
+         "//build_defs:config_msvc": [],
+-        "//conditions:default": ["@zlib"],
++        "//conditions:default": ["@envoy//bazel:zlib"],
+     }),
+ )
+

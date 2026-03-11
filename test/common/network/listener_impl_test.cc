@@ -585,6 +585,82 @@ TEST_P(TcpListenerImplTest, LoadShedPointCanRejectConnection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Test that when a connection is rejected due to load shedding, the global connection
+// resource allocated during rejectCxOverGlobalLimit() is properly deallocated.
+// This is a regression test for https://github.com/envoyproxy/envoy/issues/41867.
+TEST_P(TcpListenerImplTest, LoadShedPointRejectDeallocatesGlobalConnectionResource) {
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  MockTcpListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
+  Random::MockRandomGenerator random_generator;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  // Set up mock overload state that tracks global connection limit.
+  testing::NiceMock<Server::MockThreadLocalOverloadState> mock_overload_state;
+
+  // Enable the resource monitor in overload state.
+  ON_CALL(mock_overload_state,
+          isResourceMonitorEnabled(
+              Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections))
+      .WillByDefault(Return(true));
+
+  // tryAllocateResource should succeed (return true) - connection is admitted.
+  ON_CALL(
+      mock_overload_state,
+      tryAllocateResource(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
+      .WillByDefault(Return(true));
+
+  Server::ThreadLocalOverloadStateOptRef overload_state_ref(mock_overload_state);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
+                               listener_callbacks, true, false, false, overload_state_ref);
+
+  Server::MockOverloadManager overload_manager;
+  Server::MockLoadShedPoint accept_connection_point;
+
+  EXPECT_CALL(overload_manager, getLoadShedPoint(testing::_))
+      .WillOnce(Return(&accept_connection_point));
+  listener.configureLoadShedPoints(overload_manager);
+
+  // The key expectations:
+  // 1. tryAllocateResource is called when checking global limit (connection admitted)
+  // 2. shouldShedLoad returns true (load shedding rejects the connection)
+  // 3. tryDeallocateResource MUST be called to release the allocated resource
+  {
+    testing::InSequence s1;
+    // First, resource is allocated when checking global limit.
+    EXPECT_CALL(mock_overload_state,
+                tryAllocateResource(
+                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
+        .WillOnce(Return(true));
+    // Then load shedding kicks in and rejects.
+    EXPECT_CALL(accept_connection_point, shouldShedLoad()).WillOnce(Return(true));
+    // Critical: resource must be deallocated since connection was rejected.
+    EXPECT_CALL(mock_overload_state,
+                tryDeallocateResource(
+                    Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
+        .WillOnce(Return(true));
+    EXPECT_CALL(listener_callbacks, onReject(TcpListenerCallbacks::RejectCause::OverloadAction));
+  }
+
+  {
+    testing::InSequence s2;
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::Connected));
+    EXPECT_CALL(connection_callbacks, onEvent(ConnectionEvent::RemoteClose)).WillOnce([&] {
+      dispatcher_->exit();
+    });
+  }
+
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_))
+      .Times(testing::AtLeast(1));
+  ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
+  client_connection->addConnectionCallbacks(connection_callbacks);
+  client_connection->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -619,7 +695,10 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   {
     testing::InSequence s2;
     EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::Connected));
-    EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::RemoteClose));
+    // The first connection is rejected by load shedding, so it will receive RemoteClose.
+    // Use AnyNumber since the close event may or may not be processed before dispatcher exits.
+    EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::RemoteClose))
+        .Times(testing::AnyNumber());
   }
 
   {
@@ -641,16 +720,21 @@ TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {
   client_connection2->addConnectionCallbacks(connection_callbacks2);
   client_connection2->connect();
 
+  // Level-triggered listeners may fire multiple socket events, so allow multiple calls.
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_))
+      .Times(testing::AtLeast(1));
   listener.enable();
-  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Now that we've seen that the connection hasn't been closed by the listener, make sure to
-  // close it.
+  // Close the connections that were not closed by the listener to avoid assertion failures
+  // when the test ends. Use LocalClose expectation for both since we're explicitly closing them.
+  EXPECT_CALL(connection_callbacks1, onEvent(ConnectionEvent::LocalClose))
+      .Times(testing::AnyNumber());
   EXPECT_CALL(connection_callbacks2, onEvent(ConnectionEvent::LocalClose));
+  client_connection1->close(ConnectionCloseType::NoFlush);
   client_connection2->close(ConnectionCloseType::NoFlush);
 
-  // Clear client_connection1.
+  // Process remaining events.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 

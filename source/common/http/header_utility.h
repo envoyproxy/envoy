@@ -92,6 +92,10 @@ public:
       return present_ != invert_match_;
     };
 
+    bool matchesHeadersIndividually(const HeaderMap& request_headers) const override {
+      return matchesHeaders(request_headers);
+    };
+
   private:
     const LowerCaseString name_;
     const bool invert_match_;
@@ -124,6 +128,35 @@ public:
       // Execute the specific matcher's code and invert if invert_match_ is set.
       return specificMatchesHeaders(value) != invert_match_;
     };
+
+    // Matches each header value individually.
+    bool matchesHeadersIndividually(const HeaderMap& request_headers) const override {
+      const auto header_values = request_headers.get(name_);
+
+      if (header_values.empty()) {
+        if (!treat_missing_as_empty_) {
+          return false;
+        }
+        // treat_missing_as_empty_ is true, match against empty string
+        return specificMatchesHeaders(EMPTY_STRING) != invert_match_;
+      }
+
+      // Validate each header value individually
+      for (size_t i = 0; i < header_values.size(); ++i) {
+        absl::string_view value = header_values[i]->value().getStringView();
+        bool matches = specificMatchesHeaders(value);
+        if (!invert_match_ && matches) {
+          return true;
+        }
+        if (invert_match_ && matches) {
+          return false;
+        }
+      }
+
+      // For normal match: no value matched, return false
+      // For invert_match: no value matched the pattern, return true
+      return invert_match_;
+    }
 
   protected:
     // A matcher specific implementation to match the given header_value.

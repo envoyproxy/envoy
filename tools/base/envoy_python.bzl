@@ -1,6 +1,5 @@
-load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
@@ -136,68 +135,6 @@ def envoy_jinja_env(
         deps = [name_entry_point],
     )
 
-def envoy_genjson(
-        name,
-        srcs = [],
-        yaml_srcs = [],
-        filter = None,
-        args = None,
-        data = [],
-        visibility = None):
-    '''Generate JSON from JSON and YAML sources
-
-    By default the sources will be merged in jq `slurp` mode.
-
-    Specify a jq `filter` to mangle the data.
-
-    Example - places the sources into a dictionary with separate keys, but merging
-    the data from one of the JSON files with the data from the YAML file:
-
-    ```starlark
-
-    envoy_genjson(
-        name = "myjson",
-        srcs = [
-            ":json_data.json",
-            "@com_somewhere//:other_json_data.json",
-        ],
-        yaml_srcs = [
-            ":yaml_data.yaml",
-        ],
-        filter = """
-        {first_data: .[0], rest_of_data: .[1] * .[2]}
-        """,
-    )
-
-    ```
-    '''
-    if not srcs and not yaml_srcs:
-        fail("At least one of `srcs` or `yaml_srcs` must be provided")
-
-    yaml_json = []
-    for i, yaml_src in enumerate(yaml_srcs):
-        yaml_name = "%s_yaml_%s" % (name, i)
-        yq(
-            name = yaml_name,
-            srcs = [yaml_src],
-            args = ["-o=json"],
-            outs = ["%s.json" % yaml_name],
-        )
-        yaml_json.append(yaml_name)
-
-    all_srcs = srcs + yaml_json
-    args = args or ["--slurp"]
-    filter = filter or " *".join([(".[%s]" % i) for i, x in enumerate(all_srcs)])
-    jq(
-        name = name,
-        srcs = all_srcs,
-        out = "%s.json" % name,
-        args = args,
-        filter = filter,
-        visibility = visibility,
-        data = data,
-    )
-
 def envoy_py_data(
         name,
         src,
@@ -304,7 +241,7 @@ def envoy_gencontent(
         template_deps = []):
     '''Generate templated output from a Jinja template and JSON/Yaml sources.
 
-    `srcs`, `yaml_srcs` and `**json_kwargs` are passed to `envoy_genjson`.
+    `srcs`, `yaml_srcs` and `**json_kwargs` are passed to `json_merge`.
 
     Args prefixed with `template_` are passed to `envoy_jinja_env`.
 
@@ -331,7 +268,7 @@ def envoy_gencontent(
     name_tpl = "%s_jinja" % name
     name_template_bin = ":%s_generate_content" % name
 
-    envoy_genjson(
+    json_merge(
         name = "%s_json" % name,
         srcs = srcs,
         yaml_srcs = yaml_srcs,

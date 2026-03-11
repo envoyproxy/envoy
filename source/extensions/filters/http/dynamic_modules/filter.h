@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -32,6 +33,7 @@ public:
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) override;
 
   // ----------  Http::StreamDecoderFilter  ----------
   FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -40,11 +42,9 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // config_ can only be nullptr in certain unit tests where we don't set up the
-    // whole filter chain.
-    if (config_ && config_->terminal_filter_) {
-      decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
-    }
+    // We always register for downstream watermark callbacks. This allows all filters
+    // including the terminal filter to receive flow control events.
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
   }
   void decodeComplete() override;
 
@@ -80,6 +80,10 @@ public:
   // call.
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
+
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the end of the current event hook.
+  absl::optional<std::string> last_serialized_filter_state_;
 
   /**
    * Helper to get the correct callbacks.
@@ -156,6 +160,18 @@ public:
   }
 
   /**
+   * Helper to get the active tracing span for this stream.
+   * Returns a reference to a NullSpan if tracing is not enabled.
+   */
+  Tracing::Span& activeSpan() {
+    auto cb = callbacks();
+    if (cb) {
+      return cb->activeSpan();
+    }
+    return Tracing::NullSpan::instance();
+  }
+
+  /**
    * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
@@ -203,6 +219,7 @@ public:
    */
   bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
+  bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
@@ -247,8 +264,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t id)
-        : filter_(std::move(filter)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t id)
+        : filter_(filter), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
@@ -261,7 +278,7 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    DynamicModuleHttpFilter& filter_;
     const uint64_t callout_id_{};
   };
 
@@ -272,8 +289,8 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t callout_id)
-        : callout_id_(callout_id), filter_(std::move(filter)) {}
+    HttpStreamCalloutCallback(DynamicModuleHttpFilter& filter, uint64_t callout_id)
+        : callout_id_(callout_id), filter_(filter) {}
     ~HttpStreamCalloutCallback() override = default;
 
     // AsyncClient::StreamCallbacks
@@ -301,7 +318,7 @@ private:
     bool cleaned_up_ = false;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    DynamicModuleHttpFilter& filter_;
   };
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }

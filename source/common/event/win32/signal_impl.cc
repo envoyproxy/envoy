@@ -1,6 +1,7 @@
+#include "source/common/event/signal_impl.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/event/dispatcher_impl.h"
-#include "source/common/event/signal_impl.h"
 
 #include "event2/event.h"
 

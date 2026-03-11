@@ -56,6 +56,85 @@ filter_config:
   factory_cb(callbacks);
 }
 
+TEST(DynamicModuleConfigFactory, LoadOKNoOptionalABI) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: no_op_no_optional_abi
+    do_not_close: true
+    load_globally: false
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_TRUE(result.ok());
+  auto factory_cb = result.value();
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
+  factory_cb(callbacks);
+}
+
+TEST(DynamicModuleConfigFactory, LoadOKBasedOnServerContext) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: no_op
+    do_not_close: true
+    load_globally: false
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto factory_cb = factory.createFilterFactoryFromProtoWithServerContext(
+      proto_config, "", context.server_factory_context_);
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
+  factory_cb(callbacks);
+}
+
 TEST(DynamicModuleConfigFactory, LoadEmpty) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
@@ -109,6 +188,47 @@ filter_name: foo
 filter_config:
     "@type": "type.googleapis.com/google.protobuf.BytesValue"
     value: "YmFy" # echo -n "bar" | base64
+)EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_TRUE(result.ok());
+  auto factory_cb = result.value();
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
+  factory_cb(callbacks);
+}
+
+TEST(DynamicModuleConfigFactory, LoadStruct) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: no_op
+    do_not_close: true
+    load_globally: true
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.Struct"
+    value:
+        key: value
 )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;

@@ -13,9 +13,10 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
+
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 #else

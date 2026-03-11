@@ -207,8 +207,10 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
   - actions:
     - remote_address: {}
     - destination_cluster: {}
+    x_ratelimit_option: DRAFT_VERSION_03
   - actions:
     - destination_cluster: {}
+    x_ratelimit_option: "OFF"
   )EOF";
 
   setupTest(yaml);
@@ -222,6 +224,10 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
                        {{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
                    Envoy::RateLimit::Descriptor{{{"destination_cluster", "fake_cluster"}}}}),
               testing::ContainerEq(descriptors));
+
+  EXPECT_EQ(envoy::config::route::v3::RateLimit::DRAFT_VERSION_03,
+            descriptors[0].x_ratelimit_option_);
+  EXPECT_EQ(envoy::config::route::v3::RateLimit::OFF, descriptors[1].x_ratelimit_option_);
 }
 
 TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndOneForStreamDone) {
@@ -2026,6 +2032,47 @@ actions:
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"query_match", "%REQ(header1)%_static_value_%REQ(header2)%"}}}}),
               testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, RemoteAddressMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "10.0.0.1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, RemoteAddressMatchNoMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  EXPECT_TRUE(descriptors_.empty());
 }
 
 } // namespace

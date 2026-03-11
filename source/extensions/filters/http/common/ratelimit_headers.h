@@ -10,16 +10,14 @@ namespace HttpFilters {
 namespace Common {
 namespace RateLimit {
 
+constexpr absl::string_view QuotaPolicyWindow = "w";
+constexpr absl::string_view QuotaPolicyName = "name";
+
 class XRateLimitHeaderValues {
 public:
   const Http::LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
   const Http::LowerCaseString XRateLimitRemaining{"x-ratelimit-remaining"};
   const Http::LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
-
-  struct {
-    const std::string Window{"w"};
-    const std::string Name{"name"};
-  } QuotaPolicyKeys;
 };
 
 using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;

@@ -34,6 +34,7 @@ const static bool should_log = true;
 
 // TODO: find a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
+  FUNCTION(a2a)                                                                                    \
   FUNCTION(admin)                                                                                  \
   FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
@@ -68,6 +69,7 @@ const static bool should_log = true;
   FUNCTION(init)                                                                                   \
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
+  FUNCTION(json_rpc)                                                                               \
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
@@ -91,6 +93,7 @@ const static bool should_log = true;
   FUNCTION(runtime)                                                                                \
   FUNCTION(stats)                                                                                  \
   FUNCTION(secret)                                                                                 \
+  FUNCTION(sse)                                                                                    \
   FUNCTION(tap)                                                                                    \
   FUNCTION(testing)                                                                                \
   FUNCTION(thrift)                                                                                 \

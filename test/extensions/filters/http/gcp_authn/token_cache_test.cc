@@ -65,20 +65,20 @@ public:
     TestUtility::loadFromYaml(DefaultConfig, config);
     token_cache_ = std::make_unique<TokenCacheImpl<JwtToken>>(config.cache_config(), time_system_);
 
-    jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+    jwt_ = std::make_unique<JwtVerify::Jwt>();
   }
 
   NiceMock<MockFactoryContext> context_;
   std::unique_ptr<TokenCacheImpl<JwtToken>> token_cache_;
   Event::SimulatedTimeSystem time_system_;
-  std::unique_ptr<::google::jwt_verify::Jwt> jwt_ = nullptr;
+  std::unique_ptr<JwtVerify::Jwt> jwt_ = nullptr;
 };
 
 TEST_F(TokenCacheTest, ValidToken) {
   EXPECT_EQ(token_cache_->capacity(), 100);
   std::string good_token = std::string(GoodTokenStr);
-  ::google::jwt_verify::Status status = jwt_->parseFromString(good_token);
-  EXPECT_TRUE(status == ::google::jwt_verify::Status::Ok);
+  JwtVerify::Status status = jwt_->parseFromString(good_token);
+  EXPECT_TRUE(status == JwtVerify::Status::Ok);
   auto* old_jwt = jwt_.get();
   token_cache_->insert(good_token, std::move(jwt_));
   auto* found_jwt = token_cache_->lookUp(good_token);
@@ -88,8 +88,8 @@ TEST_F(TokenCacheTest, ValidToken) {
 
 TEST_F(TokenCacheTest, ExpiredToken) {
   std::string expired_token = std::string(ExpiredToken);
-  ::google::jwt_verify::Status status = jwt_->parseFromString(expired_token);
-  EXPECT_TRUE(status == ::google::jwt_verify::Status::Ok);
+  JwtVerify::Status status = jwt_->parseFromString(expired_token);
+  EXPECT_TRUE(status == JwtVerify::Status::Ok);
   token_cache_->insert(expired_token, std::move(jwt_));
   auto* found_jwt = token_cache_->lookUp(expired_token);
   EXPECT_TRUE(found_jwt == nullptr);
@@ -100,16 +100,16 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   // Set the time to exp_time + 1s.
   // i.e., The expiration time in the token is `Sun May 29 2033 13:36:41 GMT-0400` and the time we
   // set to is `Sun May 29 2033 13:35:42 GMT-0400`.
-  const time_t exp_time_with_skew = ExpTime - ::google::jwt_verify::kClockSkewInSecond;
+  const time_t exp_time_with_skew = ExpTime - JwtVerify::kClockSkewInSecond;
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
   std::string token = std::string(GoodTokenStr);
-  ::google::jwt_verify::Status status = jwt_->parseFromString(token);
-  EXPECT_TRUE(status == ::google::jwt_verify::Status::Ok);
+  JwtVerify::Status status = jwt_->parseFromString(token);
+  EXPECT_TRUE(status == JwtVerify::Status::Ok);
   token_cache_->insert(token, std::move(jwt_));
   auto* found_jwt = token_cache_->lookUp(token);
   EXPECT_TRUE(found_jwt == nullptr);
 
-  std::unique_ptr<::google::jwt_verify::Jwt> jwt = std::make_unique<::google::jwt_verify::Jwt>();
+  std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
   // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
   auto* old_jwt = jwt.get();

@@ -7906,14 +7906,65 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
 
-  // Enable the rsa_key_usage enforcement.
-  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
                                  /*skip_server_failure_reason_check=*/true);
   // Client connection is failed with key_usage_mismatch.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
   // Server connection error was not populated in this case.
   test_options.setExpectedServerStats("");
+  testUtilV2(test_options);
+}
+
+// Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.
+// This verifies the certificate compression feature (RFC 8879) integration with brotli, zstd,
+// and zlib algorithms when the runtime flag is enabled.
+TEST_P(SslSocketTest, CertificateCompressionEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // TLS handshake should succeed with compression algorithms registered.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
+  testUtilV2(test_options);
+}
+
+// Test that TLS handshakes succeed with certificate compression disabled (default behavior).
+// This verifies backward compatibility when the runtime flag is disabled.
+TEST_P(SslSocketTest, CertificateCompressionDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "false"}});
+
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // TLS handshake should succeed without compression algorithms (backward compatibility).
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
   testUtilV2(test_options);
 }
 

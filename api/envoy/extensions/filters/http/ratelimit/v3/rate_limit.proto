@@ -60,7 +60,7 @@ message RateLimit {
       [(validate.rules).string = {in: "internal" in: "external" in: "both" in: ""}];
 
   // The timeout in milliseconds for the rate limit service RPC. If not
-  // set, this defaults to 20ms.
+  // set, this defaults to 20ms. A value of 0 disables the timeout (infinite).
   google.protobuf.Duration timeout = 4;
 
   // The filter's behaviour in case the rate limiting service does

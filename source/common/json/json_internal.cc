@@ -16,9 +16,8 @@
 #include "source/common/protobuf/utility.h"
 
 // Do not let nlohmann/json leak outside of this file.
-#include "include/nlohmann/json.hpp"
-
 #include "absl/strings/match.h"
+#include "include/nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Json {

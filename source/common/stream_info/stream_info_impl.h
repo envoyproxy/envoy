@@ -29,7 +29,10 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct UpstreamInfoImpl : public UpstreamInfo {
-  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
+  void setUpstreamConnectionId(uint64_t id) override {
+    upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
+  }
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
@@ -71,6 +74,18 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
   }
+  void setUpstreamDetectedCloseType(DetectedCloseType close_type) override {
+    upstream_detected_close_type_ = close_type;
+  }
+  DetectedCloseType upstreamDetectedCloseType() const override {
+    return upstream_detected_close_type_;
+  }
+  void setUpstreamLocalCloseReason(absl::string_view reason) override {
+    upstream_local_close_reason_ = std::string(reason);
+  }
+  absl::string_view upstreamLocalCloseReason() const override {
+    return upstream_local_close_reason_;
+  }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -94,6 +109,19 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
   absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
 
+  void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
+    upstream_hosts_attempted_.push_back(host);
+  }
+
+  const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const override {
+    return upstream_hosts_attempted_;
+  }
+
+  const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const override {
+    return upstream_connection_ids_attempted_;
+  }
+
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
@@ -102,9 +130,13 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<std::string> upstream_connection_interface_name_;
   std::string upstream_transport_failure_reason_;
+  DetectedCloseType upstream_detected_close_type_{DetectedCloseType::Normal};
+  std::string upstream_local_close_reason_;
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};
   absl::optional<Http::Protocol> upstream_protocol_;
+  std::vector<Upstream::HostDescriptionConstSharedPtr> upstream_hosts_attempted_;
+  std::vector<uint64_t> upstream_connection_ids_attempted_;
 };
 
 struct StreamInfoImpl : public StreamInfo {
@@ -392,6 +424,7 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    downstream_local_close_reason_ = std::string(info.downstreamLocalCloseReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
     should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
@@ -449,6 +482,22 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::string_view downstreamTransportFailureReason() const override {
     return downstream_transport_failure_reason_;
+  }
+
+  void setDownstreamLocalCloseReason(absl::string_view failure_reason) override {
+    downstream_local_close_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamLocalCloseReason() const override {
+    return downstream_local_close_reason_;
+  }
+
+  void setDownstreamDetectedCloseType(DetectedCloseType close_type) override {
+    downstream_detected_close_type_ = close_type;
+  }
+
+  DetectedCloseType downstreamDetectedCloseType() const override {
+    return downstream_detected_close_type_;
   }
 
   bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
@@ -516,6 +565,8 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   std::string downstream_transport_failure_reason_;
+  std::string downstream_local_close_reason_;
+  DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   OptRef<const StreamInfo> parent_stream_info_;
   uint64_t bytes_received_{};
   uint64_t bytes_retransmitted_{};

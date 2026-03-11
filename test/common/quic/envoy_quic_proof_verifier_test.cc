@@ -401,7 +401,9 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
                                        {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
-  EXPECT_EQ("verify cert failed: verify SAN list", error_details);
+  EXPECT_EQ("verify cert failed: verify SAN list, expected SANs: [non-example.com], certificate "
+            "SANs: [www.example.org, mail.example.org, mail.example.com, 127.0.0.1]",
+            error_details);
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }

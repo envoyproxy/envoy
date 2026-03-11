@@ -38,6 +38,7 @@ envoy_cc_extension(
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
@@ -49,7 +50,7 @@ envoy_cc_extension(
         "//source/common/config:xds_resource_lib",
         "//source/common/memory:utils_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/container:btree",
+        "@abseil-cpp//absl/container:btree",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -119,6 +120,7 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
     ],
 )
 
@@ -144,6 +146,7 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:load_stats_reporter_lib",
     ],
 )
 

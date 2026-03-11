@@ -1,12 +1,12 @@
 #include <assert.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
 
 static int some_variable = 0;
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 envoy_dynamic_module_type_udp_listener_filter_config_module_ptr
@@ -32,7 +32,8 @@ envoy_dynamic_module_type_on_udp_listener_filter_status
 envoy_dynamic_module_on_udp_listener_filter_on_data(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr) {
-  assert(envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(filter_envoy_ptr) == 1);
+  (void)filter_envoy_ptr;
+  (void)filter_module_ptr;
   return envoy_dynamic_module_type_on_udp_listener_filter_status_Continue;
 }
 
