@@ -197,6 +197,9 @@ def envoy_dependency_imports(
         # last_update = "2023-01-06"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.10.1/dependencies.bzl#L35-L40"
+        build_directives = [
+            "gazelle:resolve go github.com/spf13/afero @com_github_spf13_afero//:afero",
+        ],
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
