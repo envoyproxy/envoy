@@ -42,6 +42,8 @@ using OnClusterDestroyType = decltype(&envoy_dynamic_module_on_cluster_destroy);
 using OnClusterLbNewType = decltype(&envoy_dynamic_module_on_cluster_lb_new);
 using OnClusterLbDestroyType = decltype(&envoy_dynamic_module_on_cluster_lb_destroy);
 using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_choose_host);
+using OnClusterLbCancelHostSelectionType =
+    decltype(&envoy_dynamic_module_on_cluster_lb_cancel_host_selection);
 using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
 using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
@@ -78,6 +80,7 @@ public:
   OnClusterLbNewType on_cluster_lb_new_ = nullptr;
   OnClusterLbDestroyType on_cluster_lb_destroy_ = nullptr;
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
+  OnClusterLbCancelHostSelectionType on_cluster_lb_cancel_host_selection_ = nullptr;
   OnClusterScheduledType on_cluster_scheduled_ = nullptr;
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
@@ -279,6 +282,9 @@ public:
       : cluster_(std::move(cluster)) {}
   ~DynamicModuleClusterHandle();
 
+  // Access the cluster for host lookup during async completion.
+  DynamicModuleCluster* cluster() const { return cluster_.get(); }
+
 private:
   std::shared_ptr<DynamicModuleCluster> cluster_;
   friend class DynamicModuleCluster;
@@ -391,6 +397,28 @@ private:
 };
 
 /**
+ * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
+ * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
+ * pending result from choose_host, and destroyed after the module delivers the result or the
+ * selection is canceled.
+ */
+class DynamicModuleAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
+public:
+  DynamicModuleAsyncHostSelectionHandle(
+      envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
+      envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
+      OnClusterLbCancelHostSelectionType cancel_fn)
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn) {}
+
+  void cancel() override;
+
+private:
+  envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  OnClusterLbCancelHostSelectionType cancel_fn_;
+};
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
@@ -415,9 +443,19 @@ public:
   // Access the priority set for lb callbacks.
   const Upstream::PrioritySet& prioritySet() const;
 
+  // Access the handle for async host selection completion.
+  const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
+
+  // Per-host custom data storage.
+  bool setHostData(uint32_t priority, size_t index, uintptr_t data);
+  bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+
+  // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
+  absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
 };
 
 /**
