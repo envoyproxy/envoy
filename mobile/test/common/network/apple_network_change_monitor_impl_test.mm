@@ -11,7 +11,7 @@
 // Mock NetworkChangeListener to observe callbacks from EnvoyCxxNetworkMonitor
 class MockNetworkChangeListener : public Envoy::Platform::NetworkChangeListener {
 public:
-  MockNetworkChangeListener() 
+  MockNetworkChangeListener()
       : available_called_(0), unavailable_called_(0), change_event_network_(-1) {}
 
   void onDefaultNetworkChangeEvent(int network) override { change_event_network_ = network; }
@@ -175,7 +175,7 @@ TEST_F(AppleNetworkChangeMonitorImplTest, OfflineToOnlineEvent) {
   // Now simulate coming online.
   mock_provider_.status = nw_path_status_satisfied;
   mock_provider_.hasWifiOrWired = YES;
-  
+
   simulateNetworkChange();
 
   EXPECT_EQ(mock_listener_->available_called_, 1);
