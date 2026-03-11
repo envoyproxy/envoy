@@ -608,7 +608,7 @@ EXTENSIONS = {
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 
     # Dynamic modules
-    "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+    #"envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",

@@ -119,6 +119,7 @@ public:
       ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
       std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)> data_transform_cb,
       uint64_t max_size, absl::optional<std::function<void()>> data_update_cb = absl::nullopt) {
+    std::cerr << "***DataSourceProviderPtr create"<< std::endl;
     auto initial_data_or_error = read(source, allow_empty, api, max_size);
     RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
 
@@ -131,18 +132,21 @@ public:
                                                     max_size));
     }
     auto transformed_data_or_error = data_transform_cb(initial_data_or_error.value());
+    std::cerr << "***DataSourceProviderPtr transformed data"<< std::endl;
     RETURN_IF_NOT_OK_REF(transformed_data_or_error.status());
     if (!source.has_watched_directory() ||
         source.specifier_case() != envoy::config::core::v3::DataSource::kFilename) {
       return std::unique_ptr<DataSourceProvider<DataType>>(
           new DataSourceProvider<DataType>(std::move(*transformed_data_or_error.value())));
     }
+    std::cerr << "***DataSourceProviderPtr transformed data 2"<< std::endl;
 
     auto slot =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
 
     slot->set([initial_data = std::make_shared<DataType>(
                    std::move(*transformed_data_or_error.value()))](Event::Dispatcher&) {
+      std::cerr << "***DataSourceProviderPtr updated slot"<< std::endl;
       return std::make_shared<typename DynamicData<DataType>::ThreadLocalData>(initial_data);
     });
 
@@ -161,6 +165,7 @@ public:
                             "Failed to read file: {}", new_data_or_error.status().message());
         return absl::OkStatus();
       }
+      std::cerr << "***On data updated, invoking data_transform_cb"<< std::endl;
       auto transformed_new_data_or_error = data_transform_cb(new_data_or_error.value());
       if (!transformed_new_data_or_error.ok()) {
         // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
@@ -174,8 +179,10 @@ public:
           [new_data = std::make_shared<DataType>(std::move(*transformed_new_data_or_error.value())),
            data_update_cb](OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
             if (obj.has_value()) {
+              std::cerr << "***Setting new data"<< std::endl;
               obj->data_ = new_data;
               if (data_update_cb.has_value()) {
+                std::cerr << "***Invoking data update cb"<< std::endl;
                 data_update_cb.value()();
               }
             }

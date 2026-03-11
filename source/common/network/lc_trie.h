@@ -41,6 +41,8 @@ constexpr size_t MaxLcTrieNodes = (1 << 20);
  */
 template <class T> class LcTrie {
 public:
+
+  LcTrie() = default;
   /**
    * @param data supplies a vector of data and CIDR ranges.
    * @param exclusive if true then only data for the most specific subnet will be returned
