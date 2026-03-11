@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: contrib
+  change: |
+    Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
+    peak_ewma loadbalancer.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
