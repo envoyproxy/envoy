@@ -26,7 +26,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#ifdef ENVOY_ENABLE_CERT_COMPRESSION
 #include "source/common/tls/cert_compression.h"
+#endif
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -164,6 +166,7 @@ ContextImpl::ContextImpl(
       }
     }
 
+#ifdef ENVOY_ENABLE_CERT_COMPRESSION
     // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
     // Priority: brotli > zlib (brotli generally provides best compression for certs).
     if (Runtime::runtimeFeatureEnabled(
@@ -171,6 +174,7 @@ ContextImpl::ContextImpl(
       CertCompression::registerBrotli(ctx.ssl_ctx_.get());
       CertCompression::registerZlib(ctx.ssl_ctx_.get());
     }
+#endif
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
