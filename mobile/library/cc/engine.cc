@@ -3,6 +3,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "library/common/internal_engine.h"
+#include "library/common/system/system_helper.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -39,6 +40,13 @@ std::string Engine::dumpStats() { return engine_->dumpStats(); }
 int64_t Engine::getInternalEngineHandle() const { return reinterpret_cast<int64_t>(engine_); }
 
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
+
+void Engine::initializeNetworkChangeMonitor() {
+  network_change_monitor_ = SystemHelper::getInstance().initializeNetworkChangeMonitor(*this);
+  if (network_change_monitor_ != nullptr) {
+    network_change_monitor_->start();
+  }
+}
 
 void Engine::onDefaultNetworkChangeEvent(int network) {
   engine_->onDefaultNetworkChangeEvent(network);
