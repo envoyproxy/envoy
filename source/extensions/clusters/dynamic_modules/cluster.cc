@@ -385,7 +385,7 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (async_handle != nullptr) {
     // Async pending: the module will call the completion callback later.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
-        context, async_handle, in_module_lb_,
+        async_handle, in_module_lb_,
         handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }

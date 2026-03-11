@@ -1610,11 +1610,8 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-  // Verify cancel does not crash with nullptr function.
-  DynamicModuleAsyncHostSelectionHandle handle(&context, dummy_async_handle, dummy_lb, nullptr);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
   handle.cancel();
-  EXPECT_EQ(handle.context(), &context);
 }
 
 // Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
@@ -1623,21 +1620,9 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-  DynamicModuleAsyncHostSelectionHandle handle(&context, dummy_async_handle, dummy_lb, nullptr);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
   // Should not crash with nullptr cancel function.
   handle.cancel();
-}
-
-// Test DynamicModuleAsyncHostSelectionHandle context accessor.
-TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleContext) {
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-  auto* dummy_async_handle =
-      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
-  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
-
-  DynamicModuleAsyncHostSelectionHandle handle(&context, dummy_async_handle, dummy_lb, nullptr);
-  EXPECT_EQ(handle.context(), &context);
 }
 
 // Test async host selection complete callback with a valid host.

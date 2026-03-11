@@ -405,20 +405,14 @@ private:
 class DynamicModuleAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
 public:
   DynamicModuleAsyncHostSelectionHandle(
-      Upstream::LoadBalancerContext* context,
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
       OnClusterLbCancelHostSelectionType cancel_fn)
-      : context_(context), async_handle_(async_handle), in_module_lb_(in_module_lb),
-        cancel_fn_(cancel_fn) {}
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn) {}
 
   void cancel() override;
 
-  // Called by the async completion callback to deliver the result.
-  Upstream::LoadBalancerContext* context() const { return context_; }
-
 private:
-  Upstream::LoadBalancerContext* context_;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
   OnClusterLbCancelHostSelectionType cancel_fn_;
