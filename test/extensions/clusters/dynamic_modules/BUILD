@@ -41,3 +41,22 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/clusters/dynamic_modules:cluster",
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//test/extensions/dynamic_modules:util",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)

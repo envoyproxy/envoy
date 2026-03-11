@@ -2059,8 +2059,10 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  auto cancelled = std::make_shared<std::atomic<bool>>(false);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
   handle.cancel();
+  EXPECT_TRUE(cancelled->load());
 }
 
 // Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
@@ -2069,7 +2071,8 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  auto cancelled = std::make_shared<std::atomic<bool>>(false);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
   // Should not crash with nullptr cancel function.
   handle.cancel();
 }

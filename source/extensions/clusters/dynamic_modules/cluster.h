@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -30,10 +31,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
-
-// The default custom stat namespace which prepends all user-defined metrics.
-// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
-constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
@@ -70,14 +67,12 @@ public:
    *
    * @param cluster_name the name identifying the cluster implementation in the module.
    * @param cluster_config the configuration bytes to pass to the module.
-   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
-         const std::string& metrics_namespace,
          Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
 
   ~DynamicModuleClusterConfig();
@@ -268,7 +263,6 @@ public:
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
-                             const std::string& metrics_namespace,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
                              Stats::Scope& stats_scope);
 
@@ -471,8 +465,11 @@ public:
   DynamicModuleAsyncHostSelectionHandle(
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
-      OnClusterLbCancelHostSelectionType cancel_fn)
-      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn) {}
+      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled)
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn),
+        cancelled_(std::move(cancelled)) {}
+
+  ~DynamicModuleAsyncHostSelectionHandle() override;
 
   void cancel() override;
 
@@ -480,6 +477,7 @@ private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
   OnClusterLbCancelHostSelectionType cancel_fn_;
+  std::shared_ptr<std::atomic<bool>> cancelled_;
 };
 
 /**
@@ -510,6 +508,22 @@ public:
   // Access the handle for async host selection completion.
   const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
 
+  /**
+   * Returns the shared cancellation flag for the current async host selection. When the router
+   * cancels the selection (e.g., stream timeout), the flag is set so the posted completion
+   * callback becomes a no-op. Returns nullptr when there is no active async selection.
+   */
+  std::shared_ptr<std::atomic<bool>> activeAsyncCancelled() const {
+    return active_async_cancelled_;
+  }
+
+  /**
+   * Returns the worker thread's dispatcher captured during chooseHost. Used by the async
+   * completion callback in abi_impl.cc to post to the correct worker thread without accessing
+   * the LoadBalancerContext from a background thread.
+   */
+  Event::Dispatcher* activeAsyncDispatcher() const { return active_async_dispatcher_; }
+
   // Per-host custom data storage.
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
   bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
@@ -521,6 +535,13 @@ public:
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+
+  // Shared cancellation flag for the active async host selection. Set in chooseHost when the
+  // module returns AsyncPending, and read by the posted completion callback in abi_impl.cc.
+  std::shared_ptr<std::atomic<bool>> active_async_cancelled_;
+
+  // Worker thread dispatcher captured during chooseHost for async completion posting.
+  Event::Dispatcher* active_async_dispatcher_{nullptr};
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
