@@ -725,6 +725,43 @@ TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
                             "Stats logger gauge set operation must have a valid log type.");
 }
 
+TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+      - stat:
+          name: gauge
+        value_fixed: 20
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD for both definitions
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  // Both add operations should be called
+  EXPECT_CALL(*gauge_, add(10));
+  EXPECT_CALL(*gauge_, add(20));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  // It should sub(30) once, as they are accumulated into one stored map entry
+  EXPECT_CALL(*gauge_, sub(30));
+  EXPECT_CALL(*gauge_, sub(10)).Times(0);
+  EXPECT_CALL(*gauge_, sub(20)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+}
+
 } // namespace StatsAccessLog
 } // namespace AccessLoggers
 } // namespace Extensions

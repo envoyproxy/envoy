@@ -18,24 +18,24 @@ public:
   explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
   ~AccessLogState() override {
-    for (const auto& [gauge, value] : inflight_gauges_) {
-      gauge->sub(value);
+    while (!inflight_gauges_.empty()) {
+      removeInflightGauge(inflight_gauges_.begin()->first);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    auto [it, inserted] = inflight_gauges_.try_emplace(gauge, 0);
+    auto it = inflight_gauges_.try_emplace(gauge, 0).first;
     it->second += value;
+    gauge->add(value);
   }
 
-  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
+  void removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
-    if (it == inflight_gauges_.end()) {
-      return absl::nullopt;
+    if (it != inflight_gauges_.end()) {
+      uint64_t value = it->second;
+      inflight_gauges_.erase(it);
+      gauge->sub(value);
     }
-    uint64_t value = it->second;
-    inflight_gauges_.erase(it);
-    return value;
   }
 
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
@@ -329,12 +329,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
       state->addInflightGauge(&gauge_stat, value);
-      gauge_stat.add(value);
     } else {
-      absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
-      if (added_value.has_value()) {
-        gauge_stat.sub(added_value.value());
-      }
+      state->removeInflightGauge(&gauge_stat);
     }
     return;
   }
