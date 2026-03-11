@@ -255,8 +255,8 @@ public:
     UNREFERENCED_PARAMETER(f_stat);
   }
 
-  NullCounterImpl& nullCounter() override { return *null_counter_; }
-  NullGaugeImpl& nullGauge() override { return *null_gauge_; }
+  NullCounterImpl& nullCounter() override { return null_counter_; }
+  NullGaugeImpl& nullGauge() override { return null_gauge_; }
 
   bool iterate(const IterateFn<Counter>& fn) const override {
     return constRootScope()->iterate(fn);
@@ -297,8 +297,8 @@ private:
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
   IsolatedStatsCache<TextReadout> text_readouts_;
-  RefcountPtr<NullCounterImpl> null_counter_;
-  RefcountPtr<NullGaugeImpl> null_gauge_;
+  NullCounterImpl null_counter_;
+  NullGaugeImpl null_gauge_;
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
@@ -334,7 +334,7 @@ public:
                                        StatNameTagVectorOptConstRef tags) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
     return store_.counters_.get(prefix(), name, tags, symbolTable(), matcher)
-        .value_or(*store_.null_counter_);
+        .value_or(store_.null_counter_);
   }
   ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
                              const ScopeStatsLimitSettings& limits = {},
@@ -345,8 +345,12 @@ public:
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
-    return store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode, matcher)
-        .value_or(*store_.null_gauge_);
+    auto gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode, matcher);
+    if (!gauge.has_value()) {
+      return store_.null_gauge_;
+    }
+    gauge->mergeImportMode(import_mode);
+    return *gauge;
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {

@@ -46,8 +46,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
                                       tagVectorFromOpt(tags));
       }),
-      null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)), null_histogram_(symbol_table),
+      null_counter_(symbol_table), null_gauge_(symbol_table), null_histogram_(symbol_table),
       null_text_readout_(symbol_table) {}
 
 ScopeSharedPtr IsolatedStoreImpl::rootScope() {

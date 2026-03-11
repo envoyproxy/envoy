@@ -88,7 +88,7 @@ public:
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
-   * except another matcher is explicitly set for the sub scope.
+   * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
                                      const ScopeStatsLimitSettings& limits = {},
@@ -105,7 +105,7 @@ public:
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
-   * except another matcher is explicitly set for the sub scope.
+   * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
                                            const ScopeStatsLimitSettings& limits = {},
