@@ -203,6 +203,106 @@ WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host(nullptr, 0, 0))
+WEAK_STUB(ClusterLbContextComputeHashKey,
+          envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(nullptr, nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeadersSize,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeaders,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(nullptr, nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamHeader,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterLbContextGetHostSelectionRetryCount,
+          envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(nullptr))
+WEAK_STUB(ClusterLbContextShouldSelectAnotherHost,
+          envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(nullptr,
+                                                                                      nullptr, 0,
+                                                                                      0))
+WEAK_STUB(ClusterLbContextGetOverrideHost,
+          envoy_dynamic_module_callback_cluster_lb_context_get_override_host(nullptr, nullptr,
+                                                                             nullptr))
+WEAK_STUB(ClusterLbContextGetDownstreamConnectionSni,
+          envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(nullptr,
+                                                                                         nullptr))
+WEAK_STUB(ClusterLbGetClusterName,
+          envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
+WEAK_STUB(ClusterLbGetHostsCount,
+          envoy_dynamic_module_callback_cluster_lb_get_hosts_count(nullptr, 0))
+WEAK_STUB(ClusterLbGetDegradedHostsCount,
+          envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(nullptr, 0))
+WEAK_STUB(ClusterLbGetPrioritySetSize,
+          envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(nullptr))
+WEAK_STUB(ClusterLbGetHealthyHostAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(nullptr, 0, 0, nullptr))
+WEAK_STUB(ClusterLbGetHealthyHostWeight,
+          envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHostHealth,
+          envoy_dynamic_module_callback_cluster_lb_get_host_health(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHostHealthByAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(nullptr, {nullptr, 0},
+                                                                              nullptr))
+WEAK_STUB(ClusterLbGetHostAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_host_address(nullptr, 0, 0, nullptr))
+WEAK_STUB(ClusterLbGetHostWeight,
+          envoy_dynamic_module_callback_cluster_lb_get_host_weight(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetHostStat, envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+                                    nullptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal))
+WEAK_STUB(ClusterLbGetHostLocality,
+          envoy_dynamic_module_callback_cluster_lb_get_host_locality(nullptr, 0, 0, nullptr,
+                                                                     nullptr, nullptr))
+WEAK_STUB(ClusterLbSetHostData,
+          envoy_dynamic_module_callback_cluster_lb_set_host_data(nullptr, 0, 0, 0))
+WEAK_STUB(ClusterLbGetHostData,
+          envoy_dynamic_module_callback_cluster_lb_get_host_data(nullptr, 0, 0, nullptr))
+WEAK_STUB(ClusterLbGetHostMetadataString,
+          envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(nullptr, 0, 0,
+                                                                            {nullptr, 0},
+                                                                            {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterLbGetHostMetadataNumber,
+          envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(nullptr, 0, 0,
+                                                                            {nullptr, 0},
+                                                                            {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterLbGetHostMetadataBool,
+          envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(nullptr, 0, 0,
+                                                                          {nullptr, 0},
+                                                                          {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterLbGetLocalityCount,
+          envoy_dynamic_module_callback_cluster_lb_get_locality_count(nullptr, 0))
+WEAK_STUB(ClusterLbGetLocalityHostCount,
+          envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(nullptr, 0, 0))
+WEAK_STUB(ClusterLbGetLocalityHostAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(nullptr, 0, 0, 0,
+                                                                             nullptr))
+WEAK_STUB(ClusterLbGetLocalityWeight,
+          envoy_dynamic_module_callback_cluster_lb_get_locality_weight(nullptr, 0, 0))
+WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
+          envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(nullptr, nullptr,
+                                                                                 nullptr,
+                                                                                 {nullptr, 0}))
+WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_new(nullptr))
+WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
+WEAK_STUB(ClusterSchedulerCommit,
+          envoy_dynamic_module_callback_cluster_scheduler_commit(nullptr, 0))
+WEAK_STUB(ClusterConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_config_define_counter(nullptr, {nullptr, 0},
+                                                                      nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_config_increment_counter(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_config_define_gauge(nullptr, {nullptr, 0}, nullptr,
+                                                                    0, nullptr))
+WEAK_STUB(ClusterConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_config_increment_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_config_decrement_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(ClusterConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_config_define_histogram(nullptr, {nullptr, 0},
+                                                                        nullptr, 0, nullptr))
+WEAK_STUB(ClusterConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_config_record_histogram_value(nullptr, 0, nullptr,
+                                                                              0, 0))
 
 WEAK_STUB(LbGetClusterName, envoy_dynamic_module_callback_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(LbGetHostsCount, envoy_dynamic_module_callback_lb_get_hosts_count(nullptr, 0))
@@ -222,10 +322,6 @@ WEAK_STUB(LbGetHostHealthByAddress,
 WEAK_STUB(LbGetHostAddress,
           envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, nullptr))
 WEAK_STUB(LbGetHostWeight, envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0))
-WEAK_STUB(LbGetHostActiveRequests,
-          envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0))
-WEAK_STUB(LbGetHostActiveConnections,
-          envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0))
 WEAK_STUB(LbGetHostLocality,
           envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr, nullptr,
                                                              nullptr))
@@ -265,9 +361,8 @@ WEAK_STUB(LbGetLocalityWeight, envoy_dynamic_module_callback_lb_get_locality_wei
 WEAK_STUB(LbGetMemberUpdateHostAddress,
           envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0, true,
                                                                           nullptr))
-WEAK_STUB(LbGetHostCounterStat,
-          envoy_dynamic_module_callback_lb_get_host_counter_stat(
-              nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal))
+WEAK_STUB(LbGetHostStat, envoy_dynamic_module_callback_lb_get_host_stat(
+                             nullptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal))
 
 WEAK_STUB(LbConfigDefineCounter,
           envoy_dynamic_module_callback_lb_config_define_counter(nullptr, {"counter", 7}, nullptr,

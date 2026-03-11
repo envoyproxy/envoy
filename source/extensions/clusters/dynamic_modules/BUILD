@@ -19,8 +19,10 @@ envoy_cc_library(
         "cluster.h",
     ],
     deps = [
+        "//envoy/stats:stats_interface",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

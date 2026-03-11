@@ -19,6 +19,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/config:metadata_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -26,7 +27,9 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
