@@ -1,6 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/request_splitter.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,18 +11,16 @@ namespace OpenTelemetry {
 void RequestSplitter::chunkRequests(
     Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& rm_list,
     const uint32_t max_dp, const std::function<void(MetricsExportRequestPtr)>& send_callback) {
-
-  // Envoy's OTLP stat sink currently guarantees exactly 1 ResourceMetrics
-  // and exactly 1 ScopeMetrics per export loop. We optimize the chunking
-  // by holding this assumption.
+  // If there are no resource metrics, there is nothing to do.
   if (rm_list.empty()) {
     return;
   }
+
+  // Envoy's OTLP stat sink currently guarantees exactly 1 ResourceMetrics
+  // and exactly 1 ScopeMetrics per export loop if there are any metric data points. We optimize the
+  // chunking by holding this assumption.
   ENVOY_BUG(rm_list.size() == 1, "Expected exactly 1 ResourceMetrics in OTLP stat sink.");
   auto* rm = rm_list.Mutable(0);
-  if (rm->scope_metrics_size() == 0) {
-    return;
-  }
   ENVOY_BUG(rm->scope_metrics_size() == 1,
             "Expected exactly 1 ScopeMetrics in OTLP stat sink ResourceMetrics.");
   auto* sm = rm->mutable_scope_metrics(0);
@@ -101,11 +100,9 @@ void RequestSplitter::chunkRequests(
         append_dp([&](auto* m) { *m->mutable_histogram()->add_data_points() = std::move(dp); });
       }
       break;
-    case opentelemetry::proto::metrics::v1::Metric::DataCase::kExponentialHistogram:
-    case opentelemetry::proto::metrics::v1::Metric::DataCase::kSummary:
-      ENVOY_BUG(false, "ExponentialHistogram and Summary metric types are not supported");
-      break;
     default:
+      ENVOY_BUG(false, fmt::format("Metric type {} is not supported in OTLP RequestSplitter.",
+                                   static_cast<int>(metric.data_case())));
       break;
     }
   }

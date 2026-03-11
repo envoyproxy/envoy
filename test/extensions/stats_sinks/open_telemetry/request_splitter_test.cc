@@ -195,7 +195,7 @@ TEST(RequestSplitterTest, UnsupportedMetricTypes) {
                                                   [&requests](MetricsExportRequestPtr req) {
                                                     requests.push_back(std::move(req));
                                                   }),
-                   "ExponentialHistogram and Summary metric types are not supported");
+                   "Metric type 10 is not supported in OTLP RequestSplitter.");
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics> resource_metrics2;
   auto* rm2 = resource_metrics2.Add();
@@ -208,7 +208,7 @@ TEST(RequestSplitterTest, UnsupportedMetricTypes) {
                                                   [&requests](MetricsExportRequestPtr req) {
                                                     requests.push_back(std::move(req));
                                                   }),
-                   "ExponentialHistogram and Summary metric types are not supported");
+                   "Metric type 11 is not supported in OTLP RequestSplitter.");
 }
 
 TEST(RequestSplitterTest, MultipleResourceMetrics) {

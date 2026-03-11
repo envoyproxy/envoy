@@ -418,10 +418,6 @@ void OtlpMetricsFlusherImpl::flush(
   }
 
   auto resource_metrics = aggregator.getResourceMetrics(config_->resource_attributes());
-  if (resource_metrics.empty()) {
-    return;
-  }
-
   RequestSplitter::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
                                  send_callback);
 }
