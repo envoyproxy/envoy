@@ -116,6 +116,11 @@ def envoy_dependency_imports(
         sum = "h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=",
         version = "v0.34.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/secure/bidirule @org_golang_x_text//secure/bidirule",
+            "gazelle:resolve go golang.org/x/text/unicode/bidi @org_golang_x_text//unicode/bidi",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "org_golang_x_text",
@@ -172,6 +177,11 @@ def envoy_dependency_imports(
         sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
         version = "v1.10.0",
         build_external = "external",
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes",
+            "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star_v2",
