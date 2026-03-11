@@ -115,13 +115,11 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
+  // We expect a warning log for ABI version mismatch but still load the module successfully.
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
@@ -157,6 +155,31 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
   std::filesystem::remove(staged_lib);
+}
+
+TEST(StaticModule, LoadSuccess) {
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("matcher_no_op_static");
+  EXPECT_TRUE(result.ok()) << result.status().message();
+}
+
+TEST(StaticModule, SymbolNotFound) {
+  // "nonexistent_module" has no prefixed symbols in the binary.
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("nonexistent_module");
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("Failed to resolve symbol "
+                                 "envoy_dynamic_module_on_program_init"));
+}
+
+TEST(StaticModule, MultipleLoads) {
+  absl::StatusOr<DynamicModulePtr> c_module =
+      newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
+  EXPECT_TRUE(c_module.ok()) << c_module.status().message();
+
+  absl::StatusOr<DynamicModulePtr> c_module_2 =
+      newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
+  EXPECT_TRUE(c_module_2.ok()) << c_module_2.status().message();
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {

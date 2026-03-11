@@ -1,5 +1,11 @@
 package fake
 
+import (
+	"unsafe"
+
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
+)
+
 type FakeHeaderMap struct {
 	Headers map[string][]string
 }
@@ -10,23 +16,32 @@ func NewFakeHeaderMap(headers map[string][]string) *FakeHeaderMap {
 	}
 }
 
-func (m *FakeHeaderMap) Get(key string) []string {
-	return m.Headers[key]
+func (m *FakeHeaderMap) Get(key string) []shared.UnsafeEnvoyBuffer {
+	values := m.Headers[key]
+	result := make([]shared.UnsafeEnvoyBuffer, len(values))
+	for i, v := range values {
+		result[i] = shared.UnsafeEnvoyBuffer{Ptr: unsafe.StringData(v), Len: uint64(len(v))}
+	}
+	return result
 }
 
-func (m *FakeHeaderMap) GetOne(key string) string {
+func (m *FakeHeaderMap) GetOne(key string) shared.UnsafeEnvoyBuffer {
 	values := m.Headers[key]
 	if len(values) > 0 {
-		return values[0]
+		v := values[0]
+		return shared.UnsafeEnvoyBuffer{Ptr: unsafe.StringData(v), Len: uint64(len(v))}
 	}
-	return ""
+	return shared.UnsafeEnvoyBuffer{}
 }
 
-func (m *FakeHeaderMap) GetAll() [][2]string {
-	var result [][2]string
+func (m *FakeHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
+	var result [][2]shared.UnsafeEnvoyBuffer
 	for k, vs := range m.Headers {
 		for _, v := range vs {
-			result = append(result, [2]string{k, v})
+			result = append(result, [2]shared.UnsafeEnvoyBuffer{
+				{Ptr: unsafe.StringData(k), Len: uint64(len(k))},
+				{Ptr: unsafe.StringData(v), Len: uint64(len(v))},
+			})
 		}
 	}
 	return result
@@ -54,8 +69,10 @@ func NewFakeBodyBuffer(body []byte) *FakeBodyBuffer {
 	}
 }
 
-func (b *FakeBodyBuffer) GetChunks() [][]byte {
-	return [][]byte{b.Body}
+func (b *FakeBodyBuffer) GetChunks() []shared.UnsafeEnvoyBuffer {
+	return []shared.UnsafeEnvoyBuffer{
+		{Ptr: unsafe.SliceData(b.Body), Len: uint64(len(b.Body))},
+	}
 }
 
 func (b *FakeBodyBuffer) GetSize() uint64 {

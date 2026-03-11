@@ -24,7 +24,7 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:policy_interface",
         "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",

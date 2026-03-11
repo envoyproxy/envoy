@@ -31,6 +31,9 @@ struct GrpcMuxContext {
   const std::string& target_xds_authority_;
   EdsResourcesCachePtr eds_resources_cache_;
   bool skip_subsequent_node_;
+  // A factory method that allows a GrpcMux lazily create a Load-Stats-Reporter
+  // if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
 };
 
 } // namespace Config

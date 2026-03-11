@@ -45,8 +45,8 @@ envoy_cc_library(
         "//source/common/http:default_server_string_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

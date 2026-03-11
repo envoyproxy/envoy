@@ -6,5 +6,5 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     has_services = True,
-    deps = ["@com_github_cncf_xds//udpa/annotations:pkg"],
+    deps = ["@xds//udpa/annotations:pkg"],
 )

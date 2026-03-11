@@ -24,10 +24,10 @@
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/config/integration/certs/clientcert_hash.h"
-#include "test/config/integration/certs/servercert_info.h"
-#include "test/config/integration/certs/server2cert_info.h"
 #include "test/common/tls/test_private_key_method_provider.h"
+#include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/server2cert_info.h"
+#include "test/config/integration/certs/servercert_info.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"

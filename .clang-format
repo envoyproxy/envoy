@@ -4,7 +4,33 @@ AccessModifierOffset: -2
 ColumnLimit: 100
 DerivePointerAlignment: false
 PointerAlignment: Left
-SortIncludes: false
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+# Main header file for the source file gets category 0 by default.
+- Regex: '^<.*\.h>'
+  Priority: 1
+- Regex: '^<.*>'
+  Priority: 2
+# proxy_wasm_intrinsics[_lite] must be included before other header files, as it sets macros.
+- Regex: '^"proxy_wasm_intrinsics'
+  Priority: 3
+- Regex: '^"envoy'
+  Priority: 4
+- Regex: '^"common'
+  Priority: 5
+- Regex: '^"source'
+  Priority: 6
+- Regex: '^"exe'
+  Priority: 7
+- Regex: '^"server'
+  Priority: 8
+- Regex: '^"extensions'
+  Priority: 9
+- Regex: '^"test'
+  Priority: 10
+- Regex: '^.*'
+  Priority: 11
 TypenameMacros: ['STACK_OF']
 ...
 

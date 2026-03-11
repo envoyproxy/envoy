@@ -18,6 +18,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:utility_lib",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )

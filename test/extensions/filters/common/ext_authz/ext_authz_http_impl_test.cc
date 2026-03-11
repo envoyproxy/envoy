@@ -97,7 +97,10 @@ public:
     }
 
     cm_.initializeThreadLocalClusters({"ext_authz"});
-    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix, factory_context_);
+    const std::string path_prefix_value =
+        yaml.empty() ? path_prefix : proto_config.http_service().path_prefix();
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix_value,
+                                          factory_context_);
   }
 
   void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
@@ -226,8 +229,21 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
                                             /*timeout_ms=*/123, factory_context_);
   EXPECT_EQ(cfg->cluster(), "ext_authz");
   EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+  EXPECT_TRUE(cfg->pathOverride().empty());
   EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
   EXPECT_TRUE(cfg->encodeRawHeaders());
+}
+
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpServiceWithPathOverride) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+  http_service.mutable_server_uri()->set_cluster("ext_authz");
+  http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+  http_service.set_path_override("/override");
+  auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/false,
+                                            /*timeout_ms=*/456, factory_context_);
+  EXPECT_EQ(cfg->pathPrefix(), "");
+  EXPECT_EQ(cfg->pathOverride(), "/override");
 }
 
 TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
@@ -301,12 +317,63 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
                             "path_prefix should start with \"/\".");
 }
 
-// Verify client response when the authorization server returns a 200 OK and path_prefix is
-// configured.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
+// Verify path_override completely replaces the path (no prefix of original path).
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth");
+}
 
-  EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
+// Same input path /hello but with path_prefix /auth yields /auth/hello.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathPrefixSameInput) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth/hello");
+}
+
+// Verify only one of path_prefix or path_override may be set.
+TEST_F(ExtAuthzHttpClientTest, PathPrefixAndPathOverrideMutuallyExclusive) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/prefix"
+    path_override: "/override"
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "Only one of path_prefix or path_override may be set, not both.");
+}
+
+// Verify path_override must start with /.
+TEST_F(ExtAuthzHttpClientTest, PathOverrideMustStartWithSlash) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "no-leading-slash"
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "path_override should start with \"/\".");
 }
 
 // Verify request body is set correctly when the normal body is empty and raw body is set.
@@ -404,15 +471,10 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
-  // The default config has allowed_upstream_headers with prefix: "X-", so both
-  // x-downstream-ok and x-upstream-ok would match and get added to request_header_mutations.
-  auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, EMPTY_STRING,
-      TestCommon::makeHeaderValueOption(
-          {{"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}}));
-  // The HTTP impl always uses Add action for response headers.
-  authz_response.response_header_mutations.push_back(
-      {"x-downstream-ok", "1", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
+      // By default, the value of envoy.config.core.v3.HeaderValueOption.append is true.
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", true}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
@@ -479,9 +541,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
 // Verify client response headers when allow_upstream_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   const std::string empty_body{};
-  // Headers are returned in header map iteration order, which is bar then x-baz.
   const auto expected_headers =
-      TestCommon::makeHeaderValueOption({{"bar", "foo", false}, {"x-baz", "foo", false}});
+      TestCommon::makeHeaderValueOption({{"x-baz", "foo", false}, {"bar", "foo", false}});
   const auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -546,12 +607,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
-  // For denied responses, :status goes to local_response_header_mutations which matches
-  // response_matchers_.
-  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden);
-  authz_response.local_response_header_mutations.push_back(
-      {":status", "403", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Denied, Http::Code::Forbidden, EMPTY_STRING, expected_headers);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
@@ -572,25 +629,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   const auto expected_body = std::string{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "401", false}, {"foo", "bar", false}, {"x-foobar", "bar", false}});
-  // Manually construct expected response because HTTP impl processes headers differently:
-  // - For denied responses, upstreamHeaderMatchers (X- prefix) are not applied i.e., no
-  // upstream request is made.
-  // - :status, foo, x-foobar match clientHeaderMatchers (default :status, Foo exact, X- prefix)
-  //   → local_response_header_mutations with Add
-  Response authz_response;
-  authz_response.status = CheckStatus::Denied;
-  authz_response.status_code = Http::Code::Unauthorized;
-  authz_response.body = expected_body;
-  // :status matches default client header matcher → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {":status", "401", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // foo matches clientHeaderMatchers (Foo exact) → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {"foo", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // x-foobar matches clientHeaderMatchers (X- prefix) → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {"x-foobar", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
@@ -605,28 +645,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
 // allowed_client_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   const auto expected_body = std::string{"test"};
-  // Manually construct expected response because HTTP impl processes headers differently.
-  // Response headers from auth server: :method, x-foo, :status, foo
-  // - For denied responses, upstreamHeaderMatchers are not applied.
-  // - x-foo, :status, foo match clientHeaderMatchers (X- prefix, default :status, Foo exact)
-  //   → local_response_header_mutations with Add.
-  // - :method doesn't match any matcher.
-  // Note that the header iteration order may differ from insertion order. Pseudo-headers
-  // like :status are typically iterated first.
-  Response authz_response;
-  authz_response.status = CheckStatus::Denied;
-  authz_response.status_code = Http::Code::Unauthorized;
-  authz_response.body = expected_body;
-  // :status matches default client header matcher → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {":status", "401", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // x-foo matches clientHeaderMatchers (X- prefix) → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {"x-foo", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // foo matches clientHeaderMatchers (Foo exact) → local_response_header_mutations.
-  authz_response.local_response_header_mutations.push_back(
-      {"foo", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
+      TestCommon::makeHeaderValueOption(
+          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}),
+      TestCommon::makeHeaderValueOption({}));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
@@ -668,6 +691,60 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test that HTTP call failure leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, HttpCallFailureDoesNotSetStatusCode) {
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test that HTTP 5xx response leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, Http5xxResponseDoesNotSetStatusCode) {
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test that missing cluster leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, MissingClusterDoesNotSetStatusCode) {
+  InSequence s;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
+                 stream_info_);
 }
 
 // Test the client when the request is canceled.
@@ -800,10 +877,8 @@ TEST_F(ExtAuthzHttpClientTest, SetCookieHeaderOnSuccess) {
                                          {"x-custom-header", "custom-value", false}});
 
   Response expected_response = TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK);
-  expected_response.response_header_mutations.push_back(
-      {"set-cookie", "session=abc123", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  expected_response.response_header_mutations.push_back(
-      {"x-custom-header", "custom-value", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+  expected_response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                               {"x-custom-header", "custom-value"}};
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
@@ -841,15 +916,12 @@ TEST_F(ExtAuthzHttpClientTest, SetCookieHeaderOnDenied) {
 
   Response expected_response =
       TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden, expected_body);
-  // For denied responses, headers matching allowed_client_headers go to
-  // local_response_header_mutations. Note that :status is always matched by the default client
-  // header matchers and is iterated first. Pseudo-headers are iterated before regular headers.
-  expected_response.local_response_header_mutations.push_back(
-      {":status", "403", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  expected_response.local_response_header_mutations.push_back(
-      {"set-cookie", "error=invalid", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  expected_response.local_response_header_mutations.push_back(
-      {"x-auth-error", "invalid_token", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+  // For denied responses, headers matching allowed_client_headers populate headers_to_set
+  // which is used by the ext_authz filter for the local reply.
+  // Note: :status is included because toClientMatchers adds default matchers for Status,
+  // Content-Length, WWW-Authenticate, and Location when allowed_client_headers is non-empty.
+  expected_response.headers_to_set = {
+      {":status", "403"}, {"set-cookie", "error=invalid"}, {"x-auth-error", "invalid_token"}};
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
@@ -884,10 +956,8 @@ TEST_F(ExtAuthzHttpClientTest, MultipleSetCookieHeadersOnSuccess) {
   message_response->headers().addCopy(Http::LowerCaseString{"set-cookie"}, "user=john");
 
   Response expected_response = TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK);
-  expected_response.response_header_mutations.push_back(
-      {"set-cookie", "session=abc123", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  expected_response.response_header_mutations.push_back(
-      {"set-cookie", "user=john", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+  expected_response.response_headers_to_add = {{"set-cookie", "session=abc123"},
+                                               {"set-cookie", "user=john"}};
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);

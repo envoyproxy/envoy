@@ -22,6 +22,10 @@ namespace ReverseConnection {
 class ReverseConnectionAddress : public Network::Address::Instance,
                                  public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
+  // Placeholder port for reverse connection listeners. Non-zero to prevent port resolution logic
+  // from updating the address, since reverse connection listeners do not actually bind to port.
+  static constexpr uint32_t kReverseConnectionListenerPortPlaceholder = 1;
+
   // Struct to hold reverse connection configuration
   struct ReverseConnectionConfig {
     // Source node id of initiator envoy
@@ -36,6 +40,36 @@ public:
     uint32_t connection_count;
   };
 
+  // Minimal IP implementation for reverse connections. Provides the required Ip interface
+  // but returns a placeholder port since reverse connection listeners do not actually bind to port.
+  class ReverseConnectionIp : public Network::Address::Ip {
+  public:
+    // Minimal Ipv4 implementation for reverse connections
+    class ReverseConnectionIpv4 : public Network::Address::Ipv4 {
+    public:
+      uint32_t address() const override { return htonl(INADDR_LOOPBACK); } // 127.0.0.1
+    };
+
+    const std::string& addressAsString() const override { return address_str_; }
+    bool isAnyAddress() const override { return false; }
+    bool isUnicastAddress() const override { return true; }
+    bool isLinkLocalAddress() const override { return false; }
+    bool isUniqueLocalAddress() const override { return false; }
+    bool isSiteLocalAddress() const override { return false; }
+    bool isTeredoAddress() const override { return false; }
+    const Network::Address::Ipv4* ipv4() const override { return &ipv4_; }
+    const Network::Address::Ipv6* ipv6() const override { return nullptr; }
+    // Return the placeholder port.
+    uint32_t port() const override { return kReverseConnectionListenerPortPlaceholder; }
+    Network::Address::IpVersion version() const override { return Network::Address::IpVersion::v4; }
+
+    // Public static address string used by both the Ip interface and ReverseConnectionAddress.
+    static const std::string address_str_;
+
+  private:
+    ReverseConnectionIpv4 ipv4_;
+  };
+
   ReverseConnectionAddress(const ReverseConnectionConfig& config);
 
   // Network::Address::Instance
@@ -46,7 +80,8 @@ public:
   const std::string& asString() const override;
   absl::string_view asStringView() const override;
   const std::string& logicalName() const override;
-  const Network::Address::Ip* ip() const override { return ipv4_instance_->ip(); }
+  // Return our minimal IP implementation with placeholder port
+  const Network::Address::Ip* ip() const override { return &ip_; }
   const Network::Address::Pipe* pipe() const override { return nullptr; }
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
     return nullptr;
@@ -77,9 +112,7 @@ private:
   ReverseConnectionConfig config_;
   std::string address_string_;
   std::string logical_name_;
-  // Use a regular Ipv4Instance for 127.0.0.1:0
-  Network::Address::InstanceConstSharedPtr ipv4_instance_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0)};
+  ReverseConnectionIp ip_;
 };
 
 } // namespace ReverseConnection

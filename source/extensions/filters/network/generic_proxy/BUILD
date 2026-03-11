@@ -180,9 +180,9 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "//envoy/tracing:trace_context_interface",
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

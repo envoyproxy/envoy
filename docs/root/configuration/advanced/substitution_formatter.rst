@@ -549,6 +549,30 @@ Current supported substitution commands include:
   Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
   the main address of the upstream host (e.g., ip for TCP connections) will be used.
 
+.. _config_access_log_format_upstream_hosts_attempted:
+
+``%UPSTREAM_HOSTS_ATTEMPTED%``
+  Comma-separated list of upstream host addresses (e.g., ip:port) that were attempted during the request,
+  including retries. This is useful for debugging retry behavior and understanding which hosts were tried
+  before a successful connection or final failure.
+
+.. _config_access_log_format_upstream_hosts_attempted_without_port:
+
+``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOSTS_ATTEMPTED%`` but without port components.
+
+.. _config_access_log_format_upstream_host_names_attempted:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED%``
+  Comma-separated list of upstream host names (e.g., DNS names) that were attempted during the request,
+  including retries. If no DNS name is available for a host, its main address (e.g., ip:port) will be used.
+  This is useful for debugging retry behavior with human-readable host names.
+
+.. _config_access_log_format_upstream_host_names_attempted_without_port:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOST_NAMES_ATTEMPTED%`` but without port components.
+
 ``%UPSTREAM_CLUSTER%``
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
@@ -627,6 +651,15 @@ Current supported substitution commands include:
 ``%UPSTREAM_DETECTED_CLOSE_TYPE%``
     The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
     Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+
+.. _config_access_log_format_upstream_local_close_reason:
+
+``%UPSTREAM_LOCAL_CLOSE_REASON%``
+  HTTP/TCP
+    If upstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
 
 .. _config_access_log_format_downstream_transport_failure_reason:
 
@@ -857,6 +890,12 @@ Current supported substitution commands include:
   cross-reference timer-based reports for the same connection. The identifier
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
+
+.. _config_access_log_format_upstream_connection_ids_attempted:
+
+``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``
+  Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
+  This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.
 
 .. _config_access_log_format_stream_id:
 
@@ -1511,6 +1550,21 @@ Current supported substitution commands include:
   HTTP
     The value of the query parameter ``X``. If the query parameter ``X`` is not present, ``"-"`` symbol will be used.
     ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%QUERY_PARAMS(X):Z%``
+  HTTP
+    All of the query parameters. The parameter ``X`` is used to specify how the query parameters are presented
+    and is optional, with ``ORIG`` then being the default.
+
+    The ``X`` parameter can be:
+
+    * ``ORIG``: The output will be original query params string part of the path with no treatment.
+    * ``DECODED``: The query params will be URL decoded.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

@@ -46,7 +46,10 @@ using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
 
 class TestSPIFFEValidator : public testing::Test {
 public:
-  TestSPIFFEValidator() : stats_(generateSslStats(*store_.rootScope())) {}
+  TestSPIFFEValidator()
+      : api_(Api::createApiForTest()), stats_(generateSslStats(*store_.rootScope())) {
+    ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  }
 
   absl::Status initialize(std::string yaml, TimeSource& time_source) {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
@@ -156,6 +159,7 @@ public:
     }
   };
 
+  Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Envoy::Event::MockDispatcher> dispatcher_;
 

@@ -40,7 +40,7 @@ genrule(
 )
 
 cc_library(
-    name = "zlib_ng",
+    name = "zlib-ng",
     srcs = [
         "adler32.c",
         "compress.c",

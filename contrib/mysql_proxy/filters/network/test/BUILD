@@ -117,6 +117,6 @@ envoy_cc_test(
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
-        "@com_github_envoyproxy_sqlparser//:sqlparser",
+        "@sql-parser//:sqlparser",
     ],
 )

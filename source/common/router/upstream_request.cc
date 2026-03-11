@@ -96,7 +96,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
       enable_half_close_(enable_half_close) {
-  if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+  // Get tracing config once and reuse it.
+  auto tracing_config = parent_.callbacks()->tracingConfig();
+
+  if (tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
       span_ = parent_.callbacks()->activeSpan().spawnChild(
           tracing_config.value().get(),
@@ -111,20 +114,30 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   // The router checks that the connection pool is non-null before creating the upstream request.
   auto upstream_host = conn_pool_->host();
-  Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
-  Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
-                                            &upstream_host->cluster(),     // cluster_
-                                            Tracing::ServiceType::Unknown, // service_type_
-                                            false                          // async_client_span_
-  );
 
-  if (span_ != nullptr) {
-    span_->injectContext(trace_context, upstream_context);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+  // Only inject trace context if propagation is not disabled.
+  // When noContextPropagation is true, spans are still reported but trace context
+  // headers (e.g., traceparent, X-B3-*) are not injected into upstream requests.
+  const bool no_context_propagation =
+      tracing_config.has_value() && tracing_config->noContextPropagation();
+
+  if (!no_context_propagation) {
+    Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
+    Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
+                                              &upstream_host->cluster(),     // cluster_
+                                              Tracing::ServiceType::Unknown, // service_type_
+                                              false                          // async_client_span_
+    );
+
+    if (span_ != nullptr) {
+      span_->injectContext(trace_context, upstream_context);
+    } else {
+      // No independent child span for current upstream request then inject the parent span's
+      // tracing context into the request headers.
+      // The injectContext() of the parent span may be called repeatedly when the request is
+      // retried.
+      parent_.callbacks()->activeSpan().injectContext(trace_context, upstream_context);
+    }
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -644,7 +657,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    upstream_info.setUpstreamConnectionId(connection_id);
   }
 
   if (info.downstreamAddressProvider().interfaceName().has_value()) {

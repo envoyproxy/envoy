@@ -34,6 +34,7 @@ import "C"
 import (
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -395,8 +396,117 @@ func (s *streamInfo) DrainConnectionUponCompletion() {
 	cAPI.HttpSetDrainConnectionUponCompletion(unsafe.Pointer(s.request))
 }
 
+func (s *streamInfo) DownstreamSslConnection() api.SslConnection {
+	exists, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslConnectionExists)
+	if exists == 0 {
+		return nil
+	}
+	return &sslConnection{request: s.request}
+}
+
 type filterState struct {
 	request *httpRequest
+}
+
+type sslConnection struct {
+	request *httpRequest
+}
+
+func (s *sslConnection) getStringSliceValue(id int) []string {
+	val, ok := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), id)
+	if !ok || val == "" {
+		return nil
+	}
+	return strings.Split(val, "\x00")
+}
+
+func (s *sslConnection) PeerCertificatePresented() bool {
+	presented, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslPeerCertificatePresented)
+	return ok && presented != 0
+}
+
+func (s *sslConnection) PeerCertificateValidated() bool {
+	validated, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslPeerCertificateValidated)
+	return ok && validated != 0
+}
+
+func (s *sslConnection) Sha256PeerCertificateDigest() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSha256PeerCertificateDigest)
+	return val
+}
+
+func (s *sslConnection) SerialNumberPeerCertificate() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSerialNumberPeerCertificate)
+	return val
+}
+
+func (s *sslConnection) SubjectPeerCertificate() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSubjectPeerCertificate)
+	return val
+}
+
+func (s *sslConnection) IssuerPeerCertificate() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslIssuerPeerCertificate)
+	return val
+}
+
+func (s *sslConnection) SubjectLocalCertificate() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSubjectLocalCertificate)
+	return val
+}
+
+func (s *sslConnection) UriSanPeerCertificate() []string {
+	return s.getStringSliceValue(ValueSslUriSanPeerCertificate)
+}
+
+func (s *sslConnection) UriSanLocalCertificate() []string {
+	return s.getStringSliceValue(ValueSslUriSanLocalCertificate)
+}
+
+func (s *sslConnection) DnsSansPeerCertificate() []string {
+	return s.getStringSliceValue(ValueSslDnsSansPeerCertificate)
+}
+
+func (s *sslConnection) DnsSansLocalCertificate() []string {
+	return s.getStringSliceValue(ValueSslDnsSansLocalCertificate)
+}
+
+func (s *sslConnection) ValidFromPeerCertificate() (uint64, bool) {
+	return cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslValidFromPeerCertificate)
+}
+
+func (s *sslConnection) ExpirationPeerCertificate() (uint64, bool) {
+	return cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslExpirationPeerCertificate)
+}
+
+func (s *sslConnection) TlsVersion() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslTlsVersion)
+	return val
+}
+
+func (s *sslConnection) CiphersuiteString() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslCiphersuiteString)
+	return val
+}
+
+func (s *sslConnection) CiphersuiteId() (uint16, bool) {
+	// TLS cipher suite IDs are 16-bit values (RFC 5246), narrowing from uint64 is safe.
+	id, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueSslCiphersuiteId)
+	return uint16(id), ok
+}
+
+func (s *sslConnection) SessionId() (string, bool) {
+	return cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslSessionId)
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificate() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUrlEncodedPemEncodedPeerCertificate)
+	return val
+}
+
+func (s *sslConnection) UrlEncodedPemEncodedPeerCertificateChain() string {
+	val, _ := cAPI.HttpGetStringValue(unsafe.Pointer(s.request), ValueSslUrlEncodedPemEncodedPeerCertificateChain)
+	return val
 }
 
 func (s *streamInfo) FilterState() api.FilterState {

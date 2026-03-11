@@ -203,7 +203,9 @@ void Filter::onDestroy() {
       std::shared_ptr<Filters::Common::RateLimit::Client> shared_client = std::move(client_);
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete by leaking the client with OnStreamDoneCallBack.
-      auto callback = new OnStreamDoneCallBack(shared_client);
+      std::shared_ptr<OnStreamDoneCallBack> callback =
+          std::make_shared<OnStreamDoneCallBack>(shared_client);
+      callback->keepAlive();
       callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
                                callbacks_->streamInfo(), getHitAddend());
       // If the limit() call fails directly then the detach() will be no-op.
@@ -377,7 +379,7 @@ void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
                                     Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&,
                                     const std::string&,
                                     Filters::Common::RateLimit::DynamicMetadataPtr&&) {
-  delete this;
+  self_.reset();
 }
 
 bool FilterConfig::enabled() const {

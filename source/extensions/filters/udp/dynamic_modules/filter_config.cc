@@ -13,10 +13,14 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
         config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
     : filter_name_(config.filter_name()),
-      filter_config_(MessageUtil::getJsonStringFromMessageOrError(config.filter_config())),
+      filter_config_(
+          THROW_OR_RETURN_VALUE(MessageUtil::knownAnyToBytes(config.filter_config()), std::string)),
       dynamic_module_(std::move(dynamic_module)),
       stats_scope_(stats_scope.createScope(
-          absl::StrCat(UdpListenerFilterStatsNamespace, ".", config.filter_name(), "."))),
+          absl::StrCat(config.dynamic_module_config().metrics_namespace().empty()
+                           ? std::string(DefaultMetricsNamespace)
+                           : config.dynamic_module_config().metrics_namespace(),
+                       ".", config.filter_name(), "."))),
       stat_name_pool_(stats_scope_->symbolTable()) {
 
   auto config_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_config_new_)>(
