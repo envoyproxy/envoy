@@ -421,11 +421,9 @@ void OtlpMetricsFlusherImpl::flush(
   if (resource_metrics.empty()) {
     return;
   }
-  ENVOY_BUG(resource_metrics.size() == 1,
-            "MetricAggregator should only produce a single ResourceMetrics object.");
-  for (auto& rm : resource_metrics) {
-    RequestSplitter::chunkRequests(rm, config_->maxDatapointsPerRequest(), send_callback);
-  }
+
+  RequestSplitter::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
+                                 send_callback);
 }
 
 } // namespace OpenTelemetry

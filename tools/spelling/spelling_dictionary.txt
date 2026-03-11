@@ -13,7 +13,6 @@ addrlen
 chunker
 datapoint
 defragmentation
-dp
 evictable
 flushdb
 itr
