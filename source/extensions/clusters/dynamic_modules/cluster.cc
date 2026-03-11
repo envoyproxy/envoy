@@ -79,10 +79,18 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
                  on_cluster_lb_destroy_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_lb_choose_host", OnClusterLbChooseHostType,
                  on_cluster_lb_choose_host_);
-  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_scheduled", OnClusterScheduledType,
-                 on_cluster_scheduled_);
 
 #undef RESOLVE_SYMBOL
+
+  // Optional hooks. Modules that don't need async host selection or scheduling don't need to
+  // implement these.
+  auto on_cancel = config->dynamic_module_->getFunctionPointer<OnClusterLbCancelHostSelectionType>(
+      "envoy_dynamic_module_on_cluster_lb_cancel_host_selection");
+  config->on_cluster_lb_cancel_host_selection_ = on_cancel.ok() ? on_cancel.value() : nullptr;
+
+  auto on_scheduled = config->dynamic_module_->getFunctionPointer<OnClusterScheduledType>(
+      "envoy_dynamic_module_on_cluster_scheduled");
+  config->on_cluster_scheduled_ = on_scheduled.ok() ? on_scheduled.value() : nullptr;
 
   // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
   auto on_server_initialized =
@@ -369,7 +377,19 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  auto* host_ptr = handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context);
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
+                                                          &async_handle);
+
+  if (async_handle != nullptr) {
+    // Async pending: the module will call the completion callback later.
+    auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
+        async_handle, in_module_lb_,
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+  }
+
   if (host_ptr == nullptr) {
     return {nullptr};
   }
@@ -377,6 +397,12 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // Look up the host shared pointer from the raw pointer.
   auto host = handle_->cluster_->findHost(host_ptr);
   return {host};
+}
+
+void DynamicModuleAsyncHostSelectionHandle::cancel() {
+  if (cancel_fn_ != nullptr) {
+    cancel_fn_(in_module_lb_, async_handle_);
+  }
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {

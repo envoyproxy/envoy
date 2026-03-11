@@ -527,4 +527,25 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details) {
+  auto* lb = getLb(lb_envoy_ptr);
+  auto* context = getContext(context_envoy_ptr);
+
+  Envoy::Upstream::HostConstSharedPtr host_shared;
+  if (host != nullptr) {
+    host_shared = lb->handle()->cluster()->findHost(host);
+  }
+
+  std::string details_str;
+  if (details.ptr != nullptr && details.length > 0) {
+    details_str.assign(details.ptr, details.length);
+  }
+
+  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+}
+
 } // extern "C"

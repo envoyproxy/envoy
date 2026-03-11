@@ -1600,6 +1600,112 @@ TEST_F(DynamicModuleClusterTest, LbContextGetDownstreamConnectionSniNullResult) 
       context_ptr, nullptr));
 }
 
+// =================================================================================================
+// Async Host Selection Tests
+// =================================================================================================
+
+// Test DynamicModuleAsyncHostSelectionHandle cancel calls the module's cancel function.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  handle.cancel();
+}
+
+// Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr);
+  // Should not crash with nullptr cancel function.
+  handle.cancel();
+}
+
+// Test async host selection complete callback with a valid host.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto& module_cluster = dynamic_cast<DynamicModuleCluster&>(*cluster);
+
+  // Add a host so we can find it later.
+  std::vector<Upstream::HostSharedPtr> result_hosts;
+  ASSERT_TRUE(module_cluster.addHosts({"127.0.0.1:8080"}, {1}, result_hosts));
+  ASSERT_EQ(result_hosts.size(), 1);
+  auto* raw_host_ptr = const_cast<Upstream::Host*>(result_hosts[0].get());
+
+  // Create a mock LB context that expects onAsyncHostSelection.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([&raw_host_ptr](Upstream::HostConstSharedPtr&& host, std::string&&) {
+        EXPECT_EQ(host.get(), raw_host_ptr);
+      });
+
+  // Create a handle for the async completion callback.
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      lb_envoy_ptr, context_ptr, raw_host_ptr, {"resolved", 8});
+}
+
+// Test async host selection complete callback with null host.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "dns_failure");
+      });
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      lb_envoy_ptr, context_ptr, nullptr, {"dns_failure", 11});
+}
+
+// Test async host selection complete callback with empty details.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_TRUE(details.empty());
+      });
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+
+  auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
+  auto* context_ptr = static_cast<void*>(&context);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
+                                                                         nullptr, {nullptr, 0});
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Clusters
