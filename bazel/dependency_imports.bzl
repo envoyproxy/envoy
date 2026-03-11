@@ -120,6 +120,11 @@ def envoy_dependency_imports(
         # last_update = "2020-02-26"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/secure/bidirule @org_golang_x_text//secure/bidirule",
+            "gazelle:resolve go golang.org/x/text/unicode/bidi @org_golang_x_text//unicode/bidi",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "org_golang_x_text",
@@ -176,6 +181,11 @@ def envoy_dependency_imports(
         # last_update = "2021-03-20"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L60-L65"
+        build_directives = [
+            "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes",
+            "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+        ],
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star_v2",
