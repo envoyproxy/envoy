@@ -106,5 +106,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-regex 'template\s*<typename' 'using\s*UniquePtr' \
   --uncomment-macro OPENSSL_DEPRECATED \
   --uncomment-typedef-redef X509_STORE_CTX \
+  --uncomment-typedef-redef DIST_POINT \
   --uncomment-typedef-redef GENERAL_NAME \
   --uncomment-typedef-redef X509_ALGOR

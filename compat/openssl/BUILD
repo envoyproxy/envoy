@@ -420,6 +420,7 @@ mapping_func_filegroup(
         "d2i_PKCS12_bio",
         "d2i_SSL_SESSION",
         "d2i_X509",
+        "DIST_POINT_free",
         "DTLS_method",
         "EC_GROUP_get_curve_name",
         "EC_GROUP_get_degree",

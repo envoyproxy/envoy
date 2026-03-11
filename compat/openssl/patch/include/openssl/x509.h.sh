@@ -124,12 +124,16 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl X509_get_key_usage \
   --uncomment-func-decl GENERAL_NAME_free \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(BASIC_CONSTRAINTS, BASIC_CONSTRAINTS_free)' \
+  --uncomment-regex 'BORINGSSL_MAKE_DELETER(DIST_POINT, DIST_POINT_free)' \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(GENERAL_NAME, GENERAL_NAME_free)' \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(GENERAL_SUBTREE, GENERAL_SUBTREE_free)' \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(NAME_CONSTRAINTS, NAME_CONSTRAINTS_free)' \
   --uncomment-macro-redef 'X509V3_ADD_[[:alnum:]_]*' \
   --uncomment-func-decl BASIC_CONSTRAINTS_free \
   --uncomment-func-decl NAME_CONSTRAINTS_free \
+  --uncomment-regex 'DEFINE_STACK_OF(DIST_POINT)' \
+  --uncomment-func-decl DIST_POINT_free \
+  --uncomment-typedef CRL_DIST_POINTS \
   --uncomment-func-decl GENERAL_SUBTREE_free \
   --uncomment-func-decl GENERAL_NAMES_new \
   --uncomment-func-decl GENERAL_NAMES_free \
