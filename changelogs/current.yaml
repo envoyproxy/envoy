@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: March 11, 2026
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: oauth2
   change: |
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
@@ -64,9 +57,6 @@ bug_fixes:
     into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
     The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
 
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: dynamic modules
   change: |
@@ -74,5 +64,3 @@ new_features:
     where modules built with a SDK version can be loaded by Envoy
     binaries of the next Envoy version. For example, A module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
-
-deprecated:
