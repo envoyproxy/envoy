@@ -8107,6 +8107,33 @@ void envoy_dynamic_module_on_cluster_shutdown(
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
     envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
 
+/**
+ * envoy_dynamic_module_on_cluster_http_callout_done is called on the main thread when an HTTP
+ * callout initiated by envoy_dynamic_module_callback_cluster_http_callout receives a response or
+ * fails.
+ *
+ * This is optional. Only modules that use HTTP callouts need to implement this. If not
+ * implemented, envoy_dynamic_module_callback_cluster_http_callout will return
+ * envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param callout_id is the ID of the callout that was returned by
+ * envoy_dynamic_module_callback_cluster_http_callout.
+ * @param result is the result of the HTTP callout.
+ * @param headers is the response headers. Can be nullptr if the callout failed.
+ * @param headers_size is the number of response headers.
+ * @param body_chunks is the response body chunks. Can be nullptr if the callout failed or
+ * there is no body.
+ * @param body_chunks_size is the number of response body chunks.
+ */
+void envoy_dynamic_module_on_cluster_http_callout_done(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
 // =============================================================================
 // Cluster Dynamic Module Callbacks
 // =============================================================================
@@ -8839,6 +8866,30 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host,
     envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_cluster_http_callout sends an HTTP request to the specified cluster
+ * and asynchronously delivers the response via envoy_dynamic_module_on_cluster_http_callout_done.
+ *
+ * This must be called on the main thread. The request requires ``:method``, ``:path``, and
+ * ``host`` headers to be present.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored on success.
+ * @param cluster_name is the name of the target cluster to which the HTTP request is sent.
+ * @param headers is the array of request headers. Must include ``:method``, ``:path``, and
+ * ``host``.
+ * @param headers_size is the number of request headers.
+ * @param body is the request body. Can be empty (length 0) for requests without a body.
+ * @param timeout_milliseconds is the timeout for the request in milliseconds.
+ * @return the result of the callout initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 // =============================================================================
 // =============================== Load Balancer ===============================

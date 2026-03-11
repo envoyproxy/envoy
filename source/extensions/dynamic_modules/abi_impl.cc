@@ -718,6 +718,17 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_async_host_s
                "not implemented in this context");
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr, uint64_t* /* callout_id_out */,
+    envoy_dynamic_module_type_module_buffer /* cluster_name */,
+    envoy_dynamic_module_type_module_http_header* /* headers */, size_t /* headers_size */,
+    envoy_dynamic_module_type_module_buffer /* body */, uint64_t /* timeout_milliseconds */) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_http_callout: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+}
+
 // ---------------------- Load Balancer callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the load balancing policy extension abi_impl.cc when the extension is used.

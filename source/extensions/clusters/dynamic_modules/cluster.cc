@@ -4,6 +4,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/network/drain_decision.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -107,6 +108,12 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
       "envoy_dynamic_module_on_cluster_shutdown");
   config->on_cluster_shutdown_ = on_shutdown.ok() ? on_shutdown.value() : nullptr;
 
+  auto on_http_callout_done =
+      config->dynamic_module_->getFunctionPointer<OnClusterHttpCalloutDoneType>(
+          "envoy_dynamic_module_on_cluster_http_callout_done");
+  config->on_cluster_http_callout_done_ =
+      on_http_callout_done.ok() ? on_http_callout_done.value() : nullptr;
+
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
                                                         config->cluster_name_.size()};
@@ -174,6 +181,14 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
 DynamicModuleCluster::~DynamicModuleCluster() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Cancel any pending HTTP callouts before destroying the cluster.
+  for (auto& callout : http_callouts_) {
+    if (callout.second->request_ != nullptr) {
+      callout.second->request_->cancel();
+    }
+  }
+  http_callouts_.clear();
+
   if (in_module_cluster_ != nullptr && config_->on_cluster_destroy_ != nullptr) {
     config_->on_cluster_destroy_(in_module_cluster_);
   }
@@ -352,6 +367,105 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
   return removed_hosts.size();
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+DynamicModuleCluster::sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                                      Http::RequestMessagePtr&& message,
+                                      uint64_t timeout_milliseconds) {
+  if (config_->on_cluster_http_callout_done_ == nullptr) {
+    ENVOY_LOG(debug, "dynamic module cluster: HTTP callout requested but "
+                     "on_cluster_http_callout_done is not implemented.");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  Upstream::ThreadLocalCluster* cluster =
+      server_context_.clusterManager().getThreadLocalCluster(cluster_name);
+  if (!cluster) {
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
+  }
+  Http::AsyncClient::RequestOptions options;
+  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
+
+  const uint64_t callout_id = getNextCalloutId();
+  auto http_callout_callback =
+      std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(shared_from_this(), callout_id);
+  DynamicModuleCluster::HttpCalloutCallback& callback = *http_callout_callback;
+
+  auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
+  if (!request) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  callback.request_ = request;
+  http_callouts_.emplace(callout_id, std::move(http_callout_callback));
+  *callout_id_out = callout_id;
+
+  return envoy_dynamic_module_type_http_callout_init_result_Success;
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onSuccess(const Http::AsyncClient::Request&,
+                                                          Http::ResponseMessagePtr&& response) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
+  headers_vector.reserve(response->headers().size());
+  response->headers().iterate([&headers_vector](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    headers_vector.emplace_back(envoy_dynamic_module_type_envoy_http_header{
+        const_cast<char*>(header.key().getStringView().data()), header.key().getStringView().size(),
+        const_cast<char*>(header.value().getStringView().data()),
+        header.value().getStringView().size()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
+  cluster->config_->on_cluster_http_callout_done_(
+      cluster.get(), cluster->in_module_cluster_, callout_id,
+      envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
+      headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
+      body.size());
+  cluster->http_callouts_.erase(callout_id);
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClient::Request&,
+                                                          Http::AsyncClient::FailureReason reason) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  const uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  // request_ is not null if the callout is actually sent to the upstream cluster.
+  // This allows us to avoid inlined calls to onFailure() method (which results in a reentrant to
+  // the modules) when the async client immediately fails the callout.
+  if (request_) {
+    envoy_dynamic_module_type_http_callout_result result;
+    switch (reason) {
+    case Http::AsyncClient::FailureReason::Reset:
+      result = envoy_dynamic_module_type_http_callout_result_Reset;
+      break;
+    case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+      result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
+      break;
+    }
+    cluster->config_->on_cluster_http_callout_done_(cluster.get(), cluster->in_module_cluster_,
+                                                    callout_id, result, nullptr, 0, nullptr, 0);
+  }
+
+  cluster->http_callouts_.erase(callout_id);
 }
 
 // =================================================================================================
