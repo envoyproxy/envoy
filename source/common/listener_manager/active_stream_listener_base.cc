@@ -40,7 +40,6 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     return;
   }
 
-  socket->connectionInfoProvider().setListenerInfo(config_->listenerInfo());
   socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
 
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();

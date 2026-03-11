@@ -774,6 +774,7 @@ message CustomInlineHeader {
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
 }
 
+// [#next-free-field: 6]
 message MemoryAllocatorManager {
   // Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
   // If equals to ``0``, no memory release will occur. Defaults to ``0``.
@@ -783,4 +784,29 @@ message MemoryAllocatorManager {
   // interval Envoy will try to release ``bytes_to_release`` of free memory back to operating system for reuse.
   // Defaults to ``1000`` milliseconds.
   google.protobuf.Duration memory_release_interval = 2;
+
+  // Sets the soft memory limit for tcmalloc. When the total memory used by tcmalloc exceeds this
+  // limit, background release will be performed more aggressively to bring memory usage below the
+  // limit. If not set, no soft memory limit is applied.
+  //
+  // .. note::
+  //     This is currently only supported with tcmalloc and not with ``gperftools``.
+  //
+  google.protobuf.UInt64Value soft_memory_limit_bytes = 3;
+
+  // Sets the maximum per-CPU cache size in bytes for tcmalloc. Smaller values reduce per-CPU
+  // memory overhead at the cost of increased contention on the central free list. If not set,
+  // tcmalloc's default is used.
+  //
+  // .. note::
+  //     This is currently only supported with tcmalloc and not with ``gperftools``.
+  //
+  google.protobuf.UInt32Value max_per_cpu_cache_size_bytes = 4;
+
+  // The threshold of unfreed memory in bytes that triggers the heap shrinker to release memory
+  // back to the OS. When the difference between physical memory used and application-allocated
+  // memory exceeds this threshold, free memory is released.
+  //
+  // Defaults to ``104857600`` (100 MB).
+  uint64 max_unfreed_memory_bytes = 5;
 }

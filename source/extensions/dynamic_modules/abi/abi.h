@@ -7848,6 +7848,21 @@ typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
  */
 typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
 
+/**
+ * envoy_dynamic_module_type_cluster_scheduler_envoy_ptr is a raw pointer to the
+ * DynamicModuleClusterScheduler class in Envoy. This is used to schedule events to the main thread
+ * from background threads.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling cluster events is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_new and the scheduling and destruction is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_commit and
+ * envoy_dynamic_module_callback_cluster_scheduler_delete. Since its lifecycle is owned/managed by
+ * the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
+
 // =============================================================================
 // Cluster Event Hooks
 // =============================================================================
@@ -7895,12 +7910,12 @@ envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new
  * should perform initial host discovery and call
  * envoy_dynamic_module_callback_cluster_pre_init_complete when the initial set of hosts is ready.
  *
- * @param cluster_module_ptr is the pointer to the in-module cluster.
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
  */
 void envoy_dynamic_module_on_cluster_init(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
 
 /**
  * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
@@ -7945,6 +7960,68 @@ void envoy_dynamic_module_on_cluster_lb_destroy(
 envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_scheduled is called on the main thread when an event previously
+ * scheduled via envoy_dynamic_module_callback_cluster_scheduler_commit is dispatched. The module
+ * can use the event_id to distinguish between different scheduled events.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object. This can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the ID of the event that was scheduled with
+ * envoy_dynamic_module_callback_cluster_scheduler_commit.
+ */
+void envoy_dynamic_module_on_cluster_scheduled(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_server_initialized is called when the server initialization is
+ * complete. This is called on the main thread during the PostInit lifecycle stage, after all
+ * clusters have finished initialization and before workers are started.
+ *
+ * This is the appropriate place to start background discovery tasks or establish connections that
+ * depend on the server being fully operational.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_server_initialized(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_drain_started is called when Envoy begins draining.
+ *
+ * This is called on the main thread before workers are stopped. The module can still use cluster
+ * operations during drain. This is the appropriate place to stop accepting new hosts, close
+ * persistent connections, or de-register from service discovery.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_drain_started(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_shutdown is called when Envoy is about to exit.
+ *
+ * This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+ * invoke the completion callback exactly once with the provided context when it has finished
+ * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
+ * flush batched data, close gRPC connections, or signal external systems.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param completion_callback is the callback that must be invoked when shutdown cleanup is done.
+ * @param completion_context is the opaque context pointer to pass to the completion callback.
+ */
+void envoy_dynamic_module_on_cluster_shutdown(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
 
 // =============================================================================
 // Cluster Dynamic Module Callbacks
@@ -8021,6 +8098,336 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_new creates a new scheduler for the given
+ * cluster. The scheduler allows the module to dispatch events to the main thread from any thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @return envoy_dynamic_module_type_cluster_scheduler_module_ptr is the pointer to the scheduler.
+ * The module is responsible for deleting the scheduler via
+ * envoy_dynamic_module_callback_cluster_scheduler_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_cluster_scheduler_module_ptr
+envoy_dynamic_module_callback_cluster_scheduler_new(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_delete deletes a scheduler previously created by
+ * envoy_dynamic_module_callback_cluster_scheduler_new. After this call, the scheduler pointer is
+ * no longer valid.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler to delete.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_delete(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_commit schedules an event to be dispatched on
+ * the main thread. When the event is dispatched, envoy_dynamic_module_on_cluster_scheduled will be
+ * called with the same event_id.
+ *
+ * This function is thread-safe and can be called from any thread.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler.
+ * @param event_id is a module-defined identifier to distinguish different scheduled events.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_commit(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
+
+// =============================================================================
+// Cluster Dynamic Module Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_counter is called by the module during
+ * initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_config_increment_counter together with
+ * cluster_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_define_counter(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_increment_counter(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_config_define_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_config_set_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_increment_gauge is called by the module to
+ * increment a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increment the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_increment_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_decrement_gauge is called by the module to
+ * decrement a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrement the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_define_histogram(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_record_histogram_value is called by the module to
+ * record a value for a previously defined histogram.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// Cluster LB Context Callbacks
+// =============================================================================
+//
+// These callbacks allow the cluster load balancer to access per-request context
+// information during envoy_dynamic_module_on_cluster_lb_choose_host. They
+// provide the same capabilities as the standalone load balancer context
+// callbacks (envoy_dynamic_module_callback_lb_context_*), but operate on the
+// cluster_lb_context_envoy_ptr instead.
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key computes a hash key from the
+ * request context for consistent hashing.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param hash_out is the output hash value. Only valid when the function returns true.
+ * @return true if a hash key was computed, false if no hash key is available or the context is
+ * nullptr.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size returns the number
+ * of downstream request headers available in the context.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the number of headers, or 0 if the context is nullptr or no headers are available.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers retrieves all downstream
+ * request headers into a pre-allocated array.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_headers is the output array of header key-value pairs. Must be pre-allocated with
+ * at least the number of headers returned by
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size.
+ * @return true if the headers were retrieved, false if the context is nullptr or no headers are
+ * available.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header retrieves a single
+ * downstream request header value by key and index.
+ *
+ * Since a header key can have multiple values, the ``index`` parameter selects a specific value.
+ * The ``optional_size`` parameter can be used to retrieve the total number of values for the key.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the header key to look up. Owned by the module.
+ * @param result_buffer is the output buffer for the header value. Owned by Envoy and valid only
+ * during the current callback.
+ * @param index is the index of the header value (for multi-valued headers).
+ * @param optional_size is an optional output for the total number of values for this key. Can be
+ * nullptr if not needed.
+ * @return true if the header value was found at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count returns the
+ * maximum number of times host selection should be retried if the chosen host is rejected by
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the retry count, or 0 if the context is nullptr.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries to
+ * avoid selecting hosts that were already attempted.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer, used to access the host set.
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param priority is the priority level of the host.
+ * @param index is the index of the host within the healthy host list at the given priority.
+ * @return true if another host should be selected, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_override_host returns the override host
+ * address and strict mode flag from the context. Override host allows upstream filters to direct
+ * the load balancer to prefer a specific host by address.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param address is the output buffer for the override host address. Owned by Envoy and valid only
+ * during the current callback.
+ * @param strict is the output flag. When true, the load balancer should return no host if the
+ * override host is not valid.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni returns the
+ * requested server name (SNI) from the downstream connection associated with the request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_buffer is the output buffer for the SNI string. Owned by Envoy and valid only
+ * during the current callback.
+ * @return true if the SNI is available and non-empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
