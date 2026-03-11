@@ -7752,6 +7752,45 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_module_buffer path_prefix);
 
 // =============================================================================
+// Common Host Types (shared by cluster and standalone load balancer extensions)
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_host_health represents the health status of an upstream host.
+ */
+typedef enum {
+  // Host is unhealthy and should not be used for traffic.
+  envoy_dynamic_module_type_host_health_Unhealthy = 0,
+  // Host is healthy but degraded. It can receive traffic but healthy hosts are preferred.
+  envoy_dynamic_module_type_host_health_Degraded = 1,
+  // Host is healthy and can receive traffic.
+  envoy_dynamic_module_type_host_health_Healthy = 2,
+} envoy_dynamic_module_type_host_health;
+
+/**
+ * envoy_dynamic_module_type_host_stat identifies a per-host stat.
+ * These correspond to the counters and gauges in Envoy's HostStats struct.
+ */
+typedef enum {
+  // Counter: total connection connect failures.
+  envoy_dynamic_module_type_host_stat_CxConnectFail = 0,
+  // Counter: total connections opened.
+  envoy_dynamic_module_type_host_stat_CxTotal = 1,
+  // Counter: total request errors (used for EDS load reporting).
+  envoy_dynamic_module_type_host_stat_RqError = 2,
+  // Counter: total successful requests (used for EDS load reporting).
+  envoy_dynamic_module_type_host_stat_RqSuccess = 3,
+  // Counter: total request timeouts.
+  envoy_dynamic_module_type_host_stat_RqTimeout = 4,
+  // Counter: total requests sent.
+  envoy_dynamic_module_type_host_stat_RqTotal = 5,
+  // Gauge: current active connections.
+  envoy_dynamic_module_type_host_stat_CxActive = 6,
+  // Gauge: current active requests.
+  envoy_dynamic_module_type_host_stat_RqActive = 7,
+} envoy_dynamic_module_type_host_stat;
+
+// =============================================================================
 // ============================ Cluster Extension ==============================
 // =============================================================================
 
@@ -8143,6 +8182,312 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+// =============================================================================
+// Cluster LB Host Information Callbacks
+// =============================================================================
+//
+// These callbacks provide the cluster load balancer with access to host
+// information from the cluster's priority set. They mirror the standalone load
+// balancer's host information callbacks (envoy_dynamic_module_callback_lb_*)
+// but operate on the cluster_lb_envoy_ptr instead.
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_cluster_name returns the name of the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param result is the output for the cluster name. The buffer is owned by Envoy.
+ */
+void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_hosts_count returns the number of all hosts
+ * at a given priority level, regardless of health status.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level to query.
+ * @return the number of all hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count returns the number of degraded
+ * hosts at a given priority level.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level to query.
+ * @return the number of degraded hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_priority_set_size returns the number of priority
+ * levels in the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @return the number of priority levels.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address returns the address of a host
+ * by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight returns the load balancing
+ * weight of a host by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_health returns the health status of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_cluster_lb_get_host_health(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address looks up a host by its
+ * address string across all priorities and returns the health status. This uses the cross-priority
+ * host map internally, providing O(1) lookup by address.
+ *
+ * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param address is the address string to look up, owned by the module.
+ * @param result is the output for the health status of the host.
+ * @return true if the host was found, false if the address is not in the host map.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, envoy_dynamic_module_type_host_health* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_address returns the address of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_weight returns the load balancing weight
+ * of a host by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_stat returns the value of a per-host stat
+ * identified by the stat enum. This provides access to host-level counters and gauges such as
+ * total connections, request errors, active requests, and active connections.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the host was not found or the stat is invalid.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_stat stat);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_locality returns the locality information
+ * (region, zone, sub_zone) for a host by index within all hosts at a given priority.
+ * This enables zone-aware and locality-aware load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param region is the output for the region string. Can be null if not needed.
+ * @param zone is the output for the zone string. Can be null if not needed.
+ * @param sub_zone is the output for the sub-zone string. Can be null if not needed.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_set_host_data stores a module-defined opaque value on a
+ * host identified by priority and index within all hosts. This data is stored per load balancer
+ * instance (i.e., per worker thread) and can be used to attach per-host state for load balancing
+ * decisions such as moving averages or request tracking.
+ *
+ * The data is only valid for the lifetime of the load balancer instance. It is not shared across
+ * worker threads. Callers are responsible for managing the memory pointed to by the stored value
+ * if it represents a pointer.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the opaque value to store. Use 0 to clear the data.
+ * @return true if the data was stored successfully, false if the host was not found.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_set_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_data retrieves a module-defined opaque value
+ * previously stored on a host via envoy_dynamic_module_callback_cluster_lb_set_host_data.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the output for the stored opaque value. Set to 0 if no data was stored.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string is called by the module to get
+ * the string value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a string, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number is called by the module to get
+ * the number value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a number, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool is called by the module to get
+ * the bool value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_count returns the number of locality
+ * buckets for the healthy hosts at a given priority. Each bucket groups hosts that share the same
+ * locality.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @return the number of locality buckets at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_host_count returns the number of healthy
+ * hosts in a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the number of hosts in the locality bucket, or 0 if the index is out of bounds.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_host_address returns the address of a host
+ * within a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @param host_index is the index of the host within the locality bucket.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index, size_t host_index, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_weight returns the weight of a locality
+ * bucket at a given priority. Locality weights are used for locality-aware load balancing.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the weight of the locality, or 0 if the index is out of bounds or weights are not set.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index);
 
 /**
  * envoy_dynamic_module_callback_cluster_scheduler_new creates a new scheduler for the given
@@ -8554,37 +8899,6 @@ typedef const void* envoy_dynamic_module_type_lb_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_lb_context_envoy_ptr;
 
-/**
- * envoy_dynamic_module_type_host_health represents the health status of an upstream host.
- */
-typedef enum {
-  // Host is unhealthy and should not be used for traffic.
-  envoy_dynamic_module_type_host_health_Unhealthy = 0,
-  // Host is healthy but degraded. It can receive traffic but healthy hosts are preferred.
-  envoy_dynamic_module_type_host_health_Degraded = 1,
-  // Host is healthy and can receive traffic.
-  envoy_dynamic_module_type_host_health_Healthy = 2,
-} envoy_dynamic_module_type_host_health;
-
-/**
- * envoy_dynamic_module_type_host_counter_stat identifies a per-host counter stat.
- * These correspond to the counters in Envoy's HostStats struct.
- */
-typedef enum {
-  // Total connection connect failures.
-  envoy_dynamic_module_type_host_counter_stat_CxConnectFail = 0,
-  // Total connections opened.
-  envoy_dynamic_module_type_host_counter_stat_CxTotal = 1,
-  // Total request errors (used for EDS load reporting).
-  envoy_dynamic_module_type_host_counter_stat_RqError = 2,
-  // Total successful requests (used for EDS load reporting).
-  envoy_dynamic_module_type_host_counter_stat_RqSuccess = 3,
-  // Total request timeouts.
-  envoy_dynamic_module_type_host_counter_stat_RqTimeout = 4,
-  // Total requests sent.
-  envoy_dynamic_module_type_host_counter_stat_RqTotal = 5,
-} envoy_dynamic_module_type_host_counter_stat;
-
 // =============================================================================
 // Load Balancer Event Hooks
 // =============================================================================
@@ -8813,32 +9127,6 @@ bool envoy_dynamic_module_callback_lb_get_host_address(
  * @return the weight of the host (1-128), or 0 if the host was not found.
  */
 uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
-
-/**
- * envoy_dynamic_module_callback_lb_get_host_active_requests returns the number of active
- * requests for a host by index within all hosts at a given priority. This is essential for
- * implementing least-request, peak EWMA, and similar load balancing algorithms.
- *
- * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
- * @param priority is the priority level.
- * @param index is the index of the host within all hosts.
- * @return the number of active requests, or 0 if the host was not found.
- */
-uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
-
-/**
- * envoy_dynamic_module_callback_lb_get_host_active_connections returns the number of active
- * connections for a host by index within all hosts at a given priority. This is useful for
- * connection-aware load balancing decisions.
- *
- * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
- * @param priority is the priority level.
- * @param index is the index of the host within all hosts.
- * @return the number of active connections, or 0 if the host was not found.
- */
-uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
 
 /**
@@ -9128,19 +9416,20 @@ bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
- * envoy_dynamic_module_callback_lb_get_host_counter_stat returns the value of a per-host counter
- * stat identified by the stat enum. This provides access to host-level counters such as total
- * connections, request errors, and request totals.
+ * envoy_dynamic_module_callback_lb_get_host_stat returns the value of a per-host stat
+ * identified by the stat enum. This provides access to host-level counters and gauges such as
+ * total connections, request errors, active requests, and active connections.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param priority is the priority level.
  * @param index is the index of the host within all hosts.
- * @param stat is the counter stat to query.
- * @return the counter value, or 0 if the host was not found or the stat is invalid.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the host was not found or the stat is invalid.
  */
-uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
-    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
-    envoy_dynamic_module_type_host_counter_stat stat);
+uint64_t
+envoy_dynamic_module_callback_lb_get_host_stat(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+                                               uint32_t priority, size_t index,
+                                               envoy_dynamic_module_type_host_stat stat);
 
 // =============================================================================
 // Load Balancer Callbacks - Metrics

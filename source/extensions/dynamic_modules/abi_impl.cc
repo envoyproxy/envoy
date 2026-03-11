@@ -396,6 +396,164 @@ envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   return nullptr;
 }
 
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_cluster_name: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_hosts_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_priority_set_size: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint32_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_host_health
+envoy_dynamic_module_callback_cluster_lb_get_host_health(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_health: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_host_health_Unhealthy;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_host_health*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_address: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint32_t envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_weight: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_host_stat) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_stat: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_envoy_buffer*, envoy_dynamic_module_type_envoy_buffer*,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_locality: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_set_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t, uintptr_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_set_host_data: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t, uintptr_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_data: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_locality_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_locality_host_count: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t, size_t,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_locality_host_address: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint32_t envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr, uint32_t, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_get_locality_weight: "
+               "not implemented in this context");
+  return 0;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr, uint64_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key: "
@@ -646,20 +804,6 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
   return 0;
 }
 
-__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_active_requests(
-    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_active_requests: "
-               "not implemented in this context");
-  return 0;
-}
-
-__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_active_connections(
-    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_active_connections: "
-               "not implemented in this context");
-  return 0;
-}
-
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_lb_get_host_locality(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
                                                    size_t, envoy_dynamic_module_type_envoy_buffer*,
@@ -800,11 +944,9 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_member_update_ho
   return false;
 }
 
-__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_counter_stat(
-    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
-    envoy_dynamic_module_type_host_counter_stat) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_counter_stat: "
-               "not implemented in this context");
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_lb_get_host_stat(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t, envoy_dynamic_module_type_host_stat) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_stat: not implemented in this context");
   return 0;
 }
 
