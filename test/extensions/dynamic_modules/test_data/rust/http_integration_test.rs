@@ -40,13 +40,6 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
-    "send_response_grpc" => Some(Box::new(SendResponseGrpcFilterConfig {
-      grpc_status: String::from_utf8(config.to_owned())
-        .unwrap()
-        .parse::<i32>()
-        .unwrap(),
-    })),
-    "grpc_status_attribute" => Some(Box::new(GrpcStatusAttributeFilterConfig {})),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
     "stats_callbacks" => {
@@ -233,9 +226,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigCalloutFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     if self.callout_done.load(Ordering::SeqCst) {
-      envoy_filter.send_response(200, &[("x-config-callout", b"success")], None, None, None);
+      envoy_filter.send_response(200, &[("x-config-callout", b"success")], None, None);
     } else {
-      envoy_filter.send_response(503, &[("x-config-callout", b"pending")], None, None, None);
+      envoy_filter.send_response(503, &[("x-config-callout", b"pending")], None, None);
     }
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
@@ -286,9 +279,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     if self.stream_done.load(Ordering::SeqCst) {
-      envoy_filter.send_response(200, &[("x-config-stream", b"success")], None, None, None);
+      envoy_filter.send_response(200, &[("x-config-stream", b"success")], None, None);
     } else {
-      envoy_filter.send_response(503, &[("x-config-stream", b"pending")], None, None, None);
+      envoy_filter.send_response(503, &[("x-config-stream", b"pending")], None, None);
     }
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
@@ -823,7 +816,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         200,
         &[("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_headers"),
-        None,
         Some("test_details"),
       );
       envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
@@ -843,7 +835,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         &[("some_header", b"some_value")],
         Some(b"local_response_body_from_on_request_body"),
         None,
-        None,
       );
       envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
     } else {
@@ -862,70 +853,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
         &[("some_header", b"some_value")],
         Some(b"local_response_body_from_on_response_headers"),
         None,
-        None,
       );
       return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
     }
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-}
-
-struct SendResponseGrpcFilterConfig {
-  grpc_status: i32,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseGrpcFilterConfig {
-  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(SendResponseGrpcFilter {
-      grpc_status: self.grpc_status,
-    })
-  }
-}
-
-struct SendResponseGrpcFilter {
-  grpc_status: i32,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseGrpcFilter {
-  fn on_request_headers(
-    &mut self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    envoy_filter.send_response(
-      200,
-      &[("x-grpc-test", b"true")],
-      Some(b"grpc_response"),
-      Some(self.grpc_status),
-      None,
-    );
-    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
-  }
-}
-
-struct GrpcStatusAttributeFilterConfig {}
-
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for GrpcStatusAttributeFilterConfig {
-  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(GrpcStatusAttributeFilter {})
-  }
-}
-
-struct GrpcStatusAttributeFilter {}
-
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for GrpcStatusAttributeFilter {
-  fn on_response_headers(
-    &mut self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    if let Some(grpc_status) = envoy_filter.get_response_grpc_status() {
-      envoy_filter.set_response_header(
-        "x-grpc-status-from-attr",
-        grpc_status.to_string().as_bytes(),
-      );
-    }
-    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
@@ -964,7 +895,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       1000,
     );
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("foo", b"bar")], None, None, None);
+      envoy_filter.send_response(500, &[("foo", b"bar")], None, None);
     }
     self.callout_handle = handle;
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
@@ -1010,7 +941,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       200,
       &[("some_header", b"some_value")],
       Some(b"local_response_body"),
-      None,
       Some("callout_success"),
     );
   }
@@ -1148,13 +1078,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       // Event from the on_scheduled when the cache key was found.
       1 => {
         let result = self.rx.take().unwrap().recv().unwrap();
-        envoy_filter.send_response(
-          200,
-          &[("cached", b"yes")],
-          Some(result.as_bytes()),
-          None,
-          None,
-        );
+        envoy_filter.send_response(200, &[("cached", b"yes")], Some(result.as_bytes()), None);
       },
       // Event from the on_response_headers.
       2 => {
@@ -1624,7 +1548,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -1678,7 +1602,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
       200,
       &[("x-stream-test", b"basic")],
       Some(b"stream_callout_success"),
-      None,
       None,
     );
   }
@@ -1742,7 +1665,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -1817,7 +1740,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
       ],
       Some(b"bidirectional_success"),
       None,
-      None,
     );
   }
 }
@@ -1871,7 +1793,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     );
 
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
-      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None, None);
+      envoy_filter.send_response(500, &[("x-error", b"stream_init_failed")], None, None);
       return envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration;
     }
 
@@ -1919,12 +1841,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
     assert_eq!(stream_handle, self.stream_handle);
-    envoy_filter.send_response(
-      200,
-      &[("x-reset", b"true")],
-      Some(b"upstream_reset"),
-      None,
-      None,
-    );
+    envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
   }
 }

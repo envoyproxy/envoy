@@ -122,7 +122,7 @@ fn test_send_response_filter() {
 
   envoy_filter
     .expect_send_response()
-    .withf(|status_code, headers, body, grpc_status, details| {
+    .withf(|status_code, headers, body, details| {
       *status_code == 200
         && *headers
           == vec![
@@ -130,7 +130,6 @@ fn test_send_response_filter() {
             ("header2", "value2".as_bytes()),
           ]
         && *body == Some(b"Hello, World!")
-        && grpc_status.is_none()
         && details.is_none()
     })
     .once()

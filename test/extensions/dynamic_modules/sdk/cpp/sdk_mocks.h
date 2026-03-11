@@ -112,7 +112,7 @@ public:
   MOCK_METHOD(void, setFilterState, (std::string_view key, std::string_view value), (override));
   MOCK_METHOD(void, sendLocalResponse,
               (uint32_t status, std::span<const HeaderView> headers, std::string_view body,
-               int32_t grpc_status, std::string_view detail),
+               std::string_view detail),
               (override));
   MOCK_METHOD(void, sendResponseHeaders, (std::span<const HeaderView> headers, bool end_stream),
               (override));
