@@ -10,9 +10,8 @@ PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
-chunker
-datapoint
 defragmentation
+dp
 evictable
 flushdb
 itr
@@ -1391,7 +1390,6 @@ sim
 sinked
 sint
 sizeof
-sm
 smatch
 snapshotted
 sockaddr
@@ -1687,3 +1685,4 @@ lcalpha
 nblk
 chr
 IWYU
+dp
