@@ -3,6 +3,7 @@
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
 #include "source/common/common/assert.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -1001,6 +1002,42 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
   }
 
   context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+}
+
+// =============================================================================
+// HTTP Callout Callback
+// =============================================================================
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+
+  Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; ++i) {
+    header_map->addCopy(
+        Envoy::Http::LowerCaseString(std::string(headers[i].key_ptr, headers[i].key_length)),
+        std::string(headers[i].value_ptr, headers[i].value_length));
+  }
+
+  if (header_map->Path() == nullptr || header_map->Method() == nullptr ||
+      header_map->Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  Envoy::Http::RequestMessagePtr message =
+      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(header_map));
+
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(absl::string_view(body.ptr, body.length));
+  }
+
+  return cluster->sendHttpCallout(callout_id_out,
+                                  absl::string_view(cluster_name.ptr, cluster_name.length),
+                                  std::move(message), timeout_milliseconds);
 }
 
 } // extern "C"

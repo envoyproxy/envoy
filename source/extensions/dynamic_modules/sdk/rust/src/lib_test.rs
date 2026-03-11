@@ -3923,6 +3923,19 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
   false
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
+}
+
 // =============================================================================
 // Cluster Extension Rust SDK tests.
 // =============================================================================
