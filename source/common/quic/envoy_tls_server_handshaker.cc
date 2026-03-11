@@ -79,7 +79,7 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyProofSourceHandle::SelectCe
     const SSL_CLIENT_HELLO& client_hello, const std::string& /*alpn*/,
     absl::optional<std::string> /*alps*/, const std::vector<uint8_t>& /*quic_transport_params*/,
     const absl::optional<std::vector<uint8_t>>& /*early_data_context*/,
-    const quic::QuicSSLConfig& /*ssl_config*/) {
+    const quic::QuicSSLConfig& /*ssl_config*/, bool /*disable_alps_explicit_codepoint*/) {
   if (!handshaker_ || !proof_source_) {
     QUIC_BUG(envoy_select_cert_detached) << "SelectCertificate called on a detached handle";
     return quic::QUIC_FAILURE;
@@ -92,12 +92,12 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyProofSourceHandle::SelectCe
     SSL_set_ex_data(client_hello.ssl, EnvoyQuicProofSource::filterChainExDataIndex(),
                     const_cast<Network::FilterChain*>(&transport_data->filter_chain_));
 
-    auto& factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
+    auto& factory = static_cast<const QuicServerTransportSocketFactory&>(
         transport_data->filter_chain_.transportSocketFactory());
     auto ticket_config = factory.getSessionTicketConfig();
     if (ticket_config.disable_stateless_resumption || !ticket_config.has_keys ||
         ticket_config.handles_session_resumption) {
-      SSL_set_options(client_hello.ssl, SSL_OP_NO_TICKET);
+      handshaker_->disableTicketSupport();
     }
   }
 
