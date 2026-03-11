@@ -88,16 +88,6 @@ public:
   void markUnused() override { flags_ &= ~Metric::Flags::Used; }
   bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
 
-  bool evictionDisabled() const override { return eviction_disabled_count_ > 0; }
-  void setEvictionDisabled(bool disable) override {
-    if (disable) {
-      ++eviction_disabled_count_;
-    } else {
-      ASSERT(eviction_disabled_count_ > 0);
-      --eviction_disabled_count_;
-    }
-  }
-
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
@@ -145,11 +135,6 @@ protected:
   std::atomic<uint32_t> ref_count_{0};
 
   std::atomic<uint16_t> flags_{0};
-
-  // eviction_disabled_count_ keeps track of the number of active references that
-  // explicitly requested this metric to be exempt from unused eviction. Note that
-  // this is distinct from ref_count_, which prevents the metric from being destructed.
-  std::atomic<uint32_t> eviction_disabled_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
@@ -226,7 +211,6 @@ public:
   }
   void sub(uint64_t amount) override {
     ASSERT(child_value_ >= amount);
-    ASSERT(used() || amount == 0);
     child_value_ -= amount;
   }
   uint64_t value() const override { return child_value_ + parent_value_; }

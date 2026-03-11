@@ -540,6 +540,9 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
     EXPECT_FALSE(c1.used());
     EXPECT_FALSE(g1.used());
     EXPECT_FALSE(h1.used());
+
+    // Make gauge 0 so it can be evicted in the second pass.
+    g1.sub(1);
   }
 
   // Second eviction removes stats.
@@ -731,6 +734,10 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     EXPECT_EQ(1UL, store_->histograms().size());
   }
 
+  // Make gauge value zero so it can be evicted
+  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  g1.sub(5);
+
   // Eviction removes here.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
@@ -783,6 +790,8 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Second pass evicts from scope cache because it is now unused.
+  // We need to set it to 0 otherwise it won't be evicted.
+  g1.sub(10);
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
 
@@ -795,7 +804,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
 
   // 3. Interleaved PAIRED_ADD (add) on the held reference
   g1_ref->add(5);
-  EXPECT_EQ(15, g1_ref->value());
+  EXPECT_EQ(5, g1_ref->value());
   EXPECT_TRUE(g1_ref->used());
 
   // 4. Re-resolve and PAIRED_SUBTRACT (sub)
@@ -805,11 +814,60 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   EXPECT_EQ(g1_ref.get(), &g1_resurrected);
 
   // Value should be preserved
-  EXPECT_EQ(15, g1_resurrected.value());
+  EXPECT_EQ(5, g1_resurrected.value());
 
   // Perform subtract
-  g1_resurrected.sub(15);
+  g1_resurrected.sub(5);
   EXPECT_EQ(0, g1_resurrected.value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, EvictionGaugesNonZero) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->rootScope()->createScope("scope.", /*evictable=*/true);
+
+  // 1. Create gauge and add to make it non-zero
+  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  g1.add(10);
+  EXPECT_EQ(10, g1.value());
+  EXPECT_TRUE(g1.used());
+
+  // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
+  store_->evictUnused();
+  EXPECT_FALSE(g1.used());
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // Second pass would normally evict from scope cache if it was zero, but since it's non-zero,
+  // it should stay.
+  store_->evictUnused();
+
+  // Verify STILL in scope
+  StatNameManagedStorage g1_name("scope.g1", symbol_table_);
+  auto found_gauge = scope->findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge.has_value());
+  EXPECT_EQ(&g1, &(found_gauge.value().get()));
+
+  // Verify still in store (allocator)
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // 2. Now subtract to make it zero and evict
+  g1.sub(10);
+  EXPECT_EQ(0, g1.value());
+
+  // First pass actually evicts it here because it is already unused
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // Verify removed from scope
+  EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
+
+  // Verify removed from store
+  EXPECT_EQ(0UL, store_->gauges().size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();

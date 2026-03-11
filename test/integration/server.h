@@ -203,8 +203,6 @@ public:
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
-  bool evictionDisabled() const override { return counter_->evictionDisabled(); }
-  void setEvictionDisabled(bool disable) override { counter_->setEvictionDisabled(disable); }
 
 private:
   std::unique_ptr<Stats::Counter> counter_;

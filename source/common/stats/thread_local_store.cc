@@ -1119,16 +1119,19 @@ void ThreadLocalStoreImpl::evictUnused() {
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
           return [&unused_metrics](const auto& kv) {
             const auto& [name, metric] = kv;
-            if (metric->evictionDisabled()) {
-              return false;
-            }
             if (metric->used()) {
               metric->markUnused();
               return false;
-            } else {
-              unused_metrics.try_emplace(name, metric);
-              return true;
             }
+            if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
+              if (metric->value() != 0 &&
+                  (metric->importMode() == Gauge::ImportMode::Accumulate ||
+                   metric->importMode() == Gauge::ImportMode::HiddenAccumulate)) {
+                return false;
+              }
+            }
+            unused_metrics.try_emplace(name, metric);
+            return true;
           };
         };
         absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));

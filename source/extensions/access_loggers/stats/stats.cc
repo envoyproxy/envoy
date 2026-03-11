@@ -20,15 +20,11 @@ public:
   ~AccessLogState() override {
     for (const auto& [gauge, value] : inflight_gauges_) {
       gauge->sub(value);
-      gauge->setEvictionDisabled(false);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
     auto [it, inserted] = inflight_gauges_.try_emplace(gauge, 0);
-    if (inserted) {
-      gauge->setEvictionDisabled(true);
-    }
     it->second += value;
   }
 
@@ -38,7 +34,6 @@ public:
       return absl::nullopt;
     }
     uint64_t value = it->second;
-    gauge->setEvictionDisabled(false);
     inflight_gauges_.erase(it);
     return value;
   }

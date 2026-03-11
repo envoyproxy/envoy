@@ -104,18 +104,6 @@ public:
   virtual bool hidden() const PURE;
 
   /**
-   * Indicates whether this metric is exempt from being evicted when unused.
-   */
-  virtual bool evictionDisabled() const PURE;
-
-  /**
-   * Sets whether this metric should be exempt from eviction.
-   * This behaves as a reference count natively. Calling with true increments the
-   * exemption count, and calling with false decrements it.
-   */
-  virtual void setEvictionDisabled(bool disable) PURE;
-
-  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.

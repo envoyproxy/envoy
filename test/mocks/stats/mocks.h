@@ -61,9 +61,6 @@ public:
   SymbolTable& symbolTable() override { return *symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return *symbol_table_; }
 
-  bool evictionDisabled() const override { return false; }
-  void setEvictionDisabled(bool) override {}
-
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
   std::string name() const override { return name_.name(); }
