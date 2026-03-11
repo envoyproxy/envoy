@@ -397,9 +397,9 @@ protected:
 
 // Tests that a scope-level matcher rejects the appropriate stat types and accepts others.
 TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
-  // Create a scope whose matcher rejects everything prefixed "myscope.rejected.".
+  // Create a scope whose matcher rejects everything prefixed "scope.rejected.".
   ScopeSharedPtr my_scope =
-      scope_->createScope("myscope", false, {}, makePrefixMatcher("myscope.rejected."));
+      scope_->createScope("scope", false, {}, makePrefixMatcher("scope.rejected."));
 
   // Rejected counter returns null counter (empty name, value always 0).
   Counter& rejected_counter = my_scope->counterFromString("rejected.foo");
@@ -409,7 +409,7 @@ TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
 
   // Accepted counter is real.
   Counter& accepted_counter = my_scope->counterFromString("accepted.foo");
-  EXPECT_EQ("myscope.accepted.foo", accepted_counter.name());
+  EXPECT_EQ("scope.accepted.foo", accepted_counter.name());
   accepted_counter.inc();
   EXPECT_EQ(1, accepted_counter.value());
 
@@ -421,7 +421,7 @@ TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
 
   // Accepted gauge is real.
   Gauge& accepted_gauge = my_scope->gaugeFromString("accepted.g", Gauge::ImportMode::Accumulate);
-  EXPECT_EQ("myscope.accepted.g", accepted_gauge.name());
+  EXPECT_EQ("scope.accepted.g", accepted_gauge.name());
 
   // Rejected histogram returns null histogram (Unit::Null, used() == false).
   Histogram& rejected_histogram =
@@ -442,24 +442,24 @@ TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
 
   // Accepted text readout is real.
   TextReadout& accepted_tr = my_scope->textReadoutFromString("accepted.tr");
-  EXPECT_EQ("myscope.accepted.tr", accepted_tr.name());
+  EXPECT_EQ("scope.accepted.tr", accepted_tr.name());
 }
 
 // Tests that a scope without a matcher accepts all stats (no filtering).
 TEST_F(IsolatedStoreScopeMatcherTest, ScopeWithNoMatcherAcceptsAll) {
-  ScopeSharedPtr my_scope = scope_->createScope("myscope");
+  ScopeSharedPtr my_scope = scope_->createScope("scope");
 
   Counter& c = my_scope->counterFromString("foo");
-  EXPECT_EQ("myscope.foo", c.name());
+  EXPECT_EQ("scope.foo", c.name());
 
   Gauge& g = my_scope->gaugeFromString("bar", Gauge::ImportMode::Accumulate);
-  EXPECT_EQ("myscope.bar", g.name());
+  EXPECT_EQ("scope.bar", g.name());
 
   Histogram& h = my_scope->histogramFromString("baz", Histogram::Unit::Unspecified);
-  EXPECT_EQ("myscope.baz", h.name());
+  EXPECT_EQ("scope.baz", h.name());
 
   TextReadout& tr = my_scope->textReadoutFromString("qux");
-  EXPECT_EQ("myscope.qux", tr.name());
+  EXPECT_EQ("scope.qux", tr.name());
 }
 
 // Tests that child scopes inherit the parent scope's matcher.
@@ -507,25 +507,6 @@ TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
   // "rejected_by_child" prefix IS rejected by the child's own matcher.
   Counter& rejected = child_scope->counterFromString("rejected_by_child.foo");
   EXPECT_EQ("", rejected.name());
-}
-
-// Tests that scope matcher replaces (not supplements) the store-level global matcher.
-TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherReplacesGlobalOnIsolatedStore) {
-  // Global matcher applied via scopeFromStatName on root scope (IsolatedStore has no
-  // setStatsMatcher, so we test by creating scopes with matchers on a shared store).
-
-  // Scope with its own matcher: rejects "myscope.scope_rejected.", accepts
-  // "myscope.global_rejected.".
-  ScopeSharedPtr my_scope =
-      scope_->createScope("myscope", false, {}, makePrefixMatcher("myscope.scope_rejected."));
-
-  Counter& scope_rejected = my_scope->counterFromString("scope_rejected.foo");
-  EXPECT_EQ("", scope_rejected.name());
-
-  // "global_rejected.foo" would be rejected by a hypothetical global matcher, but the scope
-  // matcher (which replaces global) doesn't reject it.
-  Counter& accepted = my_scope->counterFromString("global_rejected.foo");
-  EXPECT_EQ("myscope.global_rejected.foo", accepted.name());
 }
 
 } // namespace Stats

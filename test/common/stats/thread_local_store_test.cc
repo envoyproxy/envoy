@@ -1468,17 +1468,17 @@ TEST_F(StatsMatcherTLSTest, ScopeMatcherReplacesGlobal) {
   Counter& global_rejected = scope_.counterFromString("global_rejected.foo");
   EXPECT_EQ(global_rejected.name(), ""); // rejected → null counter
 
-  // Create a scope "myscope" with its own matcher that rejects full names starting with
-  // "myscope.scope_rejected." (i.e. stat "scope_rejected.foo" inside "myscope").
+  // Create a scope "scope" with its own matcher that rejects full names starting with
+  // "scope.scope_rejected." (i.e. stat "scope_rejected.foo" inside "scope").
   StatsMatcherSharedPtr scope_matcher =
-      makePrefixMatcher("myscope.scope_rejected.", symbol_table_, context_);
-  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+      makePrefixMatcher("scope.scope_rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
 
-  // Within the scope, "scope_rejected.foo" has full name "myscope.scope_rejected.foo" → rejected.
+  // Within the scope, "scope_rejected.foo" has full name "scope.scope_rejected.foo" → rejected.
   Counter& scope_rejected = my_scope->counterFromString("scope_rejected.foo");
   EXPECT_EQ(scope_rejected.name(), ""); // rejected by scope matcher
 
-  // Within the scope, "global_rejected.foo" has full name "myscope.global_rejected.foo".
+  // Within the scope, "global_rejected.foo" has full name "scope.global_rejected.foo".
   // The scope matcher does NOT reject this (scope replaces global, not supplements it).
   Counter& global_not_rejected = my_scope->counterFromString("global_rejected.foo");
   EXPECT_NE(global_not_rejected.name(), ""); // accepted by scope matcher
@@ -1494,7 +1494,7 @@ TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
   // Create a scope with its own matcher (rejects "scope.rejected").
   StatsMatcherSharedPtr scope_matcher =
       makePrefixMatcher("scope.rejected", symbol_table_, context_);
-  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
 
   // Create a counter that is accepted by the scope matcher.
   Counter& c = my_scope->counterFromString("accepted.foo");
@@ -1502,9 +1502,9 @@ TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
   c.inc();
   EXPECT_EQ(c.value(), 1);
 
-  // Now apply a global matcher that would reject "myscope.accepted.foo".
+  // Now apply a global matcher that would reject "scope.accepted.foo".
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
-      "myscope");
+      "scope");
   store_->setStatsMatcher(
       std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
 
@@ -1518,8 +1518,8 @@ TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
 // that HiddenAccumulate gauges bypass the scope matcher, and that child scopes inherit the matcher.
 TEST_F(StatsMatcherTLSTest, ScopeMatcherRejectsAllStatTypesAndInheritsToChildren) {
   StatsMatcherSharedPtr scope_matcher =
-      makePrefixMatcher("myscope.rejected.", symbol_table_, context_);
-  ScopeSharedPtr my_scope = store_->rootScope()->createScope("myscope", false, {}, scope_matcher);
+      makePrefixMatcher("scope.rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
 
   // Gauge: rejected stat returns null gauge (empty name, NeverImport).
   Gauge& rejected_gauge = my_scope->gaugeFromString("rejected.g", Gauge::ImportMode::Accumulate);
@@ -1535,7 +1535,7 @@ TEST_F(StatsMatcherTLSTest, ScopeMatcherRejectsAllStatTypesAndInheritsToChildren
   // HiddenAccumulate gauge is never rejected even if name matches.
   Gauge& hidden_gauge =
       my_scope->gaugeFromString("rejected.hidden", Gauge::ImportMode::HiddenAccumulate);
-  EXPECT_EQ("myscope.rejected.hidden", hidden_gauge.name());
+  EXPECT_EQ("scope.rejected.hidden", hidden_gauge.name());
 
   // Histogram: rejected stat returns null histogram (empty name, Unit::Null).
   Histogram& rejected_histogram =
