@@ -1130,26 +1130,30 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
           name: gauge
         value_fixed: 20
         add_subtract:
-          add_log_type: DownstreamStart
+          add_log_type: TcpUpstreamConnected
           sub_log_type: DownstreamEnd
 )EOF";
   initialize(yaml);
 
-  // Trigger ADD for both definitions
+  // Trigger ADD for the first definition (DownstreamStart)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
-  // Both add operations should be called
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
   EXPECT_CALL(*gauge_, add(10));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger ADD for the second definition (TcpUpstreamConnected)
+  formatter_context_.setAccessLogType(
+      envoy::data::accesslog::v3::AccessLogType::TcpUpstreamConnected);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  // The second gauge is added on TcpUpstreamConnected
   EXPECT_CALL(*gauge_, add(20));
   logger_->log(formatter_context_, stream_info_);
 
-  // Trigger SUBTRACT
+  // Trigger SUBTRACT for both (DownstreamEnd)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
-  // It should sub(30) once, as they are accumulated into one stored map entry
+  // It should sub(30) once, as they are accumulated into one stored map entry prior to removal
   EXPECT_CALL(*gauge_, sub(30));
-  EXPECT_CALL(*gauge_, sub(10)).Times(0);
-  EXPECT_CALL(*gauge_, sub(20)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
