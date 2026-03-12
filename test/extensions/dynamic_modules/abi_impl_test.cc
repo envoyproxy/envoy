@@ -195,7 +195,8 @@ WEAK_STUB(CertValidatorGetFilterState,
                                                                         nullptr))
 
 WEAK_STUB(ClusterAddHosts,
-          envoy_dynamic_module_callback_cluster_add_hosts(nullptr, nullptr, nullptr, 0, nullptr))
+          envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
+                                                          nullptr, nullptr, nullptr, 0, 0, nullptr))
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
@@ -279,6 +280,17 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
           envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(nullptr, nullptr,
                                                                                  nullptr,
                                                                                  {nullptr, 0}))
+WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
+                                                                                  nullptr))
+WEAK_STUB(ClusterUpdateHostHealth,
+          envoy_dynamic_module_callback_cluster_update_host_health(
+              nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
+WEAK_STUB(ClusterFindHostByAddress,
+          envoy_dynamic_module_callback_cluster_find_host_by_address(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterLbFindHostByAddress,
+          envoy_dynamic_module_callback_cluster_lb_find_host_by_address(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterLbGetHost, envoy_dynamic_module_callback_cluster_lb_get_host(nullptr, 0, 0))
 WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_new(nullptr))
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
