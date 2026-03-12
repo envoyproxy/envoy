@@ -314,8 +314,9 @@ TEST(RouteMatchActionFactoryTest, SimpleRouteMatchActionFactoryTest) {
   auto action =
       factory.createAction(proto_config, context, server_context.messageValidationVisitor());
 
-  EXPECT_NE(action, nullptr);
-  EXPECT_EQ(action->getTyped<RouteEntryImpl>().clusterName(), "cluster_0");
+  EXPECT_TRUE(action.ok());
+  EXPECT_NE(action.value(), nullptr);
+  EXPECT_EQ(action.value()->getTyped<RouteEntryImpl>().clusterName(), "cluster_0");
 }
 
 class RouteMatcherImplTest : public testing::Test {

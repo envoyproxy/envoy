@@ -87,7 +87,7 @@ public:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, RouteActionContext& context,
                ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "envoy.matching.action.generic_proxy.route"; }

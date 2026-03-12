@@ -56,9 +56,9 @@ class ForwardClientCertActionFactory
 public:
   std::string name() const override { return "forward_client_cert"; }
 
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             ForwardClientCertActionFactoryContext&,
-                                             ProtobufMessage::ValidationVisitor&) override;
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message& config, ForwardClientCertActionFactoryContext&,
+               ProtobufMessage::ValidationVisitor&) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::network::http_connection_manager::v3::

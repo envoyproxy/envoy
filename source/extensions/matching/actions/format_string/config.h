@@ -30,7 +30,7 @@ using FilterChainActionFactoryContext = Server::Configuration::ServerFactoryCont
 class ActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext> {
 public:
   std::string name() const override { return "envoy.matching.actions.format_string"; }
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& proto_config, FilterChainActionFactoryContext& context,
                ProtobufMessage::ValidationVisitor& validator) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

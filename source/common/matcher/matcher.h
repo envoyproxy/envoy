@@ -322,11 +322,10 @@ private:
           on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
           factory);
 
-      // TODO(taoxuy): try to pass message by moving and let the created action take ownership
-      // of the message if needed, which avoid copy.
-      auto action = factory.createAction(*message, action_factory_context_,
-                                         server_factory_context_.messageValidationVisitor());
-      return [action, keep_matching = on_match.keep_matching()] {
+      auto action_status = factory.createAction(*message, action_factory_context_,
+                                                server_factory_context_.messageValidationVisitor());
+      THROW_IF_NOT_OK_REF(action_status.status());
+      return [action = std::move(action_status).value(), keep_matching = on_match.keep_matching()] {
         return OnMatch<DataType>{action, {}, keep_matching};
       };
     }

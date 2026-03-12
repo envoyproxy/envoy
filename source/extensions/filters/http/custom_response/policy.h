@@ -52,9 +52,9 @@ template <typename PolicyConfig>
 class PolicyMatchActionFactory : public Matcher::ActionFactory<CustomResponseActionFactoryContext>,
                                  Logger::Loggable<Logger::Id::config> {
 public:
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             CustomResponseActionFactoryContext& context,
-                                             ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message& config, CustomResponseActionFactoryContext& context,
+               ProtobufMessage::ValidationVisitor&) override {
     return createPolicy(config, context.server_, context.stats_prefix_);
   }
 

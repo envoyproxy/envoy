@@ -1193,6 +1193,90 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_via_on_no_match_counter")));
 }
 
+TEST_F(OtlpMetricsFlusherTests, PrependPrefixAction) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
+                                             R"pb(
+        matcher_list {
+          matchers {
+            predicate {
+              single_predicate {
+                input {
+                  name: "stat_full_name_match_input"
+                  typed_config {
+                    [type.googleapis.com/
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
+                  }
+                }
+                value_match {
+                  safe_regex {
+                    regex: "test_counter"
+                  }
+                }
+              }
+            }
+            on_match {
+              action {
+                name: "otlp_metric_prepend_prefix_action"
+                typed_config {
+                  [type.googleapis.com/envoy.extensions.stat_sinks
+                       .open_telemetry.v3.SinkConfig.ConversionAction] {
+                         metric_prefix: "custom_prefix."
+                       }
+                }
+              }
+            }
+          }
+        }
+      )pb"));
+
+  addCounterToSnapshot("test_counter", 1, 1);
+
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  EXPECT_NE(nullptr, findMetric(metrics, "custom_prefix.test_counter-tagged"));
+}
+
+TEST_F(OtlpMetricsFlusherTests, PrependPrefixActionValidation) {
+  EXPECT_THROW_WITH_REGEX(OtlpMetricsFlusherImpl(otlpOptions(false, false, true, true, "", {},
+                                                             R"pb(
+        matcher_list {
+          matchers {
+            predicate {
+              single_predicate {
+                input {
+                  name: "stat_full_name_match_input"
+                  typed_config {
+                    [type.googleapis.com/
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
+                  }
+                }
+                value_match {
+                  safe_regex {
+                    regex: "test_counter"
+                  }
+                }
+              }
+            }
+            on_match {
+              action {
+                name: "otlp_metric_prepend_prefix_action"
+                typed_config {
+                  [type.googleapis.com/envoy.extensions.stat_sinks
+                       .open_telemetry.v3.SinkConfig.ConversionAction] {
+                         metric_name: "custom_name"
+                         metric_prefix: "custom_prefix."
+                       }
+                }
+              }
+            }
+          }
+        }
+      )pb")),
+                          EnvoyException, "metric_name.*metric_prefix");
+}
+
 TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
   OtlpMetricsFlusherImpl flusher(
       otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));

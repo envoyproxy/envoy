@@ -220,25 +220,6 @@ private:
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
   getCombinedAttributes(const StatType& stat,
                         OptRef<const SinkConfig::ConversionAction> conversion_config) const;
-  template <class GaugeType>
-  void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
-                         const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;
-
-  template <class CounterType>
-  void addCounterDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
-                           const CounterType& counter, uint64_t value, uint64_t delta,
-                           int64_t snapshot_time_ns) const;
-
-  void addHistogramDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
-                             const Stats::ParentHistogram& parent_histogram,
-                             int64_t snapshot_time_ns) const;
-
-  template <class StatType>
-  void setMetricCommon(opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-                       int64_t snapshot_time_ns, const StatType& stat) const;
-
-  void setMetricCommon(opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
-                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
 
   const OtlpOptionsSharedPtr config_;
   const std::function<bool(const Stats::Metric&)> predicate_;

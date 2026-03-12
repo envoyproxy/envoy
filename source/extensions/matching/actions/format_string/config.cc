@@ -23,7 +23,7 @@ ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_b
   return nullptr;
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 ActionFactory::createAction(const Protobuf::Message& proto_config,
                             FilterChainActionFactoryContext& context,
                             ProtobufMessage::ValidationVisitor& validator) {
@@ -32,10 +32,10 @@ ActionFactory::createAction(const Protobuf::Message& proto_config,
           proto_config, validator);
 
   Server::GenericFactoryContextImpl generic_context(context, validator);
-  Formatter::FormatterConstSharedPtr formatter = THROW_OR_RETURN_VALUE(
-      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context),
-      Formatter::FormatterPtr);
-  return std::make_shared<ActionImpl>(std::move(formatter));
+  auto formatter_status =
+      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context);
+  RETURN_IF_NOT_OK_REF(formatter_status.status());
+  return std::make_shared<ActionImpl>(std::move(formatter_status).value());
 }
 
 REGISTER_FACTORY(ActionFactory, Matcher::ActionFactory<FilterChainActionFactoryContext>);

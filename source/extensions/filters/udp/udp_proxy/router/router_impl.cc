@@ -15,7 +15,7 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace Router {
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config = MessageUtil::downcastAndValidate<

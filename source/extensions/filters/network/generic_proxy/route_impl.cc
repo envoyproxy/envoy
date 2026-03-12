@@ -61,7 +61,7 @@ RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
   }
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_action =

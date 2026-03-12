@@ -122,7 +122,7 @@ using ActionConstSharedPtr = std::shared_ptr<const Action>;
 
 template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionConstSharedPtr
+  virtual absl::StatusOr<ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ActionFactoryContext& action_factory_context,
                ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 

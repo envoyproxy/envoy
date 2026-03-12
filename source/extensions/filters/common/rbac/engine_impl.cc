@@ -11,7 +11,7 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-Envoy::Matcher::ActionConstSharedPtr
+absl::StatusOr<Envoy::Matcher::ActionConstSharedPtr>
 ActionFactory::createAction(const Protobuf::Message& config, ActionContext& context,
                             ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& action_config =

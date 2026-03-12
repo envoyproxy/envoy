@@ -24,9 +24,9 @@ class SkipActionFactory
     : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&,
-                                             Envoy::Http::Matching::HttpFilterActionContext&,
-                                             ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message&, Envoy::Http::Matching::HttpFilterActionContext&,
+               ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<SkipAction>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

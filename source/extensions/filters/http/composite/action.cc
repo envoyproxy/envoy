@@ -40,7 +40,7 @@ bool ExecuteFilterAction::actionSkip() const {
              : false;
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
                                          Http::Matching::HttpFilterActionContext& context,
                                          ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -84,11 +84,12 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
   }
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionDownstream(
+absl::StatusOr<Matcher::ActionConstSharedPtr>
+ExecuteFilterActionFactory::createDynamicActionDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context) {
   if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Failed to get downstream factory context or server factory context."));
   }
   auto provider_manager =
@@ -98,12 +99,13 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionDow
       composite_action, context, "http", context.factory_context_.value(), provider_manager);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionUpstream(
+absl::StatusOr<Matcher::ActionConstSharedPtr>
+ExecuteFilterActionFactory::createDynamicActionUpstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context) {
   if (!context.upstream_factory_context_.has_value() ||
       !context.server_factory_context_.has_value()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Failed to get upstream factory context or server factory context."));
   }
   auto provider_manager =
@@ -114,14 +116,14 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionUps
       provider_manager);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
+absl::StatusOr<Matcher::ActionConstSharedPtr> ExecuteFilterActionFactory::createActionCommon(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
     bool is_downstream) {
   const std::string stream_str = is_downstream ? "downstream" : "upstream";
 
   if (callback == nullptr) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Failed to get {} filter factory creation function", stream_str));
   }
   std::string name = composite_action.typed_config().name();
@@ -137,7 +139,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
       runtime);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDownstream(
+absl::StatusOr<Matcher::ActionConstSharedPtr>
+ExecuteFilterActionFactory::createStaticActionDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -167,7 +170,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDown
   return createActionCommon(composite_action, context, callback, true);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpstream(
+absl::StatusOr<Matcher::ActionConstSharedPtr>
+ExecuteFilterActionFactory::createStaticActionUpstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -191,13 +195,13 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpst
   return createActionCommon(composite_action, context, callback, false);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainAction(
+absl::StatusOr<Matcher::ActionConstSharedPtr> ExecuteFilterActionFactory::createFilterChainAction(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& filter_chain_config = composite_action.filter_chain();
   if (filter_chain_config.typed_config().empty()) {
-    throw EnvoyException("filter_chain must contain at least one filter.");
+    return absl::InvalidArgumentError("filter_chain must contain at least one filter.");
   }
 
   FilterFactoryCbList filter_factories;
@@ -229,7 +233,7 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
       }
 
       if (callback == nullptr) {
-        throw EnvoyException(fmt::format(
+        return absl::InvalidArgumentError(fmt::format(
             "Failed to create downstream filter factory for filter '{}'", filter_config.name()));
       }
     } else {
@@ -247,8 +251,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
       }
 
       if (callback == nullptr) {
-        throw EnvoyException(fmt::format("Failed to create upstream filter factory for filter '{}'",
-                                         filter_config.name()));
+        return absl::InvalidArgumentError(fmt::format(
+            "Failed to create upstream filter factory for filter '{}'", filter_config.name()));
       }
     }
 

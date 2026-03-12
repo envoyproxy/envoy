@@ -38,7 +38,7 @@ private:
 // from opaque config.
 class ClusterActionFactory : public Envoy::Matcher::ActionFactory<ClusterActionContext> {
 public:
-  Envoy::Matcher::ActionConstSharedPtr
+  absl::StatusOr<Envoy::Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ClusterActionContext& context,
                ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "cluster"; }
