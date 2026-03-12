@@ -500,10 +500,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     v8 = dict(
         # NOTE: Update together with proxy_wasm_cpp_host, highway, fast_float, dragonbox, simdutf, and fp16.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "13.8.258.26",
+        version = "14.6.202.10",
         # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
         strip_prefix = "v8-{version}",
-        sha256 = "4ffc27074d3f79e8e6401e390443dcf02755349002be4a1b01e72a3cd9457d15",
+        sha256 = "09c3d9f796a671fb9630c7190032f00171ce99effd7c80c7aaeba148a7bcbc1b",
         urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
     ),
     fast_float = dict(
@@ -530,15 +530,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     fp16 = dict(
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "0a92994d729ff76a58f692d3028ca1b64b145d91",
+        version = "3d2de1816307bac63c16a297e8c4dc501b4076df",
         strip_prefix = "FP16-{version}",
-        sha256 = "e66e65515fa09927b348d3d584c68be4215cfe664100d01c9dbc7655a5716d70",
+        sha256 = "e2da4f41bae8869f8dee56f4c104e699e7de3a483b5e451fda8e76fbcc66c59a",
         urls = ["https://github.com/Maratyszcza/FP16/archive/{version}.zip"],
     ),
     simdutf = dict(
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "7.3.4",
-        sha256 = "a8d2b481a2089280b84df7dc234223b658056b5bbd40bd4d476902d25d353a1f",
+        version = "8.1.0",
+        sha256 = "c3565a8567b21d0096d0366654db473597ea6e5408e464198dce0897be71e4d0",
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
