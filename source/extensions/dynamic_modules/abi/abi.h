@@ -7184,6 +7184,44 @@ void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
 
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
+ * added to or updated in the ClusterManager.
+ *
+ * This is only called if the module has opted in to receiving cluster lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param cluster_name is the name of the cluster that was added or updated.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_removal is called when a cluster is
+ * removed from the ClusterManager.
+ *
+ * This is only called if the module has opted in to receiving cluster lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param cluster_name is the name of the cluster that was removed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name);
+
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
@@ -7751,45 +7789,7 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer path_prefix);
 
-// -------------------- Bootstrap Extension - Cluster Lifecycle --------------------
-
-/**
- * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
- * added to or updated in the ClusterManager.
- *
- * This is only called if the module has opted in to receiving cluster lifecycle events via
- * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
- * registered on the main thread and invoked on the main thread.
- *
- * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
- * object.
- * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
- * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
- * @param cluster_name is the name of the cluster that was added or updated.
- */
-void envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_envoy_buffer cluster_name);
-
-/**
- * envoy_dynamic_module_on_bootstrap_extension_cluster_removal is called when a cluster is
- * removed from the ClusterManager.
- *
- * This is only called if the module has opted in to receiving cluster lifecycle events via
- * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
- * registered on the main thread and invoked on the main thread.
- *
- * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
- * object.
- * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
- * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
- * @param cluster_name is the name of the cluster that was removed.
- */
-void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_envoy_buffer cluster_name);
+// -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle is called by the
