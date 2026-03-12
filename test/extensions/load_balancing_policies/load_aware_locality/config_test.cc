@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.pb.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
 
 #include "source/extensions/load_balancing_policies/load_aware_locality/config.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
@@ -95,6 +96,27 @@ TEST(LoadAwareLocalityConfigTest, ValidateFailureWithMaglevEndpointPolicy) {
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("envoy.load_balancing_policies.maglev"));
+}
+
+TEST(LoadAwareLocalityConfigTest, ValidateFailureWithRingHashEndpointPolicy) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash ring_hash_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig ring_hash_config;
+  ring_hash_config.set_name("envoy.load_balancing_policies.ring_hash");
+  ring_hash_config.mutable_typed_config()->PackFrom(ring_hash_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = ring_hash_config;
+
+  Factory factory;
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("envoy.load_balancing_policies.ring_hash"));
 }
 
 TEST(LoadAwareLocalityConfigTest, ValidateFailureWithClusterProvidedEndpointPolicy) {

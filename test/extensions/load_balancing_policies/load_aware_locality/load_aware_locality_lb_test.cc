@@ -2015,6 +2015,226 @@ TEST_F(LoadAwareLocalityLbTest, AllLocalitiesEmptiedReturnsNullptr) {
   }
 }
 
+// --- Coverage: choosePriority fallback paths ---
+
+// Test: choosePriority falls back to firstAvailablePriority when the snapshot has a different
+// number of priority_weights than the worker's per_priority_locality_.
+TEST_F(LoadAwareLocalityLbTest, ChoosePrioritySnapshotPriorityCountMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot with 2 priority_weights, but the worker LB only has 1 priority.
+  // This triggers the size mismatch check in choosePriority → firstAvailablePriority.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0, 1.0}, 2.0, false, false}, {{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {50, 50};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0, 0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // firstAvailablePriority returns priority 0 with AllHosts source. Should still work.
+  for (int i = 0; i < 50; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_TRUE(result.host == h1 || result.host == h2);
+  }
+}
+
+// Test: choosePriority falls back to firstAvailablePriority when all priority loads are zero.
+TEST_F(LoadAwareLocalityLbTest, ChoosePriorityZeroPriorityLoads) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot where all healthy and degraded loads are 0.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {0};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // choosePriority sees total == 0 → firstAvailablePriority. Should still select h1.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
+// Test: choosePriority falls back to firstAvailablePriority when the selected priority has
+// empty localities (e.g. its hosts were drained after the snapshot was computed).
+TEST_F(LoadAwareLocalityLbTest, ChoosePrioritySelectedPriorityEmptyLocalities) {
+  auto h_p0 = makeWeightTrackingMockHost();
+  setupPriorityLocalities(0, {{h_p0}});
+  // Priority 1 exists but with an empty host set.
+  setupPriorityLocalities(1, {});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a snapshot routing 100% to priority 1 (which has empty localities).
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}, {{}, 0.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {0, 100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0, 0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // choosePriority selects priority 1, sees empty localities, falls back to
+  // firstAvailablePriority which finds priority 0.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h_p0);
+  }
+}
+
+// Test: choosePriority falls back when the priority_loads sizes don't match
+// per_priority_locality_ even though priority_weights size does.
+TEST_F(LoadAwareLocalityLbTest, ChoosePriorityLoadsSizeMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // priority_weights has 1 entry (matches), but priority_loads have 2 entries (mismatch).
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {50, 50};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0, 0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // The loads size mismatch triggers firstAvailablePriority. Should still select h1.
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
+// --- Coverage: zone routing stats for degraded and panic sources ---
+
+// Test: Zone routing stats increment correctly when traffic routes via degraded source
+// with a local locality present.
+TEST_F(LoadAwareLocalityLbTest, StatsZoneRoutingDegradedWithLocalLocality) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+
+  // 2 localities with local locality. h_local is degraded only, h_remote is healthy.
+  // This means healthy routing goes only to remote, degraded routing goes only to local.
+  setupLocalities({{h_local}, {h_remote}},
+                  /*has_local_locality=*/true, std::vector<Upstream::HostVector>{{}, {h_remote}},
+                  std::vector<Upstream::HostVector>{{h_local}, {}});
+
+  createLb();
+
+  // Recompute so degraded priority load is non-zero.
+  // With 1/2 healthy capacity (50% * 1.4 overprovisioning = 70%), some traffic should go
+  // via degraded routing.
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // The degraded routing path with has_local_locality exercises allLocalFor(Degraded) and
+  // the zone routing stat counters for degraded selections.
+  auto counts = countPicks(*worker_lb, 500);
+  // Both hosts should be reachable (h_remote via healthy, h_local via degraded/all-host).
+  EXPECT_GT(counts[h_remote.get()], 0);
+  // Zone routing stats should have been incremented (either sampled or cross-zone).
+  EXPECT_GT(cluster_info_.lbStats().lb_zone_routing_sampled_.value() +
+                cluster_info_.lbStats().lb_zone_routing_cross_zone_.value() +
+                cluster_info_.lbStats().lb_zone_routing_all_directly_.value(),
+            0u);
+}
+
+// Test: Zone routing stats increment correctly when traffic routes via panic/all-host source
+// with a local locality present.
+TEST_F(LoadAwareLocalityLbTest, StatsZoneRoutingPanicWithLocalLocality) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote_1 = makeWeightTrackingMockHost();
+  auto h_remote_2 = makeWeightTrackingMockHost();
+
+  // 1/3 healthy capacity triggers panic (46% after overprovisioning < 50% threshold).
+  // has_local_locality=true so zone routing stats are exercised for the AllHosts source.
+  setupLocalities({{h_local}, {h_remote_1, h_remote_2}},
+                  /*has_local_locality=*/true, std::vector<Upstream::HostVector>{{h_local}, {}},
+                  std::vector<Upstream::HostVector>{{}, {}});
+
+  createLb();
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(1, weights->priority_panic.size());
+  EXPECT_TRUE(weights->priority_panic[0]);
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Make picks that exercise the panic/AllHosts zone routing path.
+  auto counts = countPicks(*worker_lb, 500);
+  // All hosts should be reachable in panic mode.
+  EXPECT_GT(counts[h_local.get()], 0);
+  EXPECT_GT(counts[h_remote_1.get()] + counts[h_remote_2.get()], 0);
+  // Zone routing stats should have been incremented for the AllHosts source.
+  EXPECT_GT(cluster_info_.lbStats().lb_zone_routing_sampled_.value() +
+                cluster_info_.lbStats().lb_zone_routing_cross_zone_.value() +
+                cluster_info_.lbStats().lb_zone_routing_all_directly_.value(),
+            0u);
+}
+
+// Test: peekAnotherHost with a stale snapshot that has wrong priority count still returns
+// a valid host via firstAvailablePriority fallback.
+TEST_F(LoadAwareLocalityLbTest, PeekAnotherHostSnapshotMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Push a mismatched snapshot (2 priorities but worker has 1).
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}, {{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {50, 50};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0, 0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // peekAnotherHost follows the same choosePriority path — should still work.
+  for (int i = 0; i < 20; ++i) {
+    auto host = worker_lb->peekAnotherHost(nullptr);
+    ASSERT_NE(nullptr, host);
+    EXPECT_EQ(host, h1);
+    // Drain the peek.
+    worker_lb->chooseHost(nullptr);
+  }
+}
+
+// Test: Factory's recreateOnHostChange returns false (round-robin child does not require it).
+TEST_F(LoadAwareLocalityLbTest, FactoryRecreateOnHostChangeReturnsFalse) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  EXPECT_FALSE(factory_->recreateOnHostChange());
+}
+
 } // namespace
 } // namespace LoadAwareLocality
 } // namespace LoadBalancingPolicies
