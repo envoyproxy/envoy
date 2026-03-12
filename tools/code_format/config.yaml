@@ -38,6 +38,7 @@ paths:
   excluded:
   - .
   - bazel/external/c-ares/
+  - bazel/external/cargo/remote/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-
@@ -80,7 +81,7 @@ paths:
     include:
     - api/bazel/envoy_http_archive.bzl
     - api/bazel/repository_locations.bzl
-    - bazel/external/cargo/crates.bzl
+    - bazel/external/cargo/remote/defs.bzl
     - bazel/repository_locations.bzl
     - docs/bazel/repository_locations.bzl
 
@@ -277,6 +278,7 @@ paths:
     - source/extensions/filters/http/grpc_field_extraction
     - source/extensions/filters/http/proto_message_extraction/extraction_util
     - test/extensions/bootstrap/wasm/test_data
+    - bazel/external/cargo/remote
 
   # Files that are allowed to use try without main thread assertion.
   raw_try:
