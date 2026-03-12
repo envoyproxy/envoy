@@ -12,24 +12,38 @@ modify different aspects of the server:
 
 .. attention::
 
-  The administration interface in its current form both allows destructive operations to be
-  performed (e.g., shutting down the server) as well as potentially exposes private information
-  (e.g., stats, cluster names, cert info, etc.). It is **critical** that access to the
-  administration interface is only allowed via a secure network. It is also **critical** that hosts
-  that access the administration interface are **only** attached to the secure network (i.e., to
-  avoid CSRF attacks). This involves setting up an appropriate firewall or optimally only allowing
-  access to the administration listener via localhost. This can be accomplished with a v2
-  configuration like the following:
+  The administration interface both allows destructive operations to be performed (e.g., shutting
+  down the server) as well as potentially exposes private information (e.g., stats, cluster names,
+  cert info, etc.). It is **critical** that access to the administration interface is only allowed
+  via a secure network. It is also **critical** that hosts that access the administration interface
+  are **only** attached to the secure network (i.e., to avoid CSRF attacks). This involves setting
+  up an appropriate firewall or optimally only allowing access to the administration listener via
+  localhost. This can be accomplished with a configuration like the following:
 
   .. code-block:: yaml
 
     admin:
-      profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }
 
-  In the future additional security options will be added to the administration interface. This
-  work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
+  In addition to network-level restrictions, the
+  :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` field can restrict
+  which admin endpoints are accessible. When configured, only paths matching the specified string
+  matchers are served; all other requests receive HTTP 403 Forbidden. For example, to expose only
+  the health check and stats endpoints:
+
+  .. code-block:: yaml
+
+    admin:
+      address:
+        socket_address: { address: 127.0.0.1, port_value: 9901 }
+      allow_paths:
+      - exact: /ready
+      - exact: /stats
+      - prefix: /healthcheck
+
+  This is particularly useful when the admin endpoint must be reachable for readiness probes or
+  monitoring but destructive operations like ``/quitquitquit`` should not be exposed.
 
   All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
   the request has no effect, and an HTTP 400 (Invalid Request) response is returned.

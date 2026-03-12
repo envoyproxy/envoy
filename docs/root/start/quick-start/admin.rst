@@ -50,6 +50,35 @@ In this example, the logs are simply discarded.
    You may wish to restrict the network address the admin server listens to in your own deployment as part
    of your strategy to limit access to this endpoint.
 
+.. _start_quick_start_admin_access:
+
+Restricting admin access
+------------------------
+
+Beyond binding to localhost, you can use
+:ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to restrict which
+admin endpoints are available. Requests to paths not in the allow list receive HTTP 403 Forbidden.
+
+For example, to only expose readiness and stats endpoints:
+
+.. code-block:: yaml
+
+   admin:
+     address:
+       socket_address:
+         address: 127.0.0.1
+         port_value: 9901
+     allow_paths:
+     - exact: /ready
+     - exact: /stats
+     - prefix: /healthcheck
+
+This is useful in production deployments where the admin endpoint must be reachable for health
+checks or monitoring, but destructive endpoints like ``/quitquitquit`` or ``/config_dump`` should
+not be exposed.
+
+See the :ref:`operations admin docs <operations_admin_interface_security>` for more information on
+securing the admin interface.
 
 ``stat_prefix``
 ---------------
