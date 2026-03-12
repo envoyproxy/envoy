@@ -644,6 +644,12 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: matching
+  change: |
+    Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`
+    to distinguish Envoy generated local replies from upstream responses. This matcher input returns ``true``
+    for local replies and ``false`` for upstream responses, enabling ``custom_response`` filter policies to
+    selectively apply only to locally generated error responses.
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header

@@ -938,6 +938,70 @@ pub trait EnvoyHttpFilter {
     source: abi::envoy_dynamic_module_type_metadata_source,
   ) -> Option<Vec<EnvoyBuffer<'a>>>;
 
+  /// Append a number value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Append a string value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Append a bool value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool;
+
+  /// Get the number of elements in the metadata list stored under the given namespace and key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// or the value is not a list.
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize>;
+
+  /// Get the number value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a number.
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64>;
+
+  /// Get the string value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a string.
+  ///
+  /// The returned buffer's lifetime is tied to the current event hook.
+  fn get_metadata_list_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the bool value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a bool.
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -2376,6 +2440,140 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
           .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
           .collect(),
       )
+    } else {
+      None
+    }
+  }
+
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize> {
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
     } else {
       None
     }

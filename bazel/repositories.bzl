@@ -869,7 +869,11 @@ def _wamr():
     )
 
 def _toolchains_llvm():
-    external_http_archive(name = "toolchains_llvm")
+    external_http_archive(
+        name = "toolchains_llvm",
+        patch_args = ["-p1"],
+        patches = ["@envoy_toolshed//:patches/toolchains_llvm.patch"],
+    )
 
 def _wasmtime():
     external_http_archive(
