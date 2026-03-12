@@ -677,6 +677,99 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     assert!(ns_strs.contains(&"ns_keys_test"));
     assert!(ns_strs.contains(&"ns_res_body_bool"));
 
+    // Test list metadata: add numbers, strings, and bools to a list.
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 1.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 2.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 3.0));
+    let size = envoy_filter.get_metadata_list_size(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "list_key",
+    );
+    assert_eq!(size, Some(3));
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        0,
+      ),
+      Some(1.0)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        2,
+      ),
+      Some(3.0)
+    );
+    // Out of range index returns None.
+    assert!(envoy_filter
+      .get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        3,
+      )
+      .is_none());
+
+    // Test string list.
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "hello"));
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "world"));
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      0,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"hello");
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      1,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"world");
+
+    // Test bool list.
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", true));
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", false));
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        0,
+      ),
+      Some(true)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        1,
+      ),
+      Some(false)
+    );
+
+    // Adding to an existing non-list key returns false.
+    envoy_filter.set_dynamic_metadata_number("ns_list", "not_a_list", 42.0);
+    assert!(!envoy_filter.add_dynamic_metadata_list_number("ns_list", "not_a_list", 1.0));
+
+    // Getting list size for a non-list key returns None.
+    assert!(envoy_filter
+      .get_metadata_list_size(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "not_a_list",
+      )
+      .is_none());
+
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }
