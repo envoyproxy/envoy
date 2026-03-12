@@ -1124,9 +1124,7 @@ void ThreadLocalStoreImpl::evictUnused() {
               return false;
             }
             if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
-              if (metric->value() != 0 &&
-                  (metric->importMode() == Gauge::ImportMode::Accumulate ||
-                   metric->importMode() == Gauge::ImportMode::HiddenAccumulate)) {
+              if (metric->value() != 0) {
                 return false;
               }
             }

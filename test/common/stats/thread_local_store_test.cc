@@ -825,7 +825,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   tls_.shutdownThread();
 }
 
-TEST_F(StatsThreadLocalStoreTest, EvictionGaugesNonZero) {
+TEST_F(StatsThreadLocalStoreTest, EvictionGauges) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -862,6 +862,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesNonZero) {
   // First pass actually evicts it here because it is already unused
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
   // Verify removed from scope
   EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
