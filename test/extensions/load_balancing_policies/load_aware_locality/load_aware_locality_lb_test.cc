@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/typed_load_balancer_factory.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest.h"
@@ -725,6 +726,8 @@ TEST_F(LoadAwareLocalityLbTest, RoutingWeightsRefreshOnChooseHost) {
 }
 
 // Test: Removing all hosts from a locality is handled gracefully.
+// The routing snapshot still has weight for the now-empty locality (stale), but
+// pickLocalityLb falls back to locality A. No request should return nullptr.
 TEST_F(LoadAwareLocalityLbTest, AllHostsRemovedFromLocality) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
@@ -743,14 +746,64 @@ TEST_F(LoadAwareLocalityLbTest, AllHostsRemovedFromLocality) {
 
   priority_set_.runUpdateCallbacks(0, {}, {h2});
 
-  // h1 should still be reachable — only locality A has hosts.
+  // Every pick must return h1 — pickLocalityLb falls back from the empty locality B to
+  // locality A even though the stale routing snapshot still assigns weight to B.
   for (int i = 0; i < 50; ++i) {
     auto result = worker_lb->chooseHost(nullptr);
-    // May return nullptr if child LB for empty locality is chosen, or h1.
-    // But locality A should still work.
-    if (result.host != nullptr) {
-      EXPECT_EQ(result.host, h1);
-    }
+    ASSERT_NE(nullptr, result.host);
+    EXPECT_EQ(result.host, h1);
+  }
+}
+
+// Test: Stale routing snapshot after host removal — the weighted-random may pick a locality
+// whose child LB was torn down, but pickLocalityLb falls back to a locality that still has
+// hosts. Verifies no nullptr returns during the window between the host change and the next
+// routing weight recomputation.
+TEST_F(LoadAwareLocalityLbTest, StaleSnapshotFallbackAfterHostRemoval) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  auto h3 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}, {h3}});
+
+  createLb();
+
+  // Give each locality equal ORCA utilization so they all get equal weight.
+  setHostUtilization(*h1, 0.5);
+  setHostUtilization(*h2, 0.5);
+  setHostUtilization(*h3, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Verify all three hosts are reachable before the removal.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 300));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 300));
+  EXPECT_TRUE(hostSeen(*worker_lb, h3, 300));
+
+  // Remove h2 and h3 from their localities, leaving only h1. The routing snapshot still
+  // has equal weight for all three localities (stale).
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {h1};
+  host_set->healthy_hosts_ = {h1};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{h1}, {}, {}}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  priority_set_.runUpdateCallbacks(0, {}, {h2, h3});
+
+  // Despite the stale snapshot, every pick must succeed (fallback to locality A).
+  for (int i = 0; i < 200; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_NE(nullptr, result.host) << "pick " << i << " returned nullptr with stale snapshot";
+    EXPECT_EQ(result.host, h1);
+  }
+
+  // peekAnotherHost should also never return nullptr.
+  for (int i = 0; i < 200; ++i) {
+    auto host = worker_lb->peekAnotherHost(nullptr);
+    ASSERT_NE(nullptr, host) << "peek " << i << " returned nullptr with stale snapshot";
+    EXPECT_EQ(host, h1);
   }
 }
 
@@ -1098,7 +1151,7 @@ TEST_F(LoadAwareLocalityLbTest, HealthyHostsDivergeFromAll) {
   EXPECT_NEAR(weights->weights[1], 1.0, 0.01);
 }
 
-// --- Tests for onHealthChange path ---
+// --- Tests for empty-delta priority updates ---
 
 // Test: Health-only update (no membership change) re-partitions each locality's child LB.
 TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateRepartitions) {
@@ -1115,12 +1168,35 @@ TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateRepartitions) {
   EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
 
   // Fire a health-only update (empty hosts_added, empty hosts_removed).
-  // This triggers onHealthChange(0) which re-partitions each locality.
+  // This triggers the empty-delta update path, which re-partitions each locality.
   priority_set_.runUpdateCallbacks(0, {}, {});
 
   // Both hosts should still be reachable after health-only update.
   EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
   EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+}
+
+// Test: Empty-delta updates still refresh child LB schedulers when host attributes change
+// in place (for example host weight).
+TEST_F(LoadAwareLocalityLbTest, EmptyDeltaUpdateRefreshesChildWeights) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1, h2}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto initial_counts = countPicks(*worker_lb, 200);
+  EXPECT_GT(initial_counts[h1.get()], 50);
+  EXPECT_GT(initial_counts[h2.get()], 50);
+
+  h1->weight(100);
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  auto updated_counts = countPicks(*worker_lb, 400);
+  EXPECT_GT(updated_counts[h1.get()], updated_counts[h2.get()] * 10);
+  EXPECT_GT(updated_counts[h1.get()], 300);
 }
 
 // Test: Health-only updates on higher priorities still refresh the per-priority locality state.
@@ -1792,6 +1868,142 @@ TEST_F(LoadAwareLocalityLbTest, WeightExpirationDisabled) {
   const int num_picks = 1000;
   auto counts = countPicks(*worker_lb, num_picks);
   EXPECT_GT(counts[h2.get()], num_picks * 0.7);
+}
+
+// --- Coverage for defensive guards and error paths ---
+
+// Test: initializeChildLb returns an error when the child factory returns nullptr.
+TEST_F(LoadAwareLocalityLbTest, InitializeChildLbNullChild) {
+  NiceMock<Upstream::MockTypedLoadBalancerFactory> null_child_factory;
+  ON_CALL(null_child_factory, name()).WillByDefault(Return("mock_null_factory"));
+  // Return nullptr from create(), simulating an unsupported child policy.
+  ON_CALL(null_child_factory,
+          create(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillByDefault(Return(testing::ByMove(nullptr)));
+
+  auto factory = std::make_shared<WorkerLocalLbFactory>(
+      null_child_factory, "mock_null_factory", nullptr, cluster_info_, priority_set_,
+      context_.runtime_loader_, random_, context_.time_system_, context_.thread_local_);
+
+  auto status = factory->initializeChildLb();
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("mock_null_factory"));
+}
+
+// Test: onHostChange handles a priority count change (new priority added after construction)
+// by rebuilding all per-priority locality state.
+TEST_F(LoadAwareLocalityLbTest, OnHostChangePriorityCountMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 50));
+
+  // Add a new priority level. This makes host_sets.size() (2) != per_priority_locality_.size() (1).
+  auto h_p1 = makeWeightTrackingMockHost();
+  setupPriorityLocalities(1, {{h_p1}});
+
+  // Fire a host change on the new priority. onHostChange sees the size mismatch and calls
+  // buildPerPriorityLocalities() to rebuild all priorities.
+  priority_set_.runUpdateCallbacks(1, {h_p1}, {});
+
+  // Push routing weights that send traffic to priority 1.
+  auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}, {{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {0, 100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0, 0};
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  typed_factory->updateRoutingWeights(std::move(snapshot));
+
+  // h_p1 should be reachable via priority 1.
+  EXPECT_TRUE(hostSeen(*worker_lb, h_p1, 50));
+}
+
+// Test: onInPlaceHostUpdate with a priority count mismatch is a safe no-op.
+TEST_F(LoadAwareLocalityLbTest, OnInPlaceHostUpdatePriorityCountMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Add a new priority level without firing a host change callback.
+  auto h_p1 = makeWeightTrackingMockHost();
+  setupPriorityLocalities(1, {{h_p1}});
+
+  // Fire an empty-delta update on priority 1. host_sets.size() (2) != per_priority_locality_.size()
+  // (1). onInPlaceHostUpdate should early-return without crashing.
+  priority_set_.runUpdateCallbacks(1, {}, {});
+
+  // Original host still works.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 50));
+}
+
+// Test: Priority update callbacks with an out-of-range priority are safe no-ops.
+// Covers the early-return guard in both onHostChange and onInPlaceHostUpdate.
+TEST_F(LoadAwareLocalityLbTest, OutOfRangePriorityCallbacks) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Host-change callback with out-of-range priority (covers onHostChange guard).
+  priority_set_.runUpdateCallbacks(5, {makeWeightTrackingMockHost()}, {});
+
+  // Empty-delta callback with out-of-range priority (covers onInPlaceHostUpdate guard).
+  priority_set_.runUpdateCallbacks(5, {}, {});
+
+  // Original host still works.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 50));
+}
+
+// Test: All hosts removed from all localities — pickLocalityLb returns nullptr, chooseHost
+// returns {nullptr} gracefully (no crash, no UB).
+TEST_F(LoadAwareLocalityLbTest, AllLocalitiesEmptiedReturnsNullptr) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+
+  setHostUtilization(*h1, 0.5);
+  setHostUtilization(*h2, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Verify both hosts work first.
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 200));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 200));
+
+  // Remove all hosts from all localities. The stale snapshot still assigns positive weight
+  // to both. pickLocalityLb scans all localities, finds no usable LB, returns nullptr.
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {};
+  host_set->healthy_hosts_ = {};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{}, {}}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  priority_set_.runUpdateCallbacks(0, {}, {h1, h2});
+
+  // Every pick should return nullptr (no hosts anywhere), not crash.
+  for (int i = 0; i < 50; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    EXPECT_EQ(nullptr, result.host);
+  }
+
+  // peekAnotherHost should also return nullptr.
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_EQ(nullptr, worker_lb->peekAnotherHost(nullptr));
+  }
 }
 
 } // namespace

@@ -309,8 +309,9 @@ private:
   // Handle incremental host membership changes for the given priority.
   void onHostChange(uint32_t priority);
 
-  // Handle health-only updates (no membership change) by re-partitioning each locality.
-  void onHealthChange(uint32_t priority);
+  // Handle priority updates without host deltas by re-partitioning each locality so child LBs
+  // observe in-place host changes (for example health, weight, or metadata updates).
+  void onInPlaceHostUpdate(uint32_t priority);
 
   // Update a locality/source PrioritySet with a pre-selected host subset.
   void updateLocalityHosts(PerSourceLocalityState& state, const Upstream::HostVector& hosts,
@@ -331,6 +332,14 @@ private:
   size_t selectLocality(const PriorityRoutingWeights& snapshot,
                         PriorityRoutingWeights::SelectionSource source,
                         const std::vector<PerLocalityState>& per_locality) const;
+
+  // Find a usable child LB at the preferred locality, falling back to any locality with a
+  // non-null LB when the routing snapshot is stale (e.g. a locality's hosts were removed but
+  // the routing weights haven't been recomputed yet). Returns nullptr if no locality has a
+  // usable LB. Sets actual_idx to the index of the locality whose LB was returned.
+  Upstream::LoadBalancer* pickLocalityLb(const std::vector<PerLocalityState>& per_locality,
+                                         PriorityRoutingWeights::SelectionSource source,
+                                         size_t preferred_idx, size_t& actual_idx) const;
 
   // Best-effort fallback for transient snapshot/worker mismatches.
   absl::optional<SelectedPriority> firstAvailablePriority() const;

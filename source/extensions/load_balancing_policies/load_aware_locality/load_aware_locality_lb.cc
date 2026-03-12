@@ -339,9 +339,9 @@ WorkerLocalLb::WorkerLocalLb(WorkerLocalLbFactory& factory,
         if (!hosts_added.empty() || !hosts_removed.empty()) {
           onHostChange(priority);
         } else {
-          // Health-only update (no membership change). Re-partition each locality so child
-          // LBs see current healthy/degraded/excluded host sets.
-          onHealthChange(priority);
+          // Empty-delta updates still matter for child policies, since host attributes can change
+          // in place (for example health, weight, or metadata) without host membership deltas.
+          onInPlaceHostUpdate(priority);
         }
       });
 }
@@ -431,7 +431,11 @@ void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::H
       hosts_removed.push_back(std::const_pointer_cast<Upstream::Host>(host));
     }
 
-    if (hosts_added.empty() && hosts_removed.empty()) {
+    const bool membership_changed = !hosts_added.empty() || !hosts_removed.empty();
+    if (!membership_changed) {
+      // Host identity is unchanged, but child policies still need an update to observe in-place
+      // host attribute changes such as weight or metadata.
+      updateLocalityHosts(source_state, new_hosts, is_local, {}, {});
       return;
     }
 
@@ -484,7 +488,7 @@ void WorkerLocalLb::onHostChange(uint32_t priority) {
   }
 }
 
-void WorkerLocalLb::onHealthChange(uint32_t priority) {
+void WorkerLocalLb::onInPlaceHostUpdate(uint32_t priority) {
   const auto& host_sets = priority_set_.hostSetsPerPriority();
   if (priority >= host_sets.size()) {
     return;
@@ -509,6 +513,28 @@ void WorkerLocalLb::onHealthChange(uint32_t priority) {
   }
 }
 
+Upstream::LoadBalancer*
+WorkerLocalLb::pickLocalityLb(const std::vector<PerLocalityState>& per_locality,
+                              PriorityRoutingWeights::SelectionSource source, size_t preferred_idx,
+                              size_t& actual_idx) const {
+  auto* lb = per_locality[preferred_idx].stateFor(source).lb.get();
+  if (lb != nullptr) {
+    actual_idx = preferred_idx;
+    return lb;
+  }
+  // Stale routing snapshot — the preferred locality's child LB was torn down after a host
+  // change but before the routing weights were recomputed. Scan for any locality with a
+  // usable LB.
+  for (size_t i = 0; i < per_locality.size(); ++i) {
+    lb = per_locality[i].stateFor(source).lb.get();
+    if (lb != nullptr) {
+      actual_idx = i;
+      return lb;
+    }
+  }
+  return nullptr;
+}
+
 Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancerContext* context) {
   const auto selected = choosePriority();
   if (!selected.has_value()) {
@@ -520,9 +546,10 @@ Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancer
     return {nullptr};
   }
 
-  const size_t locality_idx = chooseLocality(selected->priority, selected->source);
-  auto& source_state = per_locality[locality_idx].stateFor(selected->source);
-  if (source_state.lb == nullptr) {
+  const size_t preferred_idx = chooseLocality(selected->priority, selected->source);
+  size_t locality_idx = preferred_idx;
+  auto* lb = pickLocalityLb(per_locality, selected->source, preferred_idx, locality_idx);
+  if (lb == nullptr) {
     return {nullptr};
   }
 
@@ -531,7 +558,7 @@ Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancer
   if (snapshot != nullptr && selected->priority < snapshot->priority_weights.size()) {
     const auto& priority_snapshot = snapshot->priority_weights[selected->priority];
     if (!priority_snapshot.has_local_locality) {
-      return source_state.lb->chooseHost(context);
+      return lb->chooseHost(context);
     }
 
     if (locality_idx == 0) {
@@ -545,7 +572,7 @@ Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancer
     }
   }
 
-  return source_state.lb->chooseHost(context);
+  return lb->chooseHost(context);
 }
 
 absl::optional<SelectedPriority> WorkerLocalLb::firstAvailablePriority() const {
@@ -670,9 +697,10 @@ WorkerLocalLb::peekAnotherHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
-  const size_t locality_idx = chooseLocality(selected->priority, selected->source);
-  auto& source_state = per_locality[locality_idx].stateFor(selected->source);
-  return source_state.lb != nullptr ? source_state.lb->peekAnotherHost(context) : nullptr;
+  const size_t preferred_idx = chooseLocality(selected->priority, selected->source);
+  size_t actual_idx = preferred_idx;
+  auto* lb = pickLocalityLb(per_locality, selected->source, preferred_idx, actual_idx);
+  return lb != nullptr ? lb->peekAnotherHost(context) : nullptr;
 }
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
