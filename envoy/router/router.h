@@ -39,6 +39,7 @@ namespace Formatter {
 class Formatter;
 }
 namespace Upstream {
+class ClusterInfo;
 class ClusterManager;
 class LoadBalancerContext;
 class ThreadLocalCluster;
@@ -326,6 +327,11 @@ public:
    * back-off interval parsed from response headers.
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
+
+  /**
+   * @return whether the cluster should be refreshed on retry.
+   */
+  virtual bool refreshClusterOnRetry() const PURE;
 };
 
 /**
@@ -515,6 +521,13 @@ public:
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * Refresh the cluster used for retry stats and resource management.
+   * Called when a cross-cluster retry changes the target cluster.
+   * @param cluster the new cluster to use.
+   */
+  virtual void refreshClusterEntry(const Upstream::ClusterInfo& cluster) PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;

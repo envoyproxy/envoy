@@ -31,7 +31,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
           retry_policy.retriable_headers(), common_context)),
       retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
           retry_policy.retriable_request_headers(), common_context)),
-      validation_visitor_(&validation_visitor) {
+      validation_visitor_(&validation_visitor),
+      refresh_cluster_on_retry_(retry_policy.refresh_cluster_on_retry()) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   per_try_idle_timeout_ =
