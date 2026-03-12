@@ -370,6 +370,43 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that upstream RemoteClose propagates AbortReset when runtime guard is enabled.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseWithRstPropagation) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy", "true"}});
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::AbortReset));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that upstream LocalClose still uses FlushWrite (FIN) even when runtime guard is enabled.
+TEST_P(TcpProxyTest, UpstreamLocalCloseStillUsesFinWithRstGuardEnabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy", "true"}});
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test that upstream RemoteClose uses FlushWrite (FIN) when runtime guard is disabled (default).
+TEST_P(TcpProxyTest, UpstreamRemoteCloseUsesFinWhenRstGuardDisabled) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Test that reconnect is attempted after a local connect failure, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();

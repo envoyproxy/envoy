@@ -243,10 +243,24 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_vie
   return nullptr;
 }
 
-void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
+void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   read_half_closed_ = true;
   write_half_closed_ = true;
-  resetEncoder(Network::ConnectionEvent::LocalClose);
+  // Map remote-originated resets to RemoteClose so tcp_proxy can propagate RST.
+  Network::ConnectionEvent event;
+  switch (reason) {
+  case Http::StreamResetReason::RemoteReset:
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+  case Http::StreamResetReason::RemoteConnectionFailure:
+  case Http::StreamResetReason::ConnectionTermination:
+  case Http::StreamResetReason::ConnectError:
+    event = Network::ConnectionEvent::RemoteClose;
+    break;
+  default:
+    event = Network::ConnectionEvent::LocalClose;
+    break;
+  }
+  resetEncoder(event);
 }
 
 void HttpUpstream::onAboveWriteBufferHighWatermark() {

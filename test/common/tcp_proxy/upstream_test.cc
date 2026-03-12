@@ -140,8 +140,61 @@ TEST_P(HttpUpstreamTest, DownstreamDisconnect) {
 TEST_P(HttpUpstreamTest, UpstreamReset) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(this->callbacks_, onEvent(_));
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+}
+
+// Remote-originated reset reasons should produce RemoteClose.
+TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  const Http::StreamResetReason remote_reasons[] = {
+      Http::StreamResetReason::RemoteReset,
+      Http::StreamResetReason::RemoteRefusedStreamReset,
+      Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::ConnectionTermination,
+      Http::StreamResetReason::ConnectError,
+  };
+
+  for (const auto reason : remote_reasons) {
+    this->setupUpstream();
+    EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+    this->upstream_->onResetStream(reason, "");
+  }
+}
+
+// Local-originated reset reasons should produce LocalClose.
+TEST_P(HttpUpstreamTest, UpstreamLocalResetProducesLocalClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  const Http::StreamResetReason local_reasons[] = {
+      Http::StreamResetReason::LocalReset,
+      Http::StreamResetReason::LocalRefusedStreamReset,
+      Http::StreamResetReason::LocalConnectionFailure,
+      Http::StreamResetReason::ConnectionTimeout,
+      Http::StreamResetReason::Overflow,
+      Http::StreamResetReason::ProtocolError,
+      Http::StreamResetReason::OverloadManager,
+      Http::StreamResetReason::Http1PrematureUpstreamHalfClose,
+  };
+
+  for (const auto reason : local_reasons) {
+    this->setupUpstream();
+    EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    this->upstream_->onResetStream(reason, "");
+  }
 }
 
 TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
