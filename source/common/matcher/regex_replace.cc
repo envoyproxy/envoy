@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Matcher {
 
-absl::StatusOr<absl::optional<RegexReplace>>
+absl::StatusOr<RegexReplace>
 RegexReplace::create(Regex::Engine& engine,
                      const ::envoy::type::matcher::v3::RegexMatchAndSubstitute& proto) {
   ASSERT(!proto.pattern().regex().empty(), "invalid RegexMatchAndSubstitute message");

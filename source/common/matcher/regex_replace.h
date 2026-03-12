@@ -18,7 +18,7 @@ public:
   // Create a RegexReplace from a RegexMatchAndSubstitute proto message.
   //
   // If the proto has no pattern, returns nullopt.
-  static absl::StatusOr<absl::optional<RegexReplace>>
+  static absl::StatusOr<RegexReplace>
   create(Regex::Engine& engine, const ::envoy::type::matcher::v3::RegexMatchAndSubstitute& proto);
 
   // Returns a string of the input string with the regex replace applied.

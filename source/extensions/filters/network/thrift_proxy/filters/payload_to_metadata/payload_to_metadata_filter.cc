@@ -44,9 +44,8 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieShared
 
   if (rule_.has_on_present() && rule_.on_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule_.on_present().regex_value_rewrite();
-    regex_replace_ =
-        THROW_OR_RETURN_VALUE(Matcher::RegexReplace::create(regex_engine, rewrite_spec),
-                              absl::optional<Matcher::RegexReplace>);
+    regex_replace_.emplace(THROW_OR_RETURN_VALUE(
+        Matcher::RegexReplace::create(regex_engine, rewrite_spec), Matcher::RegexReplace));
   }
 
   switch (rule_.match_specifier_case()) {

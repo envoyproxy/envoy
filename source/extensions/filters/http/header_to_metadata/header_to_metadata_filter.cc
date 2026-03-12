@@ -104,7 +104,7 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
     auto regex_replace_or = Matcher::RegexReplace::create(regex_engine, rewrite_spec);
     SET_AND_RETURN_IF_NOT_OK(regex_replace_or.status(), creation_status);
-    regex_replace_ = std::move(regex_replace_or).value();
+    regex_replace_.emplace(std::move(regex_replace_or).value());
   }
 }
 
