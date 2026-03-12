@@ -8,6 +8,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -1481,6 +1482,61 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
 
   // Clean up.
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that enabling cluster lifecycle registers callbacks with ClusterManager.
+TEST_F(BootstrapAbiImplTest, EnableClusterLifecycle) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Expect the callback registration to go through ClusterManager.
+  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
+      .WillOnce(testing::ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>());
+
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+      config.value()->thisAsVoidPtr());
+  EXPECT_TRUE(result);
+
+  // Second call should be a no-op and return false.
+  bool result2 = envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+      config.value()->thisAsVoidPtr());
+  EXPECT_FALSE(result2);
+}
+
+// Test that cluster add/update events are forwarded to the module.
+TEST_F(BootstrapAbiImplTest, ClusterAddOrUpdateCallback) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Invoke onClusterAddOrUpdate directly on the config to test the callback forwarding.
+  Upstream::ThreadLocalClusterCommand get_cluster = []() -> Upstream::ThreadLocalCluster& {
+    PANIC("should not be called");
+  };
+  config.value()->onClusterAddOrUpdate("test_cluster", get_cluster);
+}
+
+// Test that cluster removal events are forwarded to the module.
+TEST_F(BootstrapAbiImplTest, ClusterRemovalCallback) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Invoke onClusterRemoval directly on the config.
+  config.value()->onClusterRemoval("test_cluster");
 }
 
 } // namespace DynamicModules
