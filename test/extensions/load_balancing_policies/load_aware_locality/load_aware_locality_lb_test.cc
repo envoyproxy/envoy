@@ -45,8 +45,6 @@ protected:
       constexpr uint64_t step = std::numeric_limits<uint64_t>::max() / 100;
       return (random_call_count_++ % 100) * step;
     });
-    // Capture the timer created by LoadAwareLocalityLoadBalancer.
-    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   }
 
   // Create the LB with given config and verify it initializes successfully.
@@ -74,6 +72,9 @@ protected:
         rr_factory, rr_factory.name(), std::move(rr_lb_config), weight_update_period,
         variance_threshold, ewma_alpha, probe_percentage, weight_expiration_period, dispatcher_,
         context_.thread_local_);
+
+    // Capture the timer created by LoadAwareLocalityLoadBalancer's constructor.
+    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     thread_aware_lb_ = std::make_unique<LoadAwareLocalityLoadBalancer>(
         *lb_config, cluster_info_, priority_set_, context_.runtime_loader_, random_,
@@ -799,11 +800,14 @@ TEST_F(LoadAwareLocalityLbTest, StaleSnapshotFallbackAfterHostRemoval) {
     EXPECT_EQ(result.host, h1);
   }
 
-  // peekAnotherHost should also never return nullptr.
+  // peekAnotherHost should also never return nullptr. Each peek must be followed by a
+  // chooseHost to drain the child LB's preconnect stash (the child caps outstanding peeks
+  // at the number of healthy hosts, which is 1 here).
   for (int i = 0; i < 200; ++i) {
     auto host = worker_lb->peekAnotherHost(nullptr);
     ASSERT_NE(nullptr, host) << "peek " << i << " returned nullptr with stale snapshot";
     EXPECT_EQ(host, h1);
+    worker_lb->chooseHost(nullptr);
   }
 }
 
@@ -1952,6 +1956,11 @@ TEST_F(LoadAwareLocalityLbTest, OutOfRangePriorityCallbacks) {
   createLb();
   auto worker_lb = factory_->create({priority_set_, nullptr});
   ASSERT_NE(nullptr, worker_lb);
+
+  // Ensure the mock priority set has host sets through priority 5 so that the internal
+  // PriorityLoadEvaluator (LoadBalancerBase) callback does not access out-of-bounds memory
+  // when it recalculates per-priority state for the fired priority.
+  priority_set_.getMockHostSet(5);
 
   // Host-change callback with out-of-range priority (covers onHostChange guard).
   priority_set_.runUpdateCallbacks(5, {makeWeightTrackingMockHost()}, {});
