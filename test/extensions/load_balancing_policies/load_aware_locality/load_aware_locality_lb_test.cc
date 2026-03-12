@@ -1875,11 +1875,11 @@ TEST_F(LoadAwareLocalityLbTest, WeightExpirationDisabled) {
 // Test: initializeChildLb returns an error when the child factory returns nullptr.
 TEST_F(LoadAwareLocalityLbTest, InitializeChildLbNullChild) {
   NiceMock<Upstream::MockTypedLoadBalancerFactory> null_child_factory;
-  ON_CALL(null_child_factory, name()).WillByDefault(Return("mock_null_factory"));
+  ON_CALL(null_child_factory, name()).WillByDefault(testing::Return("mock_null_factory"));
   // Return nullptr from create(), simulating an unsupported child policy.
   ON_CALL(null_child_factory,
           create(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
-      .WillByDefault(Return(testing::ByMove(nullptr)));
+      .WillByDefault(testing::Return(testing::ByMove(nullptr)));
 
   auto factory = std::make_shared<WorkerLocalLbFactory>(
       null_child_factory, "mock_null_factory", nullptr, cluster_info_, priority_set_,
