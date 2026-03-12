@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.service.ext_proc.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/header_value.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 

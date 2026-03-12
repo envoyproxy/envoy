@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.http.custom_response.local_response_policy.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/header_value.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "google/protobuf/wrappers.proto";

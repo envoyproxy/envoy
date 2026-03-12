@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/router/router.h"
 
 #include "source/common/grpc/common.h"

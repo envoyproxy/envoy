@@ -4,7 +4,6 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/config/core/v3/header_value.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/any.proto";

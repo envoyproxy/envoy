@@ -7,7 +7,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/load_balancer.h"

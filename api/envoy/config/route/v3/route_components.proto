@@ -5,7 +5,6 @@ package envoy.config.route.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
-import "envoy/config/core/v3/header_value.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/type/matcher/v3/address.proto";

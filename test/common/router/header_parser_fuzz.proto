@@ -3,7 +3,6 @@ syntax = "proto3";
 package test.common.router;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/header_value.proto";
 import "test/fuzz/common.proto";
 
 import "validate/validate.proto";

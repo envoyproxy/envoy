@@ -13,7 +13,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"

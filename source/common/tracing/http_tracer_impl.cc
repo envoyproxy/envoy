@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"

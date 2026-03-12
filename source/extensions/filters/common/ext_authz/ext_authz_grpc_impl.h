@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"

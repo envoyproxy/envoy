@@ -1,7 +1,6 @@
 #include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 

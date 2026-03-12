@@ -4,7 +4,6 @@ package envoy.service.auth.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/header_value.proto";
 
 import "google/protobuf/timestamp.proto";
 

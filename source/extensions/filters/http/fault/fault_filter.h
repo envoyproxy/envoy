@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"

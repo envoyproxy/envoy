@@ -1,7 +1,6 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/assert.h"

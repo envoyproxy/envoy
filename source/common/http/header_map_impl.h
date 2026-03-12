@@ -9,7 +9,6 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/compiled_string_map.h"
