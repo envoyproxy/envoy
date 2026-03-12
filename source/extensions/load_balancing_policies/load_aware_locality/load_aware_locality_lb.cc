@@ -358,6 +358,10 @@ void WorkerLocalLb::updateLocalityHosts(PerSourceLocalityState& state,
                                         const Upstream::HostVector& hosts_removed) {
   auto hosts_shared = std::make_shared<Upstream::HostVector>(hosts);
   auto per_locality = std::make_shared<Upstream::HostsPerLocalityImpl>(hosts, is_local);
+  // All passed-in hosts are marked as "healthy" in the child priority set regardless of their
+  // actual health status. The caller (syncLocalityState) already partitions hosts by source
+  // (healthy/degraded/all), so this child LB only sees hosts that should be selectable. Marking
+  // them all healthy ensures the child policy (e.g. RoundRobin) considers every host eligible.
   auto healthy_hosts = std::make_shared<const Upstream::HealthyHostVector>(hosts);
   auto update_params = Upstream::HostSetImpl::updateHostsParams(
       hosts_shared, per_locality, healthy_hosts, per_locality,
@@ -396,6 +400,15 @@ void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::H
 
   const auto sync_source = [this, is_local, recreate_child](PerSourceLocalityState& source_state,
                                                             const Upstream::HostVector& new_hosts) {
+    // Skip creating a child LB when the host list is empty.
+    if (new_hosts.empty()) {
+      if (source_state.priority_set != nullptr) {
+        source_state.lb.reset();
+        source_state.priority_set.reset();
+      }
+      return;
+    }
+
     if (source_state.priority_set == nullptr) {
       source_state.priority_set = std::make_unique<Upstream::PrioritySetImpl>();
       updateLocalityHosts(source_state, new_hosts, is_local, new_hosts, {});

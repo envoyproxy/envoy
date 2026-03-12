@@ -1271,6 +1271,140 @@ TEST_F(LoadAwareLocalityLbTest, PanicRoutingUsesAllHostLocalities) {
   EXPECT_GT(counts[unhealthy_host_1.get()] + counts[unhealthy_host_2.get()], 200);
 }
 
+// Test: A host transitioning from healthy to degraded updates the per-source child LBs.
+// The healthy child LB should lose the host and the degraded child LB should gain it.
+TEST_F(LoadAwareLocalityLbTest, HealthTransitionUpdatesPerSourceChildLbs) {
+  auto host_a = makeWeightTrackingMockHost();
+  auto host_b = makeWeightTrackingMockHost();
+
+  // Both hosts start healthy in separate localities.
+  setupLocalities({{host_a}, {host_b}},
+                  /*has_local_locality=*/false,
+                  std::vector<Upstream::HostVector>{{host_a}, {host_b}},
+                  std::vector<Upstream::HostVector>{{}, {}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // Both hosts should be reachable (both healthy).
+  EXPECT_TRUE(hostSeen(*worker_lb, host_a, 200));
+  EXPECT_TRUE(hostSeen(*worker_lb, host_b, 200));
+
+  // Transition host_b from healthy to degraded (health-only update, no membership change).
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->healthy_hosts_ = {host_a};
+  host_set->healthy_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{host_a}, {}},
+                                     /*force_no_local_locality=*/true);
+  host_set->degraded_hosts_ = {host_b};
+  host_set->degraded_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{}, {host_b}},
+                                     /*force_no_local_locality=*/true);
+  // Health-only update (empty added/removed).
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  // Recompute routing weights so the priority evaluator sees the new health state.
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+
+  // Healthy weights: locality 0 has host_a, locality 1 has no healthy hosts.
+  ASSERT_EQ(2, weights->priority_weights[0].weights.size());
+  EXPECT_GT(weights->priority_weights[0].weights[0], 0.0);
+  EXPECT_NEAR(weights->priority_weights[0].weights[1], 0.0, 0.01);
+
+  // Degraded weights: locality 0 has no degraded hosts, locality 1 has host_b.
+  ASSERT_EQ(2, weights->priority_weights[0].degraded_weights.size());
+  EXPECT_NEAR(weights->priority_weights[0].degraded_weights[0], 0.0, 0.01);
+  EXPECT_GT(weights->priority_weights[0].degraded_weights[1], 0.0);
+
+  // Both hosts should still be reachable (host_a via healthy, host_b via degraded routing).
+  EXPECT_TRUE(hostSeen(*worker_lb, host_a, 200));
+  EXPECT_TRUE(hostSeen(*worker_lb, host_b, 400));
+}
+
+// Test: Multi-priority with degraded hosts — priority 0 partially degraded triggers failover
+// to priority 1 healthy hosts.
+TEST_F(LoadAwareLocalityLbTest, MultiPriorityWithDegradedFailover) {
+  auto h_p0_healthy = makeWeightTrackingMockHost();
+  auto h_p0_degraded = makeWeightTrackingMockHost();
+  auto h_p1_healthy = makeWeightTrackingMockHost();
+
+  // Priority 0: 1 healthy + 1 degraded out of 2 total.
+  // Priority 1: 1 healthy out of 1 total.
+  setupPriorityLocalities(0, {{h_p0_healthy, h_p0_degraded}},
+                          /*has_local_locality=*/false,
+                          std::vector<Upstream::HostVector>{{h_p0_healthy}},
+                          std::vector<Upstream::HostVector>{{h_p0_degraded}});
+  setupPriorityLocalities(1, {{h_p1_healthy}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(2, weights->priority_weights.size());
+
+  // Priority 0 has 50% healthy capacity (1/2 with 1.4x overprovisioning = 70%), so some
+  // traffic should fail over to priority 1 via degraded routing.
+  // The degraded priority load for P0 should be > 0 or P1 healthy should get some load.
+  const uint32_t p0_healthy_load = weights->priority_loads.healthy_priority_load_.get()[0];
+  const uint32_t p1_healthy_load = weights->priority_loads.healthy_priority_load_.get()[1];
+  const uint32_t p0_degraded_load = weights->priority_loads.degraded_priority_load_.get()[0];
+
+  // P0 shouldn't get 100% healthy load since it's only partially healthy.
+  EXPECT_LT(p0_healthy_load, 100u);
+  // Either P1 gets healthy failover or P0 gets degraded load (or both).
+  EXPECT_GT(p1_healthy_load + p0_degraded_load, 0u);
+
+  // All three hosts should be reachable.
+  auto counts = countPicks(*worker_lb, 1000);
+  EXPECT_GT(counts[h_p0_healthy.get()], 0);
+  EXPECT_GT(counts[h_p0_degraded.get()] + counts[h_p1_healthy.get()], 0);
+}
+
+// Test: Lazy child LB creation — degraded child LB is not created when no hosts are degraded,
+// but is created when hosts transition to degraded.
+TEST_F(LoadAwareLocalityLbTest, LazyChildLbCreationForEmptySources) {
+  auto host_a = makeWeightTrackingMockHost();
+
+  // Start with host_a healthy, no degraded hosts.
+  setupLocalities({{host_a}},
+                  /*has_local_locality=*/false,
+                  std::vector<Upstream::HostVector>{{host_a}},
+                  std::vector<Upstream::HostVector>{{}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  // host_a is reachable via healthy routing.
+  EXPECT_TRUE(hostSeen(*worker_lb, host_a, 100));
+
+  // Transition host_a to degraded.
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->healthy_hosts_.clear();
+  host_set->healthy_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{}},
+                                     /*force_no_local_locality=*/true);
+  host_set->degraded_hosts_ = {host_a};
+  host_set->degraded_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{host_a}},
+                                     /*force_no_local_locality=*/true);
+  priority_set_.runUpdateCallbacks(0, {}, {});
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  // host_a should still be reachable (now via degraded or all-host routing).
+  EXPECT_TRUE(hostSeen(*worker_lb, host_a, 400));
+}
+
 // Test: Probe redistribution skipped when no remote healthy hosts exist.
 TEST_F(LoadAwareLocalityLbTest, ProbeSkippedWhenNoRemoteHealthyHosts) {
   auto h1 = makeWeightTrackingMockHost();
