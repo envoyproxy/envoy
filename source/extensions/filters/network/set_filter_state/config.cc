@@ -32,7 +32,7 @@ Network::FilterStatus SetFilterState::onData(Buffer::Instance&, bool) {
     on_downstream_data_->updateFilterState({}, read_callbacks_->connection().streamInfo());
   }
   return Network::FilterStatus::Continue;
-};
+}
 
 void SetFilterState::onEvent(Network::ConnectionEvent event) {
   // For SSL connections the Connected event is raised after the downstream TLS handshake completes.
