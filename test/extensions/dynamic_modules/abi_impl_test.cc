@@ -957,6 +957,46 @@ WEAK_STUB(NetworkFilterGetConnectionState,
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
 
+WEAK_STUB(NetworkSetDynamicMetadataBool,
+          envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},
+                                                                          {nullptr, 0}, true))
+WEAK_STUB(NetworkGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(nullptr, {nullptr, 0},
+                                                                          {nullptr, 0}, nullptr))
+
+WEAK_STUB(ListenerFilterGetAddressType,
+          envoy_dynamic_module_callback_listener_filter_get_address_type(nullptr))
+
+WEAK_STUB(ListenerFilterGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ListenerFilterSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+
+WEAK_STUB(HttpAddDynamicMetadataListNumber,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0}, 0))
+WEAK_STUB(HttpAddDynamicMetadataListString,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0},
+                                                                              {nullptr, 0}))
+WEAK_STUB(HttpAddDynamicMetadataListBool,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(nullptr, {nullptr, 0},
+                                                                            {nullptr, 0}, true))
+WEAK_STUB(HttpGetMetadataListSize, envoy_dynamic_module_callback_http_get_metadata_list_size(
+                                       nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                       {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HttpGetMetadataListNumber, envoy_dynamic_module_callback_http_get_metadata_list_number(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_metadata_list_string(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
+                                       nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                       {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions

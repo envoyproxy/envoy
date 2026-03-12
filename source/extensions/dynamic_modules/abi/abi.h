@@ -1954,6 +1954,148 @@ bool envoy_dynamic_module_callback_http_get_metadata_namespaces(
     envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
 
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number is called by the module to
+ * append a number value to the dynamic metadata list stored under the given namespace and key. If
+ * the key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the number value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string is called by the module to
+ * append a string value to the dynamic metadata list stored under the given namespace and key. If
+ * the key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the string value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool is called by the module to
+ * append a bool value to the dynamic metadata list stored under the given namespace and key. If the
+ * key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the bool value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_size is called by the module to get the
+ * number of elements in the metadata list stored under the given namespace and key. If the metadata
+ * is not accessible, the namespace does not exist, the key does not exist, or the value is not a
+ * list, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param result is the pointer to the variable where the number of elements will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_number is called by the module to get the
+ * number value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a number, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the variable where the number value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_string is called by the module to get the
+ * string value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a string, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the envoy_buffer where the string value will be stored. The
+ * lifetime of the buffer is guaranteed until the end of the current event hook unless the setter
+ * callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_bool is called by the module to get the
+ * bool value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a bool, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the variable where the bool value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, bool* result);
+
 // -------------------------- Filter State Callbacks ---------------------------
 
 /**
