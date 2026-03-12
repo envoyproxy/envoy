@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -91,6 +92,52 @@ struct PriorityRoutingWeights {
   // True when the hosts-per-locality has a local locality (index 0 is "local").
   // Workers use this to pick the correct zone routing stat counter.
   bool has_local_locality{false};
+  // Degraded-only routing weights. Used when Envoy chooses degraded hosts within this priority.
+  std::vector<double> degraded_weights;
+  double degraded_total_weight{0.0};
+  bool degraded_all_local{false};
+  // All-host routing weights. Used when the priority is in panic and Envoy can select all hosts.
+  std::vector<double> all_host_weights;
+  double all_host_total_weight{0.0};
+  bool all_host_all_local{false};
+
+  enum class SelectionSource : uint8_t { Healthy = 0, Degraded = 1, AllHosts = 2 };
+
+  const std::vector<double>& weightsFor(SelectionSource source) const {
+    switch (source) {
+    case SelectionSource::Healthy:
+      return weights;
+    case SelectionSource::Degraded:
+      return degraded_weights;
+    case SelectionSource::AllHosts:
+      return all_host_weights;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  double totalWeightFor(SelectionSource source) const {
+    switch (source) {
+    case SelectionSource::Healthy:
+      return total_weight;
+    case SelectionSource::Degraded:
+      return degraded_total_weight;
+    case SelectionSource::AllHosts:
+      return all_host_total_weight;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  bool allLocalFor(SelectionSource source) const {
+    switch (source) {
+    case SelectionSource::Healthy:
+      return all_local;
+    case SelectionSource::Degraded:
+      return degraded_all_local;
+    case SelectionSource::AllHosts:
+      return all_host_all_local;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
 };
 
 /**
@@ -106,6 +153,8 @@ struct RoutingWeightsSnapshot {
   std::vector<PriorityRoutingWeights> priority_weights;
   // Cluster-level priority distribution used to preserve Envoy failover semantics.
   Upstream::HealthyAndDegradedLoad priority_loads;
+  // Per-priority panic state from Envoy's priority evaluator.
+  std::vector<bool> priority_panic;
 };
 
 using RoutingWeightsSnapshotConstSharedPtr = std::shared_ptr<const RoutingWeightsSnapshot>;
@@ -186,15 +235,50 @@ private:
  * Per-locality state in the worker-local LB. Holds a child PrioritySet and child LB for
  * one locality.
  */
-struct PerLocalityState {
-  // PrioritySet containing only this locality's hosts.
+struct PerSourceLocalityState {
+  // PrioritySet containing only the hosts selectable for one source in one locality.
   std::unique_ptr<Upstream::PrioritySetImpl> priority_set;
-  // The worker-local LB for this locality, created from the shared child factory.
+  // The worker-local LB for this source/locality pair, created from the shared child factory.
   Upstream::LoadBalancerPtr lb;
+};
+
+struct PerLocalityState {
+  PerSourceLocalityState healthy;
+  PerSourceLocalityState degraded;
+  PerSourceLocalityState all_hosts;
+
+  PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource source) {
+    switch (source) {
+    case PriorityRoutingWeights::SelectionSource::Healthy:
+      return healthy;
+    case PriorityRoutingWeights::SelectionSource::Degraded:
+      return degraded;
+    case PriorityRoutingWeights::SelectionSource::AllHosts:
+      return all_hosts;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  const PerSourceLocalityState& stateFor(PriorityRoutingWeights::SelectionSource source) const {
+    switch (source) {
+    case PriorityRoutingWeights::SelectionSource::Healthy:
+      return healthy;
+    case PriorityRoutingWeights::SelectionSource::Degraded:
+      return degraded;
+    case PriorityRoutingWeights::SelectionSource::AllHosts:
+      return all_hosts;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
 };
 
 struct PerPriorityLocalityState {
   std::vector<PerLocalityState> localities;
+};
+
+struct SelectedPriority {
+  uint32_t priority;
+  PriorityRoutingWeights::SelectionSource source;
 };
 
 /**
@@ -220,7 +304,7 @@ private:
   void buildPerPriorityLocalities();
 
   // Build or rebuild the per-locality child LBs for a single priority.
-  void buildPerLocality(uint32_t priority, const Upstream::HostsPerLocality& hosts_per_locality);
+  void buildPerLocality(uint32_t priority, const Upstream::HostSet& host_set);
 
   // Handle incremental host membership changes for the given priority.
   void onHostChange(uint32_t priority);
@@ -228,23 +312,28 @@ private:
   // Handle health-only updates (no membership change) by re-partitioning each locality.
   void onHealthChange(uint32_t priority);
 
-  // Update a locality's PrioritySet with new hosts and partition parameters.
-  void updateLocalityHosts(PerLocalityState& state, const Upstream::HostVector& hosts,
+  // Update a locality/source PrioritySet with a pre-selected host subset.
+  void updateLocalityHosts(PerSourceLocalityState& state, const Upstream::HostVector& hosts,
                            bool is_local, const Upstream::HostVector& hosts_added,
                            const Upstream::HostVector& hosts_removed);
 
-  // Choose the cluster priority to route to.
-  absl::optional<uint32_t> choosePriority() const;
+  // Update the per-source child LBs for one locality from the cluster's current host set.
+  void syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
+                         size_t locality_index, bool recreate_child);
 
-  // Choose a locality index within the selected priority.
-  size_t chooseLocality(uint32_t priority) const;
+  // Choose the cluster priority to route to.
+  absl::optional<SelectedPriority> choosePriority() const;
+
+  // Choose a locality index within the selected priority/source.
+  size_t chooseLocality(uint32_t priority, PriorityRoutingWeights::SelectionSource source) const;
 
   // Select a locality index using weighted random based on routing weights.
   size_t selectLocality(const PriorityRoutingWeights& snapshot,
+                        PriorityRoutingWeights::SelectionSource source,
                         const std::vector<PerLocalityState>& per_locality) const;
 
   // Best-effort fallback for transient snapshot/worker mismatches.
-  absl::optional<uint32_t> firstAvailablePriority() const;
+  absl::optional<SelectedPriority> firstAvailablePriority() const;
 
   WorkerLocalLbFactory& factory_;
   const Upstream::PrioritySet& priority_set_;
@@ -283,9 +372,9 @@ private:
   double ewma_alpha_;
   double probe_percentage_;
   std::chrono::milliseconds weight_expiration_period_;
-  // Per-priority, per-locality EWMA-smoothed utilization state (main thread only).
-  std::vector<std::vector<double>> smoothed_utilizations_;
-  std::vector<std::vector<bool>> smoothed_utilizations_valid_;
+  // Per-source, per-priority, per-locality EWMA-smoothed utilization state (main thread only).
+  std::array<std::vector<std::vector<double>>, 3> smoothed_utilizations_;
+  std::array<std::vector<std::vector<bool>>, 3> smoothed_utilizations_valid_;
   // Scratch buffers reused across timer callback
   std::vector<double> avg_utils_;
   std::vector<uint32_t> valid_counts_;

@@ -88,7 +88,8 @@ protected:
   void setupPriorityLocalities(
       uint32_t priority, std::vector<Upstream::HostVector> localities,
       bool has_local_locality = false,
-      absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt) {
+      absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt,
+      absl::optional<std::vector<Upstream::HostVector>> degraded_localities = absl::nullopt) {
     auto* host_set = priority_set_.getMockHostSet(priority);
     Upstream::HostVector all_hosts;
     for (const auto& lv : localities) {
@@ -110,13 +111,28 @@ protected:
       host_set->healthy_hosts_ = all_hosts;
       host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
     }
+
+    if (degraded_localities.has_value()) {
+      Upstream::HostVector degraded_hosts;
+      for (const auto& lv : *degraded_localities) {
+        degraded_hosts.insert(degraded_hosts.end(), lv.begin(), lv.end());
+      }
+      host_set->degraded_hosts_ = degraded_hosts;
+      host_set->degraded_hosts_per_locality_ =
+          Upstream::makeHostsPerLocality(std::move(*degraded_localities), !has_local_locality);
+    } else {
+      host_set->degraded_hosts_.clear();
+      host_set->degraded_hosts_per_locality_ =
+          Upstream::makeHostsPerLocality({}, !has_local_locality);
+    }
   }
 
   void setupLocalities(
       std::vector<Upstream::HostVector> localities, bool has_local_locality = false,
-      absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt) {
+      absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt,
+      absl::optional<std::vector<Upstream::HostVector>> degraded_localities = absl::nullopt) {
     setupPriorityLocalities(0, std::move(localities), has_local_locality,
-                            std::move(healthy_localities));
+                            std::move(healthy_localities), std::move(degraded_localities));
   }
 
   // Set ORCA utilization on a host.
@@ -814,7 +830,7 @@ TEST_F(LoadAwareLocalityLbTest, AllLocalitiesSaturatedProportionalFallback) {
   EXPECT_GT(locality_a_count, counts[h_b.get()] * 2);
 }
 
-// Test: peekAnotherHost returns nullptr in both empty and non-empty states.
+// Test: peekAnotherHost returns nullptr for an empty LB and delegates for a populated LB.
 TEST_F(LoadAwareLocalityLbTest, PeekAnotherHost) {
   createLb();
 
@@ -823,13 +839,13 @@ TEST_F(LoadAwareLocalityLbTest, PeekAnotherHost) {
   ASSERT_NE(nullptr, empty_lb);
   EXPECT_EQ(nullptr, empty_lb->peekAnotherHost(nullptr));
 
-  // Non-empty per_locality_ — delegates to child LB (RoundRobin returns nullptr).
+  // Non-empty per_locality_ — delegates to the child LB and returns a selectable host.
   auto h1 = makeWeightTrackingMockHost();
   setupLocalities({{h1}});
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
   auto populated_lb = factory_->create({priority_set_, nullptr});
   ASSERT_NE(nullptr, populated_lb);
-  EXPECT_EQ(nullptr, populated_lb->peekAnotherHost(nullptr));
+  EXPECT_EQ(h1, populated_lb->peekAnotherHost(nullptr));
 }
 
 // Test: Priority selection fails over beyond priority 0 when higher priorities stay healthy.
@@ -1196,6 +1212,63 @@ TEST_F(LoadAwareLocalityLbTest, NoHealthyHostsWithLocalLocality) {
   EXPECT_TRUE(weights->all_local);
   EXPECT_NEAR(weights->weights[0], 1.0, 0.01);
   EXPECT_NEAR(weights->weights[1], 0.0, 0.01);
+}
+
+TEST_F(LoadAwareLocalityLbTest, DegradedLocalityWeightsUseDegradedHosts) {
+  auto healthy_host = makeWeightTrackingMockHost();
+  auto degraded_host = makeWeightTrackingMockHost();
+
+  setupLocalities({{healthy_host}, {degraded_host}},
+                  /*has_local_locality=*/false,
+                  std::vector<Upstream::HostVector>{{healthy_host}, {}},
+                  std::vector<Upstream::HostVector>{{}, {degraded_host}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(2, weights->priority_weights[0].degraded_weights.size());
+  EXPECT_NEAR(weights->priority_weights[0].degraded_weights[0], 0.0, 0.01);
+  EXPECT_NEAR(weights->priority_weights[0].degraded_weights[1], 1.0, 0.01);
+
+  auto counts = countPicks(*worker_lb, 1000);
+  EXPECT_GT(counts[healthy_host.get()], 500);
+  EXPECT_GT(counts[degraded_host.get()], 150);
+}
+
+TEST_F(LoadAwareLocalityLbTest, PanicRoutingUsesAllHostLocalities) {
+  auto healthy_host = makeWeightTrackingMockHost();
+  auto unhealthy_host_1 = makeWeightTrackingMockHost();
+  auto unhealthy_host_2 = makeWeightTrackingMockHost();
+
+  // 1/3 healthy capacity => 46% effective health after overprovisioning, which is below the
+  // default 50% panic threshold. That forces the priority into panic/all-host routing.
+  setupLocalities({{healthy_host}, {unhealthy_host_1, unhealthy_host_2}},
+                  /*has_local_locality=*/false,
+                  std::vector<Upstream::HostVector>{{healthy_host}, {}},
+                  std::vector<Upstream::HostVector>{{}, {}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(1, weights->priority_panic.size());
+  EXPECT_TRUE(weights->priority_panic[0]);
+  ASSERT_EQ(2, weights->priority_weights[0].all_host_weights.size());
+  EXPECT_NEAR(weights->priority_weights[0].all_host_weights[0], 1.0, 0.01);
+  EXPECT_NEAR(weights->priority_weights[0].all_host_weights[1], 2.0, 0.01);
+
+  auto counts = countPicks(*worker_lb, 400);
+  EXPECT_GT(counts[healthy_host.get()], 100);
+  EXPECT_GT(counts[unhealthy_host_1.get()] + counts[unhealthy_host_2.get()], 200);
 }
 
 // Test: Probe redistribution skipped when no remote healthy hosts exist.

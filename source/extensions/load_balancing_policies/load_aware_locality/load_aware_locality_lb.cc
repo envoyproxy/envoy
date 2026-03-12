@@ -33,6 +33,7 @@ public:
   }
 
   const Upstream::HealthyAndDegradedLoad& priorityLoad() const { return per_priority_load_; }
+  const std::vector<bool>& priorityPanic() const { return per_priority_panic_; }
 };
 
 // --- LoadAwareLocalityLoadBalancer (main thread) ---
@@ -81,154 +82,191 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
   const auto& host_sets = priority_set_.hostSetsPerPriority();
   snapshot->priority_weights.resize(host_sets.size());
   snapshot->priority_loads = priority_load_evaluator_->priorityLoad();
+  snapshot->priority_panic = priority_load_evaluator_->priorityPanic();
 
-  smoothed_utilizations_.resize(host_sets.size());
-  smoothed_utilizations_valid_.resize(host_sets.size());
+  for (auto& per_source_smoothed : smoothed_utilizations_) {
+    per_source_smoothed.resize(host_sets.size());
+  }
+  for (auto& per_source_valid : smoothed_utilizations_valid_) {
+    per_source_valid.resize(host_sets.size());
+  }
 
   // Current monotonic time in milliseconds, used for weight expiration checks.
   const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                              time_source_.monotonicTime().time_since_epoch())
                              .count();
 
+  const auto compute_source_weights =
+      [this, now_ms](const Upstream::HostsPerLocality& all_hosts_per_locality,
+                     const std::vector<Upstream::HostVector>& eligible_hosts_per_locality,
+                     std::vector<double>& weights, double& total_weight, bool& all_local,
+                     std::vector<double>& smoothed, std::vector<bool>& smoothed_valid) {
+        const auto& locality_hosts = all_hosts_per_locality.get();
+        const size_t locality_count = locality_hosts.size();
+        weights.assign(locality_count, 0.0);
+        total_weight = 0.0;
+        all_local = false;
+
+        avg_utils_.assign(locality_count, 0.0);
+        valid_counts_.assign(locality_count, 0);
+        host_counts_.assign(locality_count, 0);
+
+        for (size_t i = 0; i < locality_count; ++i) {
+          const bool has_eligible = i < eligible_hosts_per_locality.size();
+          host_counts_[i] =
+              has_eligible ? static_cast<uint32_t>(eligible_hosts_per_locality[i].size()) : 0u;
+
+          double util_sum = 0.0;
+          uint32_t valid_count = 0;
+          if (has_eligible) {
+            for (const auto& host : eligible_hosts_per_locality[i]) {
+              const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
+              if (last_update_ms == 0) {
+                continue;
+              }
+
+              if (weight_expiration_period_.count() > 0 &&
+                  (now_ms - last_update_ms) > weight_expiration_period_.count()) {
+                continue;
+              }
+
+              util_sum += host->orcaUtilization().get();
+              valid_count++;
+            }
+          }
+
+          avg_utils_[i] = valid_count > 0 ? util_sum / valid_count : 0.0;
+          valid_counts_[i] = valid_count;
+        }
+
+        if (smoothed.size() != locality_count || smoothed_valid.size() != locality_count) {
+          smoothed.assign(locality_count, 0.0);
+          smoothed_valid.assign(locality_count, false);
+        }
+
+        std::vector<double> utilizations(locality_count, 0.0);
+        for (size_t i = 0; i < locality_count; ++i) {
+          if (valid_counts_[i] > 0) {
+            if (!smoothed_valid[i]) {
+              smoothed[i] = avg_utils_[i];
+              smoothed_valid[i] = true;
+            } else {
+              smoothed[i] = ewma_alpha_ * avg_utils_[i] + (1.0 - ewma_alpha_) * smoothed[i];
+            }
+          } else {
+            // Expired or missing ORCA data should stop influencing routing until fresh data
+            // arrives.
+            smoothed[i] = 0.0;
+            smoothed_valid[i] = false;
+          }
+          utilizations[i] = smoothed_valid[i] ? smoothed[i] : avg_utils_[i];
+        }
+
+        uint32_t total_hosts = 0;
+        for (size_t i = 0; i < locality_count; ++i) {
+          weights[i] = host_counts_[i] * std::max(0.0, 1.0 - utilizations[i]);
+          total_hosts += host_counts_[i];
+        }
+
+        const auto set_all_local = [&weights, &all_local]() {
+          all_local = true;
+          std::fill(weights.begin(), weights.end(), 0.0);
+          if (!weights.empty()) {
+            weights[0] = 1.0;
+          }
+        };
+
+        if (all_hosts_per_locality.hasLocalLocality()) {
+          double remote_util_sum = 0.0;
+          uint32_t remote_hosts = 0;
+          for (size_t i = 1; i < locality_count; ++i) {
+            remote_util_sum += utilizations[i] * host_counts_[i];
+            remote_hosts += host_counts_[i];
+          }
+
+          if (total_hosts > 0 && !weights.empty() && weights[0] > 0.0) {
+            const double target_util = remote_hosts > 0 ? remote_util_sum / remote_hosts : 0.0;
+            if (utilizations[0] <= target_util + utilization_variance_threshold_) {
+              set_all_local();
+            }
+          } else if (total_hosts == 0) {
+            set_all_local();
+          }
+        }
+
+        if (all_hosts_per_locality.hasLocalLocality() && probe_percentage_ > 0.0 &&
+            locality_count > 1) {
+          double total = 0.0;
+          for (double weight : weights) {
+            total += weight;
+          }
+
+          if (total > 0.0) {
+            const double remote_sum = total - weights[0];
+            const double remote_target = total * probe_percentage_;
+            if (remote_sum < remote_target) {
+              uint32_t remote_hosts = 0;
+              for (size_t i = 1; i < locality_count; ++i) {
+                remote_hosts += host_counts_[i];
+              }
+
+              if (remote_hosts > 0) {
+                const double deficit = remote_target - remote_sum;
+                weights[0] = std::max(0.0, weights[0] - deficit);
+                for (size_t i = 1; i < locality_count; ++i) {
+                  weights[i] += deficit * static_cast<double>(host_counts_[i]) / remote_hosts;
+                }
+              }
+            }
+          }
+        }
+
+        total_weight = std::accumulate(weights.begin(), weights.end(), 0.0);
+        if (total_weight == 0.0 && total_hosts > 0) {
+          for (size_t i = 0; i < locality_count; ++i) {
+            weights[i] = static_cast<double>(host_counts_[i]);
+          }
+          total_weight = static_cast<double>(total_hosts);
+        }
+      };
+
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     const auto& hosts_per_locality = host_set->hostsPerLocality();
     const auto& locality_hosts = hosts_per_locality.get();
-    const auto& healthy_hosts_per_locality = host_set->healthyHostsPerLocality().get();
     auto& priority_snapshot = snapshot->priority_weights[priority];
-    auto& smoothed = smoothed_utilizations_[priority];
-    auto& smoothed_valid = smoothed_utilizations_valid_[priority];
 
     if (locality_hosts.empty()) {
-      smoothed.clear();
-      smoothed_valid.clear();
+      for (size_t source = 0; source < smoothed_utilizations_.size(); ++source) {
+        smoothed_utilizations_[source][priority].clear();
+        smoothed_utilizations_valid_[source][priority].clear();
+      }
       continue;
     }
 
-    const size_t locality_count = locality_hosts.size();
-    avg_utils_.assign(locality_count, 0.0);
-    valid_counts_.assign(locality_count, 0);
-    host_counts_.assign(locality_count, 0);
-
-    for (size_t i = 0; i < locality_count; ++i) {
-      const bool has_healthy = i < healthy_hosts_per_locality.size();
-      host_counts_[i] =
-          has_healthy ? static_cast<uint32_t>(healthy_hosts_per_locality[i].size()) : 0u;
-
-      double util_sum = 0.0;
-      uint32_t valid_count = 0;
-      if (has_healthy) {
-        for (const auto& host : healthy_hosts_per_locality[i]) {
-          const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
-          if (last_update_ms == 0) {
-            continue;
-          }
-
-          if (weight_expiration_period_.count() > 0 &&
-              (now_ms - last_update_ms) > weight_expiration_period_.count()) {
-            continue;
-          }
-
-          util_sum += host->orcaUtilization().get();
-          valid_count++;
-        }
-      }
-
-      avg_utils_[i] = valid_count > 0 ? util_sum / valid_count : 0.0;
-      valid_counts_[i] = valid_count;
-    }
-
-    if (smoothed.size() != locality_count || smoothed_valid.size() != locality_count) {
-      smoothed.assign(locality_count, 0.0);
-      smoothed_valid.assign(locality_count, false);
-    }
-
-    std::vector<double> utilizations(locality_count, 0.0);
-    for (size_t i = 0; i < locality_count; ++i) {
-      if (valid_counts_[i] > 0) {
-        if (!smoothed_valid[i]) {
-          smoothed[i] = avg_utils_[i];
-          smoothed_valid[i] = true;
-        } else {
-          smoothed[i] = ewma_alpha_ * avg_utils_[i] + (1.0 - ewma_alpha_) * smoothed[i];
-        }
-      } else {
-        // Expired or missing ORCA data should stop influencing routing until fresh data arrives.
-        smoothed[i] = 0.0;
-        smoothed_valid[i] = false;
-      }
-      utilizations[i] = smoothed_valid[i] ? smoothed[i] : avg_utils_[i];
-    }
-
-    priority_snapshot.weights.resize(locality_count, 0.0);
-    uint32_t total_hosts = 0;
-    for (size_t i = 0; i < locality_count; ++i) {
-      priority_snapshot.weights[i] = host_counts_[i] * std::max(0.0, 1.0 - utilizations[i]);
-      total_hosts += host_counts_[i];
-    }
-
-    const auto setAllLocal = [&priority_snapshot]() {
-      priority_snapshot.all_local = true;
-      std::fill(priority_snapshot.weights.begin(), priority_snapshot.weights.end(), 0.0);
-      priority_snapshot.weights[0] = 1.0;
-    };
-
     priority_snapshot.has_local_locality = hosts_per_locality.hasLocalLocality();
-    if (hosts_per_locality.hasLocalLocality()) {
-      double remote_util_sum = 0.0;
-      uint32_t remote_hosts = 0;
-      for (size_t i = 1; i < locality_count; ++i) {
-        remote_util_sum += utilizations[i] * host_counts_[i];
-        remote_hosts += host_counts_[i];
-      }
-
-      if (total_hosts > 0 && priority_snapshot.weights[0] > 0.0) {
-        const double target_util = remote_hosts > 0 ? remote_util_sum / remote_hosts : 0.0;
-        if (utilizations[0] <= target_util + utilization_variance_threshold_) {
-          setAllLocal();
-        }
-      } else if (total_hosts == 0) {
-        setAllLocal();
-      }
-    }
-
-    if (hosts_per_locality.hasLocalLocality() && probe_percentage_ > 0.0 && locality_count > 1) {
-      double total = 0.0;
-      for (double weight : priority_snapshot.weights) {
-        total += weight;
-      }
-
-      if (total > 0.0) {
-        const double remote_sum = total - priority_snapshot.weights[0];
-        const double remote_target = total * probe_percentage_;
-        if (remote_sum < remote_target) {
-          uint32_t remote_hosts = 0;
-          for (size_t i = 1; i < locality_count; ++i) {
-            remote_hosts += host_counts_[i];
-          }
-
-          if (remote_hosts > 0) {
-            const double deficit = remote_target - remote_sum;
-            priority_snapshot.weights[0] = std::max(0.0, priority_snapshot.weights[0] - deficit);
-            for (size_t i = 1; i < locality_count; ++i) {
-              priority_snapshot.weights[i] +=
-                  deficit * static_cast<double>(host_counts_[i]) / remote_hosts;
-            }
-          }
-        }
-      }
-    }
-
-    priority_snapshot.total_weight = 0.0;
-    for (double weight : priority_snapshot.weights) {
-      priority_snapshot.total_weight += weight;
-    }
-    if (priority_snapshot.total_weight == 0.0 && total_hosts > 0) {
-      for (size_t i = 0; i < locality_count; ++i) {
-        priority_snapshot.weights[i] = static_cast<double>(host_counts_[i]);
-      }
-      priority_snapshot.total_weight = static_cast<double>(total_hosts);
-    }
+    compute_source_weights(hosts_per_locality, host_set->healthyHostsPerLocality().get(),
+                           priority_snapshot.weights, priority_snapshot.total_weight,
+                           priority_snapshot.all_local,
+                           smoothed_utilizations_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::Healthy)][priority],
+                           smoothed_utilizations_valid_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::Healthy)][priority]);
+    compute_source_weights(hosts_per_locality, host_set->degradedHostsPerLocality().get(),
+                           priority_snapshot.degraded_weights,
+                           priority_snapshot.degraded_total_weight,
+                           priority_snapshot.degraded_all_local,
+                           smoothed_utilizations_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::Degraded)][priority],
+                           smoothed_utilizations_valid_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::Degraded)][priority]);
+    compute_source_weights(hosts_per_locality, locality_hosts, priority_snapshot.all_host_weights,
+                           priority_snapshot.all_host_total_weight,
+                           priority_snapshot.all_host_all_local,
+                           smoothed_utilizations_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::AllHosts)][priority],
+                           smoothed_utilizations_valid_[static_cast<size_t>(
+                               PriorityRoutingWeights::SelectionSource::AllHosts)][priority]);
   }
 
   if (!snapshot->priority_weights.empty()) {
@@ -314,12 +352,19 @@ WorkerLocalLb::~WorkerLocalLb() {
   member_update_cb_.reset();
 }
 
-void WorkerLocalLb::updateLocalityHosts(PerLocalityState& state, const Upstream::HostVector& hosts,
-                                        bool is_local, const Upstream::HostVector& hosts_added,
+void WorkerLocalLb::updateLocalityHosts(PerSourceLocalityState& state,
+                                        const Upstream::HostVector& hosts, bool is_local,
+                                        const Upstream::HostVector& hosts_added,
                                         const Upstream::HostVector& hosts_removed) {
   auto hosts_shared = std::make_shared<Upstream::HostVector>(hosts);
   auto per_locality = std::make_shared<Upstream::HostsPerLocalityImpl>(hosts, is_local);
-  auto update_params = Upstream::HostSetImpl::partitionHosts(hosts_shared, per_locality);
+  auto healthy_hosts = std::make_shared<const Upstream::HealthyHostVector>(hosts);
+  auto update_params = Upstream::HostSetImpl::updateHostsParams(
+      hosts_shared, per_locality, healthy_hosts, per_locality,
+      std::make_shared<const Upstream::DegradedHostVector>(),
+      Upstream::HostsPerLocalityImpl::empty(),
+      std::make_shared<const Upstream::ExcludedHostVector>(),
+      Upstream::HostsPerLocalityImpl::empty());
   state.priority_set->updateHosts(0, std::move(update_params), nullptr, hosts_added, hosts_removed,
                                   absl::nullopt, absl::nullopt);
 }
@@ -330,31 +375,72 @@ void WorkerLocalLb::buildPerPriorityLocalities() {
   per_priority_locality_.resize(host_sets.size());
 
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
-    buildPerLocality(priority, host_sets[priority]->hostsPerLocality());
+    buildPerLocality(priority, *host_sets[priority]);
   }
 }
 
-void WorkerLocalLb::buildPerLocality(uint32_t priority,
-                                     const Upstream::HostsPerLocality& hosts_per_locality) {
-  const auto& locality_hosts = hosts_per_locality.get();
+void WorkerLocalLb::syncLocalityState(PerLocalityState& state, const Upstream::HostSet& host_set,
+                                      size_t locality_index, bool recreate_child) {
+  static const Upstream::HostVector empty_hosts;
+  const auto& all_localities = host_set.hostsPerLocality().get();
+  const auto& healthy_localities = host_set.healthyHostsPerLocality().get();
+  const auto& degraded_localities = host_set.degradedHostsPerLocality().get();
+  const bool is_local = (locality_index == 0 && host_set.hostsPerLocality().hasLocalLocality());
+
+  const auto& all_hosts = all_localities[locality_index];
+  const auto& healthy_hosts =
+      locality_index < healthy_localities.size() ? healthy_localities[locality_index] : empty_hosts;
+  const auto& degraded_hosts = locality_index < degraded_localities.size()
+                                   ? degraded_localities[locality_index]
+                                   : empty_hosts;
+
+  const auto sync_source = [this, is_local, recreate_child](PerSourceLocalityState& source_state,
+                                                            const Upstream::HostVector& new_hosts) {
+    if (source_state.priority_set == nullptr) {
+      source_state.priority_set = std::make_unique<Upstream::PrioritySetImpl>();
+      updateLocalityHosts(source_state, new_hosts, is_local, new_hosts, {});
+      source_state.lb = factory_.createWorkerChildLb(*source_state.priority_set);
+      return;
+    }
+
+    const auto& old_hosts = source_state.priority_set->hostSetsPerPriority()[0]->hosts();
+    absl::flat_hash_set<Upstream::HostConstSharedPtr> old_set(old_hosts.begin(), old_hosts.end());
+
+    Upstream::HostVector hosts_added;
+    Upstream::HostVector hosts_removed;
+    for (const auto& host : new_hosts) {
+      if (!old_set.erase(host)) {
+        hosts_added.push_back(host);
+      }
+    }
+    hosts_removed.reserve(old_set.size());
+    for (const auto& host : old_set) {
+      hosts_removed.push_back(std::const_pointer_cast<Upstream::Host>(host));
+    }
+
+    if (hosts_added.empty() && hosts_removed.empty()) {
+      return;
+    }
+
+    updateLocalityHosts(source_state, new_hosts, is_local, hosts_added, hosts_removed);
+    if (recreate_child) {
+      source_state.lb = factory_.createWorkerChildLb(*source_state.priority_set);
+    }
+  };
+
+  sync_source(state.healthy, healthy_hosts);
+  sync_source(state.degraded, degraded_hosts);
+  sync_source(state.all_hosts, all_hosts);
+}
+
+void WorkerLocalLb::buildPerLocality(uint32_t priority, const Upstream::HostSet& host_set) {
+  const auto& locality_hosts = host_set.hostsPerLocality().get();
   auto& per_locality = per_priority_locality_[priority].localities;
   per_locality.clear();
-  per_locality.reserve(locality_hosts.size());
+  per_locality.resize(locality_hosts.size());
 
   for (size_t i = 0; i < locality_hosts.size(); ++i) {
-    const auto& hosts = locality_hosts[i];
-
-    PerLocalityState state;
-    state.priority_set = std::make_unique<Upstream::PrioritySetImpl>();
-
-    // Locality 0 is the local locality when the cluster has a local locality. Pass that flag
-    // through so child policies that check hasLocalLocality() see the correct value.
-    const bool is_local = (i == 0 && hosts_per_locality.hasLocalLocality());
-    updateLocalityHosts(state, hosts, is_local, hosts, {});
-
-    state.lb = factory_.createWorkerChildLb(*state.priority_set);
-
-    per_locality.push_back(std::move(state));
+    syncLocalityState(per_locality[i], host_set, i, /*recreate_child=*/false);
   }
 }
 
@@ -370,50 +456,18 @@ void WorkerLocalLb::onHostChange(uint32_t priority) {
   }
 
   const auto& host_set = host_sets[priority];
-  const auto& hosts_per_locality = host_set->hostsPerLocality();
-  const auto& locality_hosts = hosts_per_locality.get();
+  const auto& locality_hosts = host_set->hostsPerLocality().get();
   auto& per_locality = per_priority_locality_[priority].localities;
 
   // Topology change (locality added/removed) — full rebuild.
   if (locality_hosts.size() != per_locality.size()) {
-    buildPerLocality(priority, hosts_per_locality);
+    buildPerLocality(priority, *host_set);
     return;
   }
 
-  // Per-locality incremental update.
   const bool recreate_child = factory_.recreateChildOnHostChange();
   for (size_t i = 0; i < locality_hosts.size(); ++i) {
-    const auto& new_hosts = locality_hosts[i];
-    auto& state = per_locality[i];
-
-    // Diff old vs new: build one set from old hosts, erase matches from new hosts.
-    const auto& old_hosts = state.priority_set->hostSetsPerPriority()[0]->hosts();
-    absl::flat_hash_set<Upstream::HostConstSharedPtr> old_set(old_hosts.begin(), old_hosts.end());
-
-    Upstream::HostVector hosts_added, hosts_removed;
-    for (const auto& h : new_hosts) {
-      if (!old_set.erase(h)) {
-        hosts_added.push_back(h);
-      }
-    }
-    // Remaining entries in old_set were not in new_hosts — they were removed.
-    hosts_removed.reserve(old_set.size());
-    for (const auto& h : old_set) {
-      hosts_removed.push_back(std::const_pointer_cast<Upstream::Host>(h));
-    }
-
-    if (hosts_added.empty() && hosts_removed.empty()) {
-      continue;
-    }
-
-    const bool is_local = (i == 0 && hosts_per_locality.hasLocalLocality());
-    updateLocalityHosts(state, new_hosts, is_local, hosts_added, hosts_removed);
-
-    // If child policy says recreateOnHostChange (default for RR), recreate worker LB.
-    if (recreate_child) {
-      state.lb = factory_.createWorkerChildLb(*state.priority_set);
-    }
-    // Otherwise child LB handles it via its own registered callback on state.priority_set.
+    syncLocalityState(per_locality[i], *host_set, i, recreate_child);
   }
 }
 
@@ -428,8 +482,7 @@ void WorkerLocalLb::onHealthChange(uint32_t priority) {
   }
 
   const auto& host_set = host_sets[priority];
-  const auto& hosts_per_locality = host_set->hostsPerLocality();
-  const auto& locality_hosts = hosts_per_locality.get();
+  const auto& locality_hosts = host_set->hostsPerLocality().get();
   auto& per_locality = per_priority_locality_[priority].localities;
 
   // Topology mismatch — wait for onHostChange to rebuild.
@@ -439,40 +492,37 @@ void WorkerLocalLb::onHealthChange(uint32_t priority) {
 
   const bool recreate_child = factory_.recreateChildOnHostChange();
   for (size_t i = 0; i < locality_hosts.size(); ++i) {
-    auto& state = per_locality[i];
-    const bool is_local = (i == 0 && hosts_per_locality.hasLocalLocality());
-    // Re-partition with current health status. Empty added/removed since membership is unchanged.
-    updateLocalityHosts(state, locality_hosts[i], is_local, {}, {});
-
-    if (recreate_child) {
-      state.lb = factory_.createWorkerChildLb(*state.priority_set);
-    }
+    syncLocalityState(per_locality[i], *host_set, i, recreate_child);
   }
 }
 
 Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancerContext* context) {
-  const auto priority = choosePriority();
-  if (!priority.has_value()) {
+  const auto selected = choosePriority();
+  if (!selected.has_value()) {
     return {nullptr};
   }
 
-  auto& per_locality = per_priority_locality_[priority.value()].localities;
+  auto& per_locality = per_priority_locality_[selected->priority].localities;
   if (per_locality.empty()) {
     return {nullptr};
   }
 
-  const size_t locality_idx = chooseLocality(priority.value());
+  const size_t locality_idx = chooseLocality(selected->priority, selected->source);
+  auto& source_state = per_locality[locality_idx].stateFor(selected->source);
+  if (source_state.lb == nullptr) {
+    return {nullptr};
+  }
 
   // Increment zone routing stats when a local locality is present.
   const auto* snapshot = factory_.routingWeights();
-  if (snapshot != nullptr && priority.value() < snapshot->priority_weights.size()) {
-    const auto& priority_snapshot = snapshot->priority_weights[priority.value()];
+  if (snapshot != nullptr && selected->priority < snapshot->priority_weights.size()) {
+    const auto& priority_snapshot = snapshot->priority_weights[selected->priority];
     if (!priority_snapshot.has_local_locality) {
-      return per_locality[locality_idx].lb->chooseHost(context);
+      return source_state.lb->chooseHost(context);
     }
 
     if (locality_idx == 0) {
-      if (priority_snapshot.all_local) {
+      if (priority_snapshot.allLocalFor(selected->source)) {
         stats_.lb_zone_routing_all_directly_.inc();
       } else {
         stats_.lb_zone_routing_sampled_.inc();
@@ -482,25 +532,22 @@ Upstream::HostSelectionResponse WorkerLocalLb::chooseHost(Upstream::LoadBalancer
     }
   }
 
-  return per_locality[locality_idx].lb->chooseHost(context);
+  return source_state.lb->chooseHost(context);
 }
 
-absl::optional<uint32_t> WorkerLocalLb::firstAvailablePriority() const {
+absl::optional<SelectedPriority> WorkerLocalLb::firstAvailablePriority() const {
   for (size_t priority = 0; priority < per_priority_locality_.size(); ++priority) {
     if (!per_priority_locality_[priority].localities.empty()) {
-      return static_cast<uint32_t>(priority);
+      return SelectedPriority{static_cast<uint32_t>(priority),
+                              PriorityRoutingWeights::SelectionSource::AllHosts};
     }
   }
   return absl::nullopt;
 }
 
-absl::optional<uint32_t> WorkerLocalLb::choosePriority() const {
+absl::optional<SelectedPriority> WorkerLocalLb::choosePriority() const {
   if (per_priority_locality_.empty()) {
     return absl::nullopt;
-  }
-
-  if (per_priority_locality_.size() == 1) {
-    return 0;
   }
 
   const auto* snapshot = factory_.routingWeights();
@@ -522,19 +569,27 @@ absl::optional<uint32_t> WorkerLocalLb::choosePriority() const {
     return firstAvailablePriority();
   }
 
-  const uint32_t priority =
-      Upstream::LoadBalancerBase::choosePriority(factory_.random().random(),
-                                                 snapshot->priority_loads.healthy_priority_load_,
-                                                 snapshot->priority_loads.degraded_priority_load_)
-          .first;
+  const auto priority_and_source = Upstream::LoadBalancerBase::choosePriority(
+      factory_.random().random(), snapshot->priority_loads.healthy_priority_load_,
+      snapshot->priority_loads.degraded_priority_load_);
+  const uint32_t priority = priority_and_source.first;
   if (priority >= per_priority_locality_.size() ||
       per_priority_locality_[priority].localities.empty()) {
     return firstAvailablePriority();
   }
-  return priority;
+
+  SelectedPriority selected{priority, priority_and_source.second ==
+                                              Upstream::LoadBalancerBase::HostAvailability::Healthy
+                                          ? PriorityRoutingWeights::SelectionSource::Healthy
+                                          : PriorityRoutingWeights::SelectionSource::Degraded};
+  if (priority < snapshot->priority_panic.size() && snapshot->priority_panic[priority]) {
+    selected.source = PriorityRoutingWeights::SelectionSource::AllHosts;
+  }
+  return selected;
 }
 
-size_t WorkerLocalLb::chooseLocality(uint32_t priority) const {
+size_t WorkerLocalLb::chooseLocality(uint32_t priority,
+                                     PriorityRoutingWeights::SelectionSource source) const {
   const auto& per_locality = per_priority_locality_[priority].localities;
   if (per_locality.size() <= 1) {
     return 0;
@@ -545,29 +600,31 @@ size_t WorkerLocalLb::chooseLocality(uint32_t priority) const {
     return 0;
   }
 
-  return selectLocality(snapshot->priority_weights[priority], per_locality);
+  return selectLocality(snapshot->priority_weights[priority], source, per_locality);
 }
 
 size_t WorkerLocalLb::selectLocality(const PriorityRoutingWeights& snapshot,
+                                     PriorityRoutingWeights::SelectionSource source,
                                      const std::vector<PerLocalityState>& per_locality) const {
-  if (snapshot.total_weight <= 0.0 || snapshot.weights.empty()) {
+  const auto& weights = snapshot.weightsFor(source);
+  if (snapshot.totalWeightFor(source) <= 0.0 || weights.empty()) {
     return 0;
   }
 
   // Clamp to the valid range in case snapshot and per_locality_ have different counts
   // (transient window between a topology change and the next weight update).
-  const size_t num_localities = std::min(snapshot.weights.size(), per_locality.size());
+  const size_t num_localities = std::min(weights.size(), per_locality.size());
 
   // Use the pre-computed total when counts agree. Only re-sum over the clamped range
   // during a transient topology mismatch, otherwise stale snapshot entries would spill
   // probability mass onto the last locality.
   double effective_total;
-  if (num_localities == snapshot.weights.size()) {
-    effective_total = snapshot.total_weight;
+  if (num_localities == weights.size()) {
+    effective_total = snapshot.totalWeightFor(source);
   } else {
     effective_total = 0.0;
     for (size_t i = 0; i < num_localities; ++i) {
-      effective_total += snapshot.weights[i];
+      effective_total += weights[i];
     }
   }
   if (effective_total <= 0.0) {
@@ -578,7 +635,7 @@ size_t WorkerLocalLb::selectLocality(const PriorityRoutingWeights& snapshot,
   double target = (rng.random() / static_cast<double>(rng.max())) * effective_total;
   double cumulative = 0.0;
   for (size_t i = 0; i < num_localities; ++i) {
-    cumulative += snapshot.weights[i];
+    cumulative += weights[i];
     if (target < cumulative) {
       return i;
     }
@@ -590,17 +647,19 @@ size_t WorkerLocalLb::selectLocality(const PriorityRoutingWeights& snapshot,
 
 Upstream::HostConstSharedPtr
 WorkerLocalLb::peekAnotherHost(Upstream::LoadBalancerContext* context) {
-  const auto priority = choosePriority();
-  if (!priority.has_value()) {
+  const auto selected = choosePriority();
+  if (!selected.has_value()) {
     return nullptr;
   }
 
-  auto& per_locality = per_priority_locality_[priority.value()].localities;
+  auto& per_locality = per_priority_locality_[selected->priority].localities;
   if (per_locality.empty()) {
     return nullptr;
   }
 
-  return per_locality[chooseLocality(priority.value())].lb->peekAnotherHost(context);
+  const size_t locality_idx = chooseLocality(selected->priority, selected->source);
+  auto& source_state = per_locality[locality_idx].stateFor(selected->source);
+  return source_state.lb != nullptr ? source_state.lb->peekAnotherHost(context) : nullptr;
 }
 
 OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
