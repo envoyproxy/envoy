@@ -758,7 +758,7 @@ TEST_F(LoadAwareLocalityLbTest, AllHostsRemovedFromLocality) {
 // Test: Stale routing snapshot after host removal — the weighted-random may pick a locality
 // whose child LB was torn down, but pickLocalityLb falls back to a locality that still has
 // hosts. Verifies no nullptr returns during the window between the host change and the next
-// routing weight recomputation.
+// routing weight re-computation.
 TEST_F(LoadAwareLocalityLbTest, StaleSnapshotFallbackAfterHostRemoval) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
@@ -1964,7 +1964,7 @@ TEST_F(LoadAwareLocalityLbTest, OutOfRangePriorityCallbacks) {
 }
 
 // Test: All hosts removed from all localities — pickLocalityLb returns nullptr, chooseHost
-// returns {nullptr} gracefully (no crash, no UB).
+// returns {nullptr} gracefully.
 TEST_F(LoadAwareLocalityLbTest, AllLocalitiesEmptiedReturnsNullptr) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
