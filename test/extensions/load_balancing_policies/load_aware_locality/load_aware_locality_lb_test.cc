@@ -70,8 +70,9 @@ protected:
     auto rr_lb_config = rr_factory.loadConfig(context_, *rr_proto).value();
 
     auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
-        rr_factory, std::move(rr_lb_config), weight_update_period, variance_threshold, ewma_alpha,
-        probe_percentage, weight_expiration_period, dispatcher_, context_.thread_local_);
+        rr_factory, rr_factory.name(), std::move(rr_lb_config), weight_update_period,
+        variance_threshold, ewma_alpha, probe_percentage, weight_expiration_period, dispatcher_,
+        context_.thread_local_);
 
     thread_aware_lb_ = std::make_unique<LoadAwareLocalityLoadBalancer>(
         *lb_config, cluster_info_, priority_set_, context_.runtime_loader_, random_,
@@ -81,13 +82,14 @@ protected:
     factory_ = thread_aware_lb_->factory();
   }
 
-  // Set up hosts across any number of localities on the mock priority set.
+  // Set up hosts across any number of localities on the given priority.
   // When healthy_localities is provided, it overrides the healthy hosts per locality
   // (otherwise healthy == all).
-  void setupLocalities(
-      std::vector<Upstream::HostVector> localities, bool has_local_locality = false,
+  void setupPriorityLocalities(
+      uint32_t priority, std::vector<Upstream::HostVector> localities,
+      bool has_local_locality = false,
       absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt) {
-    auto* host_set = priority_set_.getMockHostSet(0);
+    auto* host_set = priority_set_.getMockHostSet(priority);
     Upstream::HostVector all_hosts;
     for (const auto& lv : localities) {
       all_hosts.insert(all_hosts.end(), lv.begin(), lv.end());
@@ -108,6 +110,13 @@ protected:
       host_set->healthy_hosts_ = all_hosts;
       host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
     }
+  }
+
+  void setupLocalities(
+      std::vector<Upstream::HostVector> localities, bool has_local_locality = false,
+      absl::optional<std::vector<Upstream::HostVector>> healthy_localities = absl::nullopt) {
+    setupPriorityLocalities(0, std::move(localities), has_local_locality,
+                            std::move(healthy_localities));
   }
 
   // Set ORCA utilization on a host.
@@ -417,29 +426,30 @@ TEST_F(LoadAwareLocalityLbTest, EwmaSmoothing) {
   EXPECT_GT(weights2->weights[0], 0.0);
 }
 
-// Test: EWMA no-data retention — locality with no ORCA data retains previous smoothed value.
-TEST_F(LoadAwareLocalityLbTest, EwmaNoDataRetention) {
+// Test: Expired ORCA samples clear the EWMA state and fall back to "no data".
+TEST_F(LoadAwareLocalityLbTest, EwmaExpiredDataClearsState) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
   setupLocalities({{h1}, {h2}});
 
-  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/0.3);
+  createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/0.3, /*probe_percentage=*/0.0,
+           /*weight_expiration_period=*/std::chrono::milliseconds(5000));
 
   // First tick: both at 0.8.
   setHostUtilization(*h1, 0.8);
   setHostUtilization(*h2, 0.8);
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
-  // Second tick: clear ORCA data from h2 (simulate no data by resetting the store).
+  // Once the sample expires, the stale EWMA should be dropped instead of retained indefinitely.
+  context_.time_system_.advanceTimeWait(std::chrono::milliseconds(6000));
   clearHostUtilization(*h2);
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   auto weights = typed_factory->routingWeights();
-  // h2 has no data: smoothed retains 0.8 from first tick.
-  // weight[1] = 1 * (1.0 - 0.8) = 0.2 (NOT decaying to 0)
-  EXPECT_NEAR(weights->weights[1], 0.2, 0.05);
-  EXPECT_GT(weights->weights[1], 0.0);
+  ASSERT_NE(nullptr, weights);
+  // h2 has no fresh data anymore, so its stale 0.8 EWMA must be cleared.
+  EXPECT_NEAR(weights->weights[1], 1.0, 0.01);
 }
 
 // Test: A host reporting 0.0 utilization (fully idle) is treated as valid data, not "no data".
@@ -657,6 +667,9 @@ TEST_F(LoadAwareLocalityLbTest, TopologyChangeTriggersRebuild) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {1.0, 1.0, 1.0};
   snapshot->total_weight = 3.0;
+  snapshot->priority_weights = {{{1.0, 1.0, 1.0}, 3.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 
@@ -681,6 +694,9 @@ TEST_F(LoadAwareLocalityLbTest, RoutingWeightsRefreshOnChooseHost) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {0.0, 1.0};
   snapshot->total_weight = 1.0;
+  snapshot->priority_weights = {{{0.0, 1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 
@@ -816,25 +832,87 @@ TEST_F(LoadAwareLocalityLbTest, PeekAnotherHost) {
   EXPECT_EQ(nullptr, populated_lb->peekAnotherHost(nullptr));
 }
 
-// Test: Host membership changes at priority > 0 are ignored — only priority 0 is managed.
-TEST_F(LoadAwareLocalityLbTest, HigherPriorityHostChangeIgnored) {
-  auto h1 = makeWeightTrackingMockHost();
-  auto h2 = makeWeightTrackingMockHost();
-  setupLocalities({{h1}, {h2}});
+// Test: Priority selection fails over beyond priority 0 when higher priorities stay healthy.
+TEST_F(LoadAwareLocalityLbTest, HigherPriorityFailoverPreserved) {
+  auto h_p0 = makeWeightTrackingMockHost();
+  auto h_p1 = makeWeightTrackingMockHost();
+
+  setupPriorityLocalities(0, {{h_p0}}, /*has_local_locality=*/false,
+                          std::vector<Upstream::HostVector>{{}});
+  setupPriorityLocalities(1, {{h_p1}});
 
   createLb();
   auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
 
-  // Verify initial state: both hosts accessible.
-  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
-  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  ASSERT_EQ(2, weights->priority_weights.size());
+  EXPECT_EQ(0, weights->priority_loads.healthy_priority_load_.get()[0]);
+  EXPECT_EQ(100, weights->priority_loads.healthy_priority_load_.get()[1]);
 
-  // Fire a priority=1 host change — should be a no-op for per_locality_ state.
-  auto h3 = makeWeightTrackingMockHost();
-  priority_set_.runUpdateCallbacks(1, {h3}, {});
+  for (int i = 0; i < 50; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_EQ(h_p1.get(), result.host.get());
+  }
+}
 
-  // h1 and h2 still reachable; h3 is NOT (priority 1 is not managed).
-  EXPECT_FALSE(hostSeen(*worker_lb, h3));
+// Test: Priority failover follows health transitions, including failback to P0 and back to P1.
+TEST_F(LoadAwareLocalityLbTest, HigherPriorityFailoverAndFailback) {
+  auto h_p0 = makeWeightTrackingMockHost();
+  auto h_p1 = makeWeightTrackingMockHost();
+
+  setupPriorityLocalities(0, {{h_p0}}, /*has_local_locality=*/false,
+                          std::vector<Upstream::HostVector>{{}});
+  setupPriorityLocalities(1, {{h_p1}});
+
+  createLb();
+  auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
+  ASSERT_NE(nullptr, typed_factory);
+
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_EQ(h_p1.get(), result.host.get());
+  }
+
+  auto* primary_host_set = priority_set_.getMockHostSet(0);
+  primary_host_set->healthy_hosts_ = {h_p0};
+  primary_host_set->healthy_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{h_p0}},
+                                     /*force_no_local_locality=*/true);
+  priority_set_.runUpdateCallbacks(0, {}, {});
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  const auto* weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  EXPECT_EQ(100, weights->priority_loads.healthy_priority_load_.get()[0]);
+  EXPECT_EQ(0, weights->priority_loads.healthy_priority_load_.get()[1]);
+
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_EQ(h_p0.get(), result.host.get());
+  }
+
+  primary_host_set->healthy_hosts_.clear();
+  primary_host_set->healthy_hosts_per_locality_ =
+      Upstream::makeHostsPerLocality(std::vector<Upstream::HostVector>{{}},
+                                     /*force_no_local_locality=*/true);
+  priority_set_.runUpdateCallbacks(0, {}, {});
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  weights = typed_factory->routingWeights();
+  ASSERT_NE(nullptr, weights);
+  EXPECT_EQ(0, weights->priority_loads.healthy_priority_load_.get()[0]);
+  EXPECT_EQ(100, weights->priority_loads.healthy_priority_load_.get()[1]);
+
+  for (int i = 0; i < 20; ++i) {
+    auto result = worker_lb->chooseHost(nullptr);
+    ASSERT_EQ(h_p1.get(), result.host.get());
+  }
 }
 
 // Test: Variance threshold NOT triggered when local is overloaded.
@@ -885,6 +963,9 @@ TEST_F(LoadAwareLocalityLbTest, SnapshotLocalityCountMismatch) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {1.0, 1.0, 1.0};
   snapshot->total_weight = 3.0;
+  snapshot->priority_weights = {{{1.0, 1.0, 1.0}, 3.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 
@@ -1026,21 +1107,20 @@ TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateRepartitions) {
   EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
 }
 
-// Test: Health-only update at priority > 0 is ignored.
-TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateHigherPriorityIgnored) {
-  auto h1 = makeWeightTrackingMockHost();
-  auto h2 = makeWeightTrackingMockHost();
-  setupLocalities({{h1}, {h2}});
+// Test: Health-only updates on higher priorities still refresh the per-priority locality state.
+TEST_F(LoadAwareLocalityLbTest, HealthOnlyUpdateHigherPriorityRepartitions) {
+  auto h_p0 = makeWeightTrackingMockHost();
+  auto h_p1 = makeWeightTrackingMockHost();
+  setupPriorityLocalities(0, {{h_p0}}, /*has_local_locality=*/false,
+                          std::vector<Upstream::HostVector>{{}});
+  setupPriorityLocalities(1, {{h_p1}});
 
   createLb();
   auto worker_lb = factory_->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
 
-  // Fire a health-only update at priority 1 — should be ignored.
   priority_set_.runUpdateCallbacks(1, {}, {});
-
-  // Both hosts still accessible.
-  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
-  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h_p1, 50));
 }
 
 // Test: Health-only update with topology mismatch is a no-op (waits for onHostChange).
@@ -1157,6 +1237,9 @@ TEST_F(LoadAwareLocalityLbTest, SelectLocalityZeroTotalWeight) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {};
   snapshot->total_weight = 0.0;
+  snapshot->priority_weights = {{{}, 0.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 
@@ -1183,6 +1266,9 @@ TEST_F(LoadAwareLocalityLbTest, SnapshotFewerWeightsThanLocalities) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {1.0};
   snapshot->total_weight = 1.0;
+  snapshot->priority_weights = {{{1.0}, 1.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 
@@ -1265,6 +1351,9 @@ TEST_F(LoadAwareLocalityLbTest, ClampedEffectiveTotalZero) {
   auto snapshot = std::make_shared<RoutingWeightsSnapshot>();
   snapshot->weights = {0.0, 0.0, 5.0};
   snapshot->total_weight = 5.0;
+  snapshot->priority_weights = {{{0.0, 0.0, 5.0}, 5.0, false, false}};
+  snapshot->priority_loads.healthy_priority_load_.get() = {100};
+  snapshot->priority_loads.degraded_priority_load_.get() = {0};
   auto* typed_factory = dynamic_cast<WorkerLocalLbFactory*>(factory_.get());
   typed_factory->updateRoutingWeights(std::move(snapshot));
 

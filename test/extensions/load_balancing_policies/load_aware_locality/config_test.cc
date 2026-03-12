@@ -1,4 +1,6 @@
 #include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.pb.h"
+#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
 
 #include "source/extensions/load_balancing_policies/load_aware_locality/config.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
@@ -72,6 +74,49 @@ TEST(LoadAwareLocalityConfigTest, ValidateFailureWithoutEndpointPickingPolicy) {
 
   EXPECT_EQ(factory.loadConfig(context, load_aware_config_msg).status(),
             absl::InvalidArgumentError("No supported endpoint picking policy."));
+}
+
+TEST(LoadAwareLocalityConfigTest, ValidateFailureWithMaglevEndpointPolicy) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::maglev::v3::Maglev maglev_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig maglev_config;
+  maglev_config.set_name("envoy.load_balancing_policies.maglev");
+  maglev_config.mutable_typed_config()->PackFrom(maglev_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = maglev_config;
+
+  Factory factory;
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("envoy.load_balancing_policies.maglev"));
+}
+
+TEST(LoadAwareLocalityConfigTest, ValidateFailureWithClusterProvidedEndpointPolicy) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::extensions::load_balancing_policies::cluster_provided::v3::ClusterProvided
+      cluster_provided_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig cluster_provided_config;
+  cluster_provided_config.set_name("envoy.load_balancing_policies.cluster_provided");
+  cluster_provided_config.mutable_typed_config()->PackFrom(cluster_provided_config_msg);
+
+  LoadAwareLocalityLbProto load_aware_config_msg;
+  *(load_aware_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = cluster_provided_config;
+
+  Factory factory;
+  auto result = factory.loadConfig(context, load_aware_config_msg);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("envoy.load_balancing_policies.cluster_provided"));
 }
 
 // Test: The config fields that config.cc parses are accepted and used.

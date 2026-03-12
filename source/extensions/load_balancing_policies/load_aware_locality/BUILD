@@ -34,7 +34,10 @@ envoy_cc_library(
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/upstream:upstream_includes",
+        "//source/extensions/load_balancing_policies/common:load_balancer_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )

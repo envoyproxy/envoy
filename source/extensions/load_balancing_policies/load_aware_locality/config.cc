@@ -4,11 +4,22 @@
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
+
+namespace {
+
+bool supportsPerLocalityChildInstantiation(absl::string_view child_policy_name) {
+  return child_policy_name != "envoy.load_balancing_policies.ring_hash" &&
+         child_policy_name != "envoy.load_balancing_policies.maglev" &&
+         child_policy_name != "envoy.load_balancing_policies.cluster_provided";
+}
+
+} // namespace
 
 Upstream::ThreadAwareLoadBalancerPtr
 Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
@@ -33,6 +44,13 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
             /*is_optional=*/true);
 
     if (endpoint_picking_policy_factory != nullptr) {
+      if (!supportsPerLocalityChildInstantiation(endpoint_picking_policy_factory->name())) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Unsupported endpoint picking policy for load_aware_locality: ",
+                         endpoint_picking_policy_factory->name(),
+                         ". Child policies must support locality-scoped worker instantiation."));
+      }
+
       // Load and validate the child policy configuration.
       auto sub_lb_proto_message = endpoint_picking_policy_factory->createEmptyConfigProto();
       RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
@@ -64,7 +82,7 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
           PROTOBUF_GET_MS_OR_DEFAULT(lb_config, weight_expiration_period, 180000));
 
       return std::make_unique<LoadAwareLocalityLbConfig>(
-          *endpoint_picking_policy_factory,
+          *endpoint_picking_policy_factory, endpoint_picking_policy_factory->name(),
           LoadBalancerConfigSharedPtr(std::move(lb_config_or_error.value())), weight_update_period,
           utilization_variance_threshold, ewma_alpha, probe_percentage, weight_expiration_period,
           context.mainThreadDispatcher(), context.threadLocal());
