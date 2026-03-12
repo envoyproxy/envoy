@@ -23,8 +23,7 @@ TEST_F(RegexReplaceTest, PerformsSubstitution) {
   proto.set_substitution("xyz");
   auto regex_or = RegexReplace::create(engine_, proto);
   ASSERT_OK(regex_or.status());
-  ASSERT_TRUE(regex_or->has_value());
-  EXPECT_THAT((*regex_or)->apply("123abc123"), Eq("123xyz123"));
+  EXPECT_THAT(regex_or->apply("123abc123"), Eq("123xyz123"));
 }
 
 TEST_F(RegexReplaceTest, PerformsMarkerSubstitution) {
@@ -33,8 +32,7 @@ TEST_F(RegexReplaceTest, PerformsMarkerSubstitution) {
   proto.set_substitution("d\\0\\1");
   auto regex_or = RegexReplace::create(engine_, proto);
   ASSERT_OK(regex_or.status());
-  ASSERT_TRUE(regex_or->has_value());
-  EXPECT_THAT((*regex_or)->apply("123abc123abc"), Eq("123dabcc123dabcc"));
+  EXPECT_THAT(regex_or->apply("123abc123abc"), Eq("123dabcc123dabcc"));
 }
 
 TEST_F(RegexReplaceTest, ErrorsOnInvalidRegex) {
