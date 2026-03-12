@@ -1564,7 +1564,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
 
@@ -1788,6 +1788,17 @@ message RetryPolicy {
 
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
+
+  // By default, the target upstream cluster of a retry request is the same as the original request,
+  // and Envoy will not try to refresh it when retrying.
+  // But iff this field is set to true, Envoy will try to refresh the target upstream cluster when
+  // retrying a request. This is useful when users want the cross clusters retry feature.
+  //
+  // .. note::
+  //   This only make sense when the cluster selection support the dynamic refresh,
+  //   e.g. :ref:`matcher cluster specifier
+  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
+  bool refresh_cluster_on_retry = 14;
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
