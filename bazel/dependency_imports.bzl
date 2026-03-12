@@ -89,15 +89,13 @@ def envoy_dependency_imports(
     setup_sanitizer_libs()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
-    # These repos also have transient dependencies - `build_external` allows them to use them.
-    # TODO(phlax): remove `build_external` and pin all transients
+    # All transitive dependencies are pinned explicitly below to keep builds hermetic.
     go_repository(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
         sum = "h1:raiipEjMOIC/TO2AvyTxP25XFdLxNIBwzDh3FM3XztI=",
         version = "v1.34.0",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/google.golang.org/grpc",
         # last_update = "2020-12-02"
         # use_category = ["api"],
@@ -115,23 +113,28 @@ def envoy_dependency_imports(
         importpath = "golang.org/x/net",
         sum = "h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=",
         version = "v0.0.0-20200226121028-0de0cce0169b",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/net",
         # last_update = "2020-02-26"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
         build_directives = [
+            "gazelle:resolve go golang.org/x/sys/unix @org_golang_x_sys//unix",
             "gazelle:resolve go golang.org/x/text/secure/bidirule @org_golang_x_text//secure/bidirule",
             "gazelle:resolve go golang.org/x/text/unicode/bidi @org_golang_x_text//unicode/bidi",
             "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
         ],
     )
     go_repository(
+        name = "org_golang_x_sys",
+        importpath = "golang.org/x/sys",
+        sum = "h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=",
+        version = "v0.38.0",
+    )
+    go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
         sum = "h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=",
         version = "v0.3.3",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/text",
         # last_update = "2021-06-16"
         # use_category = ["api"],
@@ -142,7 +145,6 @@ def envoy_dependency_imports(
         importpath = "google.golang.org/genproto/googleapis/api",
         sum = "h1:DoPTO70H+bcDXcd39vOqb2viZxgqeBeSGtZ55yZU4/Q=",
         version = "v0.0.0-20230822172742-b8732ec3820d",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
         ],
@@ -152,21 +154,18 @@ def envoy_dependency_imports(
         importpath = "google.golang.org/genproto/googleapis/rpc",
         sum = "h1:uvYuEyMHKNt+lT4K3bN6fGswmK8qSvcreM3BwjDh+y4=",
         version = "v0.0.0-20230822172742-b8732ec3820d",
-        build_external = "external",
     )
     go_repository(
         name = "org_golang_google_protobuf",
         importpath = "google.golang.org/protobuf",
         sum = "h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=",
         version = "v1.28.1",
-        build_external = "external",
     )
     go_repository(
         name = "com_github_cncf_xds_go",
         importpath = "github.com/cncf/xds/go",
         sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
         version = "v0.0.0-20220520190051-1e77728a1eaa",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/api/expr/v1alpha1 @org_golang_google_genproto_googleapis_api//expr/v1alpha1",
         ],
@@ -176,7 +175,6 @@ def envoy_dependency_imports(
         importpath = "github.com/spf13/afero",
         sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
         version = "v1.3.4",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/spf13/afero",
         # last_update = "2021-03-20"
         # use_category = ["api"],
@@ -192,7 +190,6 @@ def envoy_dependency_imports(
         importpath = "github.com/lyft/protoc-gen-star/v2",
         sum = "h1:keaAo8hRuAT0O3DfJ/wM3rufbAjGeJ1lAtWZHDjKGB0=",
         version = "v2.0.1",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
         # last_update = "2023-01-06"
         # use_category = ["api"],
@@ -206,7 +203,6 @@ def envoy_dependency_imports(
         importpath = "github.com/iancoleman/strcase",
         sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
         version = "v0.0.0-20180726023541-3605ed457bf7",
-        build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/iancoleman/strcase",
         # last_update = "2020-11-22"
         # use_category = ["api"],
@@ -217,7 +213,6 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
-        build_external = "external",
     )
 
     protoc_gen_jsonschema_go_dependencies()
