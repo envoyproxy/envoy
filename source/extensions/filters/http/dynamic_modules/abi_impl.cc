@@ -356,6 +356,96 @@ getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_pt
   return &key_metadata->second;
 }
 
+/**
+ * Helper to get the metadata list value from the metadata namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @return the metadata list value if it exists and is a list, nullptr otherwise.
+ */
+const Protobuf::ListValue*
+getMetadataListValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                     envoy_dynamic_module_type_metadata_source metadata_source,
+                     envoy_dynamic_module_type_module_buffer ns,
+                     envoy_dynamic_module_type_module_buffer key) {
+  auto* metadata_value = getMetadataValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!metadata_value) {
+    return nullptr;
+  }
+  if (!metadata_value->has_list_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("metadata value for key {} is not a list",
+                                    absl::string_view(key.ptr, key.length)));
+    return nullptr;
+  }
+  return &metadata_value->list_value();
+}
+
+/**
+ * Helper to get the dynamic metadata value from the stream info. if the key does not exist, it will
+ * be created, assuming stream info is available.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @return the metadata value if it exists or is created, nullptr if stream info is not available.
+ */
+Protobuf::Value*
+getMutableDynamicMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                               envoy_dynamic_module_type_module_buffer ns,
+                               envoy_dynamic_module_type_module_buffer key) {
+  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("metadata namespace {} is not available",
+                                    absl::string_view(ns.ptr, ns.length)));
+    return nullptr;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  return &(*metadata_namespace->mutable_fields())[key_view];
+}
+
+/**
+ * Helper to get the dynamic metadata list value from the stream info. if the key does not exist, it
+ * will be created as a list, assuming stream info is available.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @return the metadata list value if it exists or is created as a list, nullptr if stream info is
+ * not available or if an existing non-list value exists for the key.
+ */
+Protobuf::ListValue*
+getMutableDynamicMetadataListValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                                   envoy_dynamic_module_type_module_buffer ns,
+                                   envoy_dynamic_module_type_module_buffer key) {
+  auto* metadata_value = getMutableDynamicMetadataValue(filter_envoy_ptr, ns, key);
+  if (!metadata_value) {
+    return nullptr;
+  }
+
+  if (metadata_value->kind_case() == Protobuf::Value::KindCase::KIND_NOT_SET ||
+      metadata_value->has_list_value()) {
+    return metadata_value->mutable_list_value();
+  }
+  // If the value is set and is not a list, log and return nullptr since we don't want to overwrite
+  // existing non-list values.
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                      fmt::format("metadata value for key {} is not a list",
+                                  absl::string_view(key.ptr, key.length)));
+  return nullptr;
+}
+
 } // namespace
 
 extern "C" {
@@ -1027,6 +1117,134 @@ bool envoy_dynamic_module_callback_http_get_metadata_namespaces(
     result_buffer_vector[i] = {ns.first.data(), ns.first.size()};
     i++;
   }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  auto* list_value = getMutableDynamicMetadataListValue(filter_envoy_ptr, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  list_value->add_values()->set_number_value(value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  auto* list_value = getMutableDynamicMetadataListValue(filter_envoy_ptr, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  list_value->add_values()->set_string_value(absl::string_view{value.ptr, value.length});
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value) {
+  auto* list_value = getMutableDynamicMetadataListValue(filter_envoy_ptr, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  list_value->add_values()->set_bool_value(value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t* result) {
+  const auto* list_value = getMetadataListValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  *result = list_value->values_size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, double* result) {
+  const auto* list_value = getMetadataListValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  if (index >= static_cast<size_t>(list_value->values_size())) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("index {} out of range for list key {}", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  const auto& item = list_value->values(index);
+  if (!item.has_number_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("element at index {} in key {} is not a number", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  *result = item.number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto* list_value = getMetadataListValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  if (index >= static_cast<size_t>(list_value->values_size())) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("index {} out of range for list key {}", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  const auto& item = list_value->values(index);
+  if (!item.has_string_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("element at index {} in key {} is not a string", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  const std::string& str = item.string_value();
+  *result = {str.data(), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, bool* result) {
+  const auto* list_value = getMetadataListValue(filter_envoy_ptr, metadata_source, ns, key);
+  if (!list_value) {
+    return false;
+  }
+  if (index >= static_cast<size_t>(list_value->values_size())) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("index {} out of range for list key {}", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  const auto& item = list_value->values(index);
+  if (!item.has_bool_value()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        fmt::format("element at index {} in key {} is not a bool", index,
+                                    absl::string_view(key.ptr, key.length)));
+    return false;
+  }
+  *result = item.bool_value();
   return true;
 }
 

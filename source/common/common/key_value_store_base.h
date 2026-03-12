@@ -41,8 +41,8 @@ public:
 protected:
   // Values in a KeyValueStore have an optional TTL.
   struct ValueWithTtl {
-    ValueWithTtl(std::string value, absl::optional<std::chrono::seconds> ttl)
-        : value_(value), ttl_(ttl) {}
+    ValueWithTtl(std::string&& value, absl::optional<std::chrono::seconds>&& ttl)
+        : value_(std::move(value)), ttl_(std::move(ttl)) {}
     std::string value_;
     absl::optional<std::chrono::seconds> ttl_;
   };

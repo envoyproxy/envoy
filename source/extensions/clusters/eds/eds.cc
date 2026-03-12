@@ -85,10 +85,9 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
       // The batchUpdate call must be performed after all the endpoints of all localities
       // were received.
-      ASSERT(parent_.leds_localities_.find(leds_config) != parent_.leds_localities_.end() &&
-             parent_.leds_localities_[leds_config]->isUpdated());
-      for (const auto& [_, lb_endpoint] :
-           parent_.leds_localities_[leds_config]->getEndpointsMap()) {
+      const auto it = parent_.leds_localities_.find(leds_config);
+      ASSERT(it != parent_.leds_localities_.end() && it->second->isUpdated());
+      for (const auto& [_, lb_endpoint] : it->second->getEndpointsMap()) {
         updateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
                                 all_new_hosts);
       }

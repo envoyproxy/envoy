@@ -192,6 +192,7 @@ proto_library(
         "//envoy/extensions/filters/listener/original_dst/v3:pkg",
         "//envoy/extensions/filters/listener/original_src/v3:pkg",
         "//envoy/extensions/filters/listener/proxy_protocol/v3:pkg",
+        "//envoy/extensions/filters/listener/set_filter_state/v3:pkg",
         "//envoy/extensions/filters/listener/tls_inspector/v3:pkg",
         "//envoy/extensions/filters/network/connection_limit/v3:pkg",
         "//envoy/extensions/filters/network/direct_response/v3:pkg",

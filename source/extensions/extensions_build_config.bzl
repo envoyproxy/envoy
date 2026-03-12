@@ -238,6 +238,7 @@ EXTENSIONS = {
     # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
+    "envoy.filters.listener.set_filter_state":          "//source/extensions/filters/listener/set_filter_state:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
     "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
