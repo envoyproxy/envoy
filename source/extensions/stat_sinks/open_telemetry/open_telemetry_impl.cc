@@ -330,7 +330,7 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
 
 void OtlpMetricsFlusherImpl::flush(
     Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
-    const std::function<void(MetricsExportRequestPtr)>& send_callback) const {
+    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
   MetricAggregator aggregator =
       MetricAggregator(config_->enableMetricAggregation(),
                        std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -419,7 +419,7 @@ void OtlpMetricsFlusherImpl::flush(
 
   auto resource_metrics = aggregator.getResourceMetrics(config_->resource_attributes());
   RequestSplitter::chunkRequests(resource_metrics, config_->maxDatapointsPerRequest(),
-                                 send_callback);
+                                 std::move(send_callback));
 }
 
 } // namespace OpenTelemetry

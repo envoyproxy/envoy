@@ -1300,7 +1300,7 @@ class MockOtlpMetricsFlusher : public OtlpMetricsFlusher {
 public:
   MOCK_METHOD(void, flush,
               (Stats::MetricSnapshot&, int64_t, int64_t,
-               const std::function<void(MetricsExportRequestPtr)>&),
+               absl::AnyInvocable<void(MetricsExportRequestPtr)>),
               (const, override));
 };
 
@@ -1323,7 +1323,7 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/1000,
                                /*cumulative_start_time_ns=*/1000, _))
       .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
-                           const std::function<void(MetricsExportRequestPtr)>& send_callback) {
+                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
         send_callback(std::move(request1));
       }));
   EXPECT_CALL(*exporter_, send(_));
@@ -1335,7 +1335,7 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/expected_time_ns_,
                                /*cumulative_start_time_ns=*/1000, _))
       .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
-                           const std::function<void(MetricsExportRequestPtr)>& send_callback) {
+                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
         send_callback(std::move(request2));
       }));
   EXPECT_CALL(*exporter_, send(_));

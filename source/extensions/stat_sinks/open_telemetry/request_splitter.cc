@@ -10,7 +10,7 @@ namespace OpenTelemetry {
 
 void RequestSplitter::chunkRequests(
     Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& rm_list,
-    const uint32_t max_dp, const std::function<void(MetricsExportRequestPtr)>& send_callback) {
+    const uint32_t max_dp, absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
   // If there are no resource metrics, there is nothing to do.
   if (rm_list.empty()) {
     return;
@@ -48,9 +48,9 @@ void RequestSplitter::chunkRequests(
     opentelemetry::proto::metrics::v1::Metric* current_metric = nullptr;
 
     auto append_dp = [&send_callback, &base_request, &current_request, &cur_dp, &current_metric,
-                      max_dp, &metric](
-                         const std::function<void(opentelemetry::proto::metrics::v1::Metric*)>&
-                             add_dp_func) {
+                      max_dp,
+                      &metric](absl::AnyInvocable<void(opentelemetry::proto::metrics::v1::Metric*)>
+                                   add_dp_func) {
       if (cur_dp == max_dp) {
         send_callback(std::move(current_request));
         current_request = std::make_unique<MetricsExportRequest>(*base_request);

@@ -15,6 +15,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 
+#include "absl/functional/any_invocable.h"
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/metrics/v1/metrics.pb.h"
@@ -190,7 +191,7 @@ public:
    */
   virtual void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
                      int64_t cumulative_start_time_ns,
-                     const std::function<void(MetricsExportRequestPtr)>& send_callback) const PURE;
+                     absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const PURE;
 };
 
 using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
@@ -208,7 +209,7 @@ public:
 
   void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
              int64_t cumulative_start_time_ns,
-             const std::function<void(MetricsExportRequestPtr)>& send_callback) const override;
+             absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const override;
 
 private:
   struct MetricConfig {

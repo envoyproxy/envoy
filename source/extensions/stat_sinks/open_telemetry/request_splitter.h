@@ -5,6 +5,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/functional/any_invocable.h"
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/proto/metrics/v1/metrics.pb.h"
 
@@ -26,7 +27,7 @@ public:
    */
   static void chunkRequests(
       Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::ResourceMetrics>& rm_list,
-      const uint32_t max_dp, const std::function<void(MetricsExportRequestPtr)>& send_callback);
+      const uint32_t max_dp, absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback);
 };
 
 } // namespace OpenTelemetry
