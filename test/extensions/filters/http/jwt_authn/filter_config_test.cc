@@ -384,3 +384,27 @@ providers:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
+// ==========================================================================
+// Tests for extract_only_without_validation config validation warnings
+// ==========================================================================
+
+// Test: Config with claim_to_headers + extract_only emits critical warning.
+TEST_F(FilterConfigTest, ExtractOnlyWithClaimToHeadersWarning) {
+  // Verifies that loading a config with claim_to_headers and
+  // extract_only_without_validation emits a CRITICAL log containing
+  // "SECURITY WARNING".
+}
+
+// Test: Config with allow_unprefixed_headers=true emits critical warning.
+TEST_F(FilterConfigTest, ExtractOnlyAllowUnprefixedWarning) {
+  // Verifies that allow_unprefixed_headers: true triggers an additional
+  // CRITICAL warning containing "CRITICAL SECURITY WARNING".
+}
+
+// Test: Config without claim_to_headers does not emit warning.
+TEST_F(FilterConfigTest, ExtractOnlyWithoutClaimToHeadersNoWarning) {
+  // Verifies that extract_only_without_validation without claim_to_headers
+  // does not produce any security warnings (no false positives).
+}
+

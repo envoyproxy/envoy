@@ -593,38 +593,60 @@ message JwtRequirement {
     // different is this mode will reject requests with invalid tokens.
     google.protobuf.Empty allow_missing = 6;
 
-    // Extract JWT claims without performing signature validation.
-    // This mode will decode the JWT, extract claims, and forward them as
-    // configured (via claim_to_headers, forward_payload_header, etc.) but
-    // will NOT verify the JWT signature against JWKS.
+    // [#next-major-version: consider removing or gating behind explicit opt-in]
     //
     // .. warning::
     //
-    //    This mode does not verify JWT authenticity. Use only in scenarios where:
+    //    SECURITY WARNING: This mode does NOT verify JWT signatures. Any party
+    //    can forge a JWT with arbitrary claims, and those claims will be extracted
+    //    and forwarded as HTTP headers. Headers set by this mode are
+    //    INDISTINGUISHABLE from headers set by fully validated JWTs unless the
+    //    ``unverified_header_prefix`` is configured (which is now REQUIRED by
+    //    default).
     //
-    //    - JWTs come from a trusted source (e.g., internal service mesh)
-    //    - Signature verification is performed elsewhere in the request path
-    //    - You are in a testing period and the token issuer doesn't support JWKS yet
+    //    DO NOT use this mode if:
+    //      - RBAC policies match on JWT-derived headers
+    //      - ext_authz services trust JWT-derived headers
+    //      - Backend services use JWT-derived headers for authorization
+    //      - The JWT source is not cryptographically authenticated by other means
     //
-    // This mode will:
+    //    Use only when signature verification is PROVABLY performed elsewhere
+    //    in the request path (e.g., by an upstream mTLS-authenticated service).
     //
-    // * Decode the JWT header and payload
-    // * Extract claims and forward them as headers
-    // * Always return success (Status::Ok) regardless of JWT validity
-    // * Log when extraction occurs
-    //
-    // This mode will NOT:
-    //
-    // * Verify the JWT signature
-    // * Validate the (issuer) claim
-    // * Validate the (audience) claim
-    // * Check not-before time (nbf claim)
     ExtractOnlyWithoutValidation extract_only_without_validation = 7;
   }
 }
 
+// Configuration for extract-only mode without JWT signature validation.
+//
+// .. warning::
+//
+//    See security warnings on the ``extract_only_without_validation`` field
+//    in ``JwtRequirement``. Misconfiguration can lead to complete
+//    authentication and authorization bypass.
+//
 message ExtractOnlyWithoutValidation {
-  // Reserved for future extensions (e.g., claim filtering, logging options)
+  // Prefix prepended to all header names set from unverified JWT claims
+  // via ``claim_to_headers``. This ensures downstream consumers can
+  // distinguish unverified claims from cryptographically validated ones.
+  //
+  // If empty, defaults to "x-jwt-unverified-". Set to a non-empty custom
+  // prefix if needed.
+  string unverified_header_prefix = 1;
+
+  // If true, allows claim_to_headers to set headers WITHOUT the
+  // unverified prefix. This is DANGEROUS and should only be used
+  // when the operator has verified that no downstream filter or
+  // backend trusts these headers for authorization decisions.
+  //
+  // Default: false
+  bool allow_unprefixed_headers = 2;
+
+  // If true, sets ``x-jwt-signature-verified: false`` header on requests
+  // processed by this mode.
+  //
+  // Default: true
+  google.protobuf.BoolValue set_verification_status_header = 3;
 }
 
 // This message specifies a list of RequiredProvider.

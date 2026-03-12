@@ -216,3 +216,36 @@ In this example the `tenants` claim is an object, therefore the JWT claim ("sub"
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
     x-jwt-tenants: <Base64 encoded JSON JWT Claim>
+
+
+.. _config_jwt_authn_extract_only_security:
+
+Extract-Only Mode Security Considerations
+------------------------------------------
+
+.. warning::
+
+   **CRITICAL SECURITY WARNING**: The ``extract_only_without_validation``
+   requirement type does **NOT** verify JWT signatures. Any party can craft
+   a JWT with arbitrary claims using ``alg:none`` or a self-signed key,
+   and those claims will be extracted and forwarded as HTTP headers.
+
+   **You MUST NOT use this mode if:**
+
+   - RBAC policies match on JWT-derived headers (e.g., ``x-jwt-claim-role``)
+   - ``ext_authz`` services use JWT-derived headers for authorization decisions
+   - Backend services trust JWT-derived headers for access control
+
+   **Behavior (v1.38+):**
+
+   Headers from ``extract_only_without_validation`` are prefixed with
+   ``x-jwt-unverified-`` by default. A ``x-jwt-signature-verified: false``
+   header is also set. Configure ``allow_unprefixed_headers: true`` to
+   restore the previous behavior (NOT RECOMMENDED).
+
+   This change is runtime-guarded by
+   ``envoy.reloadable_features.jwt_authn_prefix_unverified_claims``.
+
+   **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
+   or ``local_jwks`` for full signature verification.
+

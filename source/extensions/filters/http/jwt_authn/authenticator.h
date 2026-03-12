@@ -60,6 +60,17 @@ public:
   virtual AuthenticatorPtr create(const JwtVerify::CheckAudience* check_audience,
                                   const absl::optional<std::string>& provider, bool allow_failed,
                                   bool allow_missing) const PURE;
+
+  // ── Security hardening for extract_only_without_validation ──
+
+  // Determine the prefix for unverified claim headers.
+  static std::string getUnverifiedHeaderPrefix(
+      const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config);
+
+  // Whether to set the x-jwt-signature-verified header.
+  static bool shouldSetVerificationStatusHeader(
+      const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config);
+
 };
 
 } // namespace JwtAuthn

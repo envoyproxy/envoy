@@ -115,6 +115,11 @@ public:
                                  getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());
   }
 
+
+  // Validate security implications of extract_only_without_validation at config load time.
+  static void validateExtractOnlyWithoutValidationUsage(
+      const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config);
+
 private:
   JwtAuthnFilterStats generateStats(const std::string& prefix,
                                     const std::string& filter_stats_prefix, Stats::Scope& scope) {
