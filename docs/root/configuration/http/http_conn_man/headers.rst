@@ -165,7 +165,7 @@ or all of the clients or proxies that a request has flowed through, on its way f
 server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
 The XFCC header value can be formatted in either text or JSON format, controlled by the
-:ref:`set_client_cert_format<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_client_cert_format>`
+:ref:`format<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`
 option.
 
 .. _config_http_conn_man_headers_x-forwarded-client-cert_text:
@@ -254,8 +254,6 @@ How Envoy processes XFCC is specified by the
 :ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`,
 the
 :ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`,
-and the
-:ref:`set_client_cert_format<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_client_cert_format>`
 HTTP connection manager options. If ``forward_client_cert_details`` is unset, the XFCC header will be sanitized by
 default.
 

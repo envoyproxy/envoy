@@ -77,7 +77,7 @@ ForwardClientCertActionFactory::createAction(const Protobuf::Message& config,
   return std::make_shared<ForwardClientCertAction>(
       convertForwardClientCertDetailsType(typed_config.forward_client_cert_details()),
       convertSetCurrentClientCertDetails(typed_config.set_current_client_cert_details()),
-      convertForwardClientCertFormat(typed_config.format()));
+      convertForwardClientCertFormat(typed_config.set_current_client_cert_details().format()));
 }
 
 REGISTER_FACTORY(ForwardClientCertActionFactory,
