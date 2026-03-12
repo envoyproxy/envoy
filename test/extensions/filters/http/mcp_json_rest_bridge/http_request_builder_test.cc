@@ -240,11 +240,10 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
               StrEq("/v1/projects/123456789"));
 
   // Multiple substitutions.
-  EXPECT_THAT(
-      *constructBaseUrl(
-          "/bigquery/v2/projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
-          {"projectId", "datasetId", "tableId"}, arguments),
-      StrEq("/bigquery/v2/projects/project_C/datasets/dataset_B/tables/table_A/insertAll"));
+  EXPECT_THAT(*constructBaseUrl(
+                  "/test/v2/projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
+                  {"projectId", "datasetId", "tableId"}, arguments),
+              StrEq("/test/v2/projects/project_C/datasets/dataset_B/tables/table_A/insertAll"));
 
   // Missing argument.
   EXPECT_THAT(constructBaseUrl("/v1/{missing}", {"missing"}, arguments),

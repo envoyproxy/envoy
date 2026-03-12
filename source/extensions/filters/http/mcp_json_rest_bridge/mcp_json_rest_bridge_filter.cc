@@ -127,6 +127,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  // TODO(guoyilin42): For readability, prefer return values to output parameters for the `data`
+  // parameter. https://abseil.io/tips/176
   handleMcpMethod(request_body_json, data);
 
   if (mcp_operation_ == McpOperation::Initialization ||

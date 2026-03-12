@@ -123,6 +123,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // TODO(guoyilin42): Add a test for large body.
   const std::string request_body = R"({
     "jsonrpc": "2.0",
     "id": 321,
