@@ -350,6 +350,73 @@ TEST_F(LoadAwareLocalityLbTest, EmptyAndSingleLocalitySmoke) {
   EXPECT_FALSE(populated_lb->selectExistingConnection(nullptr, *h1, hash_key).has_value());
 }
 
+TEST_F(LoadAwareLocalityLbTest, HeaderSelectionHelpersReturnExpectedStates) {
+  PriorityRoutingWeights weights;
+  weights.weights = {1.0};
+  weights.total_weight = 1.0;
+  weights.all_local = true;
+  weights.degraded_weights = {2.0};
+  weights.degraded_total_weight = 2.0;
+  weights.degraded_all_local = false;
+  weights.all_host_weights = {3.0};
+  weights.all_host_total_weight = 3.0;
+  weights.all_host_all_local = true;
+
+  EXPECT_EQ(&weights.weights,
+            &weights.weightsFor(PriorityRoutingWeights::SelectionSource::Healthy));
+  EXPECT_EQ(&weights.degraded_weights,
+            &weights.weightsFor(PriorityRoutingWeights::SelectionSource::Degraded));
+  EXPECT_EQ(&weights.all_host_weights,
+            &weights.weightsFor(PriorityRoutingWeights::SelectionSource::AllHosts));
+  EXPECT_DOUBLE_EQ(1.0, weights.totalWeightFor(PriorityRoutingWeights::SelectionSource::Healthy));
+  EXPECT_DOUBLE_EQ(2.0, weights.totalWeightFor(PriorityRoutingWeights::SelectionSource::Degraded));
+  EXPECT_DOUBLE_EQ(3.0, weights.totalWeightFor(PriorityRoutingWeights::SelectionSource::AllHosts));
+  EXPECT_TRUE(weights.allLocalFor(PriorityRoutingWeights::SelectionSource::Healthy));
+  EXPECT_FALSE(weights.allLocalFor(PriorityRoutingWeights::SelectionSource::Degraded));
+  EXPECT_TRUE(weights.allLocalFor(PriorityRoutingWeights::SelectionSource::AllHosts));
+
+  PerLocalityState locality;
+  EXPECT_EQ(&locality.healthy,
+            &locality.stateFor(PriorityRoutingWeights::SelectionSource::Healthy));
+  EXPECT_EQ(&locality.degraded,
+            &locality.stateFor(PriorityRoutingWeights::SelectionSource::Degraded));
+  EXPECT_EQ(&locality.all_hosts,
+            &locality.stateFor(PriorityRoutingWeights::SelectionSource::AllHosts));
+
+  const PerLocalityState& const_locality = locality;
+  EXPECT_EQ(&const_locality.healthy,
+            &const_locality.stateFor(PriorityRoutingWeights::SelectionSource::Healthy));
+  EXPECT_EQ(&const_locality.degraded,
+            &const_locality.stateFor(PriorityRoutingWeights::SelectionSource::Degraded));
+  EXPECT_EQ(&const_locality.all_hosts,
+            &const_locality.stateFor(PriorityRoutingWeights::SelectionSource::AllHosts));
+}
+
+TEST_F(LoadAwareLocalityLbTest, TrulyEmptyPrioritySetHasNoAvailablePriority) {
+  priority_set_.host_sets_.clear();
+  priority_set_.member_update_cbs_.clear();
+
+  auto child_factory = std::make_shared<RecordingWorkerChildFactory>(false);
+  NiceMock<Upstream::MockTypedLoadBalancerFactory> typed_child_factory;
+  ON_CALL(typed_child_factory, name()).WillByDefault(Return("mock_empty_priority"));
+  ON_CALL(typed_child_factory,
+          create(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillByDefault(testing::Return(
+          testing::ByMove(std::make_unique<StaticThreadAwareLoadBalancer>(child_factory))));
+
+  auto factory = std::make_shared<WorkerLocalLbFactory>(
+      typed_child_factory, "mock_empty_priority",
+      std::make_shared<Upstream::MockTypedLoadBalancerFactory::EmptyLoadBalancerConfig>(),
+      cluster_info_, priority_set_, context_.runtime_loader_, random_, context_.time_system_,
+      context_.thread_local_);
+  ASSERT_TRUE(factory->initializeChildLb().ok());
+
+  auto worker_lb = factory->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+  EXPECT_EQ(nullptr, worker_lb->chooseHost(nullptr).host);
+  EXPECT_EQ(nullptr, worker_lb->peekAnotherHost(nullptr));
+}
+
 TEST_F(LoadAwareLocalityLbTest, BasicRoutingWeightsTrackNoDataFreshDataAndZeroUtilization) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
@@ -985,6 +1052,20 @@ TEST_F(LoadAwareLocalityLbTest, InPlaceUpdateTopologyMismatchWaitsForMembershipC
   EXPECT_TRUE(hostSeen(*worker_lb, h3, 300));
 }
 
+TEST_F(LoadAwareLocalityLbTest, DirectOutOfRangePriorityCallbacksAreIgnored) {
+  auto h1 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}});
+
+  createLb();
+  auto worker_lb = createWorkerLb();
+  ASSERT_NE(nullptr, worker_lb);
+
+  priority_set_.priority_update_cb_helper_.runCallbacks(5, Upstream::HostVector{h1}, {});
+  priority_set_.priority_update_cb_helper_.runCallbacks(5, {}, {});
+
+  expectOnlyHost(*worker_lb, h1, 20);
+}
+
 TEST_F(LoadAwareLocalityLbTest, PriorityFailoverAndFailback) {
   auto h_p0 = makeWeightTrackingMockHost();
   auto h_p1 = makeWeightTrackingMockHost();
@@ -1079,6 +1160,25 @@ TEST_F(LoadAwareLocalityLbTest, ChoosePriorityFallsBackForSnapshotMismatchesAndZ
   publishSnapshot(loads_size_mismatch);
   EXPECT_TRUE(hostSeen(*worker_lb, h1, 20));
   EXPECT_EQ(h1, worker_lb->peekAnotherHost(nullptr));
+}
+
+TEST_F(LoadAwareLocalityLbTest,
+       SnapshotShorterThanPrioritySetFallsBackToLaterAvailablePriorityLocality) {
+  auto h_p1 = makeWeightTrackingMockHost();
+  setupPriorityLocalities(0, {});
+  setupPriorityLocalities(1, {{h_p1}});
+
+  createLb();
+  auto worker_lb = createWorkerLb();
+  ASSERT_NE(nullptr, worker_lb);
+
+  PriorityRoutingWeights p0;
+  p0.weights = {1.0};
+  p0.total_weight = 1.0;
+  publishSnapshot(makeSnapshot({p0}, {100}));
+
+  expectOnlyHost(*worker_lb, h_p1, 20);
+  EXPECT_EQ(h_p1, worker_lb->peekAnotherHost(nullptr));
 }
 
 TEST_F(LoadAwareLocalityLbTest, ChoosePriorityFallsBackWhenSelectedPriorityHasNoLocalities) {

@@ -11,6 +11,8 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/typed_load_balancer_factory.h"
+#include "test/test_common/registry.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -85,6 +87,18 @@ envoy::config::core::v3::TypedExtensionConfig unsupportedChildPolicy(absl::strin
 }
 
 class UnsupportedChildPolicyTest : public testing::TestWithParam<absl::string_view> {};
+
+class FailingLoadConfigFactory : public Upstream::MockTypedLoadBalancerFactory {
+public:
+  std::string name() const override {
+    return "envoy.load_balancing_policies.load_aware_locality_test_error";
+  }
+
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message&) override {
+    return absl::InvalidArgumentError("failing child loadConfig");
+  }
+};
 
 TEST(LoadAwareLocalityConfigTest, Defaults) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -206,6 +220,19 @@ TEST(LoadAwareLocalityConfigTest, MalformedSupportedChildConfigIsRejected) {
   EXPECT_THAT(result.status().message(),
               testing::AnyOf(testing::HasSubstr("round_robin.v3.RoundRobin"),
                              testing::HasSubstr("Unable to unpack")));
+}
+
+TEST(LoadAwareLocalityConfigTest, SupportedChildLoadConfigErrorIsPropagated) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  FailingLoadConfigFactory child_factory;
+  Registry::InjectFactory<Upstream::TypedLoadBalancerFactory> registered_factory(child_factory);
+
+  Factory factory;
+  auto result = factory.loadConfig(
+      context, loadAwareConfig({typedExtensionConfig(child_factory.name(), Protobuf::Struct{})}));
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("failing child loadConfig"));
 }
 
 TEST(LoadAwareLocalityConfigTest, NegativeWeightExpirationRejected) {
