@@ -1,6 +1,7 @@
 #include "source/common/http/http_service_headers.h"
 
 #include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/generic_factory_context.h"
 
@@ -13,28 +14,23 @@ HttpServiceHeadersApplicator::HttpServiceHeadersApplicator(
     : time_source_(server_context.timeSource()) {
   Server::GenericFactoryContextImpl generic_context{server_context,
                                                     server_context.messageValidationVisitor()};
+
+  // Parse HttpService-level formatter extensions into command parsers.
+  auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+      http_service.formatters(), generic_context);
+  SET_AND_RETURN_IF_NOT_OK(commands.status(), creation_status);
+
   for (const auto& header_value_option : http_service.request_headers_to_add()) {
     const auto& header = header_value_option.header();
-    const uint8_t fields_set = (header.has_formatted_value() ? 1 : 0) +
-                               (!header.raw_value().empty() ? 1 : 0) +
-                               (!header.value().empty() ? 1 : 0);
-    if (fields_set > 1) {
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("header '{}': only one of 'value', 'raw_value', or 'formatted_value' can be "
-                      "set",
-                      header.key()));
-      return;
-    }
-    if (header.has_formatted_value()) {
-      auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-          header.formatted_value(), generic_context);
+    if (!header.value().empty()) {
+      // Parse the value as a substitution format string. FormatterImpl handles plain
+      // strings (no % markers) efficiently.
+      auto formatter_or_error = Formatter::FormatterImpl::create(header.value(), false, *commands);
       SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
       formatted_headers_.emplace_back(LowerCaseString(header.key()),
                                       std::move(formatter_or_error.value()));
-    } else if (!header.raw_value().empty()) {
-      static_headers_.emplace_back(LowerCaseString(header.key()), header.raw_value());
     } else {
-      static_headers_.emplace_back(LowerCaseString(header.key()), header.value());
+      static_headers_.emplace_back(LowerCaseString(header.key()), header.raw_value());
     }
   }
 }

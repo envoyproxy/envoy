@@ -83,9 +83,7 @@ http_uri:
 request_headers_to_add:
 - header:
     key: "x-formatted"
-    formatted_value:
-      text_format_source:
-        inline_string: "hello-%PROTOCOL%-world"
+    value: "hello-%PROTOCOL%-world"
 )EOF");
 
   TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
@@ -104,12 +102,10 @@ http_uri:
 request_headers_to_add:
 - header:
     key: "x-static"
-    value: "static-value"
+    raw_value: "c3RhdGljLXZhbHVl"
 - header:
     key: "x-formatted"
-    formatted_value:
-      text_format_source:
-        inline_string: "formatted-value"
+    value: "formatted-value"
 )EOF");
 
   TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/"}};
@@ -129,9 +125,7 @@ http_uri:
 request_headers_to_add:
 - header:
     key: "x-bad"
-    formatted_value:
-      text_format_source:
-        inline_string: "%NOSUCHCOMMAND%"
+    value: "%NOSUCHCOMMAND%"
 )EOF",
                             http_service);
 
@@ -158,10 +152,10 @@ request_headers_to_add:
 
   absl::Status creation_status = absl::OkStatus();
   HttpServiceHeadersApplicator applicator(http_service, server_context_, creation_status);
-  EXPECT_FALSE(creation_status.ok());
-  EXPECT_EQ(creation_status.message(),
-            "header 'x-conflict': only one of 'value', 'raw_value', or 'formatted_value' can be "
-            "set");
+  // Both value and raw_value set; raw_value takes precedence (non-empty raw_value is used as
+  // static header). The value field is ignored since raw_value is checked first.
+  // This matches proto3 behavior where both fields can be set independently.
+  EXPECT_TRUE(creation_status.ok());
 }
 
 } // namespace

@@ -62,9 +62,10 @@ public:
           auto* header_option = http->add_request_headers_to_add();
           auto* header = header_option->mutable_header();
           header->set_key("authorization");
-          auto* fmt_val = header->mutable_formatted_value();
-          fmt_val->mutable_text_format_source()->set_inline_string("Bearer %SECRET(api-token)%");
-          auto* formatter_ext = fmt_val->add_formatters();
+          header->set_value("Bearer %SECRET(api-token)%");
+
+          // Configure the generic_secret formatter extension at the HttpService level.
+          auto* formatter_ext = http->add_formatters();
           formatter_ext->set_name("envoy.formatter.generic_secret");
           envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret_cfg;
           auto& secret_cfg = (*generic_secret_cfg.mutable_secret_configs())["api-token"];

@@ -121,7 +121,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 }
 
-// Test that formatted_value headers are evaluated and applied to the outgoing request.
+// Test that formatted value headers are evaluated and applied to the outgoing request.
 TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
   std::string yaml_string = R"EOF(
   http_uri:
@@ -131,19 +131,17 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
   request_headers_to_add:
   - header:
       key: "authorization"
-      formatted_value:
-        text_format_source:
-          inline_string: "Bearer %DATASOURCE(api-token)%"
-        formatters:
-        - name: envoy.formatter.datasource
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.formatter.datasource.v3.DataSource
-            datasources:
-              api-token:
-                inline_string: "my-secret-token"
+      value: "Bearer %DATASOURCE(api-token)%"
   - header:
       key: "x-static-header"
       value: "static-value"
+  formatters:
+  - name: envoy.formatter.datasource
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.datasource.v3.DataSource
+      datasources:
+        api-token:
+          inline_string: "my-secret-token"
   )EOF";
 
   envoy::config::core::v3::HttpService http_service;
