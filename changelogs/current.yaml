@@ -730,5 +730,11 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: tcp_proxy
+  change: |
+    Added runtime-guarded support for propagating upstream TCP RST through tunneled tcp_proxy
+    to downstream connections. When enabled, upstream connection resets are forwarded as TCP RST
+    instead of FIN. This behavior can be enabled by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to ``true``.
 
 deprecated:

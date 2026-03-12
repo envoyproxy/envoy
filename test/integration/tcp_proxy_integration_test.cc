@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -581,6 +582,28 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
   auto log_result = waitForAccessLog(access_log_path);
   EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
 }
+
+// Verifies that upstream RST is propagated to downstream as RST (default behavior).
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Downstream should receive RST (disconnect without half-close).
+  tcp_client->waitForDisconnect();
+}
+#endif
 
 // Verifies that access log value for `UPSTREAM_LOCAL_CLOSE_REASON` matches
 // the failure message when there is a session idle timeout.
