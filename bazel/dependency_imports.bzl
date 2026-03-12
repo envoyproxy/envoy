@@ -59,7 +59,7 @@ def envoy_dependency_imports(
         exec_triple = "s390x-unknown-linux-gnu",
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
         versions = [rust_common.default_version],
     )
@@ -67,7 +67,7 @@ def envoy_dependency_imports(
     rust_register_toolchains(
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
     )
     crate_universe_dependencies()
