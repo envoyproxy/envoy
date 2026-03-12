@@ -839,7 +839,7 @@ TEST_F(LoadAwareLocalityLbTest, PeekAnotherHost) {
   ASSERT_NE(nullptr, empty_lb);
   EXPECT_EQ(nullptr, empty_lb->peekAnotherHost(nullptr));
 
-  // Non-empty per_locality_ — delegates to the child LB and returns a selectable host.
+  // Non-empty per_locality_ — delegates to the child LB and returns selected host.
   auto h1 = makeWeightTrackingMockHost();
   setupLocalities({{h1}});
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
@@ -874,7 +874,7 @@ TEST_F(LoadAwareLocalityLbTest, HigherPriorityFailoverPreserved) {
   }
 }
 
-// Test: Priority failover follows health transitions, including failback to P0 and back to P1.
+// Test: Priority failover follows health transitions, including fallback to P0 and back to P1.
 TEST_F(LoadAwareLocalityLbTest, HigherPriorityFailoverAndFailback) {
   auto h_p0 = makeWeightTrackingMockHost();
   auto h_p1 = makeWeightTrackingMockHost();
@@ -1377,8 +1377,7 @@ TEST_F(LoadAwareLocalityLbTest, LazyChildLbCreationForEmptySources) {
 
   // Start with host_a healthy, no degraded hosts.
   setupLocalities({{host_a}},
-                  /*has_local_locality=*/false,
-                  std::vector<Upstream::HostVector>{{host_a}},
+                  /*has_local_locality=*/false, std::vector<Upstream::HostVector>{{host_a}},
                   std::vector<Upstream::HostVector>{{}});
 
   createLb();

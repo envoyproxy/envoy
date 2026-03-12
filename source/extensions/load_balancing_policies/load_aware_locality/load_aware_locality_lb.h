@@ -236,7 +236,7 @@ private:
  * one locality.
  */
 struct PerSourceLocalityState {
-  // PrioritySet containing only the hosts selectable for one source in one locality.
+  // PrioritySet containing only the hosts that can be selected for one source in one locality.
   std::unique_ptr<Upstream::PrioritySetImpl> priority_set;
   // The worker-local LB for this source/locality pair, created from the shared child factory.
   Upstream::LoadBalancerPtr lb;
