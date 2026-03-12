@@ -29,6 +29,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )
 
@@ -47,6 +48,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:typed_load_balancer_factory_mocks",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )
 

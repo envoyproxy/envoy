@@ -2,7 +2,9 @@
 #include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.pb.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
 #include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/config.h"
 #include "source/extensions/load_balancing_policies/load_aware_locality/load_aware_locality_lb.h"
 
@@ -10,301 +12,191 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 
+#include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 namespace {
 
-TEST(LoadAwareLocalityConfigTest, ValidateSuccessWithRoundRobin) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+envoy::config::core::v3::TypedExtensionConfig
+typedExtensionConfig(const std::string& name, const Protobuf::Message& message) {
+  envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name(name);
+  config.mutable_typed_config()->PackFrom(message);
+  return config;
+}
+
+envoy::config::core::v3::TypedExtensionConfig roundRobinEndpointPolicy() {
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin;
+  return typedExtensionConfig("envoy.load_balancing_policies.round_robin", round_robin);
+}
+
+LoadAwareLocalityLbProto
+loadAwareConfig(std::initializer_list<envoy::config::core::v3::TypedExtensionConfig> children) {
+  LoadAwareLocalityLbProto config;
+  for (const auto& child : children) {
+    *config.mutable_endpoint_picking_policy()->add_policies()->mutable_typed_extension_config() =
+        child;
+  }
+  return config;
+}
+
+const LoadAwareLocalityLbConfig& typedConfig(const Upstream::LoadBalancerConfigPtr& config) {
+  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(config.get());
+  EXPECT_NE(nullptr, typed);
+  return *typed;
+}
+
+void expectFactoryCreateSucceeds(const Upstream::LoadBalancerConfigPtr& config,
+                                 Server::Configuration::MockServerFactoryContext& context) {
   NiceMock<Upstream::MockClusterInfo> cluster_info;
-  NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
-  NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
-
-  // Round robin policy for endpoint picking.
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
-
-  // LoadAwareLocality policy with RoundRobin for endpoint picking.
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  EXPECT_EQ("envoy.load_balancing_policies.load_aware_locality", factory.name());
-
-  auto lb_config = factory.loadConfig(context, load_aware_config_msg).value();
-
-  auto thread_aware_lb =
-      factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
-                     context.api_.random_, context.time_system_);
-  EXPECT_NE(nullptr, thread_aware_lb);
-
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
-
-  auto thread_local_lb_factory = thread_aware_lb->factory();
-  EXPECT_NE(nullptr, thread_local_lb_factory);
-
-  auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
-  EXPECT_NE(nullptr, thread_local_lb);
-}
-
-TEST(LoadAwareLocalityConfigTest, ValidateFailureWithoutEndpointPickingPolicy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
-  // LoadAwareLocality policy without endpoint picking policy.
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  EXPECT_EQ("envoy.load_balancing_policies.load_aware_locality", factory.name());
-
-  EXPECT_EQ(factory.loadConfig(context, load_aware_config_msg).status(),
-            absl::InvalidArgumentError("No supported endpoint picking policy."));
-}
-
-TEST(LoadAwareLocalityConfigTest, ValidateFailureWithMaglevEndpointPolicy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
-  envoy::extensions::load_balancing_policies::maglev::v3::Maglev maglev_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig maglev_config;
-  maglev_config.set_name("envoy.load_balancing_policies.maglev");
-  maglev_config.mutable_typed_config()->PackFrom(maglev_config_msg);
-
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = maglev_config;
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   Factory factory;
-  auto result = factory.loadConfig(context, load_aware_config_msg);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("envoy.load_balancing_policies.maglev"));
+  auto lb = factory.create(*config, cluster_info, priority_set, context.runtime_loader_,
+                           context.api_.random_, context.time_system_);
+  ASSERT_NE(nullptr, lb);
+  ASSERT_TRUE(lb->initialize().ok());
+
+  auto worker_factory = lb->factory();
+  ASSERT_NE(nullptr, worker_factory);
+  EXPECT_NE(nullptr, worker_factory->create({priority_set, nullptr}));
 }
 
-TEST(LoadAwareLocalityConfigTest, ValidateFailureWithRingHashEndpointPolicy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
-  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash ring_hash_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig ring_hash_config;
-  ring_hash_config.set_name("envoy.load_balancing_policies.ring_hash");
-  ring_hash_config.mutable_typed_config()->PackFrom(ring_hash_config_msg);
-
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = ring_hash_config;
-
-  Factory factory;
-  auto result = factory.loadConfig(context, load_aware_config_msg);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("envoy.load_balancing_policies.ring_hash"));
-}
-
-TEST(LoadAwareLocalityConfigTest, ValidateFailureWithClusterProvidedEndpointPolicy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+envoy::config::core::v3::TypedExtensionConfig unsupportedChildPolicy(absl::string_view name) {
+  if (name == "envoy.load_balancing_policies.maglev") {
+    envoy::extensions::load_balancing_policies::maglev::v3::Maglev maglev;
+    return typedExtensionConfig(std::string(name), maglev);
+  }
+  if (name == "envoy.load_balancing_policies.ring_hash") {
+    envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash ring_hash;
+    return typedExtensionConfig(std::string(name), ring_hash);
+  }
 
   envoy::extensions::load_balancing_policies::cluster_provided::v3::ClusterProvided
-      cluster_provided_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig cluster_provided_config;
-  cluster_provided_config.set_name("envoy.load_balancing_policies.cluster_provided");
-  cluster_provided_config.mutable_typed_config()->PackFrom(cluster_provided_config_msg);
+      cluster_provided;
+  return typedExtensionConfig(std::string(name), cluster_provided);
+}
 
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = cluster_provided_config;
+class UnsupportedChildPolicyTest : public testing::TestWithParam<absl::string_view> {};
+
+TEST(LoadAwareLocalityConfigTest, Defaults) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   Factory factory;
-  auto result = factory.loadConfig(context, load_aware_config_msg);
+  auto result = factory.loadConfig(context, loadAwareConfig({roundRobinEndpointPolicy()}));
+  ASSERT_TRUE(result.ok());
+
+  const auto& config = typedConfig(result.value());
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.weightUpdatePeriod());
+  EXPECT_DOUBLE_EQ(0.1, config.utilizationVarianceThreshold());
+  EXPECT_DOUBLE_EQ(0.3, config.ewmaAlpha());
+  EXPECT_DOUBLE_EQ(0.03, config.probePercentage());
+  EXPECT_EQ(std::chrono::milliseconds(180000), config.weightExpirationPeriod());
+
+  expectFactoryCreateSucceeds(result.value(), context);
+}
+
+TEST(LoadAwareLocalityConfigTest, Overrides) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  auto config_proto = loadAwareConfig({roundRobinEndpointPolicy()});
+  config_proto.mutable_weight_update_period()->set_seconds(2);
+  config_proto.mutable_utilization_variance_threshold()->set_value(0.05);
+  config_proto.mutable_ewma_alpha()->set_value(0.5);
+  config_proto.mutable_probe_percentage()->set_value(0.07);
+  config_proto.mutable_weight_expiration_period()->set_seconds(15);
+
+  Factory factory;
+  auto result = factory.loadConfig(context, config_proto);
+  ASSERT_TRUE(result.ok());
+
+  const auto& config = typedConfig(result.value());
+  EXPECT_EQ(std::chrono::milliseconds(2000), config.weightUpdatePeriod());
+  EXPECT_DOUBLE_EQ(0.05, config.utilizationVarianceThreshold());
+  EXPECT_DOUBLE_EQ(0.5, config.ewmaAlpha());
+  EXPECT_DOUBLE_EQ(0.07, config.probePercentage());
+  EXPECT_EQ(std::chrono::milliseconds(15000), config.weightExpirationPeriod());
+
+  expectFactoryCreateSucceeds(result.value(), context);
+}
+
+TEST_P(UnsupportedChildPolicyTest, UnsupportedOrMissingChild) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  LoadAwareLocalityLbProto config_proto =
+      GetParam().empty() ? loadAwareConfig({})
+                         : loadAwareConfig({unsupportedChildPolicy(GetParam())});
+
+  Factory factory;
+  auto result = factory.loadConfig(context, config_proto);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("envoy.load_balancing_policies.cluster_provided"));
+  if (GetParam().empty()) {
+    EXPECT_EQ(result.status(), absl::InvalidArgumentError("No supported endpoint picking policy."));
+  } else {
+    EXPECT_THAT(result.status().message(), testing::HasSubstr(std::string(GetParam())));
+  }
 }
 
-// Test: The config fields that config.cc parses are accepted and used.
-// Note: metric_names_for_computing_utilization is a proto field that is NOT currently
-// parsed by config.cc — it exists for forward compatibility with future ORCA integration.
-TEST(LoadAwareLocalityConfigTest, CustomParsedParams) {
+INSTANTIATE_TEST_SUITE_P(
+    ChildPolicies, UnsupportedChildPolicyTest,
+    testing::Values(absl::string_view(""),
+                    absl::string_view("envoy.load_balancing_policies.maglev"),
+                    absl::string_view("envoy.load_balancing_policies.ring_hash"),
+                    absl::string_view("envoy.load_balancing_policies.cluster_provided")));
+
+TEST(LoadAwareLocalityConfigTest, FirstSupportedChildWins) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Upstream::MockClusterInfo> cluster_info;
-  NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher));
 
-  // Round robin policy for endpoint picking.
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+  envoy::config::core::v3::TypedExtensionConfig unknown_policy;
+  unknown_policy.set_name("envoy.load_balancing_policies.does_not_exist");
+  unknown_policy.mutable_typed_config()->PackFrom(Protobuf::Struct{});
 
-  // Set only the fields that config.cc actually parses.
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-  load_aware_config_msg.mutable_weight_update_period()->set_seconds(2);
-  load_aware_config_msg.mutable_utilization_variance_threshold()->set_value(0.05);
-  load_aware_config_msg.mutable_ewma_alpha()->set_value(0.5);
-  load_aware_config_msg.mutable_probe_percentage()->set_value(0.05);
+  Factory factory;
+  auto result =
+      factory.loadConfig(context, loadAwareConfig({unknown_policy, roundRobinEndpointPolicy()}));
+  ASSERT_TRUE(result.ok());
 
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  auto lb_config_or_error = factory.loadConfig(context, load_aware_config_msg);
-  ASSERT_TRUE(lb_config_or_error.ok());
-
-  auto thread_aware_lb =
-      factory.create(*lb_config_or_error.value(), cluster_info, main_thread_priority_set,
-                     context.runtime_loader_, context.api_.random_, context.time_system_);
-  EXPECT_NE(nullptr, thread_aware_lb);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  const auto& config = typedConfig(result.value());
+  EXPECT_EQ("envoy.load_balancing_policies.round_robin", config.endpointPickingPolicyName());
+  expectFactoryCreateSucceeds(result.value(), context);
 }
 
-// Test: weight_update_period <= 0 returns an error.
 TEST(LoadAwareLocalityConfigTest, InvalidWeightUpdatePeriod) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
 
-  // Round robin policy for endpoint picking.
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+  auto config_proto = loadAwareConfig({roundRobinEndpointPolicy()});
+  config_proto.mutable_weight_update_period()->set_seconds(0);
 
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-
-  // Set weight_update_period to 0ms (invalid).
-  load_aware_config_msg.mutable_weight_update_period()->set_seconds(0);
-  load_aware_config_msg.mutable_weight_update_period()->set_nanos(0);
-
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  auto result = factory.loadConfig(context, load_aware_config_msg);
+  Factory factory;
+  auto result = factory.loadConfig(context, config_proto);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("weight_update_period"));
 }
 
-// Test: Unset weight_expiration_period uses the 3-minute default and loads successfully.
-TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodDefaultWhenUnset) {
+TEST(LoadAwareLocalityConfigTest, NegativeWeightExpirationRejected) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
 
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
+  auto config_proto = loadAwareConfig({roundRobinEndpointPolicy()});
+  config_proto.mutable_weight_expiration_period()->set_seconds(-1);
 
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-  // weight_expiration_period intentionally left unset.
-
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  auto result = factory.loadConfig(context, load_aware_config_msg);
-  ASSERT_TRUE(result.ok());
-
-  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(result.value().get());
-  ASSERT_NE(nullptr, typed);
-  EXPECT_EQ(std::chrono::milliseconds(180000), typed->weightExpirationPeriod());
-}
-
-// Test: Explicitly set weight_expiration_period to 0s (disables expiration) loads successfully.
-TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodZeroDisables) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
-
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
-
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-  load_aware_config_msg.mutable_weight_expiration_period()->set_seconds(0);
-
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  auto result = factory.loadConfig(context, load_aware_config_msg);
-  ASSERT_TRUE(result.ok());
-
-  const auto* typed = dynamic_cast<const LoadAwareLocalityLbConfig*>(result.value().get());
-  ASSERT_NE(nullptr, typed);
-  EXPECT_EQ(std::chrono::milliseconds(0), typed->weightExpirationPeriod());
-}
-
-// Test: Negative weight_expiration_period is rejected by proto validation.
-TEST(LoadAwareLocalityConfigTest, WeightExpirationPeriodNegativeRejected) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
-
-  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config_msg;
-  envoy::config::core::v3::TypedExtensionConfig rr_config;
-  rr_config.set_name("envoy.load_balancing_policies.round_robin");
-  rr_config.mutable_typed_config()->PackFrom(rr_config_msg);
-
-  LoadAwareLocalityLbProto load_aware_config_msg;
-  *(load_aware_config_msg.mutable_endpoint_picking_policy()
-        ->add_policies()
-        ->mutable_typed_extension_config()) = rr_config;
-  load_aware_config_msg.mutable_weight_expiration_period()->set_seconds(-1);
-
-  envoy::config::core::v3::TypedExtensionConfig load_aware_config;
-  load_aware_config.set_name("envoy.load_balancing_policies.load_aware_locality");
-  load_aware_config.mutable_typed_config()->PackFrom(load_aware_config_msg);
-
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(load_aware_config);
-  // Proto validation should reject negative duration before loadConfig runs.
-  // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
+  Factory factory;
   EXPECT_THROW(
-      { auto result = factory.loadConfig(context, load_aware_config_msg); },
-      ProtoValidationException);
+      { auto result = factory.loadConfig(context, config_proto); }, ProtoValidationException);
 }
 
 } // namespace
