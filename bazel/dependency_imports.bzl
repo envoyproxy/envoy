@@ -191,6 +191,7 @@ def envoy_dependency_imports(
         build_external = "external",
         build_directives = [
             "gazelle:resolve go github.com/spf13/afero @com_github_spf13_afero//:afero",
+            "gazelle:resolve go golang.org/x/tools/imports @org_golang_x_tools//imports",
         ],
     )
     go_repository(
