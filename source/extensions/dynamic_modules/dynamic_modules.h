@@ -107,6 +107,26 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
  * @param module_name the module name used to build the symbol prefix.
  */
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name);
+
+/**
+ * Creates a new DynamicModule from the given module bytes. The module is expected to be in ELF
+ * format and the bytes should be exactly the same as the content of the shared object file. The
+ * bytes are written to a temporary file and loaded via dlopen.
+ * @param module_bytes the content of the shared object file.
+ * @param sha256 the sha256 hash of the module bytes, used for temp file naming. The caller is
+ * responsible for verifying the hash before calling this function.
+ * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
+ * will not be destroyed. This is useful when an object has some global state that should not be
+ * terminated.
+ * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
+ * can share symbols with other dynamically loaded modules. This is useful for modules that need to
+ * share symbols with other modules.
+ */
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally = false);
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy
