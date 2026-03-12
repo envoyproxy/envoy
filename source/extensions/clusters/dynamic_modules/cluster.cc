@@ -3,7 +3,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/upstream/locality.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -79,10 +81,18 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
                  on_cluster_lb_destroy_);
   RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_lb_choose_host", OnClusterLbChooseHostType,
                  on_cluster_lb_choose_host_);
-  RESOLVE_SYMBOL("envoy_dynamic_module_on_cluster_scheduled", OnClusterScheduledType,
-                 on_cluster_scheduled_);
 
 #undef RESOLVE_SYMBOL
+
+  // Optional hooks. Modules that don't need async host selection or scheduling don't need to
+  // implement these.
+  auto on_cancel = config->dynamic_module_->getFunctionPointer<OnClusterLbCancelHostSelectionType>(
+      "envoy_dynamic_module_on_cluster_lb_cancel_host_selection");
+  config->on_cluster_lb_cancel_host_selection_ = on_cancel.ok() ? on_cancel.value() : nullptr;
+
+  auto on_scheduled = config->dynamic_module_->getFunctionPointer<OnClusterScheduledType>(
+      "envoy_dynamic_module_on_cluster_scheduled");
+  config->on_cluster_scheduled_ = on_scheduled.ok() ? on_scheduled.value() : nullptr;
 
   // Lifecycle hooks are optional. Modules that don't need them don't need to implement them.
   auto on_server_initialized =
@@ -98,6 +108,18 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
   auto on_shutdown = config->dynamic_module_->getFunctionPointer<OnClusterShutdownType>(
       "envoy_dynamic_module_on_cluster_shutdown");
   config->on_cluster_shutdown_ = on_shutdown.ok() ? on_shutdown.value() : nullptr;
+
+  auto on_http_callout_done =
+      config->dynamic_module_->getFunctionPointer<OnClusterHttpCalloutDoneType>(
+          "envoy_dynamic_module_on_cluster_http_callout_done");
+  config->on_cluster_http_callout_done_ =
+      on_http_callout_done.ok() ? on_http_callout_done.value() : nullptr;
+
+  auto on_lb_membership_update =
+      config->dynamic_module_->getFunctionPointer<OnClusterLbOnHostMembershipUpdateType>(
+          "envoy_dynamic_module_on_cluster_lb_on_host_membership_update");
+  config->on_cluster_lb_on_host_membership_update_ =
+      on_lb_membership_update.ok() ? on_lb_membership_update.value() : nullptr;
 
   // Call on_cluster_config_new to get the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {config->cluster_name_.data(),
@@ -166,6 +188,14 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
 
 DynamicModuleCluster::~DynamicModuleCluster() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // Cancel any pending HTTP callouts before destroying the cluster.
+  for (auto& callout : http_callouts_) {
+    if (callout.second->request_ != nullptr) {
+      callout.second->request_->cancel();
+    }
+  }
+  http_callouts_.clear();
+
   if (in_module_cluster_ != nullptr && config_->on_cluster_destroy_ != nullptr) {
     config_->on_cluster_destroy_(in_module_cluster_);
   }
@@ -228,17 +258,39 @@ void DynamicModuleCluster::onScheduled(uint64_t event_id) {
   }
 }
 
-bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
-                                    const std::vector<uint32_t>& weights,
-                                    std::vector<Upstream::HostSharedPtr>& result_hosts) {
+namespace {
+// Builds hosts-per-locality from a host vector using value-based locality comparison.
+Upstream::HostsPerLocalityConstSharedPtr buildHostsPerLocality(const Upstream::HostVector& hosts) {
+  absl::node_hash_map<envoy::config::core::v3::Locality, Upstream::HostVector,
+                      Upstream::LocalityHash, Upstream::LocalityEqualTo>
+      per_locality_hosts;
+  for (const auto& host : hosts) {
+    per_locality_hosts[host->locality()].push_back(host);
+  }
+  std::vector<Upstream::HostVector> locality_hosts;
+  for (auto& [_, h] : per_locality_hosts) {
+    locality_hosts.push_back(std::move(h));
+  }
+  return std::make_shared<Upstream::HostsPerLocalityImpl>(std::move(locality_hosts), false);
+}
+} // namespace
+
+bool DynamicModuleCluster::addHosts(
+    const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
+    const std::vector<std::string>& regions, const std::vector<std::string>& zones,
+    const std::vector<std::string>& sub_zones,
+    const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+    std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority) {
   ASSERT(addresses.size() == weights.size());
+  ASSERT(addresses.size() == regions.size());
+  ASSERT(addresses.size() == zones.size());
+  ASSERT(addresses.size() == sub_zones.size());
+  ASSERT(metadata.empty() || metadata.size() == addresses.size());
   result_hosts.clear();
   result_hosts.reserve(addresses.size());
 
   auto cluster_info = info();
 
-  // First pass: validate all hosts and create them. If any fail, return false without modifying
-  // the cluster state.
   for (size_t i = 0; i < addresses.size(); ++i) {
     if (weights[i] == 0 || weights[i] > 128) {
       ENVOY_LOG(error, "Invalid weight {} for host {}.", weights[i], addresses[i]);
@@ -252,9 +304,31 @@ bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
       return false;
     }
 
+    auto locality = std::make_shared<envoy::config::core::v3::Locality>();
+    if (!regions[i].empty()) {
+      locality->set_region(regions[i]);
+    }
+    if (!zones[i].empty()) {
+      locality->set_zone(zones[i]);
+    }
+    if (!sub_zones[i].empty()) {
+      locality->set_sub_zone(sub_zones[i]);
+    }
+
+    // Build endpoint metadata if provided.
+    Upstream::MetadataConstSharedPtr endpoint_metadata = nullptr;
+    if (!metadata.empty() && !metadata[i].empty()) {
+      auto md = std::make_shared<envoy::config::core::v3::Metadata>();
+      for (const auto& [filter_name, key, value] : metadata[i]) {
+        auto& fields = (*md->mutable_filter_metadata())[filter_name];
+        (*fields.mutable_fields())[key].set_string_value(value);
+      }
+      endpoint_metadata = std::move(md);
+    }
+
     auto host_result = Upstream::HostImpl::create(
-        cluster_info, cluster_info->name() + addresses[i], std::move(resolved_address), nullptr,
-        nullptr, weights[i], std::make_shared<envoy::config::core::v3::Locality>(),
+        cluster_info, cluster_info->name() + addresses[i], std::move(resolved_address),
+        std::move(endpoint_metadata), nullptr, weights[i], std::move(locality),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
         envoy::config::core::v3::UNKNOWN);
     if (!host_result.ok()) {
@@ -264,7 +338,6 @@ bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
     result_hosts.emplace_back(std::move(host_result.value()));
   }
 
-  // Second pass: store all host mappings and update the priority set once.
   {
     absl::WriterMutexLock lock(&host_map_lock_);
     for (const auto& host : result_hosts) {
@@ -272,20 +345,79 @@ bool DynamicModuleCluster::addHosts(const std::vector<std::string>& addresses,
     }
   }
 
-  ASSERT(priority_set_.hostSetsPerPriority().size() >= 1);
-  const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(first_host_set.hosts()));
+  const auto& host_set = priority_set_.getOrCreateHostSet(priority);
+  Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(host_set.hosts()));
   Upstream::HostVector added_hosts;
   for (const auto& host : result_hosts) {
     all_hosts->emplace_back(host);
     added_hosts.emplace_back(host);
   }
-  priority_set_.updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-      {}, added_hosts, {}, absl::nullopt, absl::nullopt);
 
-  ENVOY_LOG(debug, "Added {} hosts to dynamic module cluster.", result_hosts.size());
+  auto hosts_per_locality = buildHostsPerLocality(*all_hosts);
+
+  priority_set_.updateHosts(
+      priority, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)), {},
+      added_hosts, {}, absl::nullopt, absl::nullopt);
+
+  ENVOY_LOG(debug, "Added {} hosts to dynamic module cluster at priority {}.", result_hosts.size(),
+            priority);
   return true;
+}
+
+bool DynamicModuleCluster::updateHostHealth(Upstream::HostSharedPtr host,
+                                            envoy_dynamic_module_type_host_health health_status) {
+  if (host == nullptr) {
+    return false;
+  }
+
+  // Clear existing EDS health flags and set the new status.
+  host->healthFlagClear(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH);
+  host->healthFlagClear(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
+
+  switch (health_status) {
+  case envoy_dynamic_module_type_host_health_Unhealthy:
+    host->healthFlagSet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH);
+    break;
+  case envoy_dynamic_module_type_host_health_Degraded:
+    host->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
+    break;
+  case envoy_dynamic_module_type_host_health_Healthy:
+    break;
+  }
+
+  // Find the priority level that contains this host and trigger a priority set update to
+  // propagate the health change to load balancers.
+  const auto& host_sets = priority_set_.hostSetsPerPriority();
+  for (uint32_t p = 0; p < host_sets.size(); ++p) {
+    const auto& hosts = host_sets[p]->hosts();
+    for (const auto& h : hosts) {
+      if (h.get() == host.get()) {
+        auto all_hosts = std::make_shared<Upstream::HostVector>(hosts);
+        auto hosts_per_locality = buildHostsPerLocality(*all_hosts);
+        priority_set_.updateHosts(
+            p, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)), {},
+            {}, {}, absl::nullopt, absl::nullopt);
+        ENVOY_LOG(debug, "Updated health status for host to {} at priority {}.",
+                  static_cast<int>(health_status), p);
+        return true;
+      }
+    }
+  }
+
+  ENVOY_LOG(error, "Host not found in any priority level during health update.");
+  return false;
+}
+
+Upstream::HostSharedPtr DynamicModuleCluster::findHostByAddress(const std::string& address) {
+  const auto host_map = prioritySet().crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+  const auto it = host_map->find(address);
+  if (it == host_map->end()) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
@@ -337,13 +469,114 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
       remaining_hosts->emplace_back(h);
     }
   }
-  priority_set_.updateHosts(0,
-                            Upstream::HostSetImpl::partitionHosts(
-                                remaining_hosts, Upstream::HostsPerLocalityImpl::empty()),
-                            {}, {}, removed_hosts, absl::nullopt, absl::nullopt);
+
+  auto hosts_per_locality = buildHostsPerLocality(*remaining_hosts);
+
+  priority_set_.updateHosts(
+      0, Upstream::HostSetImpl::partitionHosts(remaining_hosts, std::move(hosts_per_locality)), {},
+      {}, removed_hosts, absl::nullopt, absl::nullopt);
 
   ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
   return removed_hosts.size();
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+DynamicModuleCluster::sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                                      Http::RequestMessagePtr&& message,
+                                      uint64_t timeout_milliseconds) {
+  if (config_->on_cluster_http_callout_done_ == nullptr) {
+    ENVOY_LOG(debug, "dynamic module cluster: HTTP callout requested but "
+                     "on_cluster_http_callout_done is not implemented.");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  Upstream::ThreadLocalCluster* cluster =
+      server_context_.clusterManager().getThreadLocalCluster(cluster_name);
+  if (!cluster) {
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
+  }
+  Http::AsyncClient::RequestOptions options;
+  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
+
+  const uint64_t callout_id = getNextCalloutId();
+  auto http_callout_callback =
+      std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(shared_from_this(), callout_id);
+  DynamicModuleCluster::HttpCalloutCallback& callback = *http_callout_callback;
+
+  auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
+  if (!request) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
+
+  callback.request_ = request;
+  http_callouts_.emplace(callout_id, std::move(http_callout_callback));
+  *callout_id_out = callout_id;
+
+  return envoy_dynamic_module_type_http_callout_init_result_Success;
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onSuccess(const Http::AsyncClient::Request&,
+                                                          Http::ResponseMessagePtr&& response) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  absl::InlinedVector<envoy_dynamic_module_type_envoy_http_header, 16> headers_vector;
+  headers_vector.reserve(response->headers().size());
+  response->headers().iterate([&headers_vector](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    headers_vector.emplace_back(envoy_dynamic_module_type_envoy_http_header{
+        const_cast<char*>(header.key().getStringView().data()), header.key().getStringView().size(),
+        const_cast<char*>(header.value().getStringView().data()),
+        header.value().getStringView().size()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
+  cluster->config_->on_cluster_http_callout_done_(
+      cluster.get(), cluster->in_module_cluster_, callout_id,
+      envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
+      headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
+      body.size());
+  cluster->http_callouts_.erase(callout_id);
+}
+
+void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClient::Request&,
+                                                          Http::AsyncClient::FailureReason reason) {
+  // Move the cluster and callout id to local scope since on_cluster_http_callout_done_ might
+  // result in operations that affect this callback's lifetime.
+  std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
+  const uint64_t callout_id = callout_id_;
+
+  if (!cluster->in_module_cluster_) {
+    cluster->http_callouts_.erase(callout_id);
+    return;
+  }
+
+  // request_ is not null if the callout is actually sent to the upstream cluster.
+  // This allows us to avoid inlined calls to onFailure() method (which results in a reentrant to
+  // the modules) when the async client immediately fails the callout.
+  if (request_) {
+    envoy_dynamic_module_type_http_callout_result result;
+    switch (reason) {
+    case Http::AsyncClient::FailureReason::Reset:
+      result = envoy_dynamic_module_type_http_callout_result_Reset;
+      break;
+    case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+      result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
+      break;
+    }
+    cluster->config_->on_cluster_http_callout_done_(cluster.get(), cluster->in_module_cluster_,
+                                                    callout_id, result, nullptr, 0, nullptr, 0);
+  }
+
+  cluster->http_callouts_.erase(callout_id);
 }
 
 // =================================================================================================
@@ -355,6 +588,19 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
     : handle_(handle), in_module_lb_(nullptr) {
   in_module_lb_ =
       handle_->cluster_->config()->on_cluster_lb_new_(handle_->cluster_->inModuleCluster(), this);
+
+  // Register for host membership updates if the module implements the hook.
+  if (handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
+    member_update_cb_ = handle_->cluster_->prioritySet().addMemberUpdateCb(
+        [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
+          hosts_added_ = &hosts_added;
+          hosts_removed_ = &hosts_removed;
+          handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_(
+              this, in_module_lb_, hosts_added.size(), hosts_removed.size());
+          hosts_added_ = nullptr;
+          hosts_removed_ = nullptr;
+        });
+  }
 }
 
 DynamicModuleLoadBalancer::~DynamicModuleLoadBalancer() {
@@ -369,7 +615,19 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  auto* host_ptr = handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context);
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+  handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
+                                                          &async_handle);
+
+  if (async_handle != nullptr) {
+    // Async pending: the module will call the completion callback later.
+    auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
+        async_handle, in_module_lb_,
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+  }
+
   if (host_ptr == nullptr) {
     return {nullptr};
   }
@@ -379,8 +637,50 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   return {host};
 }
 
+void DynamicModuleAsyncHostSelectionHandle::cancel() {
+  if (cancel_fn_ != nullptr) {
+    cancel_fn_(in_module_lb_, async_handle_);
+  }
+}
+
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
   return handle_->cluster_->prioritySet();
+}
+
+bool DynamicModuleLoadBalancer::setHostData(uint32_t priority, size_t index, uintptr_t data) {
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  if (data == 0) {
+    per_host_data_.erase({priority, index});
+  } else {
+    per_host_data_[{priority, index}] = data;
+  }
+  return true;
+}
+
+bool DynamicModuleLoadBalancer::getHostData(uint32_t priority, size_t index,
+                                            uintptr_t* data) const {
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  auto it = per_host_data_.find({priority, index});
+  if (it != per_host_data_.end()) {
+    *data = it->second;
+  } else {
+    *data = 0;
+  }
+  return true;
 }
 
 // =================================================================================================

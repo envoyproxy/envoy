@@ -3,6 +3,7 @@
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
 #include "source/common/common/assert.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -31,6 +32,38 @@ getContext(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_
   return static_cast<Envoy::Upstream::LoadBalancerContext*>(context_envoy_ptr);
 }
 
+// Helper to look up a metadata value by filter name and key for a host in the cluster priority set.
+const Envoy::Protobuf::Value*
+getClusterHostMetadataValue(envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+                            uint32_t priority, size_t index,
+                            envoy_dynamic_module_type_module_buffer filter_name,
+                            envoy_dynamic_module_type_module_buffer key) {
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return nullptr;
+  }
+  const auto& metadata = hosts[index]->metadata();
+  if (metadata == nullptr) {
+    return nullptr;
+  }
+  const auto& filter_metadata = metadata->filter_metadata();
+  absl::string_view filter_name_view(filter_name.ptr, filter_name.length);
+  auto filter_it = filter_metadata.find(filter_name_view);
+  if (filter_it == filter_metadata.end()) {
+    return nullptr;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  auto field_it = filter_it->second.fields().find(key_view);
+  if (field_it == filter_it->second.fields().end()) {
+    return nullptr;
+  }
+  return &field_it->second;
+}
+
 Envoy::Stats::StatNameTagVector buildTagsForClusterMetric(
     Envoy::Extensions::Clusters::DynamicModules::DynamicModuleClusterConfig& config,
     const Envoy::Stats::StatNameVec& label_names,
@@ -51,18 +84,50 @@ Envoy::Stats::StatNameTagVector buildTagsForClusterMetric(
 extern "C" {
 
 bool envoy_dynamic_module_callback_cluster_add_hosts(
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights, size_t count,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<std::string> address_strings;
   address_strings.reserve(count);
   std::vector<uint32_t> weight_vec(weights, weights + count);
+  std::vector<std::string> region_strings;
+  region_strings.reserve(count);
+  std::vector<std::string> zone_strings;
+  zone_strings.reserve(count);
+  std::vector<std::string> sub_zone_strings;
+  sub_zone_strings.reserve(count);
   for (size_t i = 0; i < count; ++i) {
     address_strings.emplace_back(addresses[i].ptr, addresses[i].length);
+    region_strings.emplace_back(regions[i].ptr, regions[i].length);
+    zone_strings.emplace_back(zones[i].ptr, zones[i].length);
+    sub_zone_strings.emplace_back(sub_zones[i].ptr, sub_zones[i].length);
   }
+
+  // Parse metadata triples: each host has metadata_pairs_per_host triples of
+  // (filter_name, key, value), laid out contiguously.
+  std::vector<std::vector<std::tuple<std::string, std::string, std::string>>> metadata_vec;
+  if (metadata_pairs != nullptr && metadata_pairs_per_host > 0) {
+    metadata_vec.resize(count);
+    for (size_t i = 0; i < count; ++i) {
+      metadata_vec[i].reserve(metadata_pairs_per_host);
+      for (size_t j = 0; j < metadata_pairs_per_host; ++j) {
+        size_t base = (i * metadata_pairs_per_host + j) * 3;
+        std::string filter_name(metadata_pairs[base].ptr, metadata_pairs[base].length);
+        std::string key(metadata_pairs[base + 1].ptr, metadata_pairs[base + 1].length);
+        std::string value(metadata_pairs[base + 2].ptr, metadata_pairs[base + 2].length);
+        metadata_vec[i].emplace_back(std::move(filter_name), std::move(key), std::move(value));
+      }
+    }
+  }
+
   std::vector<Envoy::Upstream::HostSharedPtr> result_hosts;
-  if (!cluster->addHosts(address_strings, weight_vec, result_hosts)) {
+  if (!cluster->addHosts(address_strings, weight_vec, region_strings, zone_strings,
+                         sub_zone_strings, metadata_vec, result_hosts, priority)) {
     return false;
   }
   for (size_t i = 0; i < result_hosts.size(); ++i) {
@@ -83,6 +148,28 @@ size_t envoy_dynamic_module_callback_cluster_remove_hosts(
   return cluster->removeHosts(hosts);
 }
 
+bool envoy_dynamic_module_callback_cluster_update_host_health(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_health health_status) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+  auto host = cluster->findHost(host_envoy_ptr);
+  return cluster->updateHostHealth(std::move(host), health_status);
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_find_host_by_address(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+  std::string address_str(address.ptr, address.length);
+  auto host = cluster->findHostByAddress(address_str);
+  if (host == nullptr) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(host.get());
+}
+
 void envoy_dynamic_module_callback_cluster_pre_init_complete(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
   getCluster(cluster_envoy_ptr)->preInitComplete();
@@ -90,27 +177,485 @@ void envoy_dynamic_module_callback_cluster_pre_init_complete(
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
-  auto* lb = getLb(lb_envoy_ptr);
-  const auto& priority_set = lb->prioritySet();
-  if (priority >= priority_set.hostSetsPerPriority().size()) {
+  if (lb_envoy_ptr == nullptr) {
     return 0;
   }
-  return priority_set.hostSetsPerPriority()[priority]->healthyHosts().size();
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->healthyHosts().size();
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr
 envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
-  auto* lb = getLb(lb_envoy_ptr);
-  const auto& priority_set = lb->prioritySet();
-  if (priority >= priority_set.hostSetsPerPriority().size()) {
+  if (lb_envoy_ptr == nullptr) {
     return nullptr;
   }
-  const auto& healthy_hosts = priority_set.hostSetsPerPriority()[priority]->healthyHosts();
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
   if (index >= healthy_hosts.size()) {
     return nullptr;
   }
   return const_cast<Envoy::Upstream::Host*>(healthy_hosts[index].get());
+}
+
+// =============================================================================
+// Cluster LB Host Information Callbacks
+// =============================================================================
+
+void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return;
+  }
+  const auto& name = getLb(lb_envoy_ptr)->handle()->cluster()->info()->observabilityName();
+  result->ptr = name.data();
+  result->length = name.size();
+}
+
+size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->hosts().size();
+}
+
+size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->degradedHosts().size();
+}
+
+size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  return getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority().size();
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
+  if (index >= healthy_hosts.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = healthy_hosts[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
+  if (index >= healthy_hosts.size()) {
+    return 0;
+  }
+  return healthy_hosts[index]->weight();
+}
+
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_cluster_lb_get_host_health(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return envoy_dynamic_module_type_host_health_Unhealthy;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return envoy_dynamic_module_type_host_health_Unhealthy;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return envoy_dynamic_module_type_host_health_Unhealthy;
+  }
+  switch (hosts[index]->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    return envoy_dynamic_module_type_host_health_Unhealthy;
+  case Envoy::Upstream::Host::Health::Degraded:
+    return envoy_dynamic_module_type_host_health_Degraded;
+  case Envoy::Upstream::Host::Health::Healthy:
+    return envoy_dynamic_module_type_host_health_Healthy;
+  }
+  return envoy_dynamic_module_type_host_health_Unhealthy;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address,
+    envoy_dynamic_module_type_host_health* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  *result = envoy_dynamic_module_type_host_health_Unhealthy;
+
+  if (lb_envoy_ptr == nullptr || address.ptr == nullptr) {
+    return false;
+  }
+  const auto host_map = getLb(lb_envoy_ptr)->prioritySet().crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return false;
+  }
+  std::string address_str(address.ptr, address.length);
+  const auto it = host_map->find(address_str);
+  if (it == host_map->end()) {
+    return false;
+  }
+  switch (it->second->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    *result = envoy_dynamic_module_type_host_health_Unhealthy;
+    break;
+  case Envoy::Upstream::Host::Health::Degraded:
+    *result = envoy_dynamic_module_type_host_health_Degraded;
+    break;
+  case Envoy::Upstream::Host::Health::Healthy:
+    *result = envoy_dynamic_module_type_host_health_Healthy;
+    break;
+  }
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address) {
+  if (lb_envoy_ptr == nullptr || address.ptr == nullptr) {
+    return nullptr;
+  }
+  const auto host_map = getLb(lb_envoy_ptr)->prioritySet().crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+  std::string address_str(address.ptr, address.length);
+  const auto it = host_map->find(address_str);
+  if (it == host_map->end()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(it->second.get());
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_lb_get_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return nullptr;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(hosts[index].get());
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = hosts[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  return hosts[index]->weight();
+}
+
+uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_stat stat) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return 0;
+  }
+  const auto& host_stats = hosts[index]->stats();
+  switch (stat) {
+  case envoy_dynamic_module_type_host_stat_CxConnectFail:
+    return host_stats.cx_connect_fail_.value();
+  case envoy_dynamic_module_type_host_stat_CxTotal:
+    return host_stats.cx_total_.value();
+  case envoy_dynamic_module_type_host_stat_RqError:
+    return host_stats.rq_error_.value();
+  case envoy_dynamic_module_type_host_stat_RqSuccess:
+    return host_stats.rq_success_.value();
+  case envoy_dynamic_module_type_host_stat_RqTimeout:
+    return host_stats.rq_timeout_.value();
+  case envoy_dynamic_module_type_host_stat_RqTotal:
+    return host_stats.rq_total_.value();
+  case envoy_dynamic_module_type_host_stat_CxActive:
+    return host_stats.cx_active_.value();
+  case envoy_dynamic_module_type_host_stat_RqActive:
+    return host_stats.rq_active_.value();
+  }
+  return 0;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone) {
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return false;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return false;
+  }
+  const auto& locality = hosts[index]->locality();
+  if (region != nullptr) {
+    region->ptr = locality.region().data();
+    region->length = locality.region().size();
+  }
+  if (zone != nullptr) {
+    zone->ptr = locality.zone().data();
+    zone->length = locality.zone().size();
+  }
+  if (sub_zone != nullptr) {
+    sub_zone->ptr = locality.sub_zone().data();
+    sub_zone->length = locality.sub_zone().size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_set_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data) {
+  if (lb_envoy_ptr == nullptr) {
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->setHostData(priority, index, data);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data) {
+  if (lb_envoy_ptr == nullptr || data == nullptr) {
+    if (data != nullptr) {
+      *data = 0;
+    }
+    return false;
+  }
+  return getLb(lb_envoy_ptr)->getHostData(priority, index, data);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto* value = getClusterHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_string_value()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& str = value->string_value();
+  result->ptr = str.data();
+  result->length = str.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* value = getClusterHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_number_value()) {
+    return false;
+  }
+  *result = value->number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* value = getClusterHostMetadataValue(lb_envoy_ptr, priority, index, filter_name, key);
+  if (value == nullptr || !value->has_bool_value()) {
+    return false;
+  }
+  *result = value->bool_value();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  return host_sets[priority]->healthyHostsPerLocality().get().size();
+}
+
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    return 0;
+  }
+  return localities[locality_index].size();
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index, size_t host_index, envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& localities = host_sets[priority]->healthyHostsPerLocality().get();
+  if (locality_index >= localities.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& hosts = localities[locality_index];
+  if (host_index >= hosts.size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = hosts[host_index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
+}
+
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index) {
+  if (lb_envoy_ptr == nullptr) {
+    return 0;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return 0;
+  }
+  const auto weights = host_sets[priority]->localityWeights();
+  if (weights == nullptr || locality_index >= weights->size()) {
+    return 0;
+  }
+  return (*weights)[locality_index];
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
@@ -525,6 +1070,86 @@ envoy_dynamic_module_callback_cluster_config_record_histogram_value(
                                         label_values_length);
   histogram->recordValue(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details) {
+  auto* lb = getLb(lb_envoy_ptr);
+  auto* context = getContext(context_envoy_ptr);
+
+  Envoy::Upstream::HostConstSharedPtr host_shared;
+  if (host != nullptr) {
+    host_shared = lb->handle()->cluster()->findHost(host);
+  }
+
+  std::string details_str;
+  if (details.ptr != nullptr && details.length > 0) {
+    details_str.assign(details.ptr, details.length);
+  }
+
+  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+}
+
+// =============================================================================
+// HTTP Callout Callback
+// =============================================================================
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+
+  Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; ++i) {
+    header_map->addCopy(
+        Envoy::Http::LowerCaseString(std::string(headers[i].key_ptr, headers[i].key_length)),
+        std::string(headers[i].value_ptr, headers[i].value_length));
+  }
+
+  if (header_map->Path() == nullptr || header_map->Method() == nullptr ||
+      header_map->Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  Envoy::Http::RequestMessagePtr message =
+      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(header_map));
+
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(absl::string_view(body.ptr, body.length));
+  }
+
+  return cluster->sendHttpCallout(callout_id_out,
+                                  absl::string_view(cluster_name.ptr, cluster_name.length),
+                                  std::move(message), timeout_milliseconds);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = (*hosts)[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
 }
 
 } // extern "C"

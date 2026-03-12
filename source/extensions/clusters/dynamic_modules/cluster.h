@@ -9,12 +9,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
+#include "envoy/http/async_client.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -42,11 +44,16 @@ using OnClusterDestroyType = decltype(&envoy_dynamic_module_on_cluster_destroy);
 using OnClusterLbNewType = decltype(&envoy_dynamic_module_on_cluster_lb_new);
 using OnClusterLbDestroyType = decltype(&envoy_dynamic_module_on_cluster_lb_destroy);
 using OnClusterLbChooseHostType = decltype(&envoy_dynamic_module_on_cluster_lb_choose_host);
+using OnClusterLbCancelHostSelectionType =
+    decltype(&envoy_dynamic_module_on_cluster_lb_cancel_host_selection);
 using OnClusterScheduledType = decltype(&envoy_dynamic_module_on_cluster_scheduled);
 using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
 using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown);
+using OnClusterHttpCalloutDoneType = decltype(&envoy_dynamic_module_on_cluster_http_callout_done);
+using OnClusterLbOnHostMembershipUpdateType =
+    decltype(&envoy_dynamic_module_on_cluster_lb_on_host_membership_update);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -78,10 +85,13 @@ public:
   OnClusterLbNewType on_cluster_lb_new_ = nullptr;
   OnClusterLbDestroyType on_cluster_lb_destroy_ = nullptr;
   OnClusterLbChooseHostType on_cluster_lb_choose_host_ = nullptr;
+  OnClusterLbCancelHostSelectionType on_cluster_lb_cancel_host_selection_ = nullptr;
   OnClusterScheduledType on_cluster_scheduled_ = nullptr;
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
+  OnClusterHttpCalloutDoneType on_cluster_http_callout_done_ = nullptr;
+  OnClusterLbOnHostMembershipUpdateType on_cluster_lb_on_host_membership_update_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -279,6 +289,9 @@ public:
       : cluster_(std::move(cluster)) {}
   ~DynamicModuleClusterHandle();
 
+  // Access the cluster for host lookup during async completion.
+  DynamicModuleCluster* cluster() const { return cluster_.get(); }
+
 private:
   std::shared_ptr<DynamicModuleCluster> cluster_;
   friend class DynamicModuleCluster;
@@ -302,16 +315,37 @@ public:
   }
 
   // Methods called by the dynamic module via ABI callbacks.
-  bool addHosts(const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
-                std::vector<Upstream::HostSharedPtr>& result_hosts);
+  bool addHosts(
+      const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
+      const std::vector<std::string>& regions, const std::vector<std::string>& zones,
+      const std::vector<std::string>& sub_zones,
+      const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+      std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority = 0);
   size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);
+  bool updateHostHealth(Upstream::HostSharedPtr host,
+                        envoy_dynamic_module_type_host_health health_status);
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
+  Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
+
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   * This must be called on the main thread.
+   *
+   * @param callout_id_out is a pointer to a variable where the callout ID will be stored.
+   * @param cluster_name is the name of the cluster to which the callout is sent.
+   * @param message is the HTTP request message to send.
+   * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+   * @return the result of the callout initialization.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
@@ -339,6 +373,31 @@ private:
   friend class DynamicModuleClusterHandle;
   friend class DynamicModuleLoadBalancer;
 
+  /**
+   * This implementation of the AsyncClient::Callbacks handles the response from the HTTP callout.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
+        : cluster_(std::move(cluster)), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    const uint64_t callout_id_{};
+  };
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
   DynamicModuleClusterConfigSharedPtr config_;
   envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
   Event::Dispatcher& dispatcher_;
@@ -356,6 +415,10 @@ private:
 
   // Handle for the server initialized lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
+
+  // HTTP callout tracking.
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+  absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
 };
 
 /**
@@ -391,6 +454,28 @@ private:
 };
 
 /**
+ * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
+ * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
+ * pending result from choose_host, and destroyed after the module delivers the result or the
+ * selection is canceled.
+ */
+class DynamicModuleAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
+public:
+  DynamicModuleAsyncHostSelectionHandle(
+      envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
+      envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
+      OnClusterLbCancelHostSelectionType cancel_fn)
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn) {}
+
+  void cancel() override;
+
+private:
+  envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
+  envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+  OnClusterLbCancelHostSelectionType cancel_fn_;
+};
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
@@ -415,9 +500,30 @@ public:
   // Access the priority set for lb callbacks.
   const Upstream::PrioritySet& prioritySet() const;
 
+  // Access the handle for async host selection completion.
+  const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
+
+  // Per-host custom data storage.
+  bool setHostData(uint32_t priority, size_t index, uintptr_t data);
+  bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
+
+  // Accessors for hosts added/removed during the on_host_membership_update callback.
+  const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
+  const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
+
+  // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
+  absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
+
+  // Temporary pointers to host vectors, valid only during on_host_membership_update callback.
+  const Upstream::HostVector* hosts_added_{};
+  const Upstream::HostVector* hosts_removed_{};
+
+  // Membership update callback handle.
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 };
 
 /**

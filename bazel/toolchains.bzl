@@ -14,6 +14,11 @@ def envoy_toolchains():
     llvm_toolchain(
         name = "llvm_toolchain",
         llvm_version = "18.1.8",
+        # These libs are only included for cross-compile targets
+        cxx_lib = {
+            "linux-aarch64": "@libcxx_libs_aarch64",
+            "linux-x86_64": "@libcxx_libs_x86_64",
+        },
         cxx_standard = {"": "c++20"},
         sysroot = {} if USE_LOCAL_SYSROOT else {
             "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
