@@ -682,5 +682,9 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
+    This filter is currently a work-in-progress and not recommended for production use.
 
 deprecated:
