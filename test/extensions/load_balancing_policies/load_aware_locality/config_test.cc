@@ -188,6 +188,26 @@ TEST(LoadAwareLocalityConfigTest, InvalidWeightUpdatePeriod) {
   EXPECT_THAT(result.status().message(), testing::HasSubstr("weight_update_period"));
 }
 
+TEST(LoadAwareLocalityConfigTest, MalformedSupportedChildConfigIsRejected) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::config::core::v3::TypedExtensionConfig malformed_round_robin;
+  malformed_round_robin.set_name("envoy.load_balancing_policies.round_robin");
+  malformed_round_robin.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/"
+      "envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin");
+  malformed_round_robin.mutable_typed_config()->set_value("not-a-valid-proto");
+
+  Factory factory;
+  auto result = factory.loadConfig(context, loadAwareConfig({malformed_round_robin}));
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().code(),
+              testing::AnyOf(absl::StatusCode::kInvalidArgument, absl::StatusCode::kInternal));
+  EXPECT_THAT(result.status().message(),
+              testing::AnyOf(testing::HasSubstr("round_robin.v3.RoundRobin"),
+                             testing::HasSubstr("Unable to unpack")));
+}
+
 TEST(LoadAwareLocalityConfigTest, NegativeWeightExpirationRejected) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 

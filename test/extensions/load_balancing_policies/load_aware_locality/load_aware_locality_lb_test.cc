@@ -141,6 +141,31 @@ protected:
     factory_ = thread_aware_lb_->factory();
   }
 
+  std::shared_ptr<WorkerLocalLbFactory> createRoundRobinWorkerFactory() {
+    envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin;
+    envoy::config::core::v3::TypedExtensionConfig round_robin_config;
+    round_robin_config.set_name("envoy.load_balancing_policies.round_robin");
+    round_robin_config.mutable_typed_config()->PackFrom(round_robin);
+
+    auto& round_robin_factory =
+        Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(round_robin_config);
+
+    auto round_robin_proto = round_robin_factory.createEmptyConfigProto();
+    EXPECT_TRUE(Config::Utility::translateOpaqueConfig(round_robin_config.typed_config(),
+                                                       context_.messageValidationVisitor(),
+                                                       *round_robin_proto)
+                    .ok());
+    auto round_robin_lb_config =
+        round_robin_factory.loadConfig(context_, *round_robin_proto).value();
+
+    auto factory = std::make_shared<WorkerLocalLbFactory>(
+        round_robin_factory, round_robin_factory.name(),
+        LoadBalancerConfigSharedPtr(std::move(round_robin_lb_config)), cluster_info_, priority_set_,
+        context_.runtime_loader_, random_, context_.time_system_, context_.thread_local_);
+    EXPECT_TRUE(factory->initializeChildLb().ok());
+    return factory;
+  }
+
   void setupPriorityLocalities(
       uint32_t priority, std::vector<Upstream::HostVector> localities,
       bool has_local_locality = false,
@@ -518,6 +543,112 @@ TEST_F(LoadAwareLocalityLbTest, ProbeDistributionAcrossMultipleRemoteLocalities)
   EXPECT_NEAR(snapshot->weights[2], 0.04, 0.01);
 }
 
+TEST_F(LoadAwareLocalityLbTest, ProbeRedistributionClampsLocalWeightAtZero) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+  setupLocalities({{h_local}, {h_remote}}, /*has_local_locality=*/true);
+
+  createLb(/*variance_threshold=*/0.0, /*ewma_alpha=*/1.0, /*probe_percentage=*/2.0);
+
+  setHostUtilization(h_local, 0.3);
+  setHostUtilization(h_remote, 0.0);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  const auto* snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  ASSERT_EQ(2, snapshot->weights.size());
+  EXPECT_NEAR(snapshot->weights[0], 0.0, 1e-9);
+  EXPECT_NEAR(snapshot->weights[1], 3.4, 0.01);
+}
+
+TEST_F(LoadAwareLocalityLbTest, ProbeSkipsRedistributionWhenTargetAlreadyMetOrTotalIsZero) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto h_remote = makeWeightTrackingMockHost();
+  setupLocalities({{h_local}, {h_remote}}, /*has_local_locality=*/true);
+
+  createLb(/*variance_threshold=*/0.0, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.1);
+
+  setHostUtilization(h_local, 0.6);
+  setHostUtilization(h_remote, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  auto snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  ASSERT_EQ(2, snapshot->weights.size());
+  EXPECT_FALSE(snapshot->all_local);
+  EXPECT_NEAR(snapshot->weights[0], 0.4, 0.01);
+  EXPECT_NEAR(snapshot->weights[1], 0.5, 0.01);
+
+  setHostUtilization(h_local, 1.0);
+  setHostUtilization(h_remote, 1.0);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  EXPECT_FALSE(snapshot->all_local);
+  EXPECT_NEAR(snapshot->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(snapshot->weights[1], 1.0, 0.01);
+}
+
+TEST_F(LoadAwareLocalityLbTest, WeightsScaleWithEligibleHostCounts) {
+  auto locality_a = makeHosts(10);
+  auto locality_b = makeHosts(2);
+  setupLocalities({locality_a, locality_b});
+
+  createLb();
+  setUtilizationForHosts(locality_a, 0.5);
+  setUtilizationForHosts(locality_b, 0.5);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  const auto* snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  ASSERT_EQ(2, snapshot->weights.size());
+  EXPECT_NEAR(snapshot->weights[0], 5.0, 0.01);
+  EXPECT_NEAR(snapshot->weights[1], 1.0, 0.01);
+  EXPECT_NEAR(snapshot->total_weight, 6.0, 0.01);
+}
+
+TEST_F(LoadAwareLocalityLbTest, HealthyWeightsCanDivergeFromAllHostWeights) {
+  auto all_a = makeHosts(4);
+  auto all_b = makeHosts(2);
+  Upstream::HostVector healthy_a = {all_a[0]};
+  Upstream::HostVector healthy_b = {all_b[0], all_b[1]};
+  setupLocalities({all_a, all_b}, /*has_local_locality=*/false,
+                  std::vector<Upstream::HostVector>{healthy_a, healthy_b});
+
+  createLb();
+
+  const auto* snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  ASSERT_EQ(2, snapshot->weights.size());
+  ASSERT_EQ(2, snapshot->priority_weights[0].all_host_weights.size());
+  EXPECT_NEAR(snapshot->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(snapshot->weights[1], 2.0, 0.01);
+  EXPECT_NEAR(snapshot->priority_weights[0].all_host_weights[0], 4.0, 0.01);
+  EXPECT_NEAR(snapshot->priority_weights[0].all_host_weights[1], 2.0, 0.01);
+}
+
+TEST_F(LoadAwareLocalityLbTest, LocalPreferenceUsesRemoteHostWeightedTargetUtilization) {
+  auto h_local = makeWeightTrackingMockHost();
+  auto remote_busy = makeHosts(9);
+  auto remote_idle = makeHosts(1);
+  setupLocalities({{h_local}, remote_busy, remote_idle}, /*has_local_locality=*/true);
+
+  createLb(/*variance_threshold=*/0.01, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0);
+
+  setHostUtilization(h_local, 0.5);
+  setUtilizationForHosts(remote_busy, 0.6);
+  setUtilizationForHosts(remote_idle, 0.0);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  const auto* snapshot = routingSnapshot();
+  ASSERT_NE(nullptr, snapshot);
+  EXPECT_TRUE(snapshot->all_local);
+  EXPECT_NEAR(snapshot->weights[0], 1.0, 0.01);
+  EXPECT_NEAR(snapshot->weights[1], 0.0, 0.01);
+  EXPECT_NEAR(snapshot->weights[2], 0.0, 0.01);
+}
+
 TEST_F(LoadAwareLocalityLbTest, AllLocalitiesSaturatedFallBacksToHostCount) {
   auto locality_a = makeHosts(3);
   auto locality_b = makeHosts(1);
@@ -824,6 +955,36 @@ TEST_F(LoadAwareLocalityLbTest, EmptyDeltaUpdatesRefreshChildWeights) {
   EXPECT_GT(updated_counts[h1.get()], 300);
 }
 
+TEST_F(LoadAwareLocalityLbTest, InPlaceUpdateTopologyMismatchWaitsForMembershipChange) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = createWorkerLb();
+  ASSERT_NE(nullptr, worker_lb);
+
+  auto h3 = makeWeightTrackingMockHost();
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {h1, h2, h3};
+  host_set->healthy_hosts_ = {h1, h2, h3};
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{h1}, {h2}, {h3}}, /*force_no_local_locality=*/true);
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+
+  priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_TRUE(hostSeen(*worker_lb, h1, 100));
+  EXPECT_TRUE(hostSeen(*worker_lb, h2, 100));
+  EXPECT_FALSE(hostSeen(*worker_lb, h3, 100));
+
+  priority_set_.runUpdateCallbacks(0, {h3}, {});
+  PriorityRoutingWeights weights;
+  weights.weights = {1.0, 1.0, 1.0};
+  weights.total_weight = 3.0;
+  publishSnapshot(makeSnapshot({weights}, {100}));
+  EXPECT_TRUE(hostSeen(*worker_lb, h3, 300));
+}
+
 TEST_F(LoadAwareLocalityLbTest, PriorityFailoverAndFailback) {
   auto h_p0 = makeWeightTrackingMockHost();
   auto h_p1 = makeWeightTrackingMockHost();
@@ -965,6 +1126,25 @@ TEST_F(LoadAwareLocalityLbTest, SelectLocalityFallsBackForCountMismatchAndZeroTo
   expectOnlyHost(*worker_lb, h1, 20);
 }
 
+TEST_F(LoadAwareLocalityLbTest, SelectLocalityResumsClampedWeightsOnMismatch) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  createLb();
+  auto worker_lb = createWorkerLb();
+  ASSERT_NE(nullptr, worker_lb);
+
+  PriorityRoutingWeights mismatched_weights;
+  mismatched_weights.weights = {1.0, 1.0, 100.0};
+  mismatched_weights.total_weight = 102.0;
+  publishSnapshot(makeSnapshot({mismatched_weights}, {100}));
+
+  auto counts = countPicks(*worker_lb, 400);
+  EXPECT_GT(counts[h1.get()], 120);
+  EXPECT_GT(counts[h2.get()], 120);
+}
+
 TEST_F(LoadAwareLocalityLbTest, SelectLocalityRoundingGuardReturnsLastLocality) {
   auto h1 = makeWeightTrackingMockHost();
   auto h2 = makeWeightTrackingMockHost();
@@ -1096,6 +1276,38 @@ TEST_F(LoadAwareLocalityLbTest, EmptyLocalityHostsDoNotCrash) {
   auto worker_lb = createWorkerLb();
   ASSERT_NE(nullptr, worker_lb);
   EXPECT_EQ(nullptr, worker_lb->chooseHost(nullptr).host);
+}
+
+TEST_F(LoadAwareLocalityLbTest, WorkerFallsBackWithoutPublishedRoutingSnapshot) {
+  auto h1 = makeWeightTrackingMockHost();
+  auto h2 = makeWeightTrackingMockHost();
+  setupLocalities({{h1}, {h2}});
+
+  auto factory = createRoundRobinWorkerFactory();
+  auto worker_lb = factory->create({priority_set_, nullptr});
+  ASSERT_NE(nullptr, worker_lb);
+
+  expectOnlyHost(*worker_lb, h1, 20);
+  EXPECT_EQ(h1, worker_lb->peekAnotherHost(nullptr));
+}
+
+TEST_F(LoadAwareLocalityLbTest, InitializePropagatesChildFactoryError) {
+  NiceMock<Upstream::MockTypedLoadBalancerFactory> null_child_factory;
+  ON_CALL(null_child_factory, name()).WillByDefault(Return("mock_null_factory"));
+  ON_CALL(null_child_factory,
+          create(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillByDefault(testing::Return(testing::ByMove(nullptr)));
+
+  auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
+      null_child_factory, "mock_null_factory", nullptr, std::chrono::milliseconds(1000), 0.1, 0.3,
+      0.03, std::chrono::milliseconds(180000), dispatcher_, context_.thread_local_);
+
+  LoadAwareLocalityLoadBalancer lb(*lb_config, cluster_info_, priority_set_,
+                                   context_.runtime_loader_, random_, context_.time_system_);
+  auto status = lb.initialize();
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(status.message(), testing::HasSubstr("mock_null_factory"));
 }
 
 TEST_F(LoadAwareLocalityLbTest, InitializeChildLbNullChildReturnsError) {
