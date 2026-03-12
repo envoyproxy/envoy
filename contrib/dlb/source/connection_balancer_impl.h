@@ -43,7 +43,8 @@ public:
 
   // Only for override, those are never used.
   uint64_t numConnections() const override { return 0; }
-  void incNumConnections() override {}
+  void preIncNumConnections() override {}
+  void postIncNumConnections() override {}
 
 private:
   Envoy::Network::BalancedConnectionHandler& handler_;

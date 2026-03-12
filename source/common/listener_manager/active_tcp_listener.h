@@ -68,9 +68,13 @@ public:
 
   // Network::BalancedConnectionHandler
   uint64_t numConnections() const override { return num_listener_connections_; }
+  void preIncNumConnections() override { ++num_listener_connections_; }
+  void postIncNumConnections() override { config_->openConnections().inc(); }
+
+  // ActiveStreamListenerBase
   void incNumConnections() override {
-    ++num_listener_connections_;
-    config_->openConnections().inc();
+    preIncNumConnections();
+    postIncNumConnections();
   }
   void post(Network::ConnectionSocketPtr&& socket) override;
   void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
