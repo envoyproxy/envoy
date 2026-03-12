@@ -471,8 +471,9 @@ public:
 // Test createTransportSocketFactory handles absent transport_socket config.
 TEST_F(SocketConfigFactoryTest, CreateSocketFactoryWithoutTransportSocket) {
   initialize();
+
+  // Inner transport socket is absent.
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
-  // Note: config.transport_socket() is absent.
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   auto factory_or_error = factory_->createTransportSocketFactory(config, context);
