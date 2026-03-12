@@ -17,6 +17,8 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
+// WARNING: Do not copy this object or share it with upstream. It is not guaranteed
+// that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
@@ -28,6 +30,10 @@ public:
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
+    if (value == 0) {
+      // We rely on the stats scope to evict the gauge if its value is 0.
+      return;
+    }
     auto it = inflight_gauges_.try_emplace(gauge, 0).first;
     it->second += value;
     gauge->add(value);

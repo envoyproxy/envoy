@@ -605,6 +605,36 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   logger_->log(formatter_context_, stream_info_);
 }
 
+TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 0
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD with value 0
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+
+  // The first time it gets the gauge and calls add(0).
+  // We don't expect it to actually be added to inflight_gauges_.
+  EXPECT_CALL(store_, gauge(_, _)).WillRepeatedly(testing::ReturnRef(*gauge_));
+
+  // EXPECT_CALL(*gauge_, add(0));  // Removed because addInflightGauge skips if value == 0
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  // We expect no `sub(0)` interaction here because it wasn't added to inflight_gauges_.
+  EXPECT_CALL(*gauge_, sub(_)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+}
+
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
