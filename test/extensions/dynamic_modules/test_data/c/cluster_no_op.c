@@ -62,21 +62,41 @@ void envoy_dynamic_module_on_cluster_lb_destroy(
   (void)lb_module_ptr;
 }
 
-envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+void envoy_dynamic_module_on_cluster_lb_choose_host(
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr) {
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out) {
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
-  // Return NULL. The C++ test will drive host selection.
-  return NULL;
+  *host_out = NULL;
+  *async_handle_out = NULL;
 }
 
-void envoy_dynamic_module_on_cluster_scheduled(
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id) {
-  (void)cluster_envoy_ptr;
-  (void)cluster_module_ptr;
-  (void)event_id;
+void envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed) {
+  (void)lb_module_ptr;
+
+  // Test accessing added host addresses.
+  for (size_t i = 0; i < num_hosts_added; i++) {
+    envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
+    envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(lb_envoy_ptr, i, true,
+                                                                           &addr);
+  }
+
+  // Test accessing removed host addresses.
+  for (size_t i = 0; i < num_hosts_removed; i++) {
+    envoy_dynamic_module_type_envoy_buffer addr = {NULL, 0};
+    envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(lb_envoy_ptr, i, false,
+                                                                           &addr);
+  }
+
+  // Test out-of-bounds index.
+  envoy_dynamic_module_type_envoy_buffer oob_result = {NULL, 0};
+  envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+      lb_envoy_ptr, num_hosts_added, true, &oob_result);
 }
 
 void envoy_dynamic_module_on_cluster_server_initialized(
@@ -101,4 +121,20 @@ void envoy_dynamic_module_on_cluster_shutdown(
   (void)cluster_module_ptr;
   // Immediately invoke the completion callback.
   completion_callback(completion_context);
+}
+
+void envoy_dynamic_module_on_cluster_http_callout_done(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+  (void)callout_id;
+  (void)result;
+  (void)headers;
+  (void)headers_size;
+  (void)body_chunks;
+  (void)body_chunks_size;
 }
