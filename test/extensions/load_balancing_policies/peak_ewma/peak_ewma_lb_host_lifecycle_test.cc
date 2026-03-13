@@ -7,8 +7,8 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 
-#include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/host_data.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/peak_ewma_lb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -80,7 +80,7 @@ protected:
 
   std::vector<Upstream::HostSharedPtr> hosts_;
   std::unique_ptr<PeakEwmaLoadBalancer> lb_;
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config_;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma config_;
 };
 
 // ============================================================================

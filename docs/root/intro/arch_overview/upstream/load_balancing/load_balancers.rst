@@ -104,6 +104,49 @@ same or different weights.
   steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C, a host will
   never truly drain, though it will receive fewer requests over time.
 
+.. _arch_overview_load_balancing_types_peak_ewma:
+
+Peak EWMA
+^^^^^^^^^
+
+Peak EWMA is a latency-aware P2C (Power of Two Choices) load balancer exposed via
+:ref:`PeakEwma <envoy_v3_api_msg_extensions.load_balancing_policies.peak_ewma.v3.PeakEwma>`.
+It assigns each healthy host a dynamic cost using:
+
+``cost = peak_ewma_rtt * (active_requests + 1)``
+
+Two hosts are chosen at random, and the one with the lower cost is selected for each request.
+Compared with weighted least request, Peak EWMA reacts directly to observed upstream latency and
+will bias away from hosts that are still healthy but becoming slow. When RTT samples are not yet
+available, it falls back to the configured default RTT.
+
+Peak EWMA supports multi-priority failover and zone-aware routing through the standard
+Envoy load balancing infrastructure.
+
+.. note::
+
+   RTT measurements require the ``envoy.filters.http.peak_ewma`` contrib HTTP filter to be
+   configured in the filter chain. This filter records RTT samples from upstream request timing
+   and feeds them into the load balancer. Without the filter, the load balancer will fall back
+   to the configured ``default_rtt`` for all hosts.
+
+Example configuration:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.load_balancing_policies.peak_ewma.v3.PeakEwma
+
+  decay_time: 10s
+  aggregation_interval: 0.1s
+  default_rtt: 0.01s
+  max_samples_per_host: 1000
+
+.. note::
+
+   Peak EWMA was promoted from a contrib extension to a core extension. If you are migrating
+   from the contrib version, update the type URL from
+   ``envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma`` to
+   ``envoy.extensions.load_balancing_policies.peak_ewma.v3.PeakEwma``.
+
 .. _arch_overview_load_balancing_types_ring_hash:
 
 Ring hash

@@ -12,8 +12,8 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha/peak_ewma.pb.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/config.h"
+#include "envoy/extensions/load_balancing_policies/peak_ewma/v3/peak_ewma.pb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/config.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
@@ -82,7 +82,7 @@ TEST_F(PeakEwmaConfigTest, CreateEmptyConfigProto) {
 
   // Verify it's the right type
   const auto* typed_proto =
-      dynamic_cast<const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma*>(
+      dynamic_cast<const envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma*>(
           proto.get());
   EXPECT_NE(typed_proto, nullptr);
 }
@@ -92,7 +92,7 @@ TEST_F(PeakEwmaConfigTest, LoadConfigWithDefaults) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // Create a minimal config proto
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma proto_config;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
 
   auto result = factory.loadConfig(context, proto_config);
   EXPECT_TRUE(result.ok());
@@ -108,7 +108,7 @@ TEST_F(PeakEwmaConfigTest, LoadConfigWithCustomValues) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // Create config with custom values
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma proto_config;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
   proto_config.mutable_decay_time()->set_seconds(5);         // 5 second decay time
   proto_config.mutable_penalty_value()->set_value(750000.0); // Custom penalty value
 
@@ -127,7 +127,7 @@ TEST_F(PeakEwmaConfigTest, CreateThreadAwareLoadBalancer) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // Create config
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma proto_config;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
 
   auto config_result = factory.loadConfig(context, proto_config);
   EXPECT_TRUE(config_result.ok());
@@ -171,7 +171,7 @@ TEST_F(PeakEwmaConfigTest, CreateWithNullConfig) {
 
 TEST_F(PeakEwmaConfigTest, ConfigValidation) {
   // Test that extreme values are handled
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma proto_config;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
 
   // Very small decay time
   proto_config.mutable_decay_time()->set_nanos(1000000); // 1ms
@@ -190,7 +190,7 @@ TEST_F(PeakEwmaConfigTest, MultipleLoadBalancerInstances) {
   Factory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma proto_config;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
 
   auto config_result = factory.loadConfig(context, proto_config);
   EXPECT_TRUE(config_result.ok());
@@ -208,6 +208,55 @@ TEST_F(PeakEwmaConfigTest, MultipleLoadBalancerInstances) {
   EXPECT_NE(lb1, nullptr);
   EXPECT_NE(lb2, nullptr);
   EXPECT_NE(lb1.get(), lb2.get()); // Should be different instances
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsZeroDecayTime) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_decay_time()->set_seconds(0);
+  proto_config.mutable_decay_time()->set_nanos(0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsZeroAggregationInterval) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_aggregation_interval()->set_seconds(0);
+  proto_config.mutable_aggregation_interval()->set_nanos(0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsZeroMaxSamplesPerHost) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_max_samples_per_host()->set_value(0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsZeroDefaultRtt) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_default_rtt()->set_seconds(0);
+  proto_config.mutable_default_rtt()->set_nanos(0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsZeroPenaltyValue) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_penalty_value()->set_value(0.0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationRejectsNegativePenaltyValue) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_penalty_value()->set_value(-1.0);
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
+TEST_F(PeakEwmaConfigTest, ProtoValidationAcceptsValidConfig) {
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma proto_config;
+  proto_config.mutable_decay_time()->set_seconds(10);
+  proto_config.mutable_aggregation_interval()->set_nanos(100000000); // 100ms
+  proto_config.mutable_max_samples_per_host()->set_value(1000);
+  proto_config.mutable_default_rtt()->set_nanos(10000000); // 10ms
+  proto_config.mutable_penalty_value()->set_value(1000000.0);
+  EXPECT_NO_THROW(TestUtility::validate(proto_config));
 }
 
 } // namespace

@@ -13,11 +13,11 @@
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/thread.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/cost.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/host_data.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha/peak_ewma.pb.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/cost.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
+#include "envoy/extensions/load_balancing_policies/peak_ewma/v3/peak_ewma.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,14 +25,10 @@ namespace LoadBalancingPolicies {
 namespace PeakEwma {
 
 // Forward declarations and type aliases.
-using Config = envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma;
+using Config = envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma;
 
 constexpr int64_t kDefaultDecayTimeSeconds = 10;
 constexpr double kDefaultRttMilliseconds = 10.0; // Default RTT for new hosts (10ms).
-
-namespace {
-class PeakEwmaTestPeer;
-} // namespace
 
 class PeakEwmaLoadBalancerFactory;
 class PeakEwmaLoadBalancer;
@@ -69,17 +65,17 @@ private:
  * - Aggregation happens lazily inline in chooseHost() when the interval elapses
  * - P2C selection uses current EWMA + active requests for cost calculation
  */
-class PeakEwmaLoadBalancer : public Upstream::LoadBalancerBase {
+class PeakEwmaLoadBalancer : public Upstream::ZoneAwareLoadBalancerBase {
 public:
   PeakEwmaLoadBalancer(
       const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* local_priority_set,
       Upstream::ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       uint32_t healthy_panic_threshold, const Upstream::ClusterInfo& cluster_info,
       TimeSource& time_source,
-      const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config);
+      const envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma& config);
 
-  // LoadBalancer interface
-  Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
+  // Upstream::ZoneAwareLoadBalancerBase
+  Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
 
 private:
@@ -104,9 +100,7 @@ private:
   double updateEwmaWithSample(double current_ewma, double new_rtt_ms, double alpha);
 
   // Core infrastructure.
-  const Upstream::PrioritySet& priority_set_;
-  const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config_proto_;
-  Random::RandomGenerator& random_;
+  const envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma config_proto_;
   TimeSource& time_source_;
   Stats::Scope& stats_scope_;
 

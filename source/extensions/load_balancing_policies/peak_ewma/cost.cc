@@ -1,4 +1,4 @@
-#include "contrib/peak_ewma/load_balancing_policies/source/cost.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/cost.h"
 
 #include "envoy/upstream/upstream.h"
 

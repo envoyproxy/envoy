@@ -1,4 +1,4 @@
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/cost.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

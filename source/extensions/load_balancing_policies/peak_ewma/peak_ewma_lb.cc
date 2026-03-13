@@ -1,4 +1,4 @@
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/peak_ewma_lb.h"
 
 #include <memory>
 
@@ -9,10 +9,9 @@
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
 
-#include "absl/base/attributes.h"
 #include "absl/status/status.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/cost.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/cost.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/host_data.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,15 +46,14 @@ void GlobalHostStats::setActiveRequestsStat(double active_requests) {
 // Peak EWMA Load Balancer Implementation.
 
 PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
-    const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* /*local_priority_set*/,
-    Upstream::ClusterLbStats& /*stats*/, Runtime::Loader& runtime, Random::RandomGenerator& random,
-    uint32_t /* healthy_panic_threshold */, const Upstream::ClusterInfo& cluster_info,
+    const Upstream::PrioritySet& priority_set, const Upstream::PrioritySet* local_priority_set,
+    Upstream::ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    uint32_t healthy_panic_threshold, const Upstream::ClusterInfo& cluster_info,
     TimeSource& time_source,
-    const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config)
-    : LoadBalancerBase(priority_set, cluster_info.lbStats(), runtime, random,
-                       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                           cluster_info.lbConfig(), healthy_panic_threshold, 100, 50)),
-      priority_set_(priority_set), config_proto_(config), random_(random),
+    const envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma& config)
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                                healthy_panic_threshold, absl::nullopt),
+      config_proto_(config),
       time_source_(time_source), stats_scope_(cluster_info.statsScope()),
       cost_(config.has_penalty_value() ? config.penalty_value().value() : 1000000.0),
       aggregation_interval_(config_proto_.has_aggregation_interval()
@@ -164,36 +162,30 @@ PeakEwmaLoadBalancer::selectFromTwoCandidates(const Upstream::HostVector& hosts,
   return selected_host;
 }
 
-Upstream::HostSelectionResponse
-PeakEwmaLoadBalancer::chooseHost(Upstream::LoadBalancerContext* /* context */) {
+Upstream::HostConstSharedPtr
+PeakEwmaLoadBalancer::chooseHostOnce(Upstream::LoadBalancerContext* context) {
   // Lazily aggregate EWMA data if the interval has elapsed.
   maybeAggregate();
 
-  // Power of Two Choices selection using host-attached EWMA data.
-  const auto& host_sets = priority_set_.hostSetsPerPriority();
-
-  if (host_sets.empty()) {
-    return {nullptr, ""};
+  const auto hosts_source = hostSourceToUse(context, random(false));
+  if (!hosts_source) {
+    return nullptr;
   }
 
-  // Use first priority for now (can be extended for multi-priority).
-  const auto& hosts = host_sets[0]->healthyHosts();
-
+  const auto& hosts = hostSourceToHosts(*hosts_source);
   if (hosts.empty()) {
-    return {nullptr, ""};
+    return nullptr;
   }
 
   if (hosts.size() == 1) {
-    return {hosts[0], ""};
+    return hosts[0];
   }
 
-  // Power of Two Choices selection using host-attached EWMA data.
-  uint64_t random_value = random_.random();
-  return {selectFromTwoCandidates(hosts, random_value), ""};
+  return selectFromTwoCandidates(hosts, random_.random());
 }
 
 Upstream::HostConstSharedPtr PeakEwmaLoadBalancer::peekAnotherHost(
-    ABSL_ATTRIBUTE_UNUSED Upstream::LoadBalancerContext* context) {
+    Upstream::LoadBalancerContext* /*context*/) {
   return nullptr;
 }
 

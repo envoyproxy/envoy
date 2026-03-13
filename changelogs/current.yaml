@@ -683,4 +683,10 @@ new_features:
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 
+- area: load_balancing
+  change: |
+    Promoted :ref:`Peak EWMA <envoy_v3_api_msg_extensions.load_balancing_policies.peak_ewma.v3.PeakEwma>`
+    load balancing policy from contrib to core extension. The API namespace changes from ``v3alpha`` to ``v3``.
+    The load balancer now supports multi-priority failover and zone-aware routing.
+
 deprecated:

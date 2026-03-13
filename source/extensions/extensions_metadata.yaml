@@ -2009,6 +2009,13 @@ envoy.load_balancing_policies.least_request:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+envoy.load_balancing_policies.peak_ewma:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.peak_ewma.v3.PeakEwma
 envoy.load_balancing_policies.random:
   categories:
   - envoy.load_balancing_policies

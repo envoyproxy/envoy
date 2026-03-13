@@ -1,20 +1,19 @@
 syntax = "proto3";
 
-package envoy.extensions.load_balancing_policies.peak_ewma.v3alpha;
+package envoy.extensions.load_balancing_policies.peak_ewma.v3;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.peak_ewma.v3alpha";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.peak_ewma.v3";
 option java_outer_classname = "PeakEwmaProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/peak_ewma/v3;peak_ewmav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Peak EWMA Load Balancer Configuration]
 // Configuration for the Peak EWMA (Exponentially Weighted Moving Average) load balancing policy.
@@ -40,8 +39,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.load_balancing_policies.peak_ewma]
 // [#next-free-field: 6]
 message PeakEwma {
-  option (xds.annotations.v3.message_status).work_in_progress = true;
-
   // The decay time for the RTT EWMA calculation. This specifies the time window over which
   // latency observations are considered relevant. After this duration, older measurements
   // have exponentially decayed to half their original weight.
@@ -53,7 +50,7 @@ message PeakEwma {
   // to the time duration over which you want to observe latency trends.
   //
   // If not specified, defaults to 10 seconds (following Finagle's default).
-  google.protobuf.Duration decay_time = 1;
+  google.protobuf.Duration decay_time = 1 [(validate.rules).duration = {gt {}}];
 
   // The interval at which EWMA data is aggregated from worker threads to the main thread.
   // This controls the frequency of cross-thread synchronization for the per-thread aggregation model.
@@ -63,7 +60,7 @@ message PeakEwma {
   // to operate with staler information about other workers' latency observations.
   //
   // If not specified, defaults to 100 milliseconds.
-  google.protobuf.Duration aggregation_interval = 2;
+  google.protobuf.Duration aggregation_interval = 2 [(validate.rules).duration = {gt {}}];
 
   // Maximum RTT samples to buffer per host per worker thread before overwriting oldest samples.
   // This bounds memory usage while allowing burst traffic handling.
@@ -73,7 +70,7 @@ message PeakEwma {
   // Memory usage per worker = max_samples_per_host × num_hosts × 16 bytes
   //
   // If not specified, defaults to 1,000 samples per host per worker.
-  google.protobuf.UInt32Value max_samples_per_host = 3;
+  google.protobuf.UInt32Value max_samples_per_host = 3 [(validate.rules).uint32 = {gte: 1}];
 
   // Default RTT value to use for hosts that don't have measured RTT yet.
   // This provides a baseline for cost calculations until actual measurements are available.
@@ -83,7 +80,7 @@ message PeakEwma {
   // the expected baseline latency for your environment:
   //
   // If not specified, defaults to 10 milliseconds.
-  google.protobuf.Duration default_rtt = 4;
+  google.protobuf.Duration default_rtt = 4 [(validate.rules).duration = {gt {}}];
 
   // Penalty cost assigned to hosts that cannot provide valid cost calculations.
   // This is used when a host has no RTT measurements or is unhealthy, ensuring
@@ -96,5 +93,5 @@ message PeakEwma {
   // still allowing them to receive traffic if no better alternatives exist.
   //
   // If not specified, defaults to 1,000,000.0 (1 million).
-  google.protobuf.DoubleValue penalty_value = 5;
+  google.protobuf.DoubleValue penalty_value = 5 [(validate.rules).double = {gt: 0}];
 }

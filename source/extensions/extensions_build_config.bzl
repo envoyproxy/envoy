@@ -573,6 +573,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
     "envoy.load_balancing_policies.ring_hash":         "//source/extensions/load_balancing_policies/ring_hash:config",
+    "envoy.load_balancing_policies.peak_ewma":         "//source/extensions/load_balancing_policies/peak_ewma:config",
     "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",

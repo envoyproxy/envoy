@@ -4,17 +4,17 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/peak_ewma_lb.h"
 
-#include "contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha/peak_ewma.pb.h"
-#include "contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha/peak_ewma.pb.validate.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "envoy/extensions/load_balancing_policies/peak_ewma/v3/peak_ewma.pb.h"
+#include "envoy/extensions/load_balancing_policies/peak_ewma/v3/peak_ewma.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace PeakEwma {
 
-using PeakEwmaLbProto = envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma;
+using PeakEwmaLbProto = envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma;
 
 class TypedPeakEwmaLbConfig : public Upstream::LoadBalancerConfig {
 public:

@@ -7,7 +7,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/peak_ewma_lb.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
@@ -47,7 +47,7 @@ public:
     ON_CALL(time_source_, monotonicTime())
         .WillByDefault(Return(MonotonicTime(std::chrono::milliseconds(1234567890))));
 
-    envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config;
+    envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma config;
     config.mutable_decay_time()->set_seconds(10);
 
     lb_ = std::make_unique<PeakEwmaLoadBalancer>(priority_set_, nullptr, stats_, runtime_, random_,

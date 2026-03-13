@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = ["peak_ewma_filter_test.cc"],
     deps = [
         "//contrib/peak_ewma/filters/http/source:peak_ewma_http_filter_lib",
-        "//contrib/peak_ewma/load_balancing_policies/source:peak_ewma_lb_lib",
+        "//source/extensions/load_balancing_policies/peak_ewma:peak_ewma_support_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -35,7 +35,7 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     deps = [
         "//contrib/peak_ewma/filters/http/source:config",
-        "//contrib/peak_ewma/load_balancing_policies/source:config",
+        "//source/extensions/load_balancing_policies/peak_ewma:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

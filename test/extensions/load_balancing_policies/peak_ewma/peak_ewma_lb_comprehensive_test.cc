@@ -9,8 +9,8 @@
 #include "test/mocks/upstream/priority_set.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/host_data.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/host_data.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/peak_ewma_lb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -77,7 +77,7 @@ protected:
 
   std::vector<Upstream::HostSharedPtr> hosts_;
   std::unique_ptr<PeakEwmaLoadBalancer> lb_;
-  envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma config_;
+  envoy::extensions::load_balancing_policies::peak_ewma::v3::PeakEwma config_;
 };
 
 TEST_F(PeakEwmaLoadBalancerComprehensiveTest, LoadBalancerCreation) {
@@ -169,6 +169,56 @@ TEST_F(PeakEwmaLoadBalancerComprehensiveTest, ConfigurationRespected) {
 }
 
 // Note: Complex cost calculation and EWMA tests are in dedicated unit tests
+
+TEST_F(PeakEwmaLoadBalancerComprehensiveTest, MultiPriorityFailover) {
+  // Set up priority 1 hosts using a separate address range.
+  auto* host_set_1 = priority_set_.getMockHostSet(1);
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  for (int i = 0; i < 2; ++i) {
+    auto address = std::make_shared<Network::Address::Ipv4Instance>(
+        "10.0.1." + std::to_string(i + 1), 9090 + i);
+    auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+    ON_CALL(*host, address()).WillByDefault(Return(address));
+    p1_hosts.push_back(host);
+  }
+  host_set_1->hosts_ = p1_hosts;
+  host_set_1->healthy_hosts_ = p1_hosts;
+
+  createLoadBalancer();
+
+  // With healthy hosts in priority 0, should select from priority 0.
+  for (int i = 0; i < 10; ++i) {
+    auto result = lb_->chooseHost(nullptr);
+    EXPECT_NE(result.host, nullptr);
+    bool is_p0 = false;
+    for (const auto& h : hosts_) {
+      if (result.host == h) {
+        is_p0 = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(is_p0) << "Should select from priority 0 when it's healthy";
+  }
+
+  // Remove all priority 0 hosts to trigger failover to priority 1.
+  host_set_->hosts_.clear();
+  host_set_->healthy_hosts_.clear();
+  host_set_->runCallbacks({}, hosts_);
+
+  // Now should failover to priority 1.
+  for (int i = 0; i < 10; ++i) {
+    auto result = lb_->chooseHost(nullptr);
+    EXPECT_NE(result.host, nullptr);
+    bool is_p1 = false;
+    for (const auto& h : p1_hosts) {
+      if (result.host == h) {
+        is_p1 = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(is_p1) << "Should failover to priority 1 when priority 0 is empty";
+  }
+}
 
 } // namespace PeakEwma
 } // namespace LoadBalancingPolicies

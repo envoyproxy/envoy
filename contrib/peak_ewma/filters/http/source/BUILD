@@ -17,13 +17,12 @@ envoy_cc_library(
     hdrs = [
         "peak_ewma_filter.h",
     ],
-    repository = "@envoy",
     deps = [
-        "//contrib/peak_ewma/load_balancing_policies/source:peak_ewma_lb_lib",
         "//envoy/http:filter_interface",
         "//source/common/common:utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/load_balancing_policies/peak_ewma:peak_ewma_support_lib",
     ],
 )
 

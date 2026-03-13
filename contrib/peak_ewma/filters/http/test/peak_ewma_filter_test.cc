@@ -4,7 +4,7 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/peak_ewma/filters/http/source/peak_ewma_filter.h"
-#include "contrib/peak_ewma/load_balancing_policies/source/peak_ewma_lb.h"
+#include "source/extensions/load_balancing_policies/peak_ewma/host_data.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
