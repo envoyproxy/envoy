@@ -250,6 +250,7 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, customFlags()).WillByDefault(Invoke([this]() {
     return absl::string_view(stream_flags_);
   }));
+  ON_CALL(*this, route()).WillByDefault(ReturnRef(route_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnPointee(&virtual_host_));
 }
 

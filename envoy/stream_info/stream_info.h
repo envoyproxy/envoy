@@ -925,7 +925,7 @@ public:
   /**
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
    */
-  virtual Router::RouteConstSharedPtr route() const PURE;
+  virtual const Router::RouteConstSharedPtr& route() const PURE;
 
   /**
    * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this

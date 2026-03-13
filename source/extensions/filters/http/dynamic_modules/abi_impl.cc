@@ -233,7 +233,7 @@ getMetadata(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     return &stream_info.dynamicMetadata();
   }
   case envoy_dynamic_module_type_metadata_source_Route: {
-    auto route = stream_info.route();
+    const auto& route = stream_info.route();
     if (route) {
       return &route->metadata();
     }

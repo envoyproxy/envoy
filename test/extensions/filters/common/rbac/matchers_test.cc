@@ -862,7 +862,8 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
   route_metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", route_label));
   EXPECT_CALL(*route, metadata()).WillRepeatedly(ReturnRef(route_metadata));
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
+  EXPECT_CALL(info, route()).WillRepeatedly(ReturnRef(info.route_));
 
   // Test DYNAMIC source metadata match
   {
@@ -902,7 +903,8 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
 
   // Test ROUTE source with null route
   {
-    EXPECT_CALL(info, route()).WillRepeatedly(Return(nullptr));
+    info.route_ = nullptr;
+    EXPECT_CALL(info, route()).WillRepeatedly(ReturnRef(info.route_));
 
     envoy::type::matcher::v3::MetadataMatcher matcher;
     matcher.set_filter("rbac");

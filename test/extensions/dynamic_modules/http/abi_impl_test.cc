@@ -781,7 +781,7 @@ TEST(ABIImpl, metadata) {
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::ReturnRef(stream_info.route_));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -903,7 +903,7 @@ TEST(ABIImpl, metadata_bool) {
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::ReturnRef(stream_info.route_));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -977,7 +977,7 @@ TEST(ABIImpl, metadata_keys) {
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::ReturnRef(stream_info.route_));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1039,7 +1039,7 @@ TEST(ABIImpl, metadata_namespaces) {
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::ReturnRef(stream_info.route_));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1106,7 +1106,7 @@ TEST(ABIImpl, metadata_list) {
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::ReturnRef(stream_info.route_));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));

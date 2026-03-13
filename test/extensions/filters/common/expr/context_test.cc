@@ -972,7 +972,8 @@ TEST(Context, XDSAttributes) {
   EXPECT_CALL(*upstream_host, localityMetadata()).WillRepeatedly(Return(locality_metadata));
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
+  EXPECT_CALL(info, route()).WillRepeatedly(ReturnRef(info.route_));
   info.virtual_host_ = route->virtual_host_;
 
   const std::string chain_name = "fake_filter_chain_name";
@@ -1079,7 +1080,8 @@ TEST(Context, XDSAttributesEdgeCases) {
       new NiceMock<Upstream::MockClusterInfo>());
   EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(nullptr));
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
+  EXPECT_CALL(info, route()).WillRepeatedly(ReturnRef(info.route_));
   info.downstream_connection_info_provider_->setListenerInfo(nullptr);
 
   Protobuf::Arena arena;

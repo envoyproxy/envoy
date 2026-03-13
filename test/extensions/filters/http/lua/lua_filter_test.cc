@@ -140,7 +140,8 @@ public:
     auto route = std::make_shared<NiceMock<Router::MockRoute>>();
     TestUtility::loadFromYaml(yaml, route->metadata_);
 
-    ON_CALL(stream_info_, route()).WillByDefault(Return(route));
+    stream_info_.route_ = route;
+    ON_CALL(stream_info_, route()).WillByDefault(ReturnRef(stream_info_.route_));
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
