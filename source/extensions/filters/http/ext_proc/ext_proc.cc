@@ -1427,6 +1427,13 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
   sendRequest(state, std::move(req), false);
+  if (logging_info_) {
+    if (state.trafficDirection() == envoy::config::core::v3::TrafficDirection::INBOUND) {
+      logging_info_->incrementRequestBodySentCount();
+    } else {
+      logging_info_->incrementResponseBodySentCount();
+    }
+  }
   stats_.stream_msgs_sent_.inc();
 }
 
