@@ -32,4 +32,5 @@ genrule(
     ],
     cmd = "$(location {}) $(location crypto/libcrypto.a) $(location ssl/libssl.a)".format("@envoy//bazel/external:aws_lc.genrule_cmd"),
     tools = ["@envoy//bazel/external:aws_lc.genrule_cmd"],
+    tags = ["no-sandbox"],
 )

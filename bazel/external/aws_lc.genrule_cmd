@@ -46,7 +46,7 @@ else
 fi
 
 curl -sLO https://github.com/llvm/llvm-project/releases/download/llvmorg-"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
-tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
+tar --no-same-owner -xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
 
 export HOME="$PWD"
 printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > ${HOME}/toolchain
@@ -72,7 +72,7 @@ fi
 
 curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
   && echo "$SHA256" go"$VERSION"."$PLATFORM".tar.gz | sha256sum --check
-tar xf go"$VERSION"."$PLATFORM".tar.gz
+tar --no-same-owner -xf go"$VERSION"."$PLATFORM".tar.gz
 
 export GOPATH="$PWD/gopath"
 export GOROOT="$PWD/go"
@@ -88,7 +88,7 @@ VERSION=1.10.2
 SHA256=ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed
 curl -sLO https://github.com/ninja-build/ninja/archive/refs/tags/v"$VERSION".tar.gz \
   && echo "$SHA256" v"$VERSION".tar.gz | sha256sum --check
-tar -xvf v"$VERSION".tar.gz
+tar --no-same-owner -xvf v"$VERSION".tar.gz
 cd ninja-"$VERSION"
 python3 ./configure.py --bootstrap
 
@@ -113,14 +113,14 @@ if [[ "$ARCH" != "ppc64le" ]]; then
 
     curl -sLO https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION"-"$PLATFORM".tar.gz \
         && echo "$SHA256" cmake-"$VERSION"-"$PLATFORM".tar.gz | sha256sum --check
-    tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+    tar --no-same-owner -xf cmake-"$VERSION"-"$PLATFORM".tar.gz
     export PATH="$PWD/cmake-$VERSION-$PLATFORM/bin:$PATH"
 else
     PLATFORM="linux-ppc64le"
     echo "Building cmake for ppc64le"
 
     curl -sL -o cmake-$VERSION-$PLATFORM.tar.gz https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION".tar.gz
-    tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+    tar --no-same-owner -xf cmake-"$VERSION"-"$PLATFORM".tar.gz
 
     cd cmake-"$VERSION"
     ./bootstrap && make
