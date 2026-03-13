@@ -881,7 +881,7 @@ fp16:
   project_name: "Conversion to/from half-precision floating point formats"
   project_desc: "Header-only library for conversion to/from half-precision floating point formats."
   project_url: "https://github.com/Maratyszcza/FP16"
-  release_date: "2021-03-20"
+  release_date: "2025-08-16"
   use_category:
   - dataplane_ext
   extensions:
@@ -1311,7 +1311,7 @@ simdutf:
     AVX-512, RISC-V Vector Extension, LoongArch64, POWER. Part of Node.js, WebKit/Safari, Ladybird, Chromium,
     Cloudflare Workers and Bun.
   project_url: "https://github.com/simdutf/simdutf"
-  release_date: "2025-08-01"
+  release_date: "2026-03-07"
   use_category:
   - dataplane_ext
   extensions:
@@ -1370,7 +1370,7 @@ v8:
   project_name: "V8"
   project_desc: "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++"
   project_url: "https://v8.dev"
-  release_date: "2025-07-09"
+  release_date: "2026-03-04"
   use_category:
   - dataplane_ext
   extensions:

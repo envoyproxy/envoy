@@ -24,6 +24,10 @@ namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
 using OnBootstrapExtensionConfigDestroyType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_destroy);
 using OnBootstrapExtensionNewType = decltype(&envoy_dynamic_module_on_bootstrap_extension_new);
@@ -60,6 +64,7 @@ public:
    * Constructor for the config.
    * @param extension_name the name of the extension.
    * @param extension_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the dynamic module to use.
    * @param main_thread_dispatcher the main thread dispatcher.
    * @param context the server factory context for accessing cluster manager lazily.
@@ -67,6 +72,7 @@ public:
    */
   DynamicModuleBootstrapExtensionConfig(const absl::string_view extension_name,
                                         const absl::string_view extension_config,
+                                        const absl::string_view metrics_namespace,
                                         Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                         Event::Dispatcher& main_thread_dispatcher,
                                         Server::Configuration::ServerFactoryContext& context,
@@ -435,6 +441,7 @@ private:
  * Creates a new DynamicModuleBootstrapExtensionConfig from the given module and configuration.
  * @param extension_name the name of the extension.
  * @param extension_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
@@ -445,6 +452,7 @@ private:
 absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store);

@@ -10,8 +10,11 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,9 +57,10 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 
 absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
     const std::string& cluster_name, const std::string& cluster_config,
+    const std::string& metrics_namespace,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
-  auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
+  auto config = std::shared_ptr<DynamicModuleClusterConfig>(new DynamicModuleClusterConfig(
+      cluster_name, cluster_config, metrics_namespace, std::move(module), stats_scope));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -138,8 +142,9 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
+    const std::string& metrics_namespace,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
+    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
       cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
 
@@ -719,12 +724,26 @@ DynamicModuleClusterFactory::createClusterWithConfig(
                                                   module_or_error.status().message()));
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
-      context.serverFactoryContext().serverScope());
+      proto_config.cluster_name(), cluster_config_bytes, metrics_namespace,
+      std::move(module_or_error.value()), context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
   }
 
   // Create the cluster.

@@ -57,7 +57,10 @@ public:
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc);
+  void handleMcpMethod(const nlohmann::json& json_rpc, Buffer::Instance& data);
+
+  // Maps the tool call request to the backend API.
+  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc, Buffer::Instance& data);
 
   // Sends MCP error response.
   void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
