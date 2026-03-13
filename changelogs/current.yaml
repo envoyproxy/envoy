@@ -633,5 +633,8 @@ new_features:
     Added :ref:`set() <config_http_filters_lua_stream_info_filter_state_wrapper>` to the Lua filter
     state API, allowing Lua scripts to create and store filter state objects dynamically using
     registered object factories.
+- area: formatter
+  change: |
+    Fixed a bug where the ``%TRACE_ID%`` string doesn't get substitued correctly in response body formatter.
 
 deprecated:
