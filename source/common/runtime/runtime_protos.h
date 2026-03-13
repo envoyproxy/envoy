@@ -38,6 +38,23 @@ private:
   Runtime::Loader& runtime_;
 };
 
+// Helper class for runtime-derived uint64.
+class UInt64 : Logger::Loggable<Logger::Id::runtime> {
+public:
+  UInt64(const envoy::config::core::v3::RuntimeUInt64& uint64_proto, Runtime::Loader& runtime)
+      : runtime_key_(uint64_proto.runtime_key()), default_value_(uint64_proto.default_value()),
+        runtime_(runtime) {}
+
+  const std::string& runtimeKey() const { return runtime_key_; }
+
+  uint64_t value() const { return runtime_.snapshot().getInteger(runtime_key_, default_value_); }
+
+private:
+  const std::string runtime_key_;
+  const uint64_t default_value_;
+  Runtime::Loader& runtime_;
+};
+
 // Helper class for runtime-derived boolean feature flags.
 class FeatureFlag {
 public:

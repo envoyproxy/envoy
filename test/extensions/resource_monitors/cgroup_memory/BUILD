@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/cgroup_memory:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

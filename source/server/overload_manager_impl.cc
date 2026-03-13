@@ -411,11 +411,11 @@ OverloadManagerImpl::create(Event::Dispatcher& dispatcher, Stats::Scope& stats_s
                             ThreadLocal::SlotAllocator& slot_allocator,
                             const envoy::config::overload::v3::OverloadManager& config,
                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                            const Server::Options& options) {
+                            const Server::Options& options, Runtime::Loader& runtime) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<OverloadManagerImpl>(
       new OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                              api, options, creation_status));
+                              api, options, runtime, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -424,7 +424,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Api::Api& api, const Server::Options& options,
-                                         absl::Status& creation_status)
+                                         Runtime::Loader& runtime, absl::Status& creation_status)
     : dispatcher_(dispatcher), time_source_(api.timeSource()), tls_(slot_allocator),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
@@ -434,7 +434,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           std::make_unique<
               absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
-                                                           validation_visitor);
+                                                           validation_visitor, runtime);
   // We should hide impl details from users, for them there should be no distinction between
   // proactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of proactive and regular resources. Proactive resources are not

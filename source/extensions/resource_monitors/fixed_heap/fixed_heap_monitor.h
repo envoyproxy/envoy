@@ -31,9 +31,8 @@ public:
  */
 class FixedHeapMonitor : public Server::ResourceMonitor {
 public:
-  FixedHeapMonitor(
-      const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
-      std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
+  FixedHeapMonitor(uint64_t max_heap_size_bytes, std::unique_ptr<MemoryStatsReader> stats =
+                                                     std::make_unique<MemoryStatsReader>());
 
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 

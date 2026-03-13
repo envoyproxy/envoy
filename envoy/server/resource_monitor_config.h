@@ -5,6 +5,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/options.h"
 #include "envoy/server/proactive_resource_monitor.h"
 #include "envoy/server/resource_monitor.h"
@@ -40,6 +41,11 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Runtime::Loader& the runtime loader for runtime key overrides.
+   */
+  virtual Runtime::Loader& runtime() PURE;
 };
 
 /**
