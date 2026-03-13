@@ -234,6 +234,7 @@ protected:
                absl::Status& creation_status);
 
 public:
+  size_t maxFilterCount() const override { return upstream_http_filter_factories_.size(); }
   bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.

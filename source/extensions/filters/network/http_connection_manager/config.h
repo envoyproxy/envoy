@@ -145,6 +145,7 @@ public:
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
   };
+  size_t maxFilterCount() const override { return filter_factories_.size(); }
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
                                 Http::FilterChainFactoryCallbacks& callbacks) const override;

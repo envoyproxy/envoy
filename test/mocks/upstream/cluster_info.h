@@ -159,6 +159,7 @@ public:
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
 
+  MOCK_METHOD(size_t, maxFilterCount, (), (const, override));
   MOCK_METHOD(bool, createFilterChain, (Http::FilterChainFactoryCallbacks & callbacks),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
