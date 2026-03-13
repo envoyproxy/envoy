@@ -181,7 +181,7 @@ void MetricAggregator::addHistogram(
     data_point->set_sum(stats.sampleSum());
 
     std::vector<uint64_t> bucket_counts = stats.computeDisjointBuckets();
-    for (size_t i = 0; i < stats.supportedBuckets().size(); ++i) {
+    for (size_t i = 0; i < stats.supportedBuckets().size(); i++) {
       data_point->add_explicit_bounds(stats.supportedBuckets()[i]);
       data_point->add_bucket_counts(bucket_counts[i]);
     }
