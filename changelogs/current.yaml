@@ -487,6 +487,12 @@ new_features:
     Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
     SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
     aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+- area: http
+  change: |
+    Added an optional :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`
+    for the :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>`
+    (XFCC) header. The format can be configured via :ref:`format
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`.
 - area: dynamic_modules
   change: |
     Added :ref:`load balancing policies
