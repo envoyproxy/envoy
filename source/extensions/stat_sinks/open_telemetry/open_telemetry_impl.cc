@@ -21,42 +21,134 @@ using NumberDataPoint = opentelemetry::proto::metrics::v1::NumberDataPoint;
 using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint;
 using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 
-void MetricAggregator::createNewRequest() {
-  current_request_metrics_.clear();
-  requests_.push_back(std::make_unique<MetricsExportRequest>());
-  auto* rm = requests_.back()->add_resource_metrics();
+absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints>
+MetricAggregator::releaseResult() {
+  return std::move(name_to_dps_);
+}
+
+void RequestBuilder::buildRequests(
+    absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints>& metrics) {
+  while (!metrics.empty()) {
+    auto node = metrics.extract(metrics.begin());
+    auto& metric_name = node.key();
+    auto& metric_data = node.mapped();
+
+    // Use either the aggregated or non-aggregated data points based on the configuration.
+    auto& gauge_points = enable_metric_aggregation_ ? metric_data.gauge_points_data
+                                                    : metric_data.non_aggregated_gauge_points;
+    handleGaugePointsList(metric_name, gauge_points, !enable_metric_aggregation_);
+
+    auto& sum_points = enable_metric_aggregation_ ? metric_data.sum_points_data
+                                                  : metric_data.non_aggregated_sum_points;
+    handleSumPointsList(metric_name, sum_points, !enable_metric_aggregation_,
+                        metric_data.sum_temporality);
+
+    auto& histogram_points = enable_metric_aggregation_
+                                 ? metric_data.histogram_points_data
+                                 : metric_data.non_aggregated_histogram_points;
+    handleHistogramPointsList(metric_name, histogram_points, !enable_metric_aggregation_,
+                              metric_data.histogram_temporality);
+  }
+
+  metrics.clear();
+  if (current_request_ != nullptr) {
+    send_callback_(std::move(current_request_));
+  }
+}
+
+void RequestBuilder::ensureRequest() {
+  // If we have an active request and it hasn't exceeded the max data point limit, we can keep using
+  // it.
+  if (current_request_ != nullptr && (max_dp_ == 0 || dp_num_ < max_dp_)) {
+    return;
+  }
+
+  // If we have an active request but it's full, send it off before creating a new one.
+  if (current_request_ != nullptr) {
+    send_callback_(std::move(current_request_));
+  }
+
+  current_request_ = std::make_unique<MetricsExportRequest>();
+  auto* rm = current_request_->add_resource_metrics();
   for (const auto& attr : resource_attributes_) {
     *rm->mutable_resource()->add_attributes() = attr;
   }
   current_scope_metrics_ = rm->add_scope_metrics();
-  cur_dp_num_ = 0;
+  dp_num_ = 0;
 }
 
-MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(absl::string_view metric_name) {
-  auto metric_name_str = std::string(metric_name);
-  auto it = metrics_.find(metric_name_str);
-  if (it == metrics_.end()) {
-    it = metrics_.emplace(metric_name_str, MetricData{}).first;
+void RequestBuilder::handleGaugePointsList(
+    const std::string& metric_name,
+    std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints,
+    bool unaggregated_split) {
+  Metric* metric = nullptr;
+  for (auto& item : datapoints) {
+    ensureRequest();
+    // Create a new metric entry if we just started a request, don't have one yet, or if we must
+    // split.
+    if (dp_num_ == 0 || metric == nullptr || unaggregated_split) {
+      metric = current_scope_metrics_->add_metrics();
+      metric->set_name(metric_name);
+    }
+    *metric->mutable_gauge()->add_data_points() = std::move(item);
+    dp_num_++;
+  }
+}
+
+void RequestBuilder::handleSumPointsList(
+    const std::string& metric_name,
+    std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints,
+    bool unaggregated_split,
+    opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
+  Metric* metric = nullptr;
+  for (auto& item : datapoints) {
+    ensureRequest();
+    // Create a new metric entry if we just started a request, don't have one yet, or if we must
+    // split.
+    if (dp_num_ == 0 || metric == nullptr || unaggregated_split) {
+      metric = current_scope_metrics_->add_metrics();
+      metric->set_name(metric_name);
+      metric->mutable_sum()->set_is_monotonic(true);
+      metric->mutable_sum()->set_aggregation_temporality(temporality);
+    }
+    *metric->mutable_sum()->add_data_points() = std::move(item);
+    dp_num_++;
+  }
+}
+
+void RequestBuilder::handleHistogramPointsList(
+    const std::string& metric_name,
+    std::vector<::opentelemetry::proto::metrics::v1::HistogramDataPoint>& datapoints,
+    bool unaggregated_split,
+    opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
+  Metric* metric = nullptr;
+  for (auto& item : datapoints) {
+    ensureRequest();
+    // Create a new metric entry if we just started a request, don't have one yet, or if we must
+    // split.
+    if (dp_num_ == 0 || metric == nullptr || unaggregated_split) {
+      metric = current_scope_metrics_->add_metrics();
+      metric->set_name(metric_name);
+      metric->mutable_histogram()->set_aggregation_temporality(temporality);
+    }
+    *metric->mutable_histogram()->add_data_points() = std::move(item);
+    dp_num_++;
+  }
+}
+
+MetricAggregator::MetricDataPoints&
+MetricAggregator::getOrCreateMetricDataPoints(absl::string_view metric_name) {
+  auto it = name_to_dps_.find(metric_name);
+  if (it == name_to_dps_.end()) {
+    it = name_to_dps_.emplace(metric_name, MetricDataPoints{}).first;
   }
   return it->second;
-}
-
-Metric* MetricAggregator::getOrCreateMetricInCurrentRequest(absl::string_view metric_name) {
-  auto metric_name_str = std::string(metric_name);
-  auto it = current_request_metrics_.find(metric_name_str);
-  if (it != current_request_metrics_.end()) {
-    return it->second;
-  }
-  Metric* metric = current_scope_metrics_->add_metrics();
-  metric->set_name(metric_name_str);
-  current_request_metrics_[metric_name_str] = metric;
-  return metric;
 }
 
 template <typename DataPoint>
 void MetricAggregator::setCommonDataPoint(
     DataPoint& data_point,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes,
     AggregationTemporality temporality) const {
   if (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
     data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
@@ -65,172 +157,135 @@ void MetricAggregator::setCommonDataPoint(
   }
   data_point.set_time_unix_nano(snapshot_time_ns_);
 
-  for (const auto& attr : attributes) {
-    *data_point.add_attributes() = attr;
-  }
+  *data_point.mutable_attributes() = std::move(attributes);
 }
 
 void MetricAggregator::addGauge(
     const std::string& metric_name, uint64_t value,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes) {
+  MetricDataPoints& metric_data = getOrCreateMetricDataPoints(metric_name);
   if (!enable_metric_aggregation_) {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = current_scope_metrics_->add_metrics();
-    metric->set_name(metric_name);
-    NumberDataPoint* data_point = metric->mutable_gauge()->add_data_points();
-    setCommonDataPoint(*data_point, attributes,
+    NumberDataPoint data_point;
+    setCommonDataPoint(data_point, std::move(attributes),
                        AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
-    data_point->set_as_int(value);
+    data_point.set_as_int(value);
+    metric_data.non_aggregated_gauge_points.push_back(std::move(data_point));
     return;
   }
-  MetricData& metric_data = getOrCreateMetric(metric_name);
 
-  DataPointKey key;
-  for (const auto& attr : attributes) {
-    key.attributes.emplace(attr.key(), attr.value().string_value());
-  }
+  DataPointKey key(attributes);
 
-  auto dp_it = metric_data.gauge_points.find(key);
-  if (dp_it != metric_data.gauge_points.end()) {
-    dp_it->second->set_as_int(dp_it->second->as_int() + value);
+  auto dp_it = metric_data.gauge_points_indices.find(key);
+  if (dp_it != metric_data.gauge_points_indices.end()) {
+    metric_data.gauge_points_data[dp_it->second].set_as_int(
+        metric_data.gauge_points_data[dp_it->second].as_int() + value);
   } else {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = getOrCreateMetricInCurrentRequest(metric_name);
-    NumberDataPoint* data_point = metric->mutable_gauge()->add_data_points();
-    setCommonDataPoint(*data_point, attributes,
+    NumberDataPoint data_point;
+    setCommonDataPoint(data_point, std::move(attributes),
                        AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
-    data_point->set_as_int(value);
-    metric_data.gauge_points[key] = data_point;
+    data_point.set_as_int(value);
+    size_t index = metric_data.gauge_points_data.size();
+    metric_data.gauge_points_data.push_back(std::move(data_point));
+    metric_data.gauge_points_indices[key] = index;
   }
 }
 
 void MetricAggregator::addCounter(
     absl::string_view metric_name, uint64_t value, uint64_t delta,
     AggregationTemporality temporality,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes) {
   const uint64_t point_value =
       (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value;
   if (point_value == 0 && temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
+  MetricDataPoints& metric_data = getOrCreateMetricDataPoints(metric_name);
+  metric_data.sum_temporality = temporality;
+
   if (!enable_metric_aggregation_) {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = current_scope_metrics_->add_metrics();
-    metric->set_name(std::string(metric_name));
-    metric->mutable_sum()->set_is_monotonic(true);
-    metric->mutable_sum()->set_aggregation_temporality(temporality);
-    NumberDataPoint* data_point = metric->mutable_sum()->add_data_points();
-    setCommonDataPoint(*data_point, attributes, temporality);
-    data_point->set_as_int(point_value);
+    NumberDataPoint data_point;
+    setCommonDataPoint(data_point, std::move(attributes), temporality);
+    data_point.set_as_int(point_value);
+    metric_data.non_aggregated_sum_points.push_back(std::move(data_point));
     return;
   }
-  MetricData& metric_data = getOrCreateMetric(metric_name);
 
-  DataPointKey key;
-  for (const auto& attr : attributes) {
-    key.attributes.emplace(attr.key(), attr.value().string_value());
-  }
+  DataPointKey key(attributes);
 
-  auto dp_it = metric_data.sum_points.find(key);
-  if (dp_it != metric_data.sum_points.end()) {
-    dp_it->second->set_as_int(dp_it->second->as_int() + point_value);
+  auto dp_it = metric_data.sum_points_indices.find(key);
+  if (dp_it != metric_data.sum_points_indices.end()) {
+    metric_data.sum_points_data[dp_it->second].set_as_int(
+        metric_data.sum_points_data[dp_it->second].as_int() + point_value);
   } else {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = getOrCreateMetricInCurrentRequest(metric_name);
-    metric->mutable_sum()->set_is_monotonic(true);
-    metric->mutable_sum()->set_aggregation_temporality(temporality);
-    NumberDataPoint* data_point = metric->mutable_sum()->add_data_points();
-    setCommonDataPoint(*data_point, attributes, temporality);
-    data_point->set_as_int(point_value);
-    metric_data.sum_points[key] = data_point;
+    NumberDataPoint data_point;
+    setCommonDataPoint(data_point, std::move(attributes), temporality);
+    data_point.set_as_int(point_value);
+    size_t index = metric_data.sum_points_data.size();
+    metric_data.sum_points_data.push_back(std::move(data_point));
+    metric_data.sum_points_indices[key] = index;
   }
 }
 
 void MetricAggregator::addHistogram(
     const std::string& metric_name, const Envoy::Stats::HistogramStatistics& stats,
     AggregationTemporality temporality,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes) {
   if (stats.sampleCount() == 0 &&
       temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
-  if (!enable_metric_aggregation_) {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = current_scope_metrics_->add_metrics();
-    metric->set_name(metric_name);
-    metric->mutable_histogram()->set_aggregation_temporality(temporality);
-    HistogramDataPoint* data_point = metric->mutable_histogram()->add_data_points();
-    setCommonDataPoint(*data_point, attributes, temporality);
-    data_point->set_count(stats.sampleCount());
-    data_point->set_sum(stats.sampleSum());
+  MetricDataPoints& metric_data = getOrCreateMetricDataPoints(metric_name);
+  metric_data.histogram_temporality = temporality;
 
-    std::vector<uint64_t> bucket_counts = stats.computeDisjointBuckets();
-    for (size_t i = 0; i < stats.supportedBuckets().size(); i++) {
-      data_point->add_explicit_bounds(stats.supportedBuckets()[i]);
-      data_point->add_bucket_counts(bucket_counts[i]);
-    }
-    data_point->add_bucket_counts(stats.outOfBoundCount());
+  if (!enable_metric_aggregation_) {
+    HistogramDataPoint data_point;
+    configureHistogramPoint(data_point, attributes, stats, temporality);
+    metric_data.non_aggregated_histogram_points.push_back(std::move(data_point));
     return;
   }
 
-  MetricData& metric_data = getOrCreateMetric(metric_name);
+  DataPointKey key(attributes);
 
-  DataPointKey key;
-  for (const auto& attr : attributes) {
-    key.attributes.emplace(attr.key(), attr.value().string_value());
-  }
-
-  auto dp_it = metric_data.histogram_points.find(key);
-  if (dp_it != metric_data.histogram_points.end()) {
+  auto dp_it = metric_data.histogram_points_indices.find(key);
+  if (dp_it != metric_data.histogram_points_indices.end()) {
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
-    if (static_cast<size_t>(dp_it->second->explicit_bounds_size()) ==
+    auto& existing_point = metric_data.histogram_points_data[dp_it->second];
+    if (static_cast<size_t>(existing_point.explicit_bounds_size()) ==
             stats.supportedBuckets().size() &&
-        static_cast<size_t>(dp_it->second->bucket_counts_size()) == new_bucket_counts.size() + 1) {
-      dp_it->second->set_count(dp_it->second->count() + stats.sampleCount());
-      dp_it->second->set_sum(dp_it->second->sum() + stats.sampleSum());
+        static_cast<size_t>(existing_point.bucket_counts_size()) == new_bucket_counts.size() + 1) {
+      existing_point.set_count(existing_point.count() + stats.sampleCount());
+      existing_point.set_sum(existing_point.sum() + stats.sampleSum());
       for (size_t i = 0; i < new_bucket_counts.size(); ++i) {
-        dp_it->second->set_bucket_counts(i, dp_it->second->bucket_counts(i) + new_bucket_counts[i]);
+        existing_point.set_bucket_counts(i, existing_point.bucket_counts(i) + new_bucket_counts[i]);
       }
-      dp_it->second->set_bucket_counts(new_bucket_counts.size(),
-                                       dp_it->second->bucket_counts(new_bucket_counts.size()) +
+      existing_point.set_bucket_counts(new_bucket_counts.size(),
+                                       existing_point.bucket_counts(new_bucket_counts.size()) +
                                            stats.outOfBoundCount());
     }
   } else {
-    if (requests_.empty() || (max_dp_ > 0 && cur_dp_num_ >= max_dp_)) {
-      createNewRequest();
-    }
-    cur_dp_num_++;
-    Metric* metric = getOrCreateMetricInCurrentRequest(metric_name);
-    metric->mutable_histogram()->set_aggregation_temporality(temporality);
-    HistogramDataPoint* data_point = metric->mutable_histogram()->add_data_points();
-    setCommonDataPoint(*data_point, attributes, temporality);
-    data_point->set_count(stats.sampleCount());
-    data_point->set_sum(stats.sampleSum());
-
-    std::vector<uint64_t> bucket_counts = stats.computeDisjointBuckets();
-    for (size_t i = 0; i < stats.supportedBuckets().size(); ++i) {
-      data_point->add_explicit_bounds(stats.supportedBuckets()[i]);
-      data_point->add_bucket_counts(bucket_counts[i]);
-    }
-    data_point->add_bucket_counts(stats.outOfBoundCount());
-    metric_data.histogram_points[key] = data_point;
+    HistogramDataPoint data_point;
+    configureHistogramPoint(data_point, attributes, stats, temporality);
+    size_t index = metric_data.histogram_points_data.size();
+    metric_data.histogram_points_data.push_back(std::move(data_point));
+    metric_data.histogram_points_indices[key] = index;
   }
+}
+
+void MetricAggregator::configureHistogramPoint(
+    ::opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
+    const Envoy::Stats::HistogramStatistics& stats, AggregationTemporality temporality) const {
+  setCommonDataPoint(data_point, std::move(attributes), temporality);
+  data_point.set_count(stats.sampleCount());
+  data_point.set_sum(stats.sampleSum());
+
+  std::vector<uint64_t> bucket_counts = stats.computeDisjointBuckets();
+  for (size_t i = 0; i < stats.supportedBuckets().size(); ++i) {
+    data_point.add_explicit_bounds(stats.supportedBuckets()[i]);
+    data_point.add_bucket_counts(bucket_counts[i]);
+  }
+  data_point.add_bucket_counts(stats.outOfBoundCount());
 }
 
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
@@ -362,9 +417,7 @@ void OtlpMetricsFlusherImpl::flush(
                        std::chrono::duration_cast<std::chrono::nanoseconds>(
                            snapshot.snapshotTime().time_since_epoch())
                            .count(),
-                       delta_start_time_ns, cumulative_start_time_ns,
-                       config_->maxDatapointsPerRequest(), config_->resource_attributes());
-
+                       delta_start_time_ns, cumulative_start_time_ns);
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
@@ -443,9 +496,10 @@ void OtlpMetricsFlusherImpl::flush(
     }
   }
 
-  for (auto& request : aggregator.releaseRequests()) {
-    send_callback(std::move(request));
-  }
+  auto metrics = aggregator.releaseResult();
+  RequestBuilder builder(config_->enableMetricAggregation(), config_->maxDatapointsPerRequest(),
+                         config_->resource_attributes(), std::move(send_callback));
+  builder.buildRequests(metrics);
 }
 
 } // namespace OpenTelemetry
