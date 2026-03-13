@@ -952,12 +952,21 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
 
 void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
+
+  // Check if there's a custom status code set via upstream override host (e.g., from stateful
+  // session filter in strict mode).
+  Http::Code response_code = Http::Code::ServiceUnavailable;
+  auto override_host = callbacks_->upstreamOverrideHost();
+  if (override_host.has_value() && override_host->status_on_missing_destination.has_value()) {
+    response_code = override_host->status_on_missing_destination.value();
+  }
+
+  chargeUpstreamCode(response_code, {}, false);
   absl::string_view details = optional_details.empty()
                                   ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
                                   : optional_details;
-  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
-                             absl::nullopt, details);
+  callbacks_->sendLocalReply(response_code, "no healthy upstream", modify_headers_, absl::nullopt,
+                             details);
 }
 
 uint64_t Filter::calculateEffectiveBufferLimit() const {

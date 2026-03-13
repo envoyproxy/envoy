@@ -414,10 +414,10 @@ bool envoy_dynamic_module_callback_lb_context_get_override_host(
   if (!override_host.has_value()) {
     return false;
   }
-  auto host_address = override_host.value().first;
+  auto host_address = override_host.value().host;
   address->ptr = const_cast<char*>(host_address.data());
   address->length = host_address.size();
-  *strict = override_host.value().second;
+  *strict = override_host.value().strict;
   return true;
 }
 

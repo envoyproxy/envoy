@@ -54,11 +54,14 @@ public:
 
   bool isStrict() const { return strict_; }
 
+  Http::Code statusOnMissingDestination() const { return status_on_missing_destination_; }
+
   OptRef<StatefulSessionFilterStats> stats() { return makeOptRefFromPtr(stats_.get()); }
 
 private:
   Http::SessionStateFactorySharedPtr factory_;
   bool strict_{false};
+  Http::Code status_on_missing_destination_{Http::Code::ServiceUnavailable};
   std::shared_ptr<StatefulSessionFilterStats> stats_;
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;

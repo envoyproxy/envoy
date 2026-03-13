@@ -257,6 +257,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: stateful_session
+  change: |
+    Added :ref:`status_on_missing_destination
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.status_on_missing_destination>`
+    to configure the HTTP status code returned in :ref:`strict mode
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>` when the
+    requested destination is unavailable. Defaults to ``503 Service Unavailable``.
 - area: filters
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.

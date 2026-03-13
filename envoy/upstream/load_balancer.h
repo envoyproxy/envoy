@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
@@ -146,14 +147,30 @@ public:
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
   /**
-   * Upstream override host. The first element is the target host address and the second element is
-   * a boolean indicating whether the host should be selected strictly or not.
-   * If the host should be selected strictly and no valid host is found, the load balancer should
-   * return  nullptr.
-   * If the host should not be selected strictly, the load balancer will select another host is the
-   * target host is not valid.
+   * Upstream override host structure.
    */
-  using OverrideHost = std::pair<absl::string_view, bool>;
+  struct OverrideHost {
+    // Default constructor
+    OverrideHost() = default;
+
+    // Constructor for backward compatibility (host, strict)
+    OverrideHost(absl::string_view host_arg, bool strict_arg)
+        : host(host_arg), strict(strict_arg) {}
+
+    // Constructor with optional status code
+    OverrideHost(absl::string_view host_arg, bool strict_arg, absl::optional<Http::Code> status_arg)
+        : host(host_arg), strict(strict_arg), status_on_missing_destination(status_arg) {}
+
+    // The target host address to select.
+    absl::string_view host;
+    // Whether the host should be selected strictly or not.
+    // If strict and no valid host is found, the load balancer should return nullptr.
+    // If not strict, the load balancer will select another host if the target host is not valid.
+    bool strict{false};
+    // Optional HTTP status code to return when strict mode is enabled and the target host is
+    // unavailable. If not set, defaults to 503 Service Unavailable.
+    absl::optional<Http::Code> status_on_missing_destination{absl::nullopt};
+  };
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm

@@ -1634,7 +1634,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 
   EXPECT_CALL(context, overrideHostToSelect())
       .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:11001", false))));
+          Upstream::LoadBalancerContext::OverrideHost{"127.0.0.1:11001", false})));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1664,8 +1664,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
 
   EXPECT_CALL(context, overrideHostToSelect())
       .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host. Let the LB choose the host.
-          std::make_pair("127.0.0.2:12345", false))));
+          Upstream::LoadBalancerContext::OverrideHost{"127.0.0.2:12345", false})));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1686,9 +1685,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
 
   EXPECT_CALL(context, overrideHostToSelect())
       .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host and indicate strict mode.
-          // LB should not be allowed to choose host.
-          std::make_pair("127.0.0.2:12345", true))));
+          Upstream::LoadBalancerContext::OverrideHost{"127.0.0.2:12345", true})));
 
   // Requested upstream host 127.0.0.2:12345 is not part of the cluster.
   // Connection pool should not be created.

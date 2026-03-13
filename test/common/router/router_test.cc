@@ -1032,6 +1032,27 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_EQ(callbacks_.details(), "no_healthy_upstream");
 }
 
+TEST_F(RouterTest, NoHostWithCustomStatusFromOverrideHost) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+
+  EXPECT_CALL(callbacks_, upstreamOverrideHost())
+      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
+          Upstream::LoadBalancerContext::OverrideHost{"1.2.3.4", true,
+                                                      absl::make_optional(Http::Code::NotFound)})));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "404"}, {"content-length", "19"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(callbacks_.details(), "no_healthy_upstream");
+}
+
 TEST_F(RouterTest, RouterLoadShedTest) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -7770,10 +7791,10 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
       .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("1.2.3.4", false))));
+          Upstream::LoadBalancerContext::OverrideHost{"1.2.3.4", false})));
 
   auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value().first);
+  EXPECT_EQ("1.2.3.4", override_host.value().host);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
