@@ -381,6 +381,28 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   ASSERT_NE(key, ns_res_body->second.fields().end());
   EXPECT_EQ(key->second.string_value(), "value");
 
+  // Check list metadata set by the filter during on_response_body.
+  auto ns_list = metadata.filter_metadata().find("ns_list");
+  // Verify number list.
+  auto list_key = ns_list->second.fields().find("list_key");
+  ASSERT_TRUE(list_key->second.has_list_value());
+  ASSERT_EQ(list_key->second.list_value().values_size(), 3);
+  EXPECT_EQ(list_key->second.list_value().values(0).number_value(), 1.0);
+  EXPECT_EQ(list_key->second.list_value().values(1).number_value(), 2.0);
+  EXPECT_EQ(list_key->second.list_value().values(2).number_value(), 3.0);
+  // Verify string list.
+  auto str_list_key = ns_list->second.fields().find("str_list_key");
+  ASSERT_TRUE(str_list_key->second.has_list_value());
+  ASSERT_EQ(str_list_key->second.list_value().values_size(), 2);
+  EXPECT_EQ(str_list_key->second.list_value().values(0).string_value(), "hello");
+  EXPECT_EQ(str_list_key->second.list_value().values(1).string_value(), "world");
+  // Verify bool list.
+  auto bool_list_key = ns_list->second.fields().find("bool_list_key");
+  ASSERT_TRUE(bool_list_key->second.has_list_value());
+  ASSERT_EQ(bool_list_key->second.list_value().values_size(), 2);
+  EXPECT_EQ(bool_list_key->second.list_value().values(0).bool_value(), true);
+  EXPECT_EQ(bool_list_key->second.list_value().values(1).bool_value(), false);
+
   filter->onDestroy();
 }
 

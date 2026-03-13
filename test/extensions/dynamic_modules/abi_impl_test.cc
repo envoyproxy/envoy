@@ -195,7 +195,8 @@ WEAK_STUB(CertValidatorGetFilterState,
                                                                         nullptr))
 
 WEAK_STUB(ClusterAddHosts,
-          envoy_dynamic_module_callback_cluster_add_hosts(nullptr, nullptr, nullptr, 0, nullptr))
+          envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
+                                                          nullptr, nullptr, nullptr, 0, 0, nullptr))
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
@@ -279,6 +280,17 @@ WEAK_STUB(ClusterLbAsyncHostSelectionComplete,
           envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(nullptr, nullptr,
                                                                                  nullptr,
                                                                                  {nullptr, 0}))
+WEAK_STUB(ClusterLbGetMemberUpdateHostAddress,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(nullptr, 0, true,
+                                                                                  nullptr))
+WEAK_STUB(ClusterUpdateHostHealth,
+          envoy_dynamic_module_callback_cluster_update_host_health(
+              nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
+WEAK_STUB(ClusterFindHostByAddress,
+          envoy_dynamic_module_callback_cluster_find_host_by_address(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterLbFindHostByAddress,
+          envoy_dynamic_module_callback_cluster_lb_find_host_by_address(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterLbGetHost, envoy_dynamic_module_callback_cluster_lb_get_host(nullptr, 0, 0))
 WEAK_STUB(ClusterSchedulerNew, envoy_dynamic_module_callback_cluster_scheduler_new(nullptr))
 WEAK_STUB(ClusterSchedulerDelete, envoy_dynamic_module_callback_cluster_scheduler_delete(nullptr))
 WEAK_STUB(ClusterSchedulerCommit,
@@ -944,6 +956,46 @@ WEAK_STUB(NetworkFilterGetConnectionState,
           envoy_dynamic_module_callback_network_filter_get_connection_state(nullptr))
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
+
+WEAK_STUB(NetworkSetDynamicMetadataBool,
+          envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},
+                                                                          {nullptr, 0}, true))
+WEAK_STUB(NetworkGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(nullptr, {nullptr, 0},
+                                                                          {nullptr, 0}, nullptr))
+
+WEAK_STUB(ListenerFilterGetAddressType,
+          envoy_dynamic_module_callback_listener_filter_get_address_type(nullptr))
+
+WEAK_STUB(ListenerFilterGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ListenerFilterSetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+
+WEAK_STUB(HttpAddDynamicMetadataListNumber,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0}, 0))
+WEAK_STUB(HttpAddDynamicMetadataListString,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(nullptr, {nullptr, 0},
+                                                                              {nullptr, 0},
+                                                                              {nullptr, 0}))
+WEAK_STUB(HttpAddDynamicMetadataListBool,
+          envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(nullptr, {nullptr, 0},
+                                                                            {nullptr, 0}, true))
+WEAK_STUB(HttpGetMetadataListSize, envoy_dynamic_module_callback_http_get_metadata_list_size(
+                                       nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                       {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(HttpGetMetadataListNumber, envoy_dynamic_module_callback_http_get_metadata_list_number(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_metadata_list_string(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
+                                       nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                       {nullptr, 0}, {nullptr, 0}, 0, nullptr))
 
 } // namespace
 } // namespace DynamicModules
