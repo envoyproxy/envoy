@@ -31,6 +31,10 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
 class DynamicModuleClusterTestPeer;
@@ -66,12 +70,14 @@ public:
    *
    * @param cluster_name the name identifying the cluster implementation in the module.
    * @param cluster_config the configuration bytes to pass to the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
+         const std::string& metrics_namespace,
          Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
 
   ~DynamicModuleClusterConfig();
@@ -262,6 +268,7 @@ public:
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
+                             const std::string& metrics_namespace,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
                              Stats::Scope& stats_scope);
 

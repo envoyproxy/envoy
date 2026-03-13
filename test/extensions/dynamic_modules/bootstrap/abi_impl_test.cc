@@ -35,8 +35,9 @@ TEST_F(BootstrapAbiImplTest, SchedulerLifecycle) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -54,8 +55,9 @@ TEST_F(BootstrapAbiImplTest, SchedulerCommit) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -85,8 +87,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -119,9 +122,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
         testDataDir() + "/libbootstrap_no_op.so", false);
     ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-    auto config = newDynamicModuleBootstrapExtensionConfig("test", "config",
-                                                           std::move(dynamic_module.value()),
-                                                           dispatcher_, context_, context_.store_);
+    auto config = newDynamicModuleBootstrapExtensionConfig(
+        "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+        context_, context_.store_);
     ASSERT_TRUE(config.ok()) << config.status();
 
     // Create a scheduler via the ABI callback.
@@ -154,8 +157,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Call onScheduled directly - this should call the in-module hook.
@@ -176,8 +180,9 @@ TEST_F(BootstrapAbiImplTest, InitTargetAutoRegisteredAndSignal) {
   // The init manager should receive an add call during config creation.
   EXPECT_CALL(context_.init_manager_, add(_));
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // The C no-op module already called signal_init_complete during config creation.
@@ -196,8 +201,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutClusterNotFound) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock to return nullptr for the cluster lookup.
@@ -228,8 +234,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutMissingHeaders) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Headers missing :method, :path, and host.
@@ -254,8 +261,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -312,8 +320,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureReset) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -360,8 +369,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureExceedBufferLimit) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -409,8 +419,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutCannotCreateRequest) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -446,8 +457,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -502,8 +514,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -553,8 +566,9 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -617,8 +631,9 @@ TEST_F(BootstrapAbiImplTest, GetCounterValueExisting) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -640,8 +655,9 @@ TEST_F(BootstrapAbiImplTest, GetCounterValueNonExistent) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -665,8 +681,9 @@ TEST_F(BootstrapAbiImplTest, GetGaugeValueExisting) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -688,8 +705,9 @@ TEST_F(BootstrapAbiImplTest, GetGaugeValueNonExistent) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -715,8 +733,9 @@ TEST_F(BootstrapAbiImplTest, IterateCounters) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -751,8 +770,9 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -787,8 +807,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a counter without labels.
@@ -820,8 +841,9 @@ TEST_F(BootstrapAbiImplTest, IncrementCounterInvalidId) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Try to increment a counter with an invalid ID.
@@ -836,8 +858,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a gauge without labels.
@@ -874,8 +897,9 @@ TEST_F(BootstrapAbiImplTest, GaugeOperationsInvalidId) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Try to set, increment, and decrement a gauge with an invalid ID.
@@ -896,8 +920,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a histogram without labels.
@@ -925,8 +950,9 @@ TEST_F(BootstrapAbiImplTest, RecordHistogramInvalidId) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Try to record a histogram value with an invalid ID.
@@ -941,8 +967,9 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define multiple counters.
@@ -998,8 +1025,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a counter vec with labels.
@@ -1028,8 +1056,9 @@ TEST_F(BootstrapAbiImplTest, IncrementCounterVecInvalidLabels) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a counter vec with 2 labels.
@@ -1053,8 +1082,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a gauge vec with labels.
@@ -1090,8 +1120,9 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define a histogram vec with labels.
@@ -1120,8 +1151,9 @@ TEST_F(BootstrapAbiImplTest, VecMetricsInvalidIdAndLabels) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Define vec metrics with a single label each.
@@ -1195,8 +1227,9 @@ TEST_F(BootstrapAbiImplTest, TimerLifecycle) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   // The MockDispatcher's createTimer_ returns a NiceMock<MockTimer> by default.
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a timer via the ABI callback.
@@ -1228,8 +1261,9 @@ TEST_F(BootstrapAbiImplTest, TimerFired) {
   // Use MockTimer to capture the timer callback.
   Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a timer via the ABI callback. This will use the MockTimer we set up.
@@ -1266,9 +1300,9 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
       return new testing::NiceMock<Event::MockTimer>();
     }));
 
-    auto config = newDynamicModuleBootstrapExtensionConfig("test", "config",
-                                                           std::move(dynamic_module.value()),
-                                                           dispatcher_, context_, context_.store_);
+    auto config = newDynamicModuleBootstrapExtensionConfig(
+        "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+        context_, context_.store_);
     ASSERT_TRUE(config.ok()) << config.status();
 
     // Create a timer via the ABI callback.
@@ -1298,8 +1332,9 @@ TEST_F(BootstrapAbiImplTest, RegisterAdminHandler) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Expect the admin handler to be registered.
@@ -1319,8 +1354,9 @@ TEST_F(BootstrapAbiImplTest, RegisterAdminHandlerFails) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Expect the admin handler registration to fail.
@@ -1343,8 +1379,9 @@ TEST_F(BootstrapAbiImplTest, RegisterAdminHandlerNoAdmin) {
   // Override admin() to return nullopt.
   EXPECT_CALL(context_, admin()).WillRepeatedly(testing::Return(OptRef<Server::Admin>{}));
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   envoy_dynamic_module_type_module_buffer path_prefix = {"/no_admin", 9};
@@ -1360,8 +1397,9 @@ TEST_F(BootstrapAbiImplTest, RemoveAdminHandler) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   EXPECT_CALL(context_.admin_, removeHandler("/test_prefix")).WillOnce(testing::Return(true));
@@ -1378,8 +1416,9 @@ TEST_F(BootstrapAbiImplTest, RemoveAdminHandlerNotFound) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   EXPECT_CALL(context_.admin_, removeHandler("/nonexistent")).WillOnce(testing::Return(false));
@@ -1399,8 +1438,9 @@ TEST_F(BootstrapAbiImplTest, RemoveAdminHandlerNoAdmin) {
   // Override admin() to return nullopt.
   EXPECT_CALL(context_, admin()).WillRepeatedly(testing::Return(OptRef<Server::Admin>{}));
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   envoy_dynamic_module_type_module_buffer path_prefix = {"/no_admin", 9};
@@ -1415,8 +1455,9 @@ TEST_F(BootstrapAbiImplTest, AdminHandlerCallbackInvokesEventHook) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Capture the handler callback when addHandler is called.
@@ -1462,8 +1503,9 @@ TEST_F(BootstrapAbiImplTest, TimerReEnable) {
 
   Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a timer via the ABI callback.
