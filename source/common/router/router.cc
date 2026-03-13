@@ -61,56 +61,6 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 } // namespace
 
-// Updates retry-related stats across cluster, virtual-cluster, and route scopes based on the
-// outcome of a shouldRetry* call.
-void Filter::updateRetryStats(RetryStatus retry_status) {
-  switch (retry_status) {
-  case RetryStatus::No:
-    // If this request is itself a retry and the response no longer needs
-    // another retry, the retry was successful.
-    if (is_retry_) {
-      cluster_->trafficStats()->upstream_rq_retry_success_.inc();
-      if (request_vcluster_) {
-        request_vcluster_->stats().upstream_rq_retry_success_.inc();
-      }
-      if (route_stats_context_) {
-        route_stats_context_->stats().upstream_rq_retry_success_.inc();
-      }
-    }
-    break;
-  case RetryStatus::NoRetryLimitExceeded:
-    cluster_->trafficStats()->upstream_rq_retry_limit_exceeded_.inc();
-    if (request_vcluster_) {
-      request_vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
-    }
-    if (route_stats_context_) {
-      route_stats_context_->stats().upstream_rq_retry_limit_exceeded_.inc();
-    }
-    break;
-  case RetryStatus::NoOverflow:
-    cluster_->trafficStats()->upstream_rq_retry_overflow_.inc();
-    if (request_vcluster_) {
-      request_vcluster_->stats().upstream_rq_retry_overflow_.inc();
-    }
-    if (route_stats_context_) {
-      route_stats_context_->stats().upstream_rq_retry_overflow_.inc();
-    }
-    break;
-  case RetryStatus::Yes:
-    cluster_->trafficStats()->upstream_rq_retry_.inc();
-    if (request_vcluster_) {
-      request_vcluster_->stats().upstream_rq_retry_.inc();
-    }
-    if (route_stats_context_) {
-      route_stats_context_->stats().upstream_rq_retry_.inc();
-    }
-    break;
-  case RetryStatus::NoRuntime:
-    // No stats to update for this case.
-    break;
-  }
-}
-
 absl::StatusOr<std::unique_ptr<FilterConfig>>
 FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                      ShadowWriterPtr&& shadow_writer,
@@ -1363,13 +1313,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
           // before. In this way, QUIC won't be falsely marked as broken.
           doRetry(/*can_send_early_data*/ false, can_use_http3, TimeoutRetry::Yes);
         });
-
-    if (retry_status != RetryStatus::Yes) {
-      // Count the non-retry cases here. And the retry case is counted in doRetry() when the retry
-      // is triggered. To avoid the case where we scheduled a retry but before the retry is
-      // triggered, the request is reset or completed.
-      updateRetryStats(retry_status);
-    }
+    updateStatsOnNoRetry(retry_status);
 
     if (retry_status == RetryStatus::Yes) {
       runRetryOptionsPredicates(upstream_request);
@@ -1562,13 +1506,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
         doRetry(can_send_early_data, disable_http3 ? false : can_use_http3, is_timeout_retry);
       },
       upstream_request_started_);
-
-  if (retry_status != RetryStatus::Yes) {
-    // Count the non-retry cases here. And the retry case is counted in doRetry() when the retry is
-    // triggered. To avoid the case where we scheduled a retry but before the retry is triggered,
-    // the request is reset or completed.
-    updateRetryStats(retry_status);
-  }
+  updateStatsOnNoRetry(retry_status);
 
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
@@ -1859,13 +1797,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
               bool disable_early_data) -> void {
             doRetry((disable_early_data ? false : had_early_data), can_use_http3, TimeoutRetry::No);
           });
-
-      if (retry_status != RetryStatus::Yes) {
-        // Count the non-retry cases here. And the retry case is counted in doRetry() when the retry
-        // is triggered. To avoid the case where we scheduled a retry but before the retry is
-        // triggered, the request is reset or completed.
-        updateRetryStats(retry_status);
-      }
+      updateStatsOnNoRetry(retry_status);
 
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
@@ -2315,14 +2247,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   // updated even if host selection fails or is slow. This also ensures that if the retry attempt
   // fails due to a timeout during host selection, the retry attempt will be counted in the retry
   // stats.
-  updateRetryStats(RetryStatus::Yes);
   const RetryState::DoRetryType do_retry_type =
       retry_state_ ? retry_state_->doRetryType() : RetryState::DoRetryType::Immediately;
-  if (do_retry_type == RetryState::DoRetryType::Exponential) {
-    cluster_->trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
-  } else if (do_retry_type == RetryState::DoRetryType::Ratelimited) {
-    cluster_->trafficStats()->upstream_rq_retry_backoff_ratelimited_.inc();
-  }
+  updateStatsOnDoRetry(do_retry_type);
 
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
@@ -2531,6 +2458,57 @@ const Router::RetryPolicy* Filter::getEffectiveRetryPolicy() const {
     retry_policy = route_entry_->retryPolicy().get();
   }
   return retry_policy;
+}
+
+#define INC_RETRY_STATS(STAT)                                                                      \
+  cluster_->trafficStats()->STAT.inc();                                                            \
+  if (request_vcluster_) {                                                                         \
+    request_vcluster_->stats().STAT.inc();                                                         \
+  }                                                                                                \
+  if (route_stats_context_) {                                                                      \
+    route_stats_context_->stats().STAT.inc();                                                      \
+  }
+
+// Updates retry-related stats across cluster, virtual-cluster, and route scopes based on the
+// outcome of a shouldRetry* call.
+void Filter::updateStatsOnNoRetry(RetryStatus retry_status) {
+  switch (retry_status) {
+  case RetryStatus::No:
+    // If this request is itself a retry and the response no longer needs
+    // another retry, the retry was successful.
+    if (is_retry_) {
+      INC_RETRY_STATS(upstream_rq_retry_success_);
+    }
+    break;
+  case RetryStatus::NoRetryLimitExceeded:
+    INC_RETRY_STATS(upstream_rq_retry_limit_exceeded_);
+    break;
+  case RetryStatus::NoOverflow:
+    INC_RETRY_STATS(upstream_rq_retry_overflow_);
+    break;
+  case RetryStatus::Yes:
+    // This case should be handled in the doRetry() call specifically.
+    break;
+  case RetryStatus::NoRuntime:
+    // No stats to update for this case.
+    break;
+  }
+}
+
+void Filter::updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type) {
+  INC_RETRY_STATS(upstream_rq_retry_);
+
+  switch (do_retry_type) {
+  case RetryState::DoRetryType::Immediately:
+    // No backoff applied, so no additional stats to update.
+    break;
+  case RetryState::DoRetryType::Ratelimited:
+    cluster_->trafficStats()->upstream_rq_retry_backoff_ratelimited_.inc();
+    break;
+  case RetryState::DoRetryType::Exponential:
+    cluster_->trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
+    break;
+  }
 }
 
 RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,

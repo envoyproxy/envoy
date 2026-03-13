@@ -615,7 +615,8 @@ private:
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
                        absl::string_view host_selection_details);
-  void updateRetryStats(RetryStatus retry_status);
+  void updateStatsOnNoRetry(RetryStatus retry_status);
+  void updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Returns the effective retry policy to use for this request.
