@@ -650,6 +650,11 @@ new_features:
     to distinguish Envoy generated local replies from upstream responses. This matcher input returns ``true``
     for local replies and ``false`` for upstream responses, enabling ``custom_response`` filter policies to
     selectively apply only to locally generated error responses.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` request transcoding. Support for ``tools/list`` and
+    ``tools/call`` response transcoding is planned. This filter is currently a work-in-progress and
+    not recommended for production use.
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header
