@@ -73,6 +73,12 @@ def envoy_select_enable_http3(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+def envoy_select_enable_protovalidate(xs, repository = ""):
+    return select({
+        repository + "//bazel:protovalidate_disabled": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if yaml is enabled in the current build.
 def envoy_select_enable_yaml(xs, repository = ""):
     return select({

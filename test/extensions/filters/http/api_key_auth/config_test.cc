@@ -22,7 +22,7 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   - key: key1
     client: user2
   key_sources:
-  - header: "Authorization
+  - header: "Authorization"
   )";
 
   ApiKeyAuthProto proto_config;

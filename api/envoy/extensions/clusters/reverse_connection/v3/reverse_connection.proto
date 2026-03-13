@@ -4,6 +4,8 @@ package envoy.extensions.clusters.reverse_connection.v3;
 
 import "google/protobuf/duration.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -22,7 +24,8 @@ message ReverseConnectionClusterConfig {
   // Hosts that are not referenced by any connection pool are deleted during cleanup.
   //
   // If unset, Envoy uses a default of 60s.
-  google.protobuf.Duration cleanup_interval = 1 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration cleanup_interval = 1
+      [(validate.rules).duration = {gt {}}, (buf.validate.field).duration = {gt {}}];
 
   // Host identifier format string.
   //
@@ -45,7 +48,8 @@ message ReverseConnectionClusterConfig {
   // * ``node-%REQ(x-tenant-id)%-%REQ(x-region)%``: Combine multiple values.
   //
   // If the format string evaluates to an empty value, the request will not be routed.
-  string host_id_format = 2 [(validate.rules).string = {min_len: 1}];
+  string host_id_format = 2
+      [(validate.rules).string = {min_len: 1}, (buf.validate.field).string = {min_len: 1}];
 
   // Tenant identifier format string for tenant-aware isolation.
   //
@@ -70,5 +74,9 @@ message ReverseConnectionClusterConfig {
   // The delimiter used for concatenation is internal and not configurable. Users should
   // ensure that tenant identifiers and host identifiers do not contain the delimiter character
   // (``:``) to avoid ambiguity.
-  string tenant_id_format = 3 [(validate.rules).string = {max_len: 1024 ignore_empty: true}];
+  string tenant_id_format = 3 [
+    (validate.rules).string = {max_len: 1024 ignore_empty: true},
+    (buf.validate.field).string = {max_len: 1024},
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 }

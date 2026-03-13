@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.filter.http.header_to_metadata.v2;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -50,7 +52,8 @@ message Config {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_bytes: 1}];
+    string key = 2
+        [(validate.rules).string = {min_bytes: 1}, (buf.validate.field).string = {min_len: 1}];
 
     // The value to pair with the given key.
     //
@@ -72,8 +75,10 @@ message Config {
   // A Rule defines what metadata to apply when a header is present or missing.
   message Rule {
     // The header that triggers this rule — required.
-    string header = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+    string header = 1 [
+      (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false},
+      (buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}
+    ];
 
     // If the header is present, apply this metadata KeyValuePair.
     //

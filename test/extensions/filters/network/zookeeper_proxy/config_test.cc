@@ -52,13 +52,11 @@ latency_threshold_overrides:)EOF";
 };
 
 TEST_F(ZookeeperFilterConfigTest, ValidateFail) {
-  EXPECT_THROW_WITH_REGEX(
-      ZooKeeperConfigFactory()
-          .createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(), context_)
-          .IgnoreError(),
-      ProtoValidationException,
-      "Proto constraint validation failed \\(ZooKeeperProxyValidationError.StatPrefix: value "
-      "length must be at least 1 characters\\)");
+  EXPECT_THROW_WITH_REGEX(ZooKeeperConfigFactory()
+                              .createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(), context_)
+                              .IgnoreError(),
+                          ProtoValidationException,
+                          "stat_prefix: value length must be at least 1 characters");
 }
 
 TEST_F(ZookeeperFilterConfigTest, InvalidStatPrefix) {
@@ -66,10 +64,9 @@ TEST_F(ZookeeperFilterConfigTest, InvalidStatPrefix) {
 stat_prefix: ""
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), ProtoValidationException,
-      "Proto constraint validation failed \\(ZooKeeperProxyValidationError.StatPrefix: value "
-      "length must be at least 1 characters\\)");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_),
+                          ProtoValidationException,
+                          "stat_prefix: value length must be at least 1 characters");
 }
 
 TEST_F(ZookeeperFilterConfigTest, InvalidMaxPacketBytes) {
@@ -104,8 +101,9 @@ latency_threshold_overrides:
       nanos: -150000000
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-                          "Invalid duration: Expected positive duration");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+      "latency_threshold_overrides.threshold: value must be greater than or equal to 0.001s");
 }
 
 TEST_F(ZookeeperFilterConfigTest, TooSmallLatencyThreshold) {
@@ -119,10 +117,7 @@ latency_threshold_overrides:
 
   EXPECT_THROW_WITH_REGEX(
       TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-      "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
-      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value must be "
-      "greater than or equal to 1ms\\)");
+      "latency_threshold_overrides.threshold: value must be greater than or equal to 0.001s");
 }
 
 TEST_F(ZookeeperFilterConfigTest, UnsetLatencyThreshold) {
@@ -133,12 +128,8 @@ latency_threshold_overrides:
     threshold:
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
-      "Proto constraint validation failed "
-      "\\(ZooKeeperProxyValidationError.LatencyThresholdOverrides\\[0\\]: embedded message failed "
-      "validation \\| caused by LatencyThresholdOverrideValidationError.Threshold: value is "
-      "required\\)");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config_), EnvoyException,
+                          "latency_threshold_overrides.threshold: value is required");
 }
 
 TEST_F(ZookeeperFilterConfigTest, DuplicatedOpcodes) {

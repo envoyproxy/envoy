@@ -7,6 +7,8 @@ import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -49,7 +51,7 @@ message Decompressor {
   // is included in Envoy.
   // [#extension-category: envoy.compression.decompressor]
   config.core.v3.TypedExtensionConfig decompressor_library = 1
-      [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 
   // Configuration for request decompression. Decompression is enabled by default if left empty.
   RequestDirectionConfig request_direction_config = 2;

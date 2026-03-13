@@ -5,6 +5,8 @@ package envoy.data.tap.v3;
 import "envoy/data/tap/v3/http.proto";
 import "envoy/data/tap/v3/transport.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -25,6 +27,7 @@ message TraceWrapper {
 
   oneof trace {
     option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // An HTTP buffered tap trace.
     HttpBufferedTrace http_buffered_trace = 1;

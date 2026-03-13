@@ -68,7 +68,7 @@ settings: {}
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
-                          ProtoValidationException, "embedded message failed validation");
+                          ProtoValidationException, "settings.op_timeout: value is required");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectProto) {
@@ -195,7 +195,8 @@ settings:
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException,
-                          "ConnectionRateLimitPerSec: value must be greater than 0");
+                          "settings.connection_rate_limit.connection_rate_limit_per_sec: value "
+                          "must be greater than 0");
 }
 
 // Verify async gRPC client is created if external auth is enabled.

@@ -123,8 +123,8 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     (*rbac.mutable_policies())["foo"] = policy;
 
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
-                            ".*value must contain at least")
+                            "policies.permissions: value must contain at least 1 item.s., "
+                            "policies.principals: value must contain at least 1 item");
   }
 
   {
@@ -134,9 +134,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     policy.add_permissions();
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(
-        TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions.*rule.*is required");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "policies.principals: value must contain at least 1 item.s., "
+                            "policies.permissions.rule: exactly one field is required in oneof");
   }
 
   {
@@ -150,8 +150,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
     EXPECT_THROW_WITH_REGEX(
         TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
-        ".*PermissionValidationError\\.AndRules.*SetValidationError\\.Rules.*rule.*is required");
+        "policies.principals: value must contain at least 1 item.s., "
+        "policies.permissions.and_rules.rules.rule: exactly one field is required in "
+        "oneof");
   }
 
   {
@@ -163,8 +164,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     (*rbac.mutable_policies())["foo"] = policy;
 
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-                            ".*value must contain at least")
+                            "policies.principals: value must contain at least 1 item");
   }
 
   {
@@ -176,9 +176,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     policy.add_principals();
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-                            ".*identifier.*is required");
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "policies.principals.identifier: exactly one field is required in oneof");
   }
 
   {
@@ -192,10 +192,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     and_ids->add_ids();
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(
-        TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-        ".*PrincipalValidationError\\.AndIds.*SetValidationError\\.Ids.*identifier.*is required");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "policies.principals.and_ids.ids.identifier: exactly one field "
+                            "is required in oneof");
   }
 }
 

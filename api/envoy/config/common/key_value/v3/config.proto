@@ -4,6 +4,7 @@ package envoy.config.common.key_value.v3;
 
 import "envoy/config/core/v3/extension.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -22,5 +23,6 @@ message KeyValueStoreConfig {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
   // [#extension-category: envoy.common.key_value]
-  core.v3.TypedExtensionConfig config = 1 [(validate.rules).message = {required: true}];
+  core.v3.TypedExtensionConfig config = 1
+      [(validate.rules).message = {required: true}, (buf.validate.field).required = true];
 }
