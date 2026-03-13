@@ -333,7 +333,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::VirtualHostConstSharedPtr& virtualHost() const override { return vhost_; }
 
-  Router::RouteConstSharedPtr route() const override { return route_; }
+  const Router::RouteConstSharedPtr& route() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };

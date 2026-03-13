@@ -1892,7 +1892,8 @@ TEST_P(WasmHttpFilterTest, Property) {
   EXPECT_CALL(encoder_callbacks_, connection())
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection}));
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
+  request_stream_info_.route_ = route;
+  EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(ReturnRef(request_stream_info_.route_));
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(

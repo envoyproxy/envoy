@@ -150,7 +150,7 @@ public:
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
-  MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
+  MOCK_METHOD(const Router::RouteConstSharedPtr&, route, (), (const));
   MOCK_METHOD(const Router::VirtualHostConstSharedPtr&, virtualHost, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
@@ -224,6 +224,7 @@ public:
   std::string downstream_local_close_reason_;
   DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   std::string stream_flags_;
+  Router::RouteConstSharedPtr route_;
   Router::VirtualHostConstSharedPtr virtual_host_;
 };
 

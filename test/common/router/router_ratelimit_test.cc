@@ -143,7 +143,8 @@ virtual_hosts:
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
-  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
+  stream_info_.route_ = route;
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
 
   EXPECT_EQ(0U, route_entry->rateLimitPolicy().getApplicableRateLimit(0).size());
   EXPECT_TRUE(route_entry->rateLimitPolicy().empty());
@@ -169,7 +170,8 @@ virtual_hosts:
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
-  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
+  stream_info_.route_ = route;
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
 
   EXPECT_FALSE(route_entry->rateLimitPolicy().empty());
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
@@ -203,7 +205,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www2test"}, {});
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info_, 0);
-  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
+  stream_info_.route_ = route;
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route->virtualHost()->rateLimitPolicy().getApplicableRateLimit(0);
@@ -244,7 +247,8 @@ virtual_hosts:
   setupTest(yaml);
   auto route = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info_, 0);
   auto* route_entry = route->routeEntry();
-  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
+  stream_info_.route_ = route;
+  ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_entry->rateLimitPolicy().getApplicableRateLimit(0);
@@ -282,7 +286,8 @@ public:
     THROW_IF_NOT_OK(creation_status); // NOLINT
     descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
-    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
+    stream_info_.route_ = route_;
+    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -306,7 +311,8 @@ public:
     THROW_IF_NOT_OK(creation_status); // NOLINT
     descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
-    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
+    stream_info_.route_ = route_;
+    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::ReturnRef(stream_info_.route_));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;

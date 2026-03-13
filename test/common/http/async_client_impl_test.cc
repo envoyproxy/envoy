@@ -2411,7 +2411,7 @@ TEST_F(AsyncClientImplTest, ParentStreamInfo) {
 
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRoute) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(ReturnRef(parent_stream_info.route_));
 
   auto options = AsyncClient::StreamOptions();
   options.parent_context.stream_info = &parent_stream_info;
@@ -2430,7 +2430,8 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRoute) {
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRouteEntry) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
   const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+  parent_stream_info.route_ = route;
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(ReturnRef(parent_stream_info.route_));
 
   EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(nullptr));
 
@@ -2451,7 +2452,8 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRouteEntry) {
 TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithValidRouteEntry) {
   NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
   const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+  parent_stream_info.route_ = route;
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(ReturnRef(parent_stream_info.route_));
 
   NiceMock<Router::MockRouteEntry> route_entry;
   const auto metadata_criteria =
