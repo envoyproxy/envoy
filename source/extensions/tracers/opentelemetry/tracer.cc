@@ -1,6 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
 #include <cstdint>
+#include <iterator>
 #include <string>
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
@@ -56,6 +57,45 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
   }
 }
 
+/**
+ * Moves the spans from the span buffer to the request.
+ * Note that the spans are *moved* to the request, so the span vector will be
+ * full of invalid spans after this call.
+ */
+void moveResourceSpansToRequest(const Resource& global_resource,
+                                const Resource* per_tenant_resource,
+                                std::vector<::opentelemetry::proto::trace::v1::Span>& spans,
+                                ExportTraceServiceRequest& request) {
+  ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
+  absl::string_view schema_url =
+      per_tenant_resource != nullptr && !per_tenant_resource->schema_url_.empty()
+          ? per_tenant_resource->schema_url_
+          : global_resource.schema_url_;
+  resource_span->set_schema_url(schema_url);
+  for (auto const& [key, value] : global_resource.attributes_) {
+    if (per_tenant_resource != nullptr && per_tenant_resource->attributes_.contains(key)) {
+      // The per-tenant resource attributes fully override the global ones.
+      continue;
+    }
+    auto* new_attribute = resource_span->mutable_resource()->add_attributes();
+    new_attribute->set_key(key);
+    new_attribute->mutable_value()->set_string_value(value);
+  }
+  if (per_tenant_resource != nullptr) {
+    for (auto const& [key, value] : per_tenant_resource->attributes_) {
+      // Add per-tenant resource attributes.
+      auto* new_attribute = resource_span->mutable_resource()->add_attributes();
+      new_attribute->set_key(key);
+      new_attribute->mutable_value()->set_string_value(value);
+    }
+  }
+
+  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
+  *scope_span->mutable_scope()->mutable_name() = "envoy";
+  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  scope_span->mutable_spans()->Add(std::make_move_iterator(spans.begin()),
+                                   std::make_move_iterator(spans.end()));
+}
 } // namespace
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
@@ -69,6 +109,8 @@ Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
 
   span_.set_name(name);
   span_.set_start_time_unix_nano(std::chrono::nanoseconds(start_time.time_since_epoch()).count());
+
+  resource_ = parent_tracer_.resourceProvider().getResource(stream_info);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& name,
@@ -76,8 +118,11 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
                            std::string(tracestate()));
-  return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
-                                  ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  auto child_span =
+      parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
+                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+  child_span->setResource(resource_);
+  return child_span;
 }
 
 void Span::finishSpan() {
@@ -85,7 +130,12 @@ void Span::finishSpan() {
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
   if (sampled()) {
-    parent_tracer_.sendSpan(span_);
+    if (resource_ != nullptr) {
+      parent_tracer_.sendSpanWithResource(resource_, std::move(span_));
+    } else {
+      parent_tracer_.sendSpan(std::move(span_));
+    }
+    span_.Clear();
   }
 }
 
@@ -200,10 +250,10 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size, std::shared_ptr<ResourceProvider> resource_provider)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
-      tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      tracing_stats_(tracing_stats), resource_(resource), resource_provider_(resource_provider),
+      sampler_(sampler), max_cache_size_(max_cache_size) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -219,38 +269,23 @@ void Tracer::enableTimer() {
 }
 
 void Tracer::flushSpans() {
-  if (span_buffer_.empty()) {
+  if (span_buffer_.empty() && per_tenant_span_buffer_.empty()) {
     return;
   }
 
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
-  ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  resource_span->set_schema_url(resource_->schema_url_);
-
-  // add resource attributes
-  for (auto const& att : resource_->attributes_) {
-    opentelemetry::proto::common::v1::KeyValue key_value =
-        opentelemetry::proto::common::v1::KeyValue();
-    opentelemetry::proto::common::v1::AnyValue value_proto =
-        opentelemetry::proto::common::v1::AnyValue();
-    value_proto.set_string_value(std::string{att.second});
-    key_value.set_key(std::string{att.first});
-    *key_value.mutable_value() = value_proto;
-    (*resource_span->mutable_resource()->add_attributes()) = key_value;
+  if (!span_buffer_.empty()) {
+    moveResourceSpansToRequest(*resource_, nullptr, span_buffer_, request);
+  }
+  for (auto& [resource, spans] : per_tenant_span_buffer_) {
+    // This function does the merging of global and per-tenant resource attributes
+    // with minimal copying.
+    moveResourceSpansToRequest(*resource_, resource.get(), spans, request);
   }
 
-  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
-
-  // set the instrumentation scope name and version
-  *scope_span->mutable_scope()->mutable_name() = "envoy";
-  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
-
-  for (const auto& pending_span : span_buffer_) {
-    (*scope_span->add_spans()) = pending_span;
-  }
   if (exporter_) {
-    tracing_stats_.spans_sent_.add(span_buffer_.size());
+    tracing_stats_.spans_sent_.add(span_count_);
     if (!exporter_->log(request)) {
       // TODO: should there be any sort of retry or reporting here?
       ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
@@ -259,10 +294,12 @@ void Tracer::flushSpans() {
     ENVOY_LOG(info, "Skipping log request to OpenTelemetry: no exporter configured");
   }
   span_buffer_.clear();
+  per_tenant_span_buffer_.clear();
+  span_count_ = 0;
 }
 
-void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
-  if (span_buffer_.size() >= max_cache_size_) {
+void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span&& span) {
+  if (span_count_ >= max_cache_size_) {
     ENVOY_LOG_EVERY_POW_2(
         warn,
         "Span buffer size exceeded maximum limit. Discarding span. Current size: {}, Max size: {}",
@@ -271,19 +308,40 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
     flushSpans();
     return;
   }
-  span_buffer_.push_back(span);
+  span_buffer_.push_back(std::move(span));
+  ++span_count_;
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
-  if (span_buffer_.size() >= min_flush_spans) {
+  if (span_count_ >= min_flush_spans) {
     flushSpans();
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
-                                   const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                                   Tracing::Decision tracing_decision,
-                                   OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+void Tracer::sendSpanWithResource(ResourceConstSharedPtr resource,
+                                  ::opentelemetry::proto::trace::v1::Span&& span) {
+  if (span_count_ >= max_cache_size_) {
+    ENVOY_LOG_EVERY_POW_2(
+        warn,
+        "Span buffer size exceeded maximum limit. Discarding span. Current size: {}, Max size: {}",
+        span_buffer_.size(), max_cache_size_);
+    tracing_stats_.spans_dropped_.inc();
+    flushSpans();
+    return;
+  }
+  per_tenant_span_buffer_[resource].push_back(std::move(span));
+  ++span_count_;
+  const uint64_t min_flush_spans =
+      runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
+  if (span_count_ >= min_flush_spans) {
+    flushSpans();
+  }
+}
+
+std::unique_ptr<Span> Tracer::startSpan(const std::string& operation_name,
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        SystemTime start_time, Tracing::Decision tracing_decision,
+                                        OptRef<const Tracing::TraceContext> trace_context,
+                                        OTelSpanKind span_kind) {
   // If reached here, then this is main span for request and there is no previous span context.
   // If the custom sampler is set, then the Envoy tracing decision is ignored and the custom sampler
   // should make a sampling decision, otherwise the local Envoy tracing decision is used.
@@ -292,6 +350,8 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
                                          *this, span_kind, use_local_decision);
+  new_span->setResource(resource_provider_->getResource(stream_info));
+
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
@@ -305,11 +365,11 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   return new_span;
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
-                                   const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                                   const SpanContext& parent_context,
-                                   OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+std::unique_ptr<Span> Tracer::startSpan(const std::string& operation_name,
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        SystemTime start_time, const SpanContext& parent_context,
+                                        OptRef<const Tracing::TraceContext> trace_context,
+                                        OTelSpanKind span_kind) {
   // If reached here, then this is main span for request with a parent context or this is
   // subsequent spans. Ignore the Envoy tracing decision anyway.
 
@@ -320,6 +380,8 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   if (!parent_context.spanId().empty()) {
     new_span->setParentId(parent_context.spanId());
   }
+  new_span->setResource(resource_provider_->getResource(stream_info));
+
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
   new_span->setId(Hex::uint64ToHex(span_id));

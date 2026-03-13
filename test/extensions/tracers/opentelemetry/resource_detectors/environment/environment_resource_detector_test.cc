@@ -30,7 +30,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariableNotPresent) {
 
   auto detector =
       std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_TRUE(resource.attributes_.empty());
@@ -47,7 +47,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentButEmpty) {
 
   auto detector =
       std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_TRUE(resource.attributes_.empty());
@@ -68,7 +68,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributes) {
 
   auto detector =
       std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(2, resource.attributes_.size());
@@ -96,7 +96,7 @@ TEST(EnvironmentResourceDetectorTest, EnvVariablePresentAndWithAttributesWrongFo
 
   auto detector =
       std::make_unique<EnvironmentResourceDetector>(config, context.serverFactoryContext());
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(1, resource.attributes_.size());

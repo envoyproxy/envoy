@@ -25,31 +25,44 @@ public:
   virtual ~ResourceProvider() = default;
 
   /**
-   * @brief Iterates through all loaded resource detectors and merge all the returned
-   * resources into one. Resource merging is done according to the OpenTelemetry
-   * resource SDK specification. @see
-   * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge.
-   *
-   * @param opentelemetry_config The OpenTelemetry configuration, which contains the configured
-   * resource detectors.
-   * @param context The tracer factory context.
+   * @brief Returns the resource held by this provider.
    * @return Resource const The merged resource.
    */
-  virtual Resource
-  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
-                  resource_detectors,
-              Server::Configuration::ServerFactoryContext& context,
-              absl::string_view service_name) const PURE;
+  virtual ResourceConstSharedPtr getResource() const PURE;
+
+  virtual ResourceConstSharedPtr getResource(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 using ResourceProviderPtr = std::shared_ptr<ResourceProvider>;
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
-  Resource
-  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
-                  resource_detectors,
-              Server::Configuration::ServerFactoryContext& context,
-              absl::string_view service_name) const override;
+  /**
+   * @brief Iterates through all loaded resource detectors and merge all the
+   * returned resources into one. Resource merging is done according to the
+   * OpenTelemetry resource SDK specification. @see
+   * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge.*/
+  ResourceProviderImpl(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+          resource_detectors,
+      Server::Configuration::ServerFactoryContext& context, absl::string_view service_name);
+
+  ResourceConstSharedPtr getResource() const override { return global_resource_; }
+
+  /**
+   * @brief Iterates through all loaded resource detectors. As soon as a resource
+   * detector returns a non-null resource, that resource is returned. Currently,
+   * no merging is done for stream-specific resources, favoring a "first detector
+   * wins" approach for simplicity and performance. While merging, similar to
+   * global resources, was considered for more advanced use cases, the current
+   * implementation prioritizes a clear source for stream-specific attributes.
+   */
+  ResourceConstSharedPtr getResource(const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  std::vector<ResourceDetectorPtr> resource_detectors_;
+  Envoy::Server::Configuration::ServerFactoryContext& context_;
+  std::string service_name_;
+  ResourceConstSharedPtr global_resource_;
 };
 
 } // namespace OpenTelemetry

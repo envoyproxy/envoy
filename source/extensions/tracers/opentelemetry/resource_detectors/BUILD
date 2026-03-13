@@ -11,6 +11,7 @@ envoy_extension_package()
 envoy_cc_library(
     name = "resource_detector_lib",
     srcs = [
+        "resource_detector.cc",
         "resource_provider.cc",
     ],
     hdrs = [

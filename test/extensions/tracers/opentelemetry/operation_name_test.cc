@@ -1,5 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/config.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
@@ -9,12 +10,22 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+class MockResourceProvider : public ResourceProvider {
+public:
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (), (const));
+  MOCK_METHOD(ResourceConstSharedPtr, getResource, (const StreamInfo::StreamInfo&), (const));
+};
 
 class OpenTelemetryTracerOperationNameTest : public testing::Test {
 public:
@@ -40,6 +51,14 @@ TEST_F(OpenTelemetryTracerOperationNameTest, OperationName) {
   // - The span returned by `Tracer::startSpan` has as its name the
   //   operation name passed to `Tracer::startSpan`
   // - `Span::setOperation` sets the name of the span
+  //
+  // - The span returned by `Tracer::startSpan` has as its name the
+  //   operation name passed to `Tracer::startSpan`
+  // - `Span::setOperation` sets the name of the span
+  //
+  // - The span returned by `Tracer::startSpan` has as its name the
+  //   operation name passed to `Tracer::startSpan`
+  // - `Span::setOperation` sets the name of the span
 
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -52,7 +71,11 @@ TEST_F(OpenTelemetryTracerOperationNameTest, OperationName) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  auto driver = std::make_unique<Driver>(opentelemetry_config, context);
+  auto resource_provider = std::make_shared<NiceMock<MockResourceProvider>>();
+  EXPECT_CALL(*resource_provider, getResource(_))
+      .WillRepeatedly(Return(std::make_shared<Resource>()));
+
+  auto driver = std::make_unique<Driver>(opentelemetry_config, context, resource_provider);
 
   const std::string operation_name = "initial_operation_name";
   Tracing::SpanPtr tracing_span = driver->startSpan(
