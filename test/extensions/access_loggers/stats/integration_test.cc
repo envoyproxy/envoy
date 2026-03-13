@@ -279,5 +279,75 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
+TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUnprotected) {
+  const std::string config_yaml = R"(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
+)";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"},       {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-eviction-test-tag"},
+  };
+
+  // Request 1: starts gauge at 1.
+  auto codec_client1 = makeHttpConnection(lookupPort("http"));
+  auto response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
+
+  // Simulate eviction from the store.
+  absl::Notification evict_done;
+  test_server_->server().dispatcher().post([this, &evict_done]() {
+    test_server_->statStore().evictUnused();
+    test_server_->statStore().evictUnused();
+    evict_done.Notify();
+  });
+  evict_done.WaitForNotification();
+
+  // Request 2: starts another concurrent request using the same tag.
+  auto codec_client2 = makeHttpConnection(lookupPort("http"));
+  auto response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for the second request to reach upstream.
+  // We need to keep track of the second upstream request.
+  FakeStreamPtr upstream_request2;
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  // The gauge should be kept even with eviction happened and the active request is 2.
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 2);
+
+  // Clean up.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
+  upstream_request2->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 0);
+}
+
 } // namespace
 } // namespace Envoy

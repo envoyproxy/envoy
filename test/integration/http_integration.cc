@@ -97,6 +97,13 @@ IntegrationCodecClient::IntegrationCodecClient(
   }
 }
 
+IntegrationCodecClient::~IntegrationCodecClient() {
+  // The base class owns connection_ and will destroy it after callbacks_ (owned by this class)
+  // is destroyed. Therefore, we must remove the callbacks from the connection here to prevent
+  // a use-after-free when connection_ is destroyed.
+  connection_->removeConnectionCallbacks(callbacks_);
+}
+
 void IntegrationCodecClient::flushWrite() {
   connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   // NOTE: We should run blocking until all the body data is flushed.

@@ -104,6 +104,7 @@ public:
   void initialize(const envoy::extensions::access_loggers::stats::v3::Config& config) {
     auto* gauge = new NiceMock<MockGaugeWithTags>();
     gauge_ = gauge;
+    ON_CALL(*gauge_, value()).WillByDefault(testing::Return(10));
     gauge_ptr_ = Stats::GaugeSharedPtr(gauge_);
     gauge_->name_ = "gauge";
     gauge_->setTagExtractedName("gauge");
@@ -604,6 +605,36 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   logger_->log(formatter_context_, stream_info_);
 }
 
+TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 0
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD with value 0
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+
+  // The first time it gets the gauge and calls add(0).
+  // We don't expect it to actually be added to inflight_gauges_.
+  EXPECT_CALL(store_, gauge(_, _)).WillRepeatedly(testing::ReturnRef(*gauge_));
+
+  // EXPECT_CALL(*gauge_, add(0));  // Removed because addInflightGauge skips if value == 0
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  // We expect no `sub(0)` interaction here because it wasn't added to inflight_gauges_.
+  EXPECT_CALL(*gauge_, sub(_)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+}
+
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
@@ -648,18 +679,21 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
 
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
 
-  // Called once on log() and once on destruction.
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  // Called once on log().
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
   // Expect subtraction on destruction
   EXPECT_CALL(*gauge_, sub(10));
 
+  // Destroy logger before stream_info to simulate logger config deletion while stream is active
+  logger_.reset();
+
   // local_stream_info goes out of scope here.
 }
 
-TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
+TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
     gauges:
@@ -691,44 +725,28 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorReconstructsGauge) {
 
   // Initial lookup and add
   EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
-      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
-        saved_name = name;
-        if (tags) {
-          for (const auto& tag : tags->get()) {
-            saved_tags_strs.emplace_back(store_.symbolTable().toString(tag.first),
-                                         store_.symbolTable().toString(tag.second));
-          }
-        }
-        EXPECT_FALSE(saved_tags_strs.empty());
-        auto* gauge_with_tags = dynamic_cast<MockGaugeWithTags*>(gauge_);
-        EXPECT_TRUE(gauge_with_tags != nullptr);
-        gauge_with_tags->setTags(tags->get(), store_.symbolTable());
-        return *gauge_;
-      }));
+      .WillRepeatedly(
+          Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
+                     Stats::Gauge::ImportMode) -> Stats::Gauge& {
+            saved_name = name;
+            if (tags) {
+              for (const auto& tag : tags->get()) {
+                saved_tags_strs.emplace_back(store_.symbolTable().toString(tag.first),
+                                             store_.symbolTable().toString(tag.second));
+              }
+              EXPECT_FALSE(saved_tags_strs.empty());
+              auto* gauge_with_tags = dynamic_cast<MockGaugeWithTags*>(gauge_);
+              EXPECT_TRUE(gauge_with_tags != nullptr);
+              gauge_with_tags->setTags(tags->get(), store_.symbolTable());
+            }
+            return *gauge_;
+          }));
+
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
-  // Simulate eviction from scope (or just verify lookup happens again)
-  // The destructor of AccessLogState should call gaugeFromStatNameWithTags again.
-  EXPECT_CALL(*mock_scope, gaugeFromStatNameWithTags(_, _, Stats::Gauge::ImportMode::Accumulate))
-      .WillOnce(Invoke([&](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Gauge::ImportMode) -> Stats::Gauge& {
-        EXPECT_EQ(name, saved_name);
-        EXPECT_TRUE(tags.has_value());
-        if (tags) {
-          const auto& tags_vec = tags->get();
-          // Detailed comparison
-          EXPECT_EQ(tags_vec.size(), 2);
-          if (tags_vec.size() == 2) {
-            EXPECT_EQ(store_.symbolTable().toString(tags_vec[0].first), "tag_name");
-            EXPECT_EQ(store_.symbolTable().toString(tags_vec[0].second), "200");
-            EXPECT_EQ(store_.symbolTable().toString(tags_vec[1].first), "another_tag");
-            EXPECT_EQ(store_.symbolTable().toString(tags_vec[1].second), "value_fixed");
-          }
-        }
-        return *gauge_;
-      }));
+  // The destructor of AccessLogState should call sub(10) directly on the saved gauge
+  // This will trigger a second lookup using gaugeFromString (tags == absl::nullopt).
   EXPECT_CALL(*gauge_, sub(10));
 
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.
@@ -1125,6 +1143,47 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
         return store_.mockScope().histogramFromStatNameWithTags(name, tags,
                                                                 Stats::Histogram::Unit::Bytes);
       }));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+      - stat:
+          name: gauge
+        value_fixed: 20
+        add_subtract:
+          add_log_type: TcpUpstreamConnected
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD for the first definition (DownstreamStart)
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*gauge_, add(10));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger ADD for the second definition (TcpUpstreamConnected)
+  formatter_context_.setAccessLogType(
+      envoy::data::accesslog::v3::AccessLogType::TcpUpstreamConnected);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  // The second gauge is added on TcpUpstreamConnected
+  EXPECT_CALL(*gauge_, add(20));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT for both (DownstreamEnd)
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  // It should sub(30) once, as they are accumulated into one stored map entry prior to removal
+  EXPECT_CALL(*gauge_, sub(30));
   logger_->log(formatter_context_, stream_info_);
 }
 

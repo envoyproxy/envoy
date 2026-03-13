@@ -1130,15 +1130,21 @@ void ThreadLocalStoreImpl::evictUnused() {
         MetricBag metrics(scope->scope_id_);
         CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
-          return [&unused_metrics](std::pair<StatName, T> kv) {
+          return [&unused_metrics](const auto& kv) {
             const auto& [name, metric] = kv;
             if (metric->used()) {
               metric->markUnused();
               return false;
-            } else {
-              unused_metrics.try_emplace(name, metric);
-              return true;
             }
+            // We assume the gauge is used as an updown counter here and if the value is 0, it is
+            // unused.
+            if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
+              if (metric->value() != 0) {
+                return false;
+              }
+            }
+            unused_metrics.try_emplace(name, metric);
+            return true;
           };
         };
         absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));

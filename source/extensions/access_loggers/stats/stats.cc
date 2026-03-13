@@ -17,66 +17,45 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
+// WARNING: Do not copy this object or share it with upstream. It is not guaranteed
+// that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
+  explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
-  // When the request is destroyed, we need to subtract the value from the gauge.
-  // We need to look up the gauge again in the scope because it might have been evicted.
-  // The gauge object itself is kept alive by the shared_ptr in the state, so we can access its
-  // name and tags to re-lookup/re-create it in the scope.
   ~AccessLogState() override {
-    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      // TODO(taoxuy):  make this as an accessor of the
-      // Stat class.
-      Stats::StatNameTagVector tag_names;
-      state.gauge_->iterateTagStatNames(
-          [&tag_names](Stats::StatName name, Stats::StatName value) -> bool {
-            tag_names.emplace_back(name, value);
-            return true;
-          });
-
-      // Using state.gauge_->statName() directly would be incorrect because it returns the fully
-      // qualified name (including tags). Passing this full name to scope_->gaugeFromStatName(...)
-      // would cause the scope to attempt tag extraction on the full name. Since the tags in
-      // AccessLogState are often dynamic and not configured in the global tag extractors, this
-      // extraction would likely fail to identify the tags correctly, resulting in a gauge with a
-      // different identity (the full name as the stat name and no tags).
-      auto& gauge = scope_->gaugeFromStatNameWithTags(
-          state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
-      gauge.sub(state.value_);
+    while (!inflight_gauges_.empty()) {
+      removeInflightGauge(inflight_gauges_.begin()->first);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_.try_emplace(gauge, Stats::GaugeSharedPtr(gauge), value);
+    if (value == 0) {
+      // We rely on the stats scope to evict the gauge if its value is 0.
+      return;
+    }
+    auto it = inflight_gauges_.try_emplace(gauge, 0).first;
+    it->second += value;
+    gauge->add(value);
   }
 
-  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
+  void removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
-    if (it == inflight_gauges_.end()) {
-      return absl::nullopt;
+    if (it != inflight_gauges_.end()) {
+      uint64_t value = it->second;
+      inflight_gauges_.erase(it);
+      gauge->sub(value);
     }
-    uint64_t value = it->second.value_;
-    inflight_gauges_.erase(it);
-    return value;
   }
 
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  struct State {
-    State(Stats::GaugeSharedPtr gauge, uint64_t value) : gauge_(std::move(gauge)), value_(value) {}
-
-    Stats::GaugeSharedPtr gauge_;
-    uint64_t value_;
-  };
-
   Stats::ScopeSharedPtr scope_;
 
-  // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure
-  // the gauge is not destroyed if it is evicted from the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
+  // The map key holds a raw pointer to the gauge to enable fast O(1) lookups during
+  // PAIRED_SUBTRACT.
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -430,12 +409,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
       state->addInflightGauge(&gauge_stat, value);
-      gauge_stat.add(value);
     } else {
-      absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
-      if (added_value.has_value()) {
-        gauge_stat.sub(added_value.value());
-      }
+      state->removeInflightGauge(&gauge_stat);
     }
     return;
   }
