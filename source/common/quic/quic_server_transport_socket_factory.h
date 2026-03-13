@@ -38,6 +38,29 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
+  struct SessionTicketConfig {
+    // True when session ticket encryption keys are explicitly configured via
+    // session_ticket_keys or session_ticket_keys_sds_secret_config. Without
+    // keys, the server cannot encrypt or decrypt session tickets.
+    bool has_keys;
+    // True when disable_stateless_session_resumption is set in
+    // DownstreamTlsContext. When enabled, the server will not issue session
+    // tickets and clients must perform full handshakes on every connection.
+    bool disable_stateless_resumption;
+    // True when an external mechanism (e.g., SDS provider) manages session
+    // resumption including ticket encryption/decryption. When set, Envoy
+    // should not install its own session ticket key processing callback.
+    bool handles_session_resumption;
+  };
+
+  SessionTicketConfig getSessionTicketConfig() const {
+    return {!config_->sessionTicketKeys().empty(), config_->disableStatelessSessionResumption(),
+            config_->capabilities().handles_session_resumption};
+  }
+
+  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                           HMAC_CTX* hmac_ctx, int encrypt) const;
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,

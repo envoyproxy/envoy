@@ -4,6 +4,7 @@
 
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -13,6 +14,14 @@
 
 namespace Envoy {
 namespace Quic {
+
+int EnvoyQuicProofSource::filterChainExDataIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(index >= 0, "Failed to allocate SSL ex_data index for filter chain");
+    return index;
+  }());
+}
 
 quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
@@ -113,7 +122,29 @@ void EnvoyQuicProofSource::updateFilterChainManager(
   filter_chain_manager_ = &filter_chain_manager;
 }
 
-void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) { registerCertCompression(ssl_ctx); }
+void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
+  registerCertCompression(ssl_ctx);
+
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
+    return;
+  }
+
+  SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx,
+                                   [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                                      HMAC_CTX* hmac_ctx, int encrypt) -> int {
+                                     auto* filter_chain = static_cast<const Network::FilterChain*>(
+                                         SSL_get_ex_data(ssl, filterChainExDataIndex()));
+                                     if (filter_chain == nullptr) {
+                                       return 0;
+                                     }
+
+                                     auto& transport_socket_factory =
+                                         static_cast<const QuicServerTransportSocketFactory&>(
+                                             filter_chain->transportSocketFactory());
+                                     return transport_socket_factory.sessionTicketProcess(
+                                         ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+                                   });
+}
 
 } // namespace Quic
 } // namespace Envoy
