@@ -84,12 +84,27 @@ void Span::log(SystemTime, const std::string&) {
   // Datadog spans don't have in-bound "events" or "logs".
 }
 
-void Span::finishSpan() { span_.reset(); }
+void Span::finishSpan() {
+  if (span_ && sampled_.has_value() && !sampled_.value()) {
+    span_->trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+  }
+  span_.reset();
+}
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   if (!span_) {
     return;
   }
+
+  // Apply the deferred sampling decision before injection so the correct
+  // priority is propagated in the trace context headers.
+  if (sampled_.has_value() && !sampled_.value()) {
+    span_->trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+  }
+  // When sampled is true or not set, don't override — let inject() handle it
+  // via make_sampling_decision_if_null() so the Datadog sampler decides.
 
   TraceContextWriter writer{trace_context};
   span_->inject(writer);
@@ -122,9 +137,10 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
-                                           : datadog::tracing::SamplingPriority::USER_DROP);
-  span_->trace_segment().override_sampling_priority(priority);
+  // Save the sampled state. The actual sampling priority override is deferred
+  // to injectContext()/finishSpan() so that a later setSampled(true) (e.g.
+  // from a route cache refresh) can undo an earlier setSampled(false).
+  sampled_ = sampled;
 }
 
 std::string Span::getBaggage(absl::string_view) {
