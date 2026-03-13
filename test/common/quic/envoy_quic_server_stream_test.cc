@@ -965,5 +965,29 @@ TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
   quic_stream_->OnStreamHeaderList(true, 0, header_list);
 }
 
+TEST_F(EnvoyQuicServerStreamTest, AllowObsTextBehavior) {
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_allow_obs_text()->set_value(false);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 16, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    // \x80 is obsolete text
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::REJECT,
+              stream->validateHeader("custom-header", "foo\x80"));
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo"));
+  }
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_allow_obs_text()->set_value(true);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 20, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo\x80"));
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy

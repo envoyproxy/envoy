@@ -541,7 +541,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -774,6 +774,11 @@ message Http2ProtocolOptions {
   //   request failures.
   google.protobuf.UInt32Value max_header_field_size_kb = 19
       [(validate.rules).uint32 = {lte: 256 gte: 64}];
+
+  // Whether to allow `obs-text` (characters from hexadecimal 0x80 to 0xff) in
+  // header field values.
+  // If not set, it defaults to true.
+  google.protobuf.BoolValue allow_obs_text = 20;
 }
 
 // [#not-implemented-hide:]
@@ -785,7 +790,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -827,6 +832,11 @@ message Http3ProtocolOptions {
   // Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
   // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
   bool disable_connection_flow_control_for_streams = 8;
+
+  // Whether to allow `obs-text` (characters from hexadecimal 0x80 to 0xff) in
+  // header field values.
+  // If not set, it defaults to true for alignment with HTTP/2 (Shinkansen).
+  google.protobuf.BoolValue allow_obs_text = 9;
 }
 
 // A message to control transformations to the :scheme header
