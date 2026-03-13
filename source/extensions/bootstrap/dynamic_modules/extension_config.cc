@@ -9,17 +9,15 @@ namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
-// The default custom stat namespace which prepends all user-defined bootstrap metrics.
-constexpr absl::string_view DefaultBootstrapMetricsNamespace = "dynamicmodulesbootstrap";
-
 DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store)
     : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
       context_(context), stats_store_(stats_store),
-      stats_scope_(stats_store.createScope(absl::StrCat(DefaultBootstrapMetricsNamespace, "."))),
+      stats_scope_(stats_store.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()) {
   ASSERT(dynamic_module_ != nullptr);
   ASSERT(extension_name.data() != nullptr);
@@ -164,6 +162,7 @@ void DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback::onFailure(
 absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store) {
@@ -249,8 +248,8 @@ newDynamicModuleBootstrapExtensionConfig(
   }
 
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
-      extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
-      stats_store);
+      extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
+      main_thread_dispatcher, context, stats_store);
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call
