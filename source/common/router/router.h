@@ -637,6 +637,9 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
+  // Expired clusters that we tried. Keep track of them to ensure they stay alive until the request
+  // is complete.
+  std::vector<Upstream::ClusterInfoConstSharedPtr> expired_clusters_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
@@ -687,6 +690,9 @@ private:
   bool request_buffer_overflowed_ : 1 = false;
   const bool allow_multiplexed_upstream_half_close_ : 1 = false;
   bool upstream_request_started_ : 1 = false;
+  // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
+  // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
+  bool cross_cluster_retry_ : 1 = false;
   // Indicate that ORCA report is received to process it only once in either response headers or
   // trailers.
   bool orca_load_report_received_ : 1 = false;
