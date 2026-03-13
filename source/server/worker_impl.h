@@ -85,6 +85,7 @@ private:
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
   Event::TimerPtr idle_connection_timer_;
+  OverloadActionState close_idle_http_connections_state_{OverloadActionState::inactive()};
 };
 
 } // namespace Server

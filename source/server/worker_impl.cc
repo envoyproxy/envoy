@@ -66,9 +66,18 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_overload_"
                                      "manager_close_idle_http_connections")) {
-    overload_manager.registerForAction(
+    const bool is_registered = overload_manager.registerForAction(
         OverloadActionNames::get().CloseIdleHttpConnections, *dispatcher_,
         [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state); });
+    if (is_registered) {
+      idle_connection_timer_ = dispatcher_->createTimer([this]() {
+        if (handler_) {
+          handler_->closeIdleHttpConnections(close_idle_http_connections_state_.isSaturated());
+        }
+        idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+      });
+      idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+    }
   }
 }
 
@@ -198,33 +207,7 @@ void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
 }
 
 void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
-  if (state.value().value() == 0.0) {
-    if (idle_connection_timer_) {
-      idle_connection_timer_->disableTimer();
-    }
-    return;
-  }
-
-  const bool is_saturated = state.isSaturated();
-  if (!idle_connection_timer_) {
-    idle_connection_timer_ = dispatcher_->createTimer([this, is_saturated]() {
-      if (handler_) {
-        handler_->closeIdleHttpConnections(is_saturated);
-      }
-    });
-  } else {
-    idle_connection_timer_->disableTimer();
-    idle_connection_timer_ = dispatcher_->createTimer([this, is_saturated]() {
-      if (handler_) {
-        handler_->closeIdleHttpConnections(is_saturated);
-      }
-    });
-  }
-
-  if (!idle_connection_timer_->enabled()) {
-    std::chrono::milliseconds interval = kCloseIdleHttpConnectionsInterval;
-    idle_connection_timer_->enableTimer(interval);
-  }
+  close_idle_http_connections_state_ = state;
 }
 
 } // namespace Server
