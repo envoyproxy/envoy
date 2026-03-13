@@ -16,6 +16,30 @@ namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
 
+class CpuUtilizationMonitorFactoryTest : public testing::Test {
+protected:
+  enum class Result { Null, NonNull, Throw };
+
+  Result checkResourceMonitor(
+      const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
+      Server::Configuration::ResourceMonitorFactoryContextImpl& context) {
+    auto factory =
+        Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+            "envoy.resource_monitors.cpu_utilization");
+    TRY_ASSERT_MAIN_THREAD {
+      auto monitor = factory->createResourceMonitor(config, context);
+      if (monitor == nullptr) {
+        return Result::Null;
+      }
+    }
+    END_TRY
+    catch (EnvoyException& e) {
+      return Result::Throw;
+    }
+    return Result::NonNull;
+  }
+};
+
 class TestResourcePressureCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   void onSuccess(const Server::ResourceUsage& usage) override {
@@ -39,7 +63,7 @@ private:
   bool has_error_ = false;
 };
 
-TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
+TEST_F(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -57,7 +81,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   EXPECT_NE(monitor, nullptr);
 }
 
-TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
+TEST_F(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -76,14 +100,25 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
 #if defined(__linux__)
-  auto monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+  // Skip the check if the system running the test does not support cgroup.
+  TRY_ASSERT_MAIN_THREAD {
+    auto monitor = factory->createResourceMonitor(config, context);
+    // If we did not throw, we must have a non-null monitor.
+    EXPECT_NE(monitor, nullptr);
+  }
+  END_TRY
+  catch (EnvoyException& e) {
+    // If we did throw it must have been because of cgroup.
+    EXPECT_THAT(std::string(e.what()),
+                ::testing::Eq("No supported cgroup CPU implementation found"));
+    return;
+  };
 #else
   EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 #endif
 }
 
-TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
+TEST_F(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -106,7 +141,7 @@ TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
 }
 
 #if defined(__linux__)
-TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
+TEST_F(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -121,19 +156,29 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
-  auto monitor = factory->createResourceMonitor(config, context);
-  // If cgroup files exist (Linux CI), monitor should be created and functional
-  ASSERT_NE(monitor, nullptr);
+  // Skip the check if the system running the test does not support cgroup.
+  TRY_ASSERT_MAIN_THREAD {
+    auto monitor = factory->createResourceMonitor(config, context);
+    // If cgroup files exist (Linux CI), monitor should be created and functional
+    ASSERT_NE(monitor, nullptr);
 
-  // Exercise the monitor by calling updateResourceUsage
-  TestResourcePressureCallbacks callbacks;
-  monitor->updateResourceUsage(callbacks);
-  // Either success or error is acceptable depending on system state
-  EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+    // Exercise the monitor by calling updateResourceUsage
+    TestResourcePressureCallbacks callbacks;
+    monitor->updateResourceUsage(callbacks);
+    // Either success or error is acceptable depending on system state
+    EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+  }
+  END_TRY
+  catch (EnvoyException& e) {
+    // If we did throw it must have been because of cgroup.
+    EXPECT_THAT(std::string(e.what()),
+                ::testing::Eq("No supported cgroup CPU implementation found"));
+    return;
+  };
 }
 #endif
 
-TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
+TEST_F(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
