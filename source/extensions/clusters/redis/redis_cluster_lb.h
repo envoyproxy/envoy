@@ -16,6 +16,7 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -66,12 +67,21 @@ private:
 using ClusterSlotsPtr = std::unique_ptr<std::vector<ClusterSlot>>;
 using ClusterSlotsSharedPtr = std::shared_ptr<std::vector<ClusterSlot>>;
 
+// Map from host address to zone (used during zone discovery)
+using HostZoneMap = absl::flat_hash_map<std::string, std::string>;
+
 class RedisLoadBalancerContext {
 public:
   virtual ~RedisLoadBalancerContext() = default;
 
   virtual bool isReadCommand() const PURE;
   virtual NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const PURE;
+
+  /**
+   * @return the client zone for zone-aware routing.
+   * Returns empty string if zone-aware routing is not configured.
+   */
+  virtual const std::string& clientZone() const PURE;
 };
 
 class RedisLoadBalancerContextImpl : public RedisLoadBalancerContext,
@@ -87,12 +97,14 @@ public:
    * will be hashed using crc16.
    * @param request specify the Redis request.
    * @param read_policy specify the read policy.
+   * @param client_zone specify the client zone for zone-aware routing.
    */
   RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging,
                                bool is_redis_cluster,
                                const NetworkFilters::Common::Redis::RespValue& request,
                                NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary,
+                               const std::string& client_zone = "");
 
   // Upstream::LoadBalancerContextBase
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
@@ -103,6 +115,8 @@ public:
     return read_policy_;
   }
 
+  const std::string& clientZone() const override { return client_zone_; }
+
 private:
   absl::string_view hashtag(absl::string_view v, bool enabled);
 
@@ -111,6 +125,7 @@ private:
   const absl::optional<uint64_t> hash_key_;
   const bool is_read_;
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
+  const std::string client_zone_;
 };
 
 class RedisSpecifyShardContextImpl : public RedisLoadBalancerContextImpl {
@@ -120,11 +135,13 @@ public:
    * @param shard_index specify the shard index for the Redis request.
    * @param request specify the Redis request.
    * @param read_policy specify the read policy.
+   * @param client_zone specify the client zone for zone-aware routing.
    */
   RedisSpecifyShardContextImpl(uint64_t shard_index,
                                const NetworkFilters::Common::Redis::RespValue& request,
                                NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary,
+                               const std::string& client_zone = "");
 
   // Upstream::LoadBalancerContextBase
   absl::optional<uint64_t> computeHashKey() override { return shard_index_; }
@@ -140,7 +157,7 @@ public:
   /**
    * Callback when cluster slot is updated
    * @param slots provides the updated cluster slots.
-   * @param all_hosts provides the updated hosts.
+   * @param all_hosts provides the updated hosts (with zone info already set in host locality).
    * @return indicate if the cluster slot is updated or not.
    */
   virtual bool onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
@@ -174,24 +191,60 @@ public:
 private:
   class RedisShard {
   public:
+    // Constructor derives zone information from host localities
     RedisShard(Upstream::HostConstSharedPtr primary, Upstream::HostVectorConstSharedPtr replicas,
                Upstream::HostVectorConstSharedPtr all_hosts, Random::RandomGenerator& random)
         : primary_(std::move(primary)) {
+      // Derive primary zone from host's locality
+      primary_zone_ = primary_->locality().zone();
+
       replicas_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                 std::move(replicas), Upstream::HostsPerLocalityImpl::empty()),
                             nullptr, {}, {}, random.random());
       all_hosts_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                  std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
                              nullptr, {}, {}, random.random());
+
+      // Group replicas by zone from host localities for efficient zone-aware routing
+      absl::flat_hash_map<std::string, Upstream::HostVector> zone_hosts;
+      for (const auto& host : replicas_.hosts()) {
+        const std::string& zone = host->locality().zone();
+        if (!zone.empty()) {
+          zone_hosts[zone].push_back(host);
+        }
+      }
+      // Convert each zone's hosts to HostSetImpl
+      for (auto& [zone, hosts] : zone_hosts) {
+        auto host_set = std::make_unique<Upstream::HostSetImpl>(0, absl::nullopt, absl::nullopt);
+        auto hosts_ptr = std::make_shared<Upstream::HostVector>(std::move(hosts));
+        host_set->updateHosts(Upstream::HostSetImpl::partitionHosts(
+                                  std::move(hosts_ptr), Upstream::HostsPerLocalityImpl::empty()),
+                              nullptr, {}, {}, random.random());
+        replicas_by_zone_[zone] = std::move(host_set);
+      }
     }
     const Upstream::HostConstSharedPtr primary() const { return primary_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }
     const Upstream::HostSetImpl& allHosts() const { return all_hosts_; }
 
+    // Zone information for zone-aware routing
+    const std::string& primaryZone() const { return primary_zone_; }
+
+    // Get replicas in a specific zone. Returns nullptr if no replicas in that zone.
+    const Upstream::HostSetImpl* replicasInZone(const std::string& zone) const {
+      if (zone.empty()) {
+        return nullptr;
+      }
+      auto it = replicas_by_zone_.find(zone);
+      return (it != replicas_by_zone_.end()) ? it->second.get() : nullptr;
+    }
+
   private:
     const Upstream::HostConstSharedPtr primary_;
     Upstream::HostSetImpl replicas_{0, absl::nullopt, absl::nullopt};
     Upstream::HostSetImpl all_hosts_{0, absl::nullopt, absl::nullopt};
+    std::string primary_zone_;
+    absl::flat_hash_map<std::string, std::unique_ptr<Upstream::HostSetImpl>> replicas_by_zone_;
   };
 
   using RedisShardSharedPtr = std::shared_ptr<const RedisShard>;
