@@ -1123,6 +1123,8 @@ void ThreadLocalStoreImpl::evictUnused() {
               metric->markUnused();
               return false;
             }
+            // We assume the gauge is used as an updown counter here and if the value is 0, it is
+            // unused.
             if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
               if (metric->value() != 0) {
                 return false;

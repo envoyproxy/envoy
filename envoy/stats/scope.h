@@ -83,7 +83,8 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
-   * that the metrics are not stored by reference.
+   * that the metrics are not stored by reference. Evictable gauges are expected to be updown
+   * counters where 0 means no-value.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
   virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
@@ -96,7 +97,8 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
-   * that the metrics are not stored by reference.
+   * that the metrics are not stored by reference. Evictable gauges are expected to be updown
+   * counters where 0 means no-value.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
   virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
