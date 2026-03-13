@@ -565,12 +565,12 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr
-  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   RouteStatsContextOptRef route_stats_context,
-                   Server::Configuration::CommonFactoryContext& context,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
+                                         Http::RequestHeaderMap& request_headers,
+                                         const Upstream::ClusterInfo& cluster,
+                                         Server::Configuration::CommonFactoryContext& context,
+                                         Event::Dispatcher& dispatcher,
+                                         Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -703,12 +703,13 @@ private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
-                                 const VirtualCluster* vcluster,
-                                 RouteStatsContextOptRef route_stats_context,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };
+
+void updateRetryStats(RetryStatus retry_status, bool is_retry, const Upstream::ClusterInfo& cluster,
+                      const VirtualCluster* vcluster, RouteStatsContext* route_stats_context);
 
 } // namespace Router
 } // namespace Envoy

@@ -337,7 +337,13 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+enum class RetryStatus {
+  No,
+  NoOverflow,
+  NoRetryLimitExceeded,
+  Yes,
+  NoRuntime,
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.

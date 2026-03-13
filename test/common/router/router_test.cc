@@ -27,6 +27,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
@@ -1654,6 +1655,16 @@ TEST_F(RouterTest, NoRetriesOverflow) {
               putResult(_, absl::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_overflow_.value());
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
@@ -3870,6 +3881,16 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 // Sequence: 1) per try timeout w/ hedge retry, 2) first request gets reset by upstream,
@@ -4107,6 +4128,17 @@ TEST_F(RouterTest, RetryUpstreamReset) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, RetryHttp3UpstreamReset) {
@@ -4305,6 +4337,17 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Asserts that onHostAttempted is *not* called when the upstream connection fails in such
@@ -4362,6 +4405,17 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
@@ -4516,6 +4570,17 @@ TEST_F(RouterTest, RetryUpstream5xx) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
@@ -4842,6 +4907,17 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Test retry with 2 attempts before success: 503 -> 503 -> 200
@@ -4946,6 +5022,17 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(2UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(2UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(2UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Validate gRPC Cancelled response stats are sane when retry is taking effect.
@@ -8043,6 +8130,87 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
       {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Tests for the free function updateRetryStats, which centralises retry stat updates.
+class UpdateRetryStatsTest : public testing::Test {
+public:
+  UpdateRetryStatsTest()
+      : route_stat_names_(stats_store_.symbolTable()),
+        vhost_stat_name_("fake_vhost", stats_store_.symbolTable()),
+        route_stats_context_(*stats_store_.rootScope(), route_stat_names_,
+                             vhost_stat_name_.statName(), "fake_route") {}
+
+  NiceMock<Upstream::MockClusterInfo> cluster_;
+  TestVirtualCluster virtual_cluster_;
+  Stats::IsolatedStoreImpl stats_store_;
+  RouteStatNames route_stat_names_;
+  Stats::StatNameManagedStorage vhost_stat_name_;
+  RouteStatsContextImpl route_stats_context_;
+};
+
+// RetryStatus::No when the request is NOT itself a retry: no stats should change.
+TEST_F(UpdateRetryStatsTest, NoStatusNotRetry) {
+  updateRetryStats(RetryStatus::No, /*is_retry=*/false, cluster_, &virtual_cluster_,
+                   &route_stats_context_);
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
+  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_success_.value());
+}
+
+// RetryStatus::No when the request IS a retry: the previous retry attempt succeeded.
+TEST_F(UpdateRetryStatsTest, NoStatusIsRetry) {
+  updateRetryStats(RetryStatus::No, /*is_retry=*/true, cluster_, &virtual_cluster_,
+                   &route_stats_context_);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_success_.value());
+}
+
+// RetryStatus::NoRetryLimitExceeded: the retry limit counter should be incremented.
+TEST_F(UpdateRetryStatsTest, NoRetryLimitExceededStatus) {
+  updateRetryStats(RetryStatus::NoRetryLimitExceeded, /*is_retry=*/false, cluster_,
+                   &virtual_cluster_, &route_stats_context_);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
+}
+
+// RetryStatus::NoOverflow: the overflow counter should be incremented.
+TEST_F(UpdateRetryStatsTest, NoOverflowStatus) {
+  updateRetryStats(RetryStatus::NoOverflow, /*is_retry=*/false, cluster_, &virtual_cluster_,
+                   &route_stats_context_);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_overflow_.value());
+}
+
+// RetryStatus::Yes: the retry counter should be incremented.
+TEST_F(UpdateRetryStatsTest, YesStatus) {
+  updateRetryStats(RetryStatus::Yes, /*is_retry=*/true, cluster_, &virtual_cluster_,
+                   &route_stats_context_);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_.value());
+}
+
+// RetryStatus::NoRuntime: the runtime guard disables the retry, no stats should change.
+TEST_F(UpdateRetryStatsTest, NoRuntimeStatus) {
+  updateRetryStats(RetryStatus::NoRuntime, /*is_retry=*/false, cluster_, &virtual_cluster_,
+                   &route_stats_context_);
+  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_.value());
+}
+
+// Null vcluster and route_stats_context: only cluster-level stats should be updated.
+TEST_F(UpdateRetryStatsTest, NullVclusterAndRouteStatsContext) {
+  updateRetryStats(RetryStatus::Yes, /*is_retry=*/true, cluster_, /*vcluster=*/nullptr,
+                   /*route_stats_context=*/nullptr);
+  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
+  // Virtual cluster and route stats should not be touched.
+  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_.value());
 }
 
 } // namespace Router
