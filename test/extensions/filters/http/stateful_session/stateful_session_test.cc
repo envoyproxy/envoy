@@ -106,7 +106,8 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -146,7 +147,8 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -190,7 +192,8 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -337,6 +340,42 @@ stat_prefix: "test"
   EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
   EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
   EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+}
+
+TEST_F(StatefulSessionTest, CustomStatusOnMissingDestination) {
+  const std::string strict_config_with_status = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+strict: true
+status_on_missing_destination:
+  code: 404
+)EOF";
+
+  initialize(strict_config_with_status);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
+  auto raw_session_state = session_state.get();
+
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
+      .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_TRUE(host.strict);
+        EXPECT_TRUE(host.status_on_missing_destination.has_value());
+        EXPECT_EQ(Http::Code::NotFound, host.status_on_missing_destination.value());
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(*raw_session_state, onUpdate(_, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
 TEST_F(StatefulSessionTest, StatsNoSession) {

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.stateful_session.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/v3/http_status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -38,6 +39,19 @@ message StatefulSession {
   //   Per-route configuration overrides do not support statistics and will not emit stats even if this field is set
   //   in the per-route config.
   string stat_prefix = 3;
+
+  // Sets the HTTP status code that is returned to the client when :ref:`strict mode
+  // <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>` is enabled
+  // and the requested destination is unavailable.
+  //
+  // This allows clients to distinguish between transient failures and errors from upstream.
+  // The default status is ``HTTP 503 Service Unavailable``.
+  //
+  // .. note::
+  //
+  //   This field only takes effect when ``strict`` is set to ``true``. In non-strict mode,
+  //   requests are routed according to the load balancer and this status code is not used.
+  type.v3.HttpStatus status_on_missing_destination = 4;
 }
 
 message StatefulSessionPerRoute {

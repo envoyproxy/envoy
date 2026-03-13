@@ -27,6 +27,12 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::GenericFactoryContext& context,
                                              const std::string& stats_prefix, Stats::Scope& scope)
     : strict_(config.strict()) {
+  // Parse status_on_missing_destination if specified, otherwise default to 503.
+  if (config.has_status_on_missing_destination()) {
+    const uint64_t status_code = config.status_on_missing_destination().code();
+    status_on_missing_destination_ = static_cast<Http::Code>(status_code);
+  }
+
   // Only construct stats if stat_prefix is explicitly set.
   if (!config.stat_prefix().empty()) {
     const std::string final_prefix =
@@ -82,8 +88,14 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
-    decoder_callbacks_->setUpstreamOverrideHost(
-        std::make_pair(upstream_address.value(), effective_config_->isStrict()));
+    // Set upstream override host with status code if in strict mode
+    const bool is_strict = effective_config_->isStrict();
+    const absl::optional<Http::Code> status_code =
+        is_strict ? absl::make_optional(effective_config_->statusOnMissingDestination())
+                  : absl::nullopt;
+
+    decoder_callbacks_->setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost{
+        upstream_address.value(), is_strict, status_code});
   }
   return Http::FilterHeadersStatus::Continue;
 }
