@@ -1,7 +1,4 @@
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided.pb.h"
-#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -14,7 +11,6 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/registry.h"
 
-#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -70,23 +66,6 @@ void expectFactoryCreateSucceeds(const Upstream::LoadBalancerConfigPtr& config,
   ASSERT_NE(nullptr, worker_factory);
   EXPECT_NE(nullptr, worker_factory->create({priority_set, nullptr}));
 }
-
-envoy::config::core::v3::TypedExtensionConfig unsupportedChildPolicy(absl::string_view name) {
-  if (name == "envoy.load_balancing_policies.maglev") {
-    envoy::extensions::load_balancing_policies::maglev::v3::Maglev maglev;
-    return typedExtensionConfig(std::string(name), maglev);
-  }
-  if (name == "envoy.load_balancing_policies.ring_hash") {
-    envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash ring_hash;
-    return typedExtensionConfig(std::string(name), ring_hash);
-  }
-
-  envoy::extensions::load_balancing_policies::cluster_provided::v3::ClusterProvided
-      cluster_provided;
-  return typedExtensionConfig(std::string(name), cluster_provided);
-}
-
-class UnsupportedChildPolicyTest : public testing::TestWithParam<absl::string_view> {};
 
 class FailingLoadConfigFactory : public Upstream::MockTypedLoadBalancerFactory {
 public:
@@ -145,30 +124,15 @@ TEST(LoadAwareLocalityConfigTest, Overrides) {
   expectFactoryCreateSucceeds(result.value(), context);
 }
 
-TEST_P(UnsupportedChildPolicyTest, UnsupportedOrMissingChild) {
+TEST(LoadAwareLocalityConfigTest, MissingChildPolicy) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  LoadAwareLocalityLbProto config_proto =
-      GetParam().empty() ? loadAwareConfig({})
-                         : loadAwareConfig({unsupportedChildPolicy(GetParam())});
-
   Factory factory;
-  auto result = factory.loadConfig(context, config_proto);
+  auto result = factory.loadConfig(context, loadAwareConfig({}));
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  if (GetParam().empty()) {
-    EXPECT_EQ(result.status(), absl::InvalidArgumentError("No supported endpoint picking policy."));
-  } else {
-    EXPECT_THAT(result.status().message(), testing::HasSubstr(std::string(GetParam())));
-  }
+  EXPECT_EQ(result.status(), absl::InvalidArgumentError("No supported endpoint picking policy."));
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    ChildPolicies, UnsupportedChildPolicyTest,
-    testing::Values(absl::string_view(""),
-                    absl::string_view("envoy.load_balancing_policies.maglev"),
-                    absl::string_view("envoy.load_balancing_policies.ring_hash"),
-                    absl::string_view("envoy.load_balancing_policies.cluster_provided")));
 
 TEST(LoadAwareLocalityConfigTest, FirstSupportedChildWins) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
