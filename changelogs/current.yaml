@@ -660,6 +660,10 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: cluster
+  change: |
+    Added :ref:`MCP multi cluster <arch_overview_mcp_multicluster>` extension that combines multiple MCP services
+    into a single one. This cluster type is primarily intended to support aggregation of multiple MCP services into one.
 - area: tls
   change: |
     Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
