@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.priority_load_shed.v3;
+
+import "envoy/type/v3/range.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.priority_load_shed.v3";
+option java_outer_classname = "PriorityLoadShedProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/priority_load_shed/v3;priorityloadshedv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Priority Load Shed]
+// Priority load shedding :ref:`configuration overview <config_http_filters_priority_load_shed>`.
+// [#extension: envoy.filters.http.priority_load_shed]
+
+// [#next-free-field: 6]
+message PriorityLoadShed {
+  message Bucket {
+    // Numeric range of header values in half-open interval semantics [start, end).
+    type.v3.Int64Range value_range = 1;
+
+    // Name of the overload manager load shed point used for this bucket.
+    string load_shed_point = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Header name containing the integer priority value.
+  string header_name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // Bucket mappings from header value ranges to load shed points.
+  repeated Bucket buckets = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // Optional load shed point used when the configured header is missing, the header value is
+  // invalid, or the parsed header value does not match any configured bucket.
+  // If unset, missing, invalid, or unmatched values bypass this filter.
+  // This fallback is not used when ``reject_on_missing_header`` rejects a missing header or
+  // ``reject_on_invalid_header`` rejects an invalid header.
+  string default_load_shed_point = 3;
+
+  // If true, requests without the configured priority header are rejected with ``400`` instead
+  // of using ``default_load_shed_point`` or bypassing the filter.
+  bool reject_on_missing_header = 4;
+
+  // If true, requests with a non-numeric or negative header value are rejected with ``400``
+  // instead of using ``default_load_shed_point`` or bypassing the filter.
+  bool reject_on_invalid_header = 5;
+}
