@@ -135,6 +135,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
   });
 }
 
+// This test verifies that the Rust bootstrap extension can receive cluster lifecycle events
+// (add/update and removal) via the ClusterUpdateCallbacks mechanism.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Bootstrap cluster lifecycle test: server initialized"},
+                                  {"info", "Cluster lifecycle enabled: true"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
+}
+
 // This test verifies that a bootstrap extension can register a function in the process-wide
 // function registry and an HTTP filter in the same module can resolve and call it during request
 // processing. The bootstrap extension asynchronously initializes a routing table and registers a
