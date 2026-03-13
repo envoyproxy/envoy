@@ -376,6 +376,7 @@ ContextImpl::ContextImpl(
     switch (policy.value()) {
       using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
     case ProtoPolicy::FIPS_202205:
+    #ifdef OPENSSL_IS_BORINGSSL
       if (!fips_mode) {
         ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
@@ -389,6 +390,12 @@ ContextImpl::ContextImpl(
           return;
         }
       }
+    #else
+      ENVOY_LOG(error, "FIPS_202205 compliance policy is only supported with BoringSSL");
+      creation_status = absl::InvalidArgumentError(
+          "FIPS_202205 compliance policy is only supported with BoringSSL");
+      return;
+    #endif
       break;
     default:
       creation_status = absl::InvalidArgumentError("Unknown compliance policy");
