@@ -644,6 +644,10 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: listener_manager
+  change: |
+    Added ``ListenerUpdateCallbacks`` interface to ``ListenerManager``, similar to the existing
+    ``ClusterUpdateCallbacks`` on ``ClusterManager``.
 - area: matching
   change: |
     Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`
