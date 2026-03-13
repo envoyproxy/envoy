@@ -147,11 +147,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
-  }
+  stream_info_.setUpstreamClusterInfo(parent_.callbacks()->streamInfo().upstreamClusterInfo());
 
   // Set up the upstream HTTP filter manager.
   filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);

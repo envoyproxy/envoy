@@ -416,12 +416,9 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
            }},
           {UpstreamNumEndpoints, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) != nullptr) {
-               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
-                                                 .value()
-                                                 .get()
-                                                 ->endpointStats()
-                                                 .membership_total_.value());
+             if (wrapper.info_.upstreamClusterInfo() != nullptr) {
+               return CelValue::CreateUint64(
+                   wrapper.info_.upstreamClusterInfo()->endpointStats().membership_total_.value());
              }
              return {};
            }}});
@@ -444,9 +441,9 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelValue::CreateString(&cluster_info.value()->name());
+             const auto& cluster_info = wrapper.info_->upstreamClusterInfo();
+             if (cluster_info) {
+               return CelValue::CreateString(&cluster_info->name());
              }
              return {};
            }},
@@ -455,10 +452,9 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(),
-                                                     &wrapper.arena_);
+             const auto& cluster_info = wrapper.info_->upstreamClusterInfo();
+             if (cluster_info) {
+               return CelProtoWrapper::CreateMessage(&cluster_info->metadata(), &wrapper.arena_);
              }
              return {};
            }},

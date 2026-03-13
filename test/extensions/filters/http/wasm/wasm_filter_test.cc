@@ -1933,7 +1933,7 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  request_stream_info_.upstream_cluster_info_ = cluster;
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   filter().log({&request_headers}, request_stream_info_);
