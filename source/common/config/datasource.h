@@ -81,6 +81,8 @@ struct ProviderOptions {
   bool hash_content{false};
 };
 
+static const ProviderOptions DEFAULT_PROVIDER_OPTIONS{ProviderOptions{}};
+
 // DynamicData registers the file watches and a thread local slot. This class
 // must be created and deleted on the dispatcher thread.
 template <class DataType> class DynamicData {
@@ -97,7 +99,7 @@ public:
               absl::AnyInvocable<void()> cleanup, absl::Status& creation_status,
               absl::optional<std::function<void()>> data_update_cb = absl::nullopt)
       : dispatcher_(main_dispatcher), api_(api), options_(options), filename_(source.filename()),
-        data_transform_(data_transform_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
+        data_transform_cb_(data_transform_cb), data_update_cb_(data_update_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
     slot_ =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
     slot_->set([initial_data = std::move(initial_data)](Event::Dispatcher&) {
@@ -162,7 +164,7 @@ private:
       hash_ = new_hash;
     }
 
-    slot_->runOnAllThreads([new_data = std::move(transformed_new_data_or_error.value())](
+    slot_->runOnAllThreads([new_data = std::move(transformed_new_data_or_error.value()), this](
                                OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
       if (obj.has_value()) {
         obj->data_ = new_data;
@@ -179,7 +181,7 @@ private:
   const ProviderOptions options_;
   const std::string filename_;
   DataTransform<DataType> data_transform_cb_;
-  DataUpdateCb data_update_cb_;
+  absl::optional<DataUpdateCb> data_update_cb_;
   uint64_t hash_;
   absl::AnyInvocable<void()> cleanup_;
   ThreadLocal::TypedSlotPtr<ThreadLocalData> slot_;
@@ -316,7 +318,7 @@ public:
     // Cleanup is guaranteed to execute on the main dispatcher during destruction but may happen
     // after the singleton is released.
     auto provider_or_error = DataSourceProvider<DataType>::create(
-        source, dispatcher_, tls_, api_, data_transform_, options_,
+        source, dispatcher_, tls_, api_, data_transform_cb_, options_,
         [weak_this = this->weak_from_this(), config_hash] {
           if (auto locked_this = weak_this.lock(); locked_this) {
             locked_this->cleanup(config_hash);

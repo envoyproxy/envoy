@@ -35,7 +35,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     }
     auto provider_or_error =
         Config::DataSource::DataSourceProvider<Network::LcTrie::LcTrie<std::string>>::create(
-            ip_tags_datasource, main_dispatcher, tls, api_, false,
+            ip_tags_datasource, main_dispatcher, tls, api_,
             // data_transform_cb
             [this,
              &datasource_filename, &validation_visitor, &scope, &stat_prefix](absl::string_view new_data) -> absl::StatusOr<LcTrieSharedPtr> {
@@ -61,7 +61,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
               tags_loader_ = std::make_unique<IpTagsLoader>(stat_prefix, scope);
               return tags_loader_->parseIpTagsAsProto(ip_tags_proto.ip_tags());
             },
-            0,
+            Config::DataSource::DEFAULT_PROVIDER_OPTIONS{},
             // data_update_cb
             absl::make_optional([this]() {
                 tags_loader_->incIpTagsReloadSuccess();
