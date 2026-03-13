@@ -408,6 +408,15 @@ public:
     No,
   };
 
+  enum class DoRetryType {
+    // Retry the request immediately.
+    Immediately,
+    // Retry the request with ratelimited backoff delay.
+    Ratelimited,
+    // Retry the request with exponential backoff delay.
+    Exponential,
+  };
+
   using DoRetryCallback = std::function<void()>;
   /**
    * @param disabled_http3 indicates whether the retry should disable http3 or not.
@@ -527,6 +536,13 @@ public:
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * @return the type of retry to perform when a retry is triggered.
+   * This is used to determine whether to apply a backoff delay or not, and if so, what type of
+   * backoff to apply.
+   */
+  virtual DoRetryType doRetryType() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;

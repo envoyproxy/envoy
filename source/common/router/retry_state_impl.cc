@@ -173,14 +173,11 @@ void RetryStateImpl::enableBackoffTimer() {
     // The strategy is only valid for the response that sent the ratelimit reset header and cannot
     // be reused.
     ratelimited_backoff_strategy_.reset();
-
-    cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.inc();
-
+    do_retry_type_ = DoRetryType::Ratelimited;
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-
-    cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
+    do_retry_type_ = DoRetryType::Exponential;
   }
 }
 
@@ -261,6 +258,7 @@ void RetryStateImpl::resetRetry() {
     cluster_.resourceManager(priority_).retries().dec();
     next_loop_callback_ = nullptr;
   }
+  do_retry_type_ = DoRetryType::Immediately;
 }
 
 RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallback callback) {

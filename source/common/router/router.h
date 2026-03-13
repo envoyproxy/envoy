@@ -615,6 +615,7 @@ private:
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
                        absl::string_view host_selection_details);
+  void updateRetryStats(RetryStatus retry_status);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Returns the effective retry policy to use for this request.
@@ -707,9 +708,6 @@ private:
                                  Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };
-
-void updateRetryStats(RetryStatus retry_status, bool is_retry, const Upstream::ClusterInfo& cluster,
-                      const VirtualCluster* vcluster, RouteStatsContext* route_stats_context);
 
 } // namespace Router
 } // namespace Envoy

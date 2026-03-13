@@ -1228,9 +1228,6 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryHeaders(response_headers_reset_2, request_headers, header_callback_));
-
-  EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.value());
-  EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {

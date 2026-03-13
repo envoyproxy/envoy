@@ -94,6 +94,7 @@ public:
   }
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  DoRetryType doRetryType() const override { return do_retry_type_; }
 
   bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
 
@@ -136,6 +137,7 @@ private:
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
   uint32_t host_selection_max_attempts_;
+  DoRetryType do_retry_type_{DoRetryType::Immediately};
   Upstream::ResourcePriority priority_;
   const bool auto_configured_for_http3_{};
 };
