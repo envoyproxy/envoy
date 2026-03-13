@@ -135,7 +135,6 @@ HttpTcpBridge::HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
                              BridgeConfigSharedPtr config)
     : upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)),
       config_(std::move(config)) {
-  upstream_conn_data_->connection().enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(*this);
 
   in_module_bridge_ =
@@ -146,7 +145,6 @@ HttpTcpBridge::HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
 }
 
 HttpTcpBridge::~HttpTcpBridge() {
-  *local_reply_guard_ = false;
   if (in_module_bridge_ != nullptr) {
     (*config_->on_bridge_destroy_)(in_module_bridge_);
     in_module_bridge_ = nullptr;
@@ -162,53 +160,7 @@ Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeade
   request_headers_ = &headers;
   downstream_complete_ = end_stream;
 
-  // Initialize default response headers.
-  response_headers_ = Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>(
-      {{Envoy::Http::Headers::get().Status, "200"}});
-
-  const auto status = (*config_->on_bridge_encode_headers_)(static_cast<void*>(this),
-                                                            in_module_bridge_, end_stream);
-
-  switch (status) {
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_Continue:
-    encoding_state_ = EncodingState::WaitingData;
-    sendDataToUpstream(end_stream);
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_StopAndBuffer:
-    encoding_state_ = EncodingState::WaitingAllData;
-    sendDataToUpstream(false);
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_EndStream: {
-    encoding_state_ = EncodingState::Done;
-    // Cannot call sendLocalReply synchronously here because decodeData with end_stream=true can
-    // trigger stream completion that destroys this bridge while encodeHeaders is still on the
-    // call stack. Defer the entire local reply to the next event loop iteration.
-    local_reply_pending_ = true;
-    // Move response data into the lambda capture to avoid accessing member variables after the
-    // bridge may have been destroyed during stream completion.
-    auto headers = std::move(response_headers_);
-    auto body = std::make_shared<Buffer::OwnedImpl>();
-    body->move(response_body_);
-    upstream_conn_data_->connection().dispatcher().post(
-        [this, guard = local_reply_guard_, headers = std::move(headers), body]() mutable {
-          if (!*guard) {
-            return;
-          }
-          local_reply_pending_ = false;
-          if (upstream_request_ == nullptr) {
-            return;
-          }
-          response_headers_sent_ = true;
-          if (body->length() > 0) {
-            upstream_request_->decodeHeaders(std::move(headers), false);
-            upstream_request_->decodeData(*body, true);
-          } else {
-            upstream_request_->decodeHeaders(std::move(headers), true);
-          }
-        });
-    break;
-  }
-  }
+  (*config_->on_bridge_encode_headers_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
   return Envoy::Http::okStatus();
 }
@@ -218,35 +170,11 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   downstream_complete_ = end_stream;
+  request_buffer_ = &data;
 
-  if (encoding_state_ == EncodingState::WaitingAllData) {
-    // In buffered mode, accumulate data.
-    request_buffer_.move(data);
-    if (!end_stream) {
-      return;
-    }
-    // On end_of_stream, pass the full accumulated buffer to the module.
-  } else {
-    // In streaming mode, pass the current chunk.
-    request_buffer_.drain(request_buffer_.length());
-    request_buffer_.move(data);
-  }
+  (*config_->on_bridge_encode_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
-  const auto status =
-      (*config_->on_bridge_encode_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
-
-  switch (status) {
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue:
-    sendDataToUpstream(end_stream);
-    if (end_stream) {
-      encoding_state_ = EncodingState::Done;
-    }
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_EndStream:
-    encoding_state_ = EncodingState::Done;
-    sendLocalReply();
-    break;
-  }
+  request_buffer_ = nullptr;
 }
 
 void HttpTcpBridge::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
@@ -255,19 +183,7 @@ void HttpTcpBridge::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
   }
   downstream_complete_ = true;
 
-  const auto status =
-      (*config_->on_bridge_encode_trailers_)(static_cast<void*>(this), in_module_bridge_);
-
-  switch (status) {
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue:
-    sendDataToUpstream(true);
-    encoding_state_ = EncodingState::Done;
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_EndStream:
-    encoding_state_ = EncodingState::Done;
-    sendLocalReply();
-    break;
-  }
+  (*config_->on_bridge_encode_trailers_)(static_cast<void*>(this), in_module_bridge_);
 }
 
 void HttpTcpBridge::readDisable(bool disable) {
@@ -291,35 +207,16 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   response_buffer_ = &data;
   bytes_meter_->addWireBytesReceived(data.length());
 
-  const auto status = (*config_->on_bridge_on_upstream_data_)(static_cast<void*>(this),
-                                                              in_module_bridge_, end_stream);
+  (*config_->on_bridge_on_upstream_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
   response_buffer_ = nullptr;
-
-  switch (status) {
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_Continue:
-    // Drain the upstream read buffer. The module has already copied any needed data into
-    // response_body_ via the ABI callbacks. Without draining, the connection would re-deliver
-    // the same data on the next read event since it accumulates in the read buffer.
-    data.drain(data.length());
-    sendResponseToDownstream(false);
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_StopAndBuffer:
-    // Data stays in the upstream connection's read buffer and will accumulate.
-    break;
-  case envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_EndStream:
-    data.drain(data.length());
-    sendResponseToDownstream(true);
-    break;
-  }
 }
 
 void HttpTcpBridge::onEvent(Network::ConnectionEvent event) {
   if ((event == Network::ConnectionEvent::LocalClose ||
        event == Network::ConnectionEvent::RemoteClose) &&
       upstream_request_ != nullptr) {
-    if (local_reply_pending_ || response_headers_sent_) {
-      // A deferred local reply is pending or the response was already completed.
+    if (response_started_) {
       return;
     }
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
@@ -338,53 +235,90 @@ void HttpTcpBridge::onBelowWriteBufferLowWatermark() {
   }
 }
 
-void HttpTcpBridge::sendDataToUpstream(bool end_stream) {
-  if (request_buffer_.length() == 0 && !end_stream) {
+Envoy::Http::ResponseHeaderMapPtr
+HttpTcpBridge::buildResponseHeaders(uint32_t status_code,
+                                    envoy_dynamic_module_type_module_http_header* headers_vector,
+                                    size_t headers_vector_size) {
+  auto headers = Envoy::Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(status_code);
+  if (headers_vector != nullptr) {
+    for (size_t i = 0; i < headers_vector_size; i++) {
+      const auto& header = headers_vector[i];
+      const absl::string_view key(static_cast<const char*>(header.key_ptr), header.key_length);
+      const absl::string_view value(static_cast<const char*>(header.value_ptr),
+                                    header.value_length);
+      headers->addCopy(Envoy::Http::LowerCaseString(key), value);
+    }
+  }
+  return headers;
+}
+
+void HttpTcpBridge::sendUpstreamData(absl::string_view data, bool end_stream) {
+  if (upstream_conn_data_ == nullptr) {
     return;
   }
-  bytes_meter_->addWireBytesSent(request_buffer_.length());
-  upstream_conn_data_->connection().write(request_buffer_, end_stream);
-}
-
-void HttpTcpBridge::sendResponseToDownstream(bool end_stream) {
-  if (!response_headers_sent_) {
-    response_headers_sent_ = true;
-    upstream_request_->decodeHeaders(std::move(response_headers_), false);
+  Buffer::OwnedImpl buffer;
+  if (!data.empty()) {
+    buffer.add(data);
   }
-
-  // Latch whether trailers need to be sent before calling decodeData. When end_stream is true,
-  // decodeData can trigger stream completion that destroys this bridge, so member variables
-  // must not be accessed after the call.
-  const bool has_trailers = end_stream && response_trailers_;
-
-  if (response_body_.length() > 0 || end_stream) {
-    Buffer::OwnedImpl local_body;
-    local_body.move(response_body_);
-    upstream_request_->decodeData(local_body, end_stream && !has_trailers);
-  }
-
-  if (has_trailers) {
-    upstream_request_->decodeTrailers(std::move(response_trailers_));
+  if (buffer.length() > 0 || end_stream) {
+    bytes_meter_->addWireBytesSent(buffer.length());
+    upstream_conn_data_->connection().write(buffer, end_stream);
   }
 }
 
-void HttpTcpBridge::sendLocalReply() {
+void HttpTcpBridge::sendResponse(uint32_t status_code,
+                                 envoy_dynamic_module_type_module_http_header* headers_vector,
+                                 size_t headers_vector_size, absl::string_view body) {
   if (upstream_request_ == nullptr) {
     return;
   }
-  if (!response_headers_sent_) {
-    response_headers_sent_ = true;
-    if (response_body_.length() > 0) {
-      upstream_request_->decodeHeaders(std::move(response_headers_), false);
-      // Move body to a local buffer. decodeData with end_stream=true can trigger stream
-      // completion that destroys this bridge.
-      Buffer::OwnedImpl local_body;
-      local_body.move(response_body_);
-      upstream_request_->decodeData(local_body, true);
-    } else {
-      upstream_request_->decodeHeaders(std::move(response_headers_), true);
+  response_started_ = true;
+  auto headers = buildResponseHeaders(status_code, headers_vector, headers_vector_size);
+  if (!body.empty()) {
+    upstream_request_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl body_buffer(body);
+    upstream_request_->decodeData(body_buffer, true);
+  } else {
+    upstream_request_->decodeHeaders(std::move(headers), true);
+  }
+}
+
+void HttpTcpBridge::sendResponseHeaders(
+    uint32_t status_code, envoy_dynamic_module_type_module_http_header* headers_vector,
+    size_t headers_vector_size, bool end_stream) {
+  if (upstream_request_ == nullptr) {
+    return;
+  }
+  response_started_ = true;
+  auto headers = buildResponseHeaders(status_code, headers_vector, headers_vector_size);
+  upstream_request_->decodeHeaders(std::move(headers), end_stream);
+}
+
+void HttpTcpBridge::sendResponseData(absl::string_view data, bool end_stream) {
+  if (upstream_request_ == nullptr) {
+    return;
+  }
+  Buffer::OwnedImpl buffer(data);
+  upstream_request_->decodeData(buffer, end_stream);
+}
+
+void HttpTcpBridge::sendResponseTrailers(
+    envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size) {
+  if (upstream_request_ == nullptr) {
+    return;
+  }
+  auto trailers = Envoy::Http::ResponseTrailerMapImpl::create();
+  if (trailers_vector != nullptr) {
+    for (size_t i = 0; i < trailers_vector_size; i++) {
+      const auto& trailer = trailers_vector[i];
+      const absl::string_view key(static_cast<const char*>(trailer.key_ptr), trailer.key_length);
+      const absl::string_view value(static_cast<const char*>(trailer.value_ptr),
+                                    trailer.value_length);
+      trailers->addCopy(Envoy::Http::LowerCaseString(key), value);
     }
   }
+  upstream_request_->decodeTrailers(std::move(trailers));
 }
 
 } // namespace DynamicModules

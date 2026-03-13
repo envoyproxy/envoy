@@ -284,7 +284,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-03-03"
+  release_date: "2026-03-10"
   use_category:
   - controlplane
   - dataplane_core
@@ -787,7 +787,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-01-20"
+  release_date: "2026-03-11"
   use_category:
   - build
   - controlplane
@@ -881,7 +881,7 @@ fp16:
   project_name: "Conversion to/from half-precision floating point formats"
   project_desc: "Header-only library for conversion to/from half-precision floating point formats."
   project_url: "https://github.com/Maratyszcza/FP16"
-  release_date: "2021-03-20"
+  release_date: "2025-08-16"
   use_category:
   - dataplane_ext
   extensions:
@@ -1109,6 +1109,7 @@ brotli:
   project_url: "https://brotli.org"
   release_date: "2025-10-27"
   use_category:
+  - dataplane_core
   - dataplane_ext
   extensions:
   - envoy.compression.brotli.compressor
@@ -1310,7 +1311,7 @@ simdutf:
     AVX-512, RISC-V Vector Extension, LoongArch64, POWER. Part of Node.js, WebKit/Safari, Ladybird, Chromium,
     Cloudflare Workers and Bun.
   project_url: "https://github.com/simdutf/simdutf"
-  release_date: "2025-08-01"
+  release_date: "2026-03-07"
   use_category:
   - dataplane_ext
   extensions:
@@ -1369,7 +1370,7 @@ v8:
   project_name: "V8"
   project_desc: "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++"
   project_url: "https://v8.dev"
-  release_date: "2025-07-09"
+  release_date: "2026-03-04"
   use_category:
   - dataplane_ext
   extensions:

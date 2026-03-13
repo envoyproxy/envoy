@@ -100,19 +100,13 @@ private:
 };
 
 /**
- * The encoding state machine for the request path (HTTP -> TCP).
- */
-enum class EncodingState {
-  WaitingHeaders,
-  WaitingData,
-  WaitingAllData,
-  Done,
-};
-
-/**
  * The upstream HTTP TCP bridge that delegates protocol transformation to a dynamic module.
  * This implements Router::GenericUpstream to receive HTTP from the UpstreamCodecFilter, and
  * Tcp::ConnectionPool::UpstreamCallbacks to receive TCP data from the upstream connection.
+ *
+ * The module controls the flow by calling explicit ABI callbacks (send_upstream_data,
+ * send_response, send_response_headers, send_response_data, send_response_trailers) rather
+ * than returning status codes from event hooks.
  */
 class HttpTcpBridge : public Router::GenericUpstream,
                       public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
@@ -143,36 +137,46 @@ public:
 
   // Accessors for ABI callbacks.
   const Envoy::Http::RequestHeaderMap* requestHeaders() const { return request_headers_; }
-  Buffer::OwnedImpl& requestBuffer() { return request_buffer_; }
+  Buffer::Instance* requestBuffer() { return request_buffer_; }
   Buffer::Instance* responseBuffer() { return response_buffer_; }
-  Envoy::Http::ResponseHeaderMapPtr& responseHeaders() { return response_headers_; }
-  Buffer::OwnedImpl& responseBody() { return response_body_; }
-  Envoy::Http::ResponseTrailerMapPtr& responseTrailers() { return response_trailers_; }
+
+  // Called by ABI callbacks to send data upstream.
+  void sendUpstreamData(absl::string_view data, bool end_stream);
+
+  // Called by ABI callbacks to send a complete local response downstream.
+  void sendResponse(uint32_t status_code,
+                    envoy_dynamic_module_type_module_http_header* headers_vector,
+                    size_t headers_vector_size, absl::string_view body);
+
+  // Called by ABI callbacks to send response headers downstream.
+  void sendResponseHeaders(uint32_t status_code,
+                           envoy_dynamic_module_type_module_http_header* headers_vector,
+                           size_t headers_vector_size, bool end_stream);
+
+  // Called by ABI callbacks to send response body data downstream.
+  void sendResponseData(absl::string_view data, bool end_stream);
+
+  // Called by ABI callbacks to send response trailers downstream.
+  void sendResponseTrailers(envoy_dynamic_module_type_module_http_header* trailers_vector,
+                            size_t trailers_vector_size);
 
 private:
-  void sendDataToUpstream(bool end_stream);
-  void sendResponseToDownstream(bool end_stream);
-  void sendLocalReply();
+  Envoy::Http::ResponseHeaderMapPtr
+  buildResponseHeaders(uint32_t status_code,
+                       envoy_dynamic_module_type_module_http_header* headers_vector,
+                       size_t headers_vector_size);
 
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   BridgeConfigSharedPtr config_;
   envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr in_module_bridge_ = nullptr;
 
-  EncodingState encoding_state_{EncodingState::WaitingHeaders};
-  bool response_headers_sent_ = false;
+  bool response_started_ = false;
   bool downstream_complete_ = false;
-  bool local_reply_pending_ = false;
-  // Guards the deferred sendLocalReply callback. Set to false in the destructor to ensure
-  // the callback becomes a no-op if the bridge is destroyed before the callback runs.
-  std::shared_ptr<bool> local_reply_guard_{std::make_shared<bool>(true)};
 
   const Envoy::Http::RequestHeaderMap* request_headers_ = nullptr;
-  Buffer::OwnedImpl request_buffer_;
+  Buffer::Instance* request_buffer_ = nullptr;
   Buffer::Instance* response_buffer_ = nullptr;
-  Envoy::Http::ResponseHeaderMapPtr response_headers_;
-  Buffer::OwnedImpl response_body_;
-  Envoy::Http::ResponseTrailerMapPtr response_trailers_;
 
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 };

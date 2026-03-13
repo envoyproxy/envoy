@@ -12,6 +12,17 @@ getBridge(envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_en
       bridge_envoy_ptr);
 }
 
+void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
+                      envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  Envoy::Buffer::RawSliceVector raw_slices = buffer.getRawSlices();
+  size_t counter = 0;
+  for (const auto& slice : raw_slices) {
+    result_buffer_vector[counter].length = slice.len_;
+    result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
+    counter++;
+  }
+}
+
 } // namespace
 
 extern "C" {
@@ -82,153 +93,72 @@ bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
 
 void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    uintptr_t* result_buffer_ptr, size_t* result_buffer_length) {
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& buffer = bridge->requestBuffer();
-  if (buffer.length() == 0) {
-    *result_buffer_ptr = 0;
+  auto* buffer = bridge->requestBuffer();
+  if (buffer == nullptr || buffer->length() == 0) {
     *result_buffer_length = 0;
     return;
   }
-  auto slices = buffer.getRawSlices();
-  if (slices.empty()) {
-    *result_buffer_ptr = 0;
-    *result_buffer_length = 0;
-    return;
-  }
-  // Linearize the buffer so we can return a single contiguous pointer.
-  buffer.linearize(buffer.length());
-  auto linearized = buffer.getRawSlices();
-  *result_buffer_ptr = reinterpret_cast<uintptr_t>(linearized[0].mem_);
-  *result_buffer_length = linearized[0].len_;
-}
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_request_buffer(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer data) {
-  auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& buffer = bridge->requestBuffer();
-  buffer.drain(buffer.length());
-  if (data.length > 0) {
-    buffer.add(data.ptr, data.length);
-  }
-}
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_drain_request_buffer(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr, size_t length) {
-  auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& buffer = bridge->requestBuffer();
-  buffer.drain(std::min(static_cast<uint64_t>(length), buffer.length()));
-}
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_request_buffer(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer data) {
-  auto* bridge = getBridge(bridge_envoy_ptr);
-  if (data.length > 0) {
-    bridge->requestBuffer().add(data.ptr, data.length);
-  }
+  fillBufferChunks(*buffer, result_buffer);
+  *result_buffer_length = buffer->getRawSlices(std::nullopt).size();
 }
 
 // ----------------------- Response Buffer Operations --------------------------
 
 void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    uintptr_t* result_buffer_ptr, size_t* result_buffer_length) {
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length) {
   auto* bridge = getBridge(bridge_envoy_ptr);
   auto* buffer = bridge->responseBuffer();
   if (buffer == nullptr || buffer->length() == 0) {
-    *result_buffer_ptr = 0;
     *result_buffer_length = 0;
     return;
   }
-  buffer->linearize(buffer->length());
-  auto slices = buffer->getRawSlices();
-  if (slices.empty()) {
-    *result_buffer_ptr = 0;
-    *result_buffer_length = 0;
-    return;
-  }
-  *result_buffer_ptr = reinterpret_cast<uintptr_t>(slices[0].mem_);
-  *result_buffer_length = slices[0].len_;
+  fillBufferChunks(*buffer, result_buffer);
+  *result_buffer_length = buffer->getRawSlices(std::nullopt).size();
 }
 
-// ----------------------- Response Header Operations --------------------------
+// ----------------------- Send Upstream Data ----------------------------------
 
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header(
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& headers = bridge->responseHeaders();
-  if (headers == nullptr) {
-    return;
-  }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  headers->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  bridge->sendUpstreamData(absl::string_view(data.ptr, data.length), end_stream);
 }
 
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_header(
+// ----------------------- Send Response Operations ----------------------------
+
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+    uint32_t status_code, envoy_dynamic_module_type_module_http_header* headers_vector,
+    size_t headers_vector_size, envoy_dynamic_module_type_module_buffer body) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& headers = bridge->responseHeaders();
-  if (headers == nullptr) {
-    return;
-  }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  headers->addCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  bridge->sendResponse(status_code, headers_vector, headers_vector_size,
+                       absl::string_view(body.ptr, body.length));
 }
 
-// ----------------------- Response Body Operations ----------------------------
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_body(
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer data) {
+    uint32_t status_code, envoy_dynamic_module_type_module_http_header* headers_vector,
+    size_t headers_vector_size, bool end_stream) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& body = bridge->responseBody();
-  body.drain(body.length());
-  if (data.length > 0) {
-    body.add(data.ptr, data.length);
-  }
+  bridge->sendResponseHeaders(status_code, headers_vector, headers_vector_size, end_stream);
 }
 
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_response_body(
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer data) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  if (data.length > 0) {
-    bridge->responseBody().add(data.ptr, data.length);
-  }
+  bridge->sendResponseData(absl::string_view(data.ptr, data.length), end_stream);
 }
 
-// ----------------------- Response Trailer Operations -------------------------
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_trailer(
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+    envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size) {
   auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& trailers = bridge->responseTrailers();
-  if (trailers == nullptr) {
-    trailers = Envoy::Http::createHeaderMap<Envoy::Http::ResponseTrailerMapImpl>({});
-  }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  trailers->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
-}
-
-void envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_trailer(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  auto* bridge = getBridge(bridge_envoy_ptr);
-  auto& trailers = bridge->responseTrailers();
-  if (trailers == nullptr) {
-    trailers = Envoy::Http::createHeaderMap<Envoy::Http::ResponseTrailerMapImpl>({});
-  }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  trailers->addCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  bridge->sendResponseTrailers(trailers_vector, trailers_vector_size);
 }
 
 } // extern "C"

@@ -1,6 +1,7 @@
-// An upstream bridge module that returns EndStream from encode_headers without setting any response
-// body. This tests the deferred local reply path where headers are sent with end_stream=true.
+// An upstream bridge module that sends headers with end_stream=true and no body from encode_headers.
+// Tests the deferred local reply path where headers are sent with end_stream=true.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -34,47 +35,40 @@ envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   return (envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr)0x2;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream) {
+  (void)bridge_module_ptr;
+  (void)end_of_stream;
+  envoy_dynamic_module_type_module_buffer empty_body = {.ptr = NULL, .length = 0};
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(bridge_envoy_ptr, 200, NULL,
+                                                                       0, empty_body);
+}
+
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  // Return EndStream without setting any response body to test the empty-body deferred reply path.
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_EndStream;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
-    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
-    bool end_of_stream) {
-  (void)bridge_envoy_ptr;
-  (void)bridge_module_ptr;
-  (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
-}
-
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_Continue;
 }
 
 void envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(

@@ -465,8 +465,7 @@ matcher_list:
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
   auto match_tree = factory_.create(matcher);
-  std::string error_message = absl::StrCat("Unsupported data input type: float.",
-                                           " The matcher supports input type: string");
+  std::string error_message = "Unsupported data input type: float";
   EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 
@@ -510,8 +509,7 @@ TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"))
       .Times(2);
 
-  std::string error_message = absl::StrCat("Unsupported data input type: float.",
-                                           " The matcher supports input type: string");
+  std::string error_message = "Unsupported data input type: float";
   EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException, error_message);
 }
 
@@ -826,8 +824,7 @@ TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
   ListMatcher<TestData> matcher(absl::nullopt);
 
   matcher.addMatcher(createSingleMatcher(
-                         absl::nullopt, [](auto) { return false; },
-                         DataInputGetResult::DataAvailability::NotAvailable),
+                         absl::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
                      stringOnMatch<TestData>("match"));
 
   ActionMatchResult recursive_result = evaluateMatch(matcher, TestData());
@@ -1126,7 +1123,7 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
   auto nested_matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
   nested_matcher->addMatcher(
       createSingleMatcher(
-          "string", [](auto) { return true; }, DataInputGetResult::DataAvailability::NotAvailable),
+          "string", [](auto) { return true; }, DataAvailability::NotAvailable),
       stringOnMatch<TestData>("fail"));
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),

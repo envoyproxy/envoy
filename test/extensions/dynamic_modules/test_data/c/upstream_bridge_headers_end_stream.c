@@ -1,6 +1,7 @@
-// An upstream bridge module that returns EndStream from encode_headers for testing the
-// deferred local reply path via dispatcher().post().
+// An upstream bridge module that sends a 403 response with body "access denied" from encode_headers.
+// Tests the deferred local reply path via dispatcher().post().
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -34,60 +35,41 @@ envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   return (envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr)0x2;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
-  (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-
-  // Set a response body so the deferred local reply sends headers + data.
   const char* body = "access denied";
   envoy_dynamic_module_type_module_buffer body_buf = {.ptr = body, .length = 13};
-  envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_body(bridge_envoy_ptr,
-                                                                          body_buf);
-
-  const char* status_key = ":status";
-  const char* status_val = "403";
-  envoy_dynamic_module_type_module_buffer sk = {.ptr = status_key, .length = 7};
-  envoy_dynamic_module_type_module_buffer sv = {.ptr = status_val, .length = 3};
-  envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header(bridge_envoy_ptr, sk,
-                                                                            sv);
-
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_EndStream;
+  envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(bridge_envoy_ptr, 403, NULL,
+                                                                       0, body_buf);
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_Continue;
 }
 
 void envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(

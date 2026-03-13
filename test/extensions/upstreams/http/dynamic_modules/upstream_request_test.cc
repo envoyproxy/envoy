@@ -164,7 +164,7 @@ public:
   std::unique_ptr<HttpTcpBridge> bridge_;
 };
 
-TEST_F(HttpTcpBridgeTest, EncodeHeadersStreamingMode) {
+TEST_F(HttpTcpBridgeTest, EncodeHeadersNoOp) {
   Envoy::Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/test"}, {":authority", "example.com"}};
 
@@ -195,15 +195,12 @@ TEST_F(HttpTcpBridgeTest, EncodeTrailers) {
   bridge_->encodeTrailers(trailers);
 }
 
-TEST_F(HttpTcpBridgeTest, OnUpstreamData) {
+TEST_F(HttpTcpBridgeTest, OnUpstreamDataNoOp) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
   Buffer::OwnedImpl data("response data");
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   bridge_->onUpstreamData(data, false);
-  // Buffer should be drained after Continue.
-  EXPECT_EQ(0, data.length());
 }
 
 TEST_F(HttpTcpBridgeTest, OnUpstreamConnectionClose) {
@@ -263,7 +260,7 @@ TEST_F(HttpTcpBridgeNullBridgeTest, OnUpstreamDataIsNoOp) {
 }
 
 // =============================================================================
-// HttpTcpBridge tests for StopAndBuffer behavior.
+// HttpTcpBridge tests for stop-and-buffer module (no callbacks called).
 // =============================================================================
 
 class HttpTcpBridgeStopAndBufferTest : public HttpTcpBridgeTest {
@@ -271,42 +268,33 @@ public:
   HttpTcpBridgeStopAndBufferTest() { createBridge("upstream_bridge_stop_and_buffer"); }
 };
 
-TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeHeadersStopAndBuffer) {
+TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeHeadersNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, false);
   EXPECT_TRUE(status.ok());
 }
 
-TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeDataBufferedModeAccumulatesAndSendsOnEndStream) {
+TEST_F(HttpTcpBridgeStopAndBufferTest, EncodeDataNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
-  // In buffered mode, data is accumulated. Non-end-of-stream chunks are buffered without
-  // sending to upstream.
   Buffer::OwnedImpl chunk1("chunk1");
   bridge_->encodeData(chunk1, false);
 
   Buffer::OwnedImpl chunk2("chunk2");
-  bridge_->encodeData(chunk2, false);
-
-  // On end_of_stream, the module's encode_data callback is invoked and the accumulated
-  // buffer is sent upstream.
-  Buffer::OwnedImpl chunk3("chunk3");
-  bridge_->encodeData(chunk3, true);
+  bridge_->encodeData(chunk2, true);
 }
 
-TEST_F(HttpTcpBridgeStopAndBufferTest, OnUpstreamDataStopAndBufferDoesNotDrain) {
+TEST_F(HttpTcpBridgeStopAndBufferTest, OnUpstreamDataNoCallbacksCalled) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
   Buffer::OwnedImpl data("upstream data");
   bridge_->onUpstreamData(data, false);
-  // StopAndBuffer should not drain the buffer.
-  EXPECT_EQ(13, data.length());
 }
 
 // =============================================================================
-// HttpTcpBridge tests for EndStream behavior.
+// HttpTcpBridge tests for EndStream behavior (module calls send callbacks).
 // =============================================================================
 
 class HttpTcpBridgeEndStreamTest : public HttpTcpBridgeTest {
@@ -314,12 +302,10 @@ public:
   HttpTcpBridgeEndStreamTest() { createBridge("upstream_bridge_end_stream"); }
 };
 
-TEST_F(HttpTcpBridgeEndStreamTest, EncodeDataEndStreamSendsLocalReply) {
+TEST_F(HttpTcpBridgeEndStreamTest, EncodeDataSendsResponse) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
-  // The end_stream module sets response body to "end_stream_body" and status to 403 in
-  // encode_data, then returns EndStream which triggers sendLocalReply.
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
 
@@ -327,62 +313,38 @@ TEST_F(HttpTcpBridgeEndStreamTest, EncodeDataEndStreamSendsLocalReply) {
   bridge_->encodeData(data, true);
 }
 
-TEST_F(HttpTcpBridgeEndStreamTest, EncodeTrailersEndStreamSendsLocalReply) {
+TEST_F(HttpTcpBridgeEndStreamTest, EncodeTrailersSendsResponse) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
-  // The end_stream module returns EndStream from encode_trailers, triggering sendLocalReply.
-  // No body is set in encode_trailers, so headers are sent with end_stream=true.
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, true));
 
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"key", "value"}};
   bridge_->encodeTrailers(trailers);
 }
 
-TEST_F(HttpTcpBridgeEndStreamTest, OnUpstreamDataEndStreamSendsResponse) {
+TEST_F(HttpTcpBridgeEndStreamTest, OnUpstreamDataSendsResponseHeadersAndData) {
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
 
-  // The end_stream module sets response trailers during encode_headers, so
-  // sendResponseToDownstream sends headers, then empty data (end_stream=false),
-  // then trailers to close the stream.
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, false));
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeTrailers(_));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
 
   Buffer::OwnedImpl data("upstream response");
   bridge_->onUpstreamData(data, false);
-  // Buffer should be drained after EndStream.
-  EXPECT_EQ(0, data.length());
 }
 
-TEST_F(HttpTcpBridgeEndStreamTest, AbiCallbacksExercised) {
-  // The end_stream module exercises various ABI callbacks during encode_headers:
-  // get_request_headers_size, get_request_headers, get_request_buffer, set_request_buffer,
-  // drain_request_buffer, set_response_trailer, add_response_trailer.
-  // After the module callback, sendDataToUpstream writes the request buffer to the upstream
-  // connection, so we verify via the connection write call.
+TEST_F(HttpTcpBridgeEndStreamTest, EncodeHeadersExercisesAbiCallbacks) {
   Envoy::Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/test"}, {"x-custom", "value"}};
 
-  Buffer::OwnedImpl captured_data;
-  EXPECT_CALL(mock_connection_, write(_, false))
-      .WillOnce(
-          Invoke([&captured_data](Buffer::Instance& data, bool) { captured_data.move(data); }));
-
   auto status = bridge_->encodeHeaders(headers, false);
   EXPECT_TRUE(status.ok());
-
-  // The module called set_request_buffer("replaced") then drain(3), leaving "laced".
-  // sendDataToUpstream then wrote this to the connection.
-  EXPECT_EQ("laced", captured_data.toString());
-
-  // Verify response trailers were set by the module.
-  EXPECT_NE(bridge_->responseTrailers(), nullptr);
 }
 
 // =============================================================================
-// HttpTcpBridge tests for encodeHeaders EndStream (deferred local reply).
+// HttpTcpBridge tests for encodeHeaders send_response (module sends response
+// directly during encode_headers).
 // =============================================================================
 
 class HttpTcpBridgeHeadersEndStreamTest : public HttpTcpBridgeTest {
@@ -390,89 +352,33 @@ public:
   HttpTcpBridgeHeadersEndStreamTest() { createBridge("upstream_bridge_headers_end_stream"); }
 };
 
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, DeferredLocalReplyWithBody) {
-  Event::PostCb captured_cb;
-  EXPECT_CALL(mock_connection_.dispatcher_, post(_))
-      .WillOnce(Invoke([&captured_cb](Event::PostCb cb) { captured_cb = std::move(cb); }));
-
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_TRUE(status.ok());
-
-  // The callback should have been posted. Now invoke it to simulate the next event loop tick.
-  ASSERT_NE(captured_cb, nullptr);
+TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithBody) {
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
-  captured_cb();
-}
-
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, DeferredLocalReplyGuardInvalidated) {
-  Event::PostCb captured_cb;
-  EXPECT_CALL(mock_connection_.dispatcher_, post(_))
-      .WillOnce(Invoke([&captured_cb](Event::PostCb cb) { captured_cb = std::move(cb); }));
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, true);
   EXPECT_TRUE(status.ok());
-
-  // Destroy the bridge before the callback runs.
-  bridge_.reset();
-
-  // The guard should prevent the callback from doing anything.
-  ASSERT_NE(captured_cb, nullptr);
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
-  captured_cb();
 }
 
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, DeferredLocalReplyWithoutBody) {
+TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithoutBody) {
   createBridge("upstream_bridge_headers_end_stream_no_body");
 
-  Event::PostCb captured_cb;
-  EXPECT_CALL(mock_connection_.dispatcher_, post(_))
-      .WillOnce(Invoke([&captured_cb](Event::PostCb cb) { captured_cb = std::move(cb); }));
-
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  auto status = bridge_->encodeHeaders(headers, true);
-  EXPECT_TRUE(status.ok());
-
-  // The module did not set any response body, so headers should be sent with end_stream=true.
-  ASSERT_NE(captured_cb, nullptr);
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, true));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
-  captured_cb();
-}
-
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, DeferredLocalReplyAfterResetStream) {
-  Event::PostCb captured_cb;
-  EXPECT_CALL(mock_connection_.dispatcher_, post(_))
-      .WillOnce(Invoke([&captured_cb](Event::PostCb cb) { captured_cb = std::move(cb); }));
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, true);
   EXPECT_TRUE(status.ok());
-
-  // Reset the stream before the deferred callback runs, which sets upstream_request_ to nullptr.
-  EXPECT_CALL(mock_connection_,
-              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
-  bridge_->resetStream();
-
-  // The callback should detect upstream_request_ is null and return early.
-  ASSERT_NE(captured_cb, nullptr);
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
-  captured_cb();
 }
 
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventSuppressedDuringPendingLocalReply) {
-  Event::PostCb captured_cb;
-  EXPECT_CALL(mock_connection_.dispatcher_, post(_))
-      .WillOnce(Invoke([&captured_cb](Event::PostCb cb) { captured_cb = std::move(cb); }));
+TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventSuppressedAfterResponseStarted) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, true).ok());
 
-  // While the deferred callback is pending, onEvent should not call onResetStream.
   EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _)).Times(0);
   bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -488,13 +394,13 @@ public:
 
 TEST_F(HttpTcpBridgeAbiEdgeCasesTest, EdgeCaseCallbacksExercised) {
   // The abi_edge_cases module exercises during encode_headers:
-  // - get_request_header with out-of-range index (returns false).
-  // - get_request_header without total_count_out (null pointer).
+  // - get_request_header with out-of-range index.
+  // - get_request_header without total_count_out.
   // - get_request_headers_size.
-  // - set_response_header and add_response_header.
-  // - append_response_body with non-empty and empty data.
-  // - set_response_body with empty data.
-  // - append_request_buffer with empty data.
+  // - send_response_headers and send_response_data.
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
+
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
   auto status = bridge_->encodeHeaders(headers, false);
   EXPECT_TRUE(status.ok());
@@ -525,21 +431,6 @@ TEST_F(HttpTcpBridgeTest, OnEventAfterResetStream) {
               close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
-  // After resetStream, upstream_request_ is null. onEvent should not call onResetStream.
-  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _)).Times(0);
-  bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_F(HttpTcpBridgeTest, OnEventSuppressedWhenResponseHeadersSent) {
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
-
-  // Trigger response headers being sent.
-  Buffer::OwnedImpl data("data");
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
-  bridge_->onUpstreamData(data, false);
-
-  // Now onEvent should be suppressed because response_headers_sent_ is true.
   EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _)).Times(0);
   bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -549,7 +440,6 @@ TEST_F(HttpTcpBridgeTest, WatermarksAfterResetStream) {
               close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
-  // After resetStream, watermark callbacks should be no-ops.
   EXPECT_CALL(mock_upstream_to_downstream_, onAboveWriteBufferHighWatermark()).Times(0);
   bridge_->onAboveWriteBufferHighWatermark();
 
@@ -562,46 +452,9 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamDataAfterResetStream) {
               close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
   bridge_->resetStream();
 
-  // After resetStream, upstream_request_ is null. onUpstreamData should be a no-op.
   Buffer::OwnedImpl data("response");
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
   bridge_->onUpstreamData(data, false);
-}
-
-TEST_F(HttpTcpBridgeTest, EncodeDataStreamingModeReplacesBuffer) {
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
-
-  // In streaming mode (WaitingData state), each encodeData replaces the request_buffer_.
-  Buffer::OwnedImpl data1("first");
-  bridge_->encodeData(data1, false);
-
-  Buffer::OwnedImpl data2("second");
-  bridge_->encodeData(data2, true);
-}
-
-TEST_F(HttpTcpBridgeTest, OnUpstreamDataMultipleCallsSendsHeadersOnce) {
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
-
-  // First call sends headers.
-  Buffer::OwnedImpl data1("data1");
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
-  bridge_->onUpstreamData(data1, false);
-
-  // Second call should not send headers again.
-  Buffer::OwnedImpl data2("data2");
-  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
-  bridge_->onUpstreamData(data2, false);
-}
-
-TEST_F(HttpTcpBridgeTest, SendDataToUpstreamEmptyBufferNotEndStream) {
-  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
-  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
-
-  // Empty buffer with end_stream=false should not write to the connection.
-  Buffer::OwnedImpl empty_data;
-  bridge_->encodeData(empty_data, false);
 }
 
 TEST_F(HttpTcpBridgeTest, BytesMeter) {
@@ -609,18 +462,11 @@ TEST_F(HttpTcpBridgeTest, BytesMeter) {
   EXPECT_NE(meter, nullptr);
 }
 
-TEST_F(HttpTcpBridgeTest, SetAccount) {
-  // setAccount is a no-op but should not crash.
-  bridge_->setAccount(nullptr);
-}
+TEST_F(HttpTcpBridgeTest, SetAccount) { bridge_->setAccount(nullptr); }
 
-TEST_F(HttpTcpBridgeTest, EnableTcpTunneling) {
-  // enableTcpTunneling is a no-op but should not crash.
-  bridge_->enableTcpTunneling();
-}
+TEST_F(HttpTcpBridgeTest, EnableTcpTunneling) { bridge_->enableTcpTunneling(); }
 
 TEST_F(HttpTcpBridgeTest, EncodeMetadata) {
-  // encodeMetadata is a no-op but should not crash.
   Envoy::Http::MetadataMapVector metadata;
   bridge_->encodeMetadata(metadata);
 }
@@ -664,13 +510,11 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateSuccess) {
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, CacheHit) {
   auto config = createProtoConfig();
-  // First call creates the config.
   auto pool1 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
       Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
   EXPECT_NE(pool1, nullptr);
 
-  // Second call with the same config should hit the cache.
   auto pool2 = factory_.createGenericConnPool(
       host_, cm_.thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
       Upstream::ResourcePriority::Default, absl::nullopt, nullptr, config);
@@ -708,15 +552,11 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, NoBridgeConfig) {
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, BridgeConfigParseFailure) {
-  // Construct a config with bridge_config whose Any has a type_url matching StringValue but
-  // with invalid protobuf wire format bytes so that anyToBytes fails during unpack.
   auto config = createProtoConfig();
   config.set_bridge_name("parse_fail_test");
 
   auto* any = config.mutable_bridge_config();
   any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
-  // Wire type 7 (invalid) with field number 1: tag byte = (1 << 3) | 7 = 0x0F.
-  // Followed by truncated data to trigger ParseFromString failure.
   any->set_value(std::string("\x0F\xFF\xFF", 3));
 
   auto pool = factory_.createGenericConnPool(
@@ -736,13 +576,10 @@ TEST_F(DynamicModuleGenericConnPoolFactoryTest, CreateEmptyConfigProto) {
 }
 
 TEST_F(DynamicModuleGenericConnPoolFactoryTest, InvalidTcpPool) {
-  // When tcpConnPool returns nullopt, TcpConnPool::valid() returns false and
-  // createGenericConnPool returns nullptr.
   NiceMock<Upstream::MockClusterManager> cm2;
   cm2.initializeThreadLocalClusters({"fake_cluster"});
   EXPECT_CALL(cm2.thread_local_cluster_, tcpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
 
-  // Use a different bridge name to avoid cache hit.
   auto config = createProtoConfig();
   config.set_bridge_name("invalid_pool_test");
 

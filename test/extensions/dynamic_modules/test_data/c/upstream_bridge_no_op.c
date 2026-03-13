@@ -34,46 +34,38 @@ envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   return (envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr)0x2;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_headers_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_encode_data_status_Continue;
 }
 
-envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status
-envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
     bool end_of_stream) {
   (void)bridge_envoy_ptr;
   (void)bridge_module_ptr;
   (void)end_of_stream;
-  return envoy_dynamic_module_type_on_upstream_http_tcp_bridge_on_upstream_data_status_Continue;
 }
 
 void envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(

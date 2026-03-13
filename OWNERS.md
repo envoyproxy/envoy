@@ -65,10 +65,10 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
-* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
-  * Android, Java, Kotlin, JNI.
 * Dan Zhang ([danzh2010](https://github.com/danzh2010)) (danzh@google.com)
   * Envoy Mobile, QUIC, HTTP/3.
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+  * Language APIs, xDS.
 
 # Senior extension maintainers
 
@@ -100,6 +100,7 @@ without further review.
 * Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
 
 # Emeritus maintainers
 

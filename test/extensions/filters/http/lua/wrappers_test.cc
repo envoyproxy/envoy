@@ -2,6 +2,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -1415,6 +1416,153 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
   EXPECT_CALL(printer_, testPrint("null_filter_state_returned_nil"));
   EXPECT_CALL(printer_, testPrint("null_filter_state_field_returned_nil"));
   start("callMe");
+  wrapper.reset();
+}
+
+// Test factory for ``filterState():set()`` tests.
+class TestStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "test.string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(TestStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// Test factory that always returns nullptr from createFromBytes.
+class TestNullObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "test.null"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view) const override {
+    return nullptr;
+  }
+};
+
+REGISTER_FACTORY(TestNullObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// Test for ``filterState():set()`` basic functionality.
+TEST_F(LuaStreamInfoWrapperTest, SetFilterStateBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:filterState():set("my_key", "test.string", "my_value")
+      local result = object:filterState():get("my_key")
+      if result then
+        testPrint("found")
+        testPrint(result)
+      else
+        testPrint("not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found"));
+  EXPECT_CALL(printer_, testPrint("my_value"));
+  start("callMe");
+
+  // Verify the filter state was actually set on the stream info.
+  const auto* accessor =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("my_key");
+  ASSERT_NE(nullptr, accessor);
+  EXPECT_EQ(accessor->serializeAsString(), "my_value");
+
+  wrapper.reset();
+}
+
+// Test for ``filterState():set()`` with unknown factory key.
+TEST_F(LuaStreamInfoWrapperTest, SetFilterStateUnknownFactory) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:filterState():set("my_key", "nonexistent.factory", "payload")
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:3: 'nonexistent.factory' does not have an object "
+                            "factory");
+  wrapper.reset();
+}
+
+// Test for ``filterState():set()`` when factory returns nullptr.
+TEST_F(LuaStreamInfoWrapperTest, SetFilterStateFactoryReturnsNull) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:filterState():set("my_key", "test.null", "payload")
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:3: failed to create an object 'my_key' from value "
+                            "'payload'");
+  wrapper.reset();
+}
+
+// Test for ``filterState():set()`` with envoy.network.upstream_subject_alt_names factory.
+TEST_F(LuaStreamInfoWrapperTest, SetFilterStateUpstreamSubjectAltNames) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      -- Set upstream SANs using comma-separated values.
+      object:filterState():set(
+        "envoy.network.upstream_subject_alt_names",
+        "envoy.network.upstream_subject_alt_names",
+        "san1.example.com,san2.example.com,san3.example.com")
+
+      -- Read it back via string serialization to verify it was stored.
+      local result = object:filterState():get("envoy.network.upstream_subject_alt_names")
+      if result then
+        testPrint("found_sans")
+        testPrint(result)
+      else
+        testPrint("sans_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_sans"));
+  EXPECT_CALL(printer_, testPrint("san1.example.com,san2.example.com,san3.example.com"));
+  start("callMe");
+
+  // Verify the filter state was set on the C++ side with the correct SANs.
+  const auto* sans = stream_info.filterState()->getDataReadOnly<Network::UpstreamSubjectAltNames>(
+      "envoy.network.upstream_subject_alt_names");
+  ASSERT_NE(nullptr, sans);
+  EXPECT_EQ(3, sans->value().size());
+  EXPECT_EQ("san1.example.com", sans->value()[0]);
+  EXPECT_EQ("san2.example.com", sans->value()[1]);
+  EXPECT_EQ("san3.example.com", sans->value()[2]);
+
   wrapper.reset();
 }
 
