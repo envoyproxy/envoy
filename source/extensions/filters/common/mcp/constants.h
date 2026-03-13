@@ -33,8 +33,6 @@ constexpr absl::string_view CONTENT_FIELD = "content";
 constexpr absl::string_view IS_ERROR_FIELD = "isError";
 constexpr absl::string_view ERROR_FIELD = "error";
 
-constexpr absl::string_view MCP_ENDPOINT = "/mcp";
-
 // MCP Initialize constants
 constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";

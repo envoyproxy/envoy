@@ -118,7 +118,8 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
 
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  if (request_headers.getPathValue() != McpConstants::MCP_ENDPOINT) {
+  // TODO(guoyilin42): Make the MCP endpoint configurable.
+  if (request_headers.getPathValue() != "/mcp") {
     // Only intercept /mcp requests and pass through other requests.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -179,26 +180,22 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus
-McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) {
+Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap&,
+                                                                 bool end_stream) {
   switch (mcp_operation_) {
   case McpOperation::Unspecified:
-  case McpOperation::Undecided: {
-    if (getResponseCode(response_headers) == 200) {
-      response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-    }
+  case McpOperation::Undecided:
+  case McpOperation::Initialization:
+  // The response for InitializedNotification is empty body so we don't need
+  // to modify the response headers.
+  case McpOperation::InitializationAck:
     return Http::FilterHeadersStatus::Continue;
-  }
   default:
     break;
   }
 
-  // The response for InitializedNotification is empty body so we don't need
-  // to modify the response headers.
-  return (end_stream || mcp_operation_ == McpOperation::InitializationAck ||
-          mcp_operation_ == McpOperation::Initialization)
-             ? Http::FilterHeadersStatus::Continue
-             : Http::FilterHeadersStatus::StopIteration;
+  return end_stream ? Http::FilterHeadersStatus::Continue
+                    : Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
@@ -277,8 +274,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
     break;
   }
   case McpOperation::ToolsCall: {
-    // The tool call response is in JSON REST format (after gRPC transcoding).
-    // Translates it JSON-RPC.
+    // The tool call response is in JSON REST format. Translates it to JSON-RPC.
     if (!utf8_range::IsStructurallyValid(absl::string_view(json_ptr, total_size))) {
       ENVOY_STREAM_LOG(
           warn,
