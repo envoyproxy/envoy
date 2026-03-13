@@ -104,8 +104,11 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(), Grpc::RawAsyncClientPtr);
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     } else if (opentelemetry_config.has_http_service()) {
+      absl::Status creation_status = absl::OkStatus();
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
-          factory_context.clusterManager(), opentelemetry_config.http_service());
+          factory_context.clusterManager(), opentelemetry_config.http_service(), factory_context,
+          creation_status);
+      THROW_IF_NOT_OK_REF(creation_status);
     }
     // Get the max cache size from config
     uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, max_cache_size,

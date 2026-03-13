@@ -34,13 +34,10 @@ getGrpcAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& c
 }
 
 HttpAccessLoggerCacheSharedPtr
-getHttpAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& context) {
+getHttpAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<HttpAccessLoggerCacheImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_http_access_logger_cache), [&context] {
-        return std::make_shared<HttpAccessLoggerCacheImpl>(
-            context.clusterManager(), context.serverScope(), context.threadLocal(),
-            context.localInfo());
-      });
+      SINGLETON_MANAGER_REGISTERED_NAME(open_telemetry_http_access_logger_cache),
+      [&context] { return std::make_shared<HttpAccessLoggerCacheImpl>(context); });
 }
 
 ::Envoy::AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/header_value.pb.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 

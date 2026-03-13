@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.auth.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/header_value.proto";
 import "envoy/service/auth/v3/attribute_context.proto";
 import "envoy/type/v3/http_status.proto";
 

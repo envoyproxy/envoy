@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/header_value.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
 import "udpa/annotations/status.proto";

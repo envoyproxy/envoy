@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/substitution_format_string.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "HeaderValueProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header value]
+
+// Header name/value pair.
+message HeaderValue {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
+
+  // Header name.
+  string key = 1
+      [(validate.rules).string =
+           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // Header value.
+  //
+  // The same :ref:`format specifier <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` applies here, however
+  // unknown header values are replaced with the empty string instead of ``-``.
+  // Header value is encoded as string. This does not work for non-utf8 characters.
+  // Only one of ``value``, ``raw_value``, or ``formatted_value`` can be set.
+  string value = 2 [
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
+  ];
+
+  // Header value is encoded as bytes which can support non-utf8 characters.
+  // Only one of ``value``, ``raw_value``, or ``formatted_value`` can be set.
+  bytes raw_value = 3 [
+    (validate.rules).bytes = {min_len: 0 max_len: 16384},
+    (udpa.annotations.field_migrate).oneof_promotion = "value_type"
+  ];
+
+  // Header value specified as a substitution format string, supporting
+  // :ref:`command operators <config_access_log_command_operators>` including
+  // extension formatters (e.g. ``%GENERIC_SECRET(name)%``). Evaluated once at
+  // initialization time. Only one of ``value``, ``raw_value``, or
+  // ``formatted_value`` can be set.
+  SubstitutionFormatString formatted_value = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
+}
+
+// Header name/value pair plus option to control append behavior.
+message HeaderValueOption {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.HeaderValueOption";
+
+  // Describes the supported actions types for header append action.
+  enum HeaderAppendAction {
+    // If the header already exists, this action will result in:
+    //
+    // - Comma-concatenated for predefined inline headers.
+    // - Duplicate header added in the ``HeaderMap`` for other headers.
+    //
+    // If the header doesn't exist then this will add new header with specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the header if it doesn't already exist. If the header
+    // already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will add the header
+    // with specified key and value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will be no-op.
+    OVERWRITE_IF_EXISTS = 3;
+  }
+
+  // Header name/value pair that this option applies to.
+  HeaderValue header = 1 [(validate.rules).message = {required: true}];
+
+  // Should the value be appended? If true (default), the value is appended to
+  // existing values. Otherwise it replaces any existing values.
+  // This field is deprecated and please use
+  // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
+  //
+  // .. note::
+  //   The :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>` and
+  //   :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` have
+  //   default value (``false``) for this field.
+  google.protobuf.BoolValue append = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent.
+  // Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD
+  // <envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
+  // otherwise they are added.
+  bool keep_empty_value = 4;
+}
+
+// Wrapper for a set of headers.
+message HeaderMap {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
+
+  // A list of header names and their values.
+  repeated HeaderValue headers = 1;
+}
