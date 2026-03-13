@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <map>
 #include <memory>
 #include <string>
@@ -62,6 +64,44 @@ struct HostStats {
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() {
     return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
   }
+};
+
+/**
+ * Lock-free, last-value store for per-host ORCA utilization.
+ *
+ * Written by worker threads in the router on every ORCA report; read by
+ * LB policies during host selection.
+ *
+ * set() clamps to [0, 1] and silently drops non-finite values.
+ * The initial value is 0.0. Use lastUpdateTimeMs() == 0 to distinguish
+ * "never reported" from "reported 0.0 utilization".
+ */
+class OrcaUtilizationStore {
+public:
+  double get() const { return value_.load(std::memory_order_relaxed) / kScale; }
+
+  // Set utilization with a monotonic timestamp (milliseconds since epoch).
+  void set(double utilization, int64_t monotonic_time_ms) {
+    // Reject non-finite values: std::clamp and the uint32 cast have undefined behavior for them.
+    if (!std::isfinite(utilization)) {
+      return;
+    }
+    // Clamp to [0, 1]. The fixed-point uint32 encoding cannot represent values outside this range:
+    // negative values would wrap around on cast, and values above 1.0 would overflow kScale.
+    // ORCA also defines utilization in [0, 1].
+    utilization = std::clamp(utilization, 0.0, 1.0);
+    value_.store(static_cast<uint32_t>(utilization * kScale), std::memory_order_relaxed);
+    last_update_time_ms_.store(monotonic_time_ms, std::memory_order_release);
+  }
+
+  // Returns the monotonic timestamp (ms since epoch) of the last set() call,
+  // or 0 if set() has never been called.
+  int64_t lastUpdateTimeMs() const { return last_update_time_ms_.load(std::memory_order_acquire); }
+
+private:
+  static constexpr double kScale = 10000.0;
+  std::atomic<uint32_t> value_{0};
+  std::atomic<int64_t> last_update_time_ms_{0};
 };
 
 /**
@@ -236,6 +276,14 @@ public:
    * @return custom stats for multi-dimensional load balancing.
    */
   virtual LoadMetricStats& loadMetricStats() const PURE;
+
+  /**
+   * @return the mutable ORCA utilization store for this host.
+   * Returns a mutable store even from a const host — the store is written concurrently
+   * by the router on every ORCA report and read by LB policies.
+   * See OrcaUtilizationStore for encoding semantics.
+   */
+  virtual OrcaUtilizationStore& orcaUtilization() const PURE;
 
   /**
    * @return the locality of the host (deployment specific). This will be the default instance if

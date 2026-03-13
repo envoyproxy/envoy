@@ -266,6 +266,14 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: load_balancing
+  change: |
+    Added :ref:`load-aware locality LB policy
+    <envoy_v3_api_msg_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality>`
+    that uses ORCA utilization data to distribute traffic across localities based on real-time
+    headroom. The policy computes per-locality EWMA utilization from endpoint ORCA reports and
+    shifts traffic away from overloaded localities while respecting a configurable variance
+    threshold and probe percentage to keep telemetry fresh.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.

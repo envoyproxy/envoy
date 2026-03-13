@@ -279,6 +279,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/common/v3:pkg",
         "//envoy/extensions/load_balancing_policies/dynamic_modules/v3:pkg",
         "//envoy/extensions/load_balancing_policies/least_request/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/load_aware_locality/v3:pkg",
         "//envoy/extensions/load_balancing_policies/maglev/v3:pkg",
         "//envoy/extensions/load_balancing_policies/override_host/v3:pkg",
         "//envoy/extensions/load_balancing_policies/pick_first/v3:pkg",
