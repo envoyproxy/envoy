@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_proxy_info.h"
@@ -461,9 +462,7 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
 
 class SocketConfigFactoryTest : public testing::Test {
 public:
-  void initialize() {
-    factory_ = std::make_unique<UpstreamHttp11ConnectSocketConfigFactory>();
-  }
+  void initialize() { factory_ = std::make_unique<UpstreamHttp11ConnectSocketConfigFactory>(); }
 
   std::unique_ptr<UpstreamHttp11ConnectSocketConfigFactory> factory_;
 };
