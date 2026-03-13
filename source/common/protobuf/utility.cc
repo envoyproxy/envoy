@@ -17,6 +17,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "buf/validate/validator.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
 #include "validate/validate.h"
@@ -391,6 +392,140 @@ public:
 void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   PgvCheckVisitor visitor;
   THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
+}
+
+namespace {
+
+buf::validate::ValidatorFactory& getProtovalidateValidatorFactory() {
+  static auto* factory = []() {
+    auto factory_result = buf::validate::ValidatorFactory::New();
+    if (!factory_result.ok()) {
+      throwEnvoyExceptionOrPanic(fmt::format("Failed to create protovalidate ValidatorFactory: {}",
+                                             factory_result.status().message()));
+    }
+    return factory_result.value().release();
+  }();
+  return *factory;
+}
+
+// Suppress protovalidate violations that were not enforced by the legacy PGV
+// validation. This maintains behavioral parity during the PGV->protovalidate
+// migration and avoids rejecting (test) configs that were previously accepted.
+// TODO(phlax): Remove suppressions as the migration completes and configs are
+// updated to comply with the stricter protovalidate rules.
+bool shouldSuppressViolation(const buf::validate::Violation& violation,
+                             const Protobuf::Message& message) {
+  if (!violation.has_field() || violation.field().elements_size() == 0) {
+    return false;
+  }
+  if (violation.rule_id() != "required") {
+    return false;
+  }
+  const auto& elements = violation.field().elements();
+  const std::string& field_name = elements[elements.size() - 1].field_name();
+  Protobuf::ReflectableMessage reflectable = createReflectableMessage(message);
+  const auto* descriptor = reflectable->GetDescriptor();
+  const auto* field_desc = descriptor->FindFieldByName(field_name);
+  if (field_desc == nullptr) {
+    return false;
+  }
+  const auto* oneof = field_desc->containing_oneof();
+  if (oneof == nullptr) {
+    return false;
+  }
+  for (int i = 0; i < oneof->field_count(); i++) {
+    if (oneof->field(i)->type() == Protobuf::FieldDescriptor::TYPE_BOOL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+class ValidatorWithArena {
+public:
+  ValidatorWithArena() : validator_(getProtovalidateValidatorFactory().NewValidator(&arena_)) {}
+  absl::StatusOr<buf::validate::ValidationResult>
+  Validate(const google::protobuf::Message& message) {
+    return validator_.Validate(message);
+  }
+  void Reset() { arena_.Reset(); }
+
+private:
+  google::protobuf::Arena arena_;
+  buf::validate::Validator validator_;
+};
+
+class ProtovalidateCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  ProtovalidateCheckVisitor() : validator_(getThreadLocalValidator()) {}
+
+  ~ProtovalidateCheckVisitor() {
+    // Reset the thread-local arena: destroys all arena-allocated objects (CEL
+    // evaluation temporaries) but retains the underlying memory blocks for
+    // reuse by the next validation call on this thread. This avoids
+    // repeated malloc/free of arena blocks across validation calls.
+    validator_.Reset();
+  }
+
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>,
+                         bool was_any_or_top_level) override {
+    if (!was_any_or_top_level) {
+      return absl::OkStatus();
+    }
+    Protobuf::ReflectableMessage reflectable = createReflectableMessage(message);
+    auto result = validator_.Validate(*reflectable);
+    if (!result.ok()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "{}: Proto constraint validation failed (protovalidate validation failed: {})",
+          message.DebugString(), result.status().message()));
+    }
+    const buf::validate::Violations& violations = result.value().proto();
+    if (violations.violations_size() > 0) {
+      std::vector<std::string> error_strings;
+      for (const auto& violation : violations.violations()) {
+        if (shouldSuppressViolation(violation, message)) {
+          continue;
+        }
+        std::string field_path;
+        if (violation.has_field()) {
+          std::vector<std::string> parts;
+          for (const auto& element : violation.field().elements()) {
+            parts.push_back(element.field_name());
+          }
+          field_path = absl::StrJoin(parts, ".");
+        }
+        if (!field_path.empty()) {
+          error_strings.push_back(fmt::format("{}: {}", field_path, violation.message()));
+        } else {
+          error_strings.push_back(violation.message());
+        }
+      }
+      if (!error_strings.empty()) {
+        return absl::InvalidArgumentError(
+            fmt::format("{}: Proto constraint validation failed (protovalidate violations: {})",
+                        message.DebugString(), absl::StrJoin(error_strings, ", ")));
+      }
+    }
+    return absl::OkStatus();
+  }
+
+  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+
+private:
+  static ValidatorWithArena& getThreadLocalValidator() {
+    thread_local ValidatorWithArena validator;
+    return validator;
+  }
+  ValidatorWithArena& validator_;
+};
+
+} // namespace
+
+void MessageUtil::validateWithProtovalidate(const Protobuf::Message& message,
+                                            bool recurse_into_any) {
+  ProtovalidateCheckVisitor visitor;
+  THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, recurse_into_any));
 }
 
 void MessageUtil::packFrom(Protobuf::Any& any_message, const Protobuf::Message& message) {

@@ -11,6 +11,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
         strip_prefix = "protoc-gen-validate-{version}",
     ),
+    protovalidate = dict(
+        version = "1.0.0",
+        sha256 = "c4dbec77d6dc7cc660c0dc5bce6d871c807f797c45c75576947bd93f02a2aff1",
+        strip_prefix = "protovalidate-{version}",
+        urls = ["https://github.com/bufbuild/protovalidate/archive/refs/tags/v{version}.tar.gz"],
+    ),
+    protovalidate_cc = dict(
+        version = "1.0.0",
+        sha256 = "4270d3babf1d883fd89139d80d002ad0b2dd1f16656c905514ee2d41cf9a2cb8",
+        strip_prefix = "protovalidate-cc-{version}",
+        urls = ["https://github.com/bufbuild/protovalidate-cc/archive/refs/tags/v{version}.tar.gz"],
+    ),
     rules_jvm_external = dict(
         version = "6.8",
         strip_prefix = "rules_jvm_external-{version}",

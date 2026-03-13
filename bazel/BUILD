@@ -256,6 +256,18 @@ selects.config_setting_group(
 )
 
 bool_flag(
+    name = "skip_protovalidate",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "protovalidate_disabled",
+    flag_values = {
+        ":skip_protovalidate": "True",
+    },
+)
+
+bool_flag(
     name = "http3",
     build_setting_default = True,
     # TODO(keith): make private again https://github.com/bazelbuild/bazel-skylib/issues/404
