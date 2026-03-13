@@ -635,6 +635,6 @@ new_features:
     registered object factories.
 - area: formatter
   change: |
-    Fixed a bug where the ``%TRACE_ID%`` string doesn't get substitued correctly in response body formatter.
+    Fixed a bug where the ``%TRACE_ID%`` string doesn't get substituted correctly in response body formatter.
 
 deprecated:
