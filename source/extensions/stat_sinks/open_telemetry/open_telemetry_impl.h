@@ -34,6 +34,7 @@ using MetricsExportResponse =
     opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
 using KeyValue = opentelemetry::proto::common::v1::KeyValue;
 using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
+using MetricsExportRequestSharedPtr = std::shared_ptr<MetricsExportRequest>;
 using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig;
 
 class MetricAggregator;
@@ -187,8 +188,7 @@ private:
   void
   handleSumPointsList(const std::string& metric_name,
                       std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints,
-                      bool unaggregated_split,
-                      opentelemetry::proto::metrics::v1::AggregationTemporality temporality);
+                      bool unaggregated_split, AggregationTemporality temporality);
 
   /**
    * Helper method to populate Histogram data points into the metrics request.
@@ -201,8 +201,7 @@ private:
   void handleHistogramPointsList(
       const std::string& metric_name,
       std::vector<::opentelemetry::proto::metrics::v1::HistogramDataPoint>& datapoints,
-      bool unaggregated_split,
-      opentelemetry::proto::metrics::v1::AggregationTemporality temporality);
+      bool unaggregated_split, AggregationTemporality temporality);
 
   bool enable_metric_aggregation_;
   const uint32_t max_dp_;

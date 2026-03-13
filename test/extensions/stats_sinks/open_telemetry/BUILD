@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//test/mocks/server:server_mocks",
@@ -19,9 +23,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "open_telemetry_impl_test",
     srcs = ["open_telemetry_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/common/stats:histogram_lib",
         "//source/extensions/stat_sinks/open_telemetry:config",
@@ -35,9 +40,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "open_telemetry_http_impl_test",
     srcs = ["open_telemetry_http_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
@@ -51,9 +57,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "open_telemetry_integration_test",
     srcs = ["open_telemetry_integration_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//test/integration:http_integration_lib",

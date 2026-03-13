@@ -1,7 +1,5 @@
-#include "source/common/http/message_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_http_impl.h"
-#include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"

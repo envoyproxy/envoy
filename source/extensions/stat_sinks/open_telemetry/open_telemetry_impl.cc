@@ -98,8 +98,7 @@ void RequestBuilder::handleGaugePointsList(
 void RequestBuilder::handleSumPointsList(
     const std::string& metric_name,
     std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints,
-    bool unaggregated_split,
-    opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
+    bool unaggregated_split, AggregationTemporality temporality) {
   Metric* metric = nullptr;
   for (auto& item : datapoints) {
     ensureRequest();
@@ -119,8 +118,7 @@ void RequestBuilder::handleSumPointsList(
 void RequestBuilder::handleHistogramPointsList(
     const std::string& metric_name,
     std::vector<::opentelemetry::proto::metrics::v1::HistogramDataPoint>& datapoints,
-    bool unaggregated_split,
-    opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
+    bool unaggregated_split, AggregationTemporality temporality) {
   Metric* metric = nullptr;
   for (auto& item : datapoints) {
     ensureRequest();
