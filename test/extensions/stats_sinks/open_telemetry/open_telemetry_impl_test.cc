@@ -637,33 +637,39 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
                   getTagExtractedName("test_histogram2"), true);
 }
 
-TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequest) {
+
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-  sink_config.set_max_datapoints_per_request(2);
+  sink_config.set_max_datapoints_per_request(0);
   Tracers::OpenTelemetry::Resource resource;
   auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   OtlpMetricsFlusherImpl flusher(options);
 
-  addCounterToSnapshot("counter1", 1, 1);
-  addCounterToSnapshot("counter2", 1, 1);
-  addCounterToSnapshot("counter3", 1, 1);
+  for (int i = 0; i < 10; ++i) {
+    addCounterToSnapshot(fmt::format("counter{}", i), 1, 1);
+  }
 
   std::vector<MetricsExportRequestPtr> requests;
   flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
                 [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
 
-  // 3 counters, max 2 data points per request -> 2 requests (2 dp + 1 dp)
-  EXPECT_EQ(requests.size(), 2);
+  // 10 data points, 0 limit -> 1 request
+  ASSERT_EQ(requests.size(), 1);
+  EXPECT_EQ(10, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
+}
 
-  // Request 1 should have 2 metrics
-  EXPECT_EQ(1, requests[0]->resource_metrics_size());
-  EXPECT_EQ(1, requests[0]->resource_metrics(0).scope_metrics_size());
-  EXPECT_EQ(2, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestEmptyMetrics) {
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_datapoints_per_request(10);
+  Tracers::OpenTelemetry::Resource resource;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  OtlpMetricsFlusherImpl flusher(options);
 
-  // Request 2 should have 1 metric
-  EXPECT_EQ(1, requests[1]->resource_metrics_size());
-  EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics_size());
-  EXPECT_EQ(1, requests[1]->resource_metrics(0).scope_metrics(0).metrics_size());
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  EXPECT_EQ(requests.size(), 0);
 }
 
 using OtlpMetricsFlusherAggregationTests = OtlpMetricsFlusherTests;

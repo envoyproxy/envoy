@@ -23,6 +23,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metric_aggregator_lib",
+    srcs = ["metric_aggregator.cc"],
+    hdrs = ["metric_aggregator.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/stats:stats_interface",
+        "//source/common/common:logger_lib",
+        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
+        "@opentelemetry-proto//:metrics_proto_cc",
+        "@opentelemetry-proto//:metrics_service_proto_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "request_splitter_lib",
     srcs = ["request_splitter.cc"],
     hdrs = ["request_splitter.h"],
@@ -39,6 +53,7 @@ envoy_cc_library(
     srcs = ["open_telemetry_impl.cc"],
     hdrs = ["open_telemetry_impl.h"],
     deps = [
+        ":metric_aggregator_lib",
         ":request_splitter_lib",
         ":stat_match_action_lib",
         "//envoy/grpc:async_client_interface",
