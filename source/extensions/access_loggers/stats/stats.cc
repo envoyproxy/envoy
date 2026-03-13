@@ -143,8 +143,10 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+      scope_(config.has_stats_scope()
+                 ? Stats::ScopeProviderSingleton::getScope(context, config.stats_scope())
+                 : context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
+      stat_name_pool_(context.statsScope().symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
           histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),
@@ -417,12 +419,12 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
-  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+  auto& gauge_stat = scope()->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope()),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }

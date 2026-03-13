@@ -297,14 +297,18 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool,
-                             const ScopeStatsLimitSettings&) override {
+  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+                             const ScopeStatsLimitSettings& limits) override {
+    checkCreateScopeArgs(evictable, limits);
     return ScopeSharedPtr(createScope_(name));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, bool, const ScopeStatsLimitSettings&) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
+                                   const ScopeStatsLimitSettings& limits) override {
+    checkCreateScopeArgs(evictable, limits);
     return createScope_(symbolTable().toString(name));
   }
 
+  MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
   MOCK_METHOD(ScopeSharedPtr, createScope_, (const std::string& name));
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

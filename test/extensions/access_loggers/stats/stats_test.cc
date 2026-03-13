@@ -1,9 +1,12 @@
 #include "envoy/stats/sink.h"
+#include "envoy/type/v3/scope.pb.h"
 
+#include "source/common/config/decoded_resource_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -11,8 +14,10 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -73,6 +78,8 @@ public:
 
 class StatsAccessLoggerTest : public testing::Test {
 public:
+  void TearDown() override { logger_.reset(); }
+
   void initialize(std::string config_yaml = {}) {
     const std::string default_config_yaml = R"EOF(
       stat_prefix: test_stat_prefix
@@ -110,20 +117,28 @@ public:
     ON_CALL(store_, gauge(_, _)).WillByDefault(testing::ReturnRef(*gauge_));
 
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+    ON_CALL(context_, scope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
+
     EXPECT_CALL(store_.mockScope(), createScope_(_))
-        .WillOnce(Invoke([this](const std::string& name) {
-          scope_name_storage_ =
+        .WillRepeatedly(Invoke([this](const std::string& name) {
+          auto scope_name_storage =
               std::make_unique<Stats::StatNameDynamicStorage>(name, context_.store_.symbolTable());
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
-              scope_name_storage_->statName(), store_);
+              scope_name_storage->statName(), store_);
+
           ON_CALL(*scope, gaugeFromStatNameWithTags(_, _, _))
-              .WillByDefault(Invoke(
-                  [scope_ptr = scope.get()](const Stats::StatName& name,
-                                            Stats::StatNameTagVectorOptConstRef tags,
-                                            Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
-                    return scope_ptr->Stats::MockScope::gaugeFromStatNameWithTags(name, tags,
-                                                                                  import_mode);
+              .WillByDefault(
+                  Invoke([this](const Stats::StatName& name, Stats::StatNameTagVectorOptConstRef,
+                                Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
+                    return this->store_.gauge(this->context_.store_.symbolTable().toString(name),
+                                              import_mode);
                   }));
+          ON_CALL(*scope, counterFromStatNameWithTags(_, _))
+              .WillByDefault(Invoke([this](const Stats::StatName& name,
+                                           Stats::StatNameTagVectorOptConstRef) -> Stats::Counter& {
+                return this->store_.counter(this->context_.store_.symbolTable().toString(name));
+              }));
+
           ON_CALL(*scope, histogramFromStatNameWithTags(_, _, _))
               .WillByDefault(Invoke([scope_ptr = scope.get()](
                                         const Stats::StatName& name,
@@ -131,8 +146,12 @@ public:
                                         Stats::Histogram::Unit unit) -> Stats::Histogram& {
                 return scope_ptr->Stats::MockScope::histogramFromStatNameWithTags(name, tags, unit);
               }));
-          scope_ = scope;
-          return scope_;
+
+          if (name != "scope_discovery") {
+            scope_ = scope;
+          }
+          name_storages_.push_back(std::move(scope_name_storage));
+          return scope;
         }));
 
     logger_ = std::make_unique<StatsAccessLog>(config, context_, std::move(filter_),
@@ -142,8 +161,8 @@ public:
   AccessLog::FilterPtr filter_;
   NiceMock<Stats::MockStore> store_;
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> name_storages_;
   std::shared_ptr<Stats::MockScope> scope_;
-  std::unique_ptr<Stats::StatNameDynamicStorage> scope_name_storage_;
   std::unique_ptr<StatsAccessLog> logger_;
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -379,8 +398,9 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
             EXPECT_EQ(1, tags->get().size());
             EXPECT_EQ(":200", scope_->symbolTable().toString(tags->get().front().second));
 
-            return scope_->counterFromStatNameWithTags_(name, tags);
+            return store_.counter_;
           }));
+  EXPECT_CALL(store_.counter_, add(1));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -746,6 +766,33 @@ TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
                             "Stats logger gauge set operation must have a valid log type.");
+}
+
+TEST_F(StatsAccessLoggerTest, StatsScope) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    stats_scope:
+      name: test_scope
+      settings:
+        max_counters: 10
+    counters:
+      - stat:
+          name: counter
+        value_fixed: 1
+)EOF";
+
+  initialize(yaml);
+
+  Formatter::Context formatter_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  // The newly created scope for "test_scope" is stored at the end of name_storages_ but
+  // since `scope_` only stores the last created scope for non-"scope_discovery", it should
+  // be exactly `scope_` here.
+  EXPECT_CALL(*scope_, counterFromStatNameWithTags(_, _))
+      .WillOnce(testing::ReturnRef(store_.counter_));
+  EXPECT_CALL(store_.counter_, add(1));
+  logger_->log(formatter_context, stream_info);
 }
 
 TEST_F(StatsAccessLoggerTest, DropStatAction) {

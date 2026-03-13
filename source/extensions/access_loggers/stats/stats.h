@@ -7,6 +7,7 @@
 
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/access_loggers/stats/scope_provider_singleton.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
 
 namespace Envoy {
@@ -30,6 +31,8 @@ private:
   // to ensure there are no data races in mutation of class members.
   void emitLogConst(const Formatter::Context& context,
                     const StreamInfo::StreamInfo& stream_info) const;
+
+  Stats::ScopeSharedPtr scope() const { return scope_; }
 
   class DynamicTag {
   public:
