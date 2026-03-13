@@ -76,7 +76,8 @@ TEST_P(SetFilterStateIntegrationTest, PlaintextConnectionAppliesBothLifecycleLis
   ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("\"bar\"|\"baz\"|\"on_data_set\""));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("\"bar\"|\"baz\"|\"on_data_set\""));
 }
 
 class SetFilterStateDownstreamTlsIntegrationTest

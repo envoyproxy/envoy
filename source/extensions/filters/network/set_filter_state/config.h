@@ -57,7 +57,7 @@ private:
   bool waiting_for_downstream_tls_handshake_ : 1 {false};
   bool apply_downstream_tls_handshake_on_new_connection_ : 1 {false};
   bool downstream_tls_handshake_ : 1 {false};
-  bool waiting_for_downstream_data_ : 1{false};
+  bool waiting_for_downstream_data_ : 1 {false};
 };
 
 } // namespace SetFilterState

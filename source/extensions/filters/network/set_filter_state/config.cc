@@ -89,14 +89,12 @@ private:
 
     Filters::Common::SetFilterState::ConfigSharedPtr on_downstream_data_config;
     if (!proto_config.on_downstream_data().empty()) {
-      on_downstream_data_config =
-          std::make_shared<Filters::Common::SetFilterState::Config>(
-              proto_config.on_downstream_data(),
-              StreamInfo::FilterState::LifeSpan::Connection, context);
+      on_downstream_data_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+          proto_config.on_downstream_data(), StreamInfo::FilterState::LifeSpan::Connection,
+          context);
     }
 
-    return [on_new_connection_config,
-            on_downstream_tls_handshake_config,
+    return [on_new_connection_config, on_downstream_tls_handshake_config,
             on_downstream_data_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<SetFilterState>(
           on_new_connection_config, on_downstream_tls_handshake_config, on_downstream_data_config));
