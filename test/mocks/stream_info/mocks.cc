@@ -238,7 +238,7 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
         upstream_cluster_info_ = std::move(cluster_info);
       }));
-  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
+  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnRef(upstream_cluster_info_));
   ON_CALL(*this, addCustomFlag(_)).WillByDefault(Invoke([this](absl::string_view flag) {
     if (stream_flags_.empty()) {
       stream_flags_.append(flag);

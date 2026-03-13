@@ -382,7 +382,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_cluster_info_ = upstream_cluster_info;
   }
 
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+  const Upstream::ClusterInfoConstSharedPtr& upstreamClusterInfo() const override {
     return upstream_cluster_info_;
   }
 
@@ -560,7 +560,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_info_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;

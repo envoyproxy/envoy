@@ -415,9 +415,7 @@ class RouterTestChildSpan : public RouterTestBase {
 public:
   RouterTestChildSpan()
       : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
-    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo())
-        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
-            cm_.thread_local_cluster_.cluster_.info_)));
+    callbacks_.stream_info_.upstream_cluster_info_ = cm_.thread_local_cluster_.cluster_.info_;
   }
 };
 

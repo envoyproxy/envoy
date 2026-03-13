@@ -608,11 +608,7 @@ void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& g
   if (stream_info->upstreamInfo().has_value()) {
     logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
   }
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      stream_info->upstreamClusterInfo();
-  if (cluster_info) {
-    logging_info_->setClusterInfo(std::move(*cluster_info));
-  }
+  logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

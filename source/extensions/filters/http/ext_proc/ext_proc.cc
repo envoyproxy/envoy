@@ -1540,10 +1540,9 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   envoy::config::core::v3::Metadata forwarding_metadata;
 
   // Forward cluster metadata if so configured.
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      cb->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
-    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+  const auto& cluster_info = cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info != nullptr) {
+    const auto& cluster_metadata = cluster_info->metadata().filter_metadata();
     for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_metadata.find(context_key);
           metadata_it != cluster_metadata.end()) {
@@ -1551,7 +1550,7 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
       }
     }
 
-    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    const auto& cluster_typed_metadata = cluster_info->metadata().typed_filter_metadata();
     for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_typed_metadata.find(context_key);
           metadata_it != cluster_typed_metadata.end()) {
