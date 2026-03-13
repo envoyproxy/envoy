@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package test.integration.attempt_admission_control;
+
+message TestAttemptAdmissionControlConfig {
+  // Number of retries to allow, not including the initial request.
+  uint32 retries_to_allow = 1;
+  // Whether the initial request should be allowed.
+  bool allow_initial_request = 2;
+}

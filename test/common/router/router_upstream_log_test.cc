@@ -67,7 +67,8 @@ public:
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
                                  RouteStatsContextOptRef,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
-                                 Upstream::ResourcePriority) override {
+                                 Upstream::ResourcePriority,
+                                 OptRef<Upstream::AttemptStreamAdmissionController>) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
     return RetryStatePtr{retry_state_};

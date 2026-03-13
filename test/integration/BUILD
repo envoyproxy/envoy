@@ -607,6 +607,23 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "attempt_admission_control_integration_test",
+    size = "large",
+    srcs = ["attempt_admission_control_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/integration/attempt_admission_control:test_attempt_admission_controller",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_flood_integration_test",
     size = "large",
     srcs = [
