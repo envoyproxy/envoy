@@ -16,30 +16,6 @@ namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
 
-class CpuUtilizationMonitorFactoryTest : public testing::Test {
-protected:
-  enum class Result { Null, NonNull, Throw };
-
-  Result checkResourceMonitor(
-      const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
-      Server::Configuration::ResourceMonitorFactoryContextImpl& context) {
-    auto factory =
-        Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-            "envoy.resource_monitors.cpu_utilization");
-    TRY_ASSERT_MAIN_THREAD {
-      auto monitor = factory->createResourceMonitor(config, context);
-      if (monitor == nullptr) {
-        return Result::Null;
-      }
-    }
-    END_TRY
-    catch (EnvoyException& e) {
-      return Result::Throw;
-    }
-    return Result::NonNull;
-  }
-};
-
 class TestResourcePressureCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   void onSuccess(const Server::ResourceUsage& usage) override {
@@ -63,7 +39,7 @@ private:
   bool has_error_ = false;
 };
 
-TEST_F(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
+TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -81,7 +57,7 @@ TEST_F(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   EXPECT_NE(monitor, nullptr);
 }
 
-TEST_F(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
+TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -118,7 +94,7 @@ TEST_F(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
 #endif
 }
 
-TEST_F(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
+TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -141,7 +117,7 @@ TEST_F(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
 }
 
 #if defined(__linux__)
-TEST_F(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
+TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
@@ -178,7 +154,7 @@ TEST_F(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
 }
 #endif
 
-TEST_F(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
+TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
