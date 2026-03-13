@@ -309,6 +309,18 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
+void ConnectionHandlerImpl::closeIdleHttpConnections(bool is_saturated) {
+  for (auto const& [tag, listener] : listener_map_by_tag_) {
+    if (!listener) {
+      continue;
+    }
+    listener->invokeListenerMethod(
+        [is_saturated](Network::ConnectionHandler::ActiveListener& active_listener) {
+          active_listener.onCloseIdleHttpConnections(is_saturated);
+        });
+  }
+}
+
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
