@@ -4,8 +4,15 @@ set -e
 
 TEST_DATA=test/common/runtime/test_data
 
-# Regular runtime tests.
-cd "${TEST_SRCDIR}/envoy"
+# TODO(phlax): Cleanup once bzlmod migration is complete
+if [[ -d "${TEST_SRCDIR}/_main" ]]; then
+  cd "${TEST_SRCDIR}/_main"
+elif [[ -d "${TEST_SRCDIR}/envoy" ]]; then
+  cd "${TEST_SRCDIR}/envoy"
+else
+  echo "Error: Could not find workspace directory at ${TEST_SRCDIR}/_main or ${TEST_SRCDIR}/envoy" >&2
+  exit 1
+fi
 rm -rf "${TEST_TMPDIR:?}/${TEST_DATA}"
 mkdir -p "${TEST_TMPDIR}/${TEST_DATA}"
 cp -RfL "${TEST_DATA}"/* "${TEST_TMPDIR}/${TEST_DATA}"
