@@ -20,9 +20,8 @@ TEST(Authentication, UriSanInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -33,9 +32,8 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   {
@@ -43,9 +41,8 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData().value(), "foo");
   }
 
   {
@@ -53,9 +50,8 @@ TEST(Authentication, UriSanInput) {
     EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "foo,bar");
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData().value(), "foo,bar");
   }
 }
 
@@ -65,9 +61,8 @@ TEST(Authentication, DnsSanInput) {
   Http::Matching::HttpMatchingDataImpl data(stream_info);
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -77,9 +72,8 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   {
@@ -87,9 +81,8 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData().value(), "foo");
   }
 
   {
@@ -97,9 +90,8 @@ TEST(Authentication, DnsSanInput) {
     EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "foo,bar");
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData().value(), "foo,bar");
   }
 }
 
@@ -111,9 +103,8 @@ TEST(Authentication, SubjectInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
@@ -124,17 +115,15 @@ TEST(Authentication, SubjectInput) {
 
   {
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result.data_));
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData(), absl::nullopt);
   }
 
   {
     subject = "foo";
     const auto result = input.get(data);
-    EXPECT_EQ(result.data_availability_,
-              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
+    EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.stringData().value(), "foo");
   }
 }
 

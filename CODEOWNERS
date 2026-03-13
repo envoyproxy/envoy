@@ -216,6 +216,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/matching/common_inputs/network @agrawroh @kyessenov @wbpcode
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
+# transform stats matching
+/*/extensions/matching/actions/transform_stat @TAOXUY @wbpcode
 # CEL data input
 /*/extensions/matching/http/cel_input @tyxia @yanavlasov
 # dynamic metadata input
@@ -241,7 +243,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
-/*/extensions/filters/http/mcp @botengyao @yanavlasov
+/*/extensions/filters/http/mcp @botengyao @yanavlasov @wdauchy
 # HTTP MCP Jon Rest Bridge filter
 /*/extensions/filters/http/mcp_json_rest_bridge @paulhong01 @leon-gg @botengyao @tyxia @yanavlasov
 # MCP router filter
@@ -254,6 +256,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # set_filter_state extension
 /*/extensions/filters/common/set_filter_state @kyessenov @wbpcode
 /*/extensions/filters/http/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/listener/set_filter_state @kyessenov @wbpcode @agrawroh
 /*/extensions/filters/network/set_filter_state @kyessenov @wbpcode
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123

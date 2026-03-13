@@ -166,7 +166,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithNoConfig) {
 
   auto config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
       proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
-  EXPECT_FALSE(config->filter_config_.empty());
+  EXPECT_TRUE(config->filter_config_.empty());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MultipleFiltersShareConfig) {

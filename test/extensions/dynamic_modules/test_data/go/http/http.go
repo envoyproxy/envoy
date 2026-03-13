@@ -392,6 +392,15 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 		panic(fmt.Sprintf("missing ns_res_body_bool in namespaces: %v", namespaces))
 	}
 
+	// Test list metadata.
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 1.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 2.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 3.0)
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "hello")
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "world")
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", true)
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", false)
+
 	return shared.BodyStatusContinue
 }
 

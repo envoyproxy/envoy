@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -17,8 +18,8 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
-		"header_callbacks":             &HeaderCallbacksConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
+		"header_callbacks":             &HeaderCallbacksConfigFactory{},
 		"per_route_config":             &PerRouteConfigFactory{},
 		"body_callbacks":               &BodyCallbacksConfigFactory{},
 		"http_callouts":                &HttpCalloutsConfigFactory{},
@@ -31,6 +32,10 @@ func init() {
 		"http_stream_bidirectional":    &HttpStreamBidirectionalConfigFactory{},
 		"upstream_reset":               &UpstreamResetConfigFactory{},
 		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
+		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
+		"http_config_stream":           &HttpConfigStreamConfigFactory{},
+		"http_struct_config":           &HttpStructConfigFactory{},
+		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 	})
 }
 
@@ -53,11 +58,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 	sharedStatus := new(atomic.Bool)
 	sharedStatus.Store(false)
 
-	// TODO(wbpcode): to support the actual config scheduler in golang SDK.
-	go func() {
+	handle.GetScheduler().Schedule(func() {
 		time.Sleep(100 * time.Millisecond)
 		sharedStatus.Store(true)
-	}()
+	})
 
 	return &ConfigSchedulerFilterFactory{sharedStatus: sharedStatus}, nil
 }
@@ -65,6 +69,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 type ConfigSchedulerFilterFactory struct {
 	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
+}
+
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
 }
 
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
@@ -1164,4 +1172,246 @@ func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64) {}
 func (p *UpstreamResetFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {
 	assertEq(id, p.streamID, "id")
 	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), "")
+}
+
+// -----------------------------------------------------------------------------
+// HttpConfigCallout: One-shot HTTP callout initiated at config creation time.
+// The callout result is stored in the factory and checked by each filter.
+// -----------------------------------------------------------------------------
+
+type HttpConfigCalloutConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpConfigCalloutConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	factory := &HttpConfigCalloutFilterFactory{
+		calloutDone: new(atomic.Bool),
+	}
+	res, _ := handle.HttpCallout(
+		string(config),
+		[][2]string{{":path", "/config-init"}, {":method", "GET"}, {"host", "example.com"}},
+		nil, 1000,
+		factory,
+	)
+	if res != shared.HttpCalloutInitSuccess {
+		return nil, fmt.Errorf("config callout init failed: %v", res)
+	}
+	return factory, nil
+}
+
+type HttpConfigCalloutFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	calloutDone *atomic.Bool
+}
+
+func (f *HttpConfigCalloutFilterFactory) OnHttpCalloutDone(calloutID uint64,
+	result shared.HttpCalloutResult,
+	headers [][2]shared.UnsafeEnvoyBuffer, body []shared.UnsafeEnvoyBuffer) {
+	if result == shared.HttpCalloutSuccess {
+		f.calloutDone.Store(true)
+	}
+}
+
+func (f *HttpConfigCalloutFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &HttpConfigCalloutFilter{handle: handle, calloutDone: f.calloutDone}
+}
+
+type HttpConfigCalloutFilter struct {
+	shared.EmptyHttpFilter
+	handle      shared.HttpFilterHandle
+	calloutDone *atomic.Bool
+}
+
+func (p *HttpConfigCalloutFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if p.calloutDone.Load() {
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, "")
+	} else {
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, "")
+	}
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
+// HttpConfigStream: HTTP stream initiated at config creation time.
+// The stream completion is stored and checked by each filter.
+// -----------------------------------------------------------------------------
+
+type HttpConfigStreamConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpConfigStreamConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	factory := &HttpConfigStreamFilterFactory{
+		streamDone: new(atomic.Bool),
+	}
+	res, _ := handle.StartHttpStream(
+		string(config),
+		[][2]string{{":path", "/config-stream"}, {":method", "GET"}, {"host", "example.com"}},
+		nil, true, 1000,
+		factory,
+	)
+	if res != shared.HttpCalloutInitSuccess {
+		return nil, fmt.Errorf("config stream init failed: %v", res)
+	}
+	return factory, nil
+}
+
+type HttpConfigStreamFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	streamDone *atomic.Bool
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamHeaders(id uint64,
+	headers [][2]shared.UnsafeEnvoyBuffer, end bool) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamData(id uint64,
+	body []shared.UnsafeEnvoyBuffer, end bool) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamTrailers(id uint64,
+	trailers [][2]shared.UnsafeEnvoyBuffer) {
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamComplete(id uint64) {
+	f.streamDone.Store(true)
+}
+
+func (f *HttpConfigStreamFilterFactory) OnHttpStreamReset(id uint64,
+	reason shared.HttpStreamResetReason) {
+}
+
+func (f *HttpConfigStreamFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &HttpConfigStreamFilter{handle: handle, streamDone: f.streamDone}
+}
+
+type HttpConfigStreamFilter struct {
+	shared.EmptyHttpFilter
+	handle     shared.HttpFilterHandle
+	streamDone *atomic.Bool
+}
+
+func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if p.streamDone.Load() {
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, "")
+	} else {
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
+	}
+	return shared.HeadersStatusStop
+}
+
+type HttpStructConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpStructConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// Parse config as JSON
+	var cfg map[string]string = make(map[string]string)
+	err := json.Unmarshal(config, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON config: %v", err)
+	}
+	return &HttpStructFilterFactory{cfg: cfg}, nil
+}
+
+type HttpStructFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cfg map[string]string
+}
+
+func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.cfg {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &shared.EmptyHttpFilter{}
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+type ListMetadataCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *ListMetadataCallbacksConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &ListMetadataCallbacksFilterFactory{}, nil
+}
+
+type ListMetadataCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *ListMetadataCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &ListMetadataCallbacksFilter{handle: handle}
+}
+
+type ListMetadataCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *ListMetadataCallbacksFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Build a number list: [10.0, 20.0, 30.0]
+	f.handle.AddMetadataListNumber("ns", "numbers", 10.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 20.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 30.0)
+	// Build a string list: ["hello", "world"]
+	f.handle.AddMetadataListString("ns", "strings", "hello")
+	f.handle.AddMetadataListString("ns", "strings", "world")
+	// Build a bool list: [true, false]
+	f.handle.AddMetadataListBool("ns", "bools", true)
+	f.handle.AddMetadataListBool("ns", "bools", false)
+	return shared.HeadersStatusContinue
+}
+
+func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	source := shared.MetadataSourceTypeDynamic
+
+	// Expose number list via response headers.
+	numSize, ok := f.handle.GetMetadataListSize(source, "ns", "numbers")
+	if ok {
+		headers.Set("x-list-num-size", strconv.Itoa(numSize))
+		for i := 0; i < numSize; i++ {
+			val, ok := f.handle.GetMetadataListNumber(source, "ns", "numbers", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-num-%d", i), strconv.Itoa(int(val)))
+			}
+		}
+	}
+
+	// Expose string list via response headers.
+	strSize, ok := f.handle.GetMetadataListSize(source, "ns", "strings")
+	if ok {
+		headers.Set("x-list-str-size", strconv.Itoa(strSize))
+		for i := 0; i < strSize; i++ {
+			val, ok := f.handle.GetMetadataListString(source, "ns", "strings", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-str-%d", i), string(val.ToBytes()))
+			}
+		}
+	}
+
+	// Expose bool list via response headers.
+	boolSize, ok := f.handle.GetMetadataListSize(source, "ns", "bools")
+	if ok {
+		headers.Set("x-list-bool-size", strconv.Itoa(boolSize))
+		for i := 0; i < boolSize; i++ {
+			val, ok := f.handle.GetMetadataListBool(source, "ns", "bools", i)
+			if ok {
+				if val {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "true")
+				} else {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "false")
+				}
+			}
+		}
+	}
+
+	return shared.HeadersStatusContinue
 }

@@ -1,10 +1,12 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/formatter/substitution_formatter.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,6 +14,8 @@ namespace AccessLoggers {
 namespace StatsAccessLog {
 
 namespace {
+
+using Extensions::Matching::Actions::TransformStat::ActionContext;
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
@@ -106,6 +110,32 @@ convertUnitEnum(envoy::extensions::access_loggers::stats::v3::Config::Histogram:
                                      static_cast<int64_t>(unit)));
   }
 }
+
+struct StatTagMetric : public Stats::StatTagMatchingData {
+  StatTagMetric(absl::string_view value) : value_(value) {}
+  absl::string_view value() const override { return value_; }
+  absl::string_view value_;
+};
+
+class ActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Stats::StatMatchingData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
+class TagActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Stats::StatTagMatchingData> {
+public:
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<Stats::StatTagMatchingData>&,
+                             absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
 } // namespace
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
@@ -117,7 +147,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
-          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
+          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),
                                   convertUnitEnum(hist_cfg.unit()),
                                   parseValueFormat(hist_cfg.value_format(), commands));
         }
@@ -127,7 +157,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         std::vector<Counter> counters;
         for (const auto& counter_cfg : config.counters()) {
           Counter& inserted = counters.emplace_back(
-              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands), nullptr, 0);
+              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands, context), nullptr, 0);
           if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
             throw EnvoyException(
                 "Stats logger cannot have both `value_format` and `value_fixed` configured.");
@@ -187,8 +217,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           }
 
           Gauge& inserted =
-              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
-                                  0, std::move(operations));
+              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands, context),
+                                  nullptr, 0, std::move(operations));
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
@@ -208,35 +238,66 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 
 StatsAccessLog::NameAndTags::NameAndTags(
     const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
-    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands) {
+    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+    Server::Configuration::GenericFactoryContext& context) {
   name_ = pool.add(cfg.name());
   for (const auto& tag_cfg : cfg.tags()) {
-    dynamic_tags_.emplace_back(tag_cfg, pool, commands);
+    dynamic_tags_.emplace_back(tag_cfg, pool, commands, context);
   }
 }
 
 StatsAccessLog::DynamicTag::DynamicTag(
     const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
-    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands)
+    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+    Server::Configuration::GenericFactoryContext& context)
     : name_(pool.add(tag_cfg.name())),
       value_formatter_(THROW_OR_RETURN_VALUE(
           Formatter::FormatterImpl::create(tag_cfg.value_format(), true, commands),
-          Formatter::FormatterPtr)) {}
+          Formatter::FormatterPtr)) {
+  if (tag_cfg.has_rules()) {
+    TagActionValidationVisitor validation_visitor;
+    ActionContext action_context(pool);
+    Matcher::MatchTreeFactory<Stats::StatTagMatchingData, ActionContext> factory(
+        action_context, context.serverFactoryContext(), validation_visitor);
+    rules_ = factory.create(tag_cfg.rules())();
+  }
+}
 
-std::pair<Stats::StatNameTagVector, std::vector<Stats::StatNameDynamicStorage>>
+StatsAccessLog::NameAndTags::TagsResult
 StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info,
                                   Stats::Scope& scope) const {
   Stats::StatNameTagVector tags;
-
+  tags.reserve(dynamic_tags_.size());
   std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
-  for (const auto& dynamic_tag_cfg : dynamic_tags_) {
-    std::string tag_value = dynamic_tag_cfg.value_formatter_->format(context, stream_info);
-    auto& storage = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
-    tags.emplace_back(dynamic_tag_cfg.name_, storage.statName());
+  dynamic_storage.reserve(dynamic_tags_.size());
+
+  for (const auto& dynamic_tag : dynamic_tags_) {
+    std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
+    if (dynamic_tag.rules_) {
+      StatTagMetric data(tag_value);
+      const auto result = dynamic_tag.rules_->match(data);
+      if (result.isMatch()) {
+        if (const auto* action = dynamic_cast<
+                const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
+                result.action().get())) {
+          switch (action->apply(tag_value)) {
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Keep:
+            break;
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropStat:
+            return {{}, {}, true};
+          case Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::DropTag:
+            continue;
+          }
+        }
+      }
+    }
+
+    auto& storage_value = dynamic_storage.emplace_back(tag_value, scope.symbolTable());
+    tags.emplace_back(dynamic_tag.name_, storage_value.statName());
   }
 
-  return {std::move(tags), std::move(dynamic_storage)};
+  return {std::move(tags), std::move(dynamic_storage), false};
 }
 
 namespace {
@@ -277,6 +338,12 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
 void StatsAccessLog::emitLogConst(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& histogram : histograms_) {
+    auto [tags, storage, dropped] = histogram.stat_.tags(context, stream_info, *scope_);
+
+    if (dropped) {
+      continue;
+    }
+
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
@@ -286,13 +353,18 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto [tags, storage] = histogram.stat_.tags(context, stream_info, *scope_);
     auto& histogram_stat =
         scope_->histogramFromStatNameWithTags(histogram.stat_.name_, tags, histogram.unit_);
     histogram_stat.recordValue(value);
   }
 
   for (const auto& counter : counters_) {
+    auto [tags, storage, dropped] = counter.stat_.tags(context, stream_info, *scope_);
+
+    if (dropped) {
+      continue;
+    }
+
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =
@@ -306,7 +378,6 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = counter.value_fixed_;
     }
 
-    auto [tags, storage] = counter.stat_.tags(context, stream_info, *scope_);
     auto& counter_stat = scope_->counterFromStatNameWithTags(counter.stat_.name_, tags);
     counter_stat.add(value);
   }
@@ -324,6 +395,11 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     return;
   }
 
+  auto [tags, storage, dropped] = gauge.stat_.tags(context, stream_info, *scope_);
+  if (dropped) {
+    return;
+  }
+
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
     absl::optional<uint64_t> computed_value_opt =
@@ -338,8 +414,6 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   }
 
   Gauge::OperationType op = it->second;
-
-  auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;

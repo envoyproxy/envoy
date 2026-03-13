@@ -8244,6 +8244,73 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
+// Test that responseContentType() returns the correct content type based on body_format config.
+TEST_F(RouteConfigurationV2, DirectResponseBodyFormatContentType) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/html" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+            content_type: "text/html"
+      - match: { prefix: "/json" }
+        direct_response:
+          status: 200
+          body_format:
+            json_format:
+              key: "value"
+      - match: { prefix: "/text" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+      - match: { prefix: "/nobody" }
+        direct_response:
+          status: 200
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // Explicit content_type in body_format should be returned.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/html", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("text/html", direct_response->responseContentType());
+  }
+
+  // json_format without explicit content_type should return "application/json".
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/json", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("application/json", direct_response->responseContentType());
+  }
+
+  // text_format without explicit content_type should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/text", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+
+  // No body_format at all should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/nobody", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+}
+
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(

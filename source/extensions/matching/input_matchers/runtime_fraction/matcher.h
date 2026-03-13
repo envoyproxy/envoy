@@ -18,14 +18,15 @@ public:
   Matcher(Runtime::Loader& runtime,
           envoy::config::core::v3::RuntimeFractionalPercent runtime_fraction, uint64_t seed)
       : runtime_(runtime), runtime_fraction_(runtime_fraction), seed_(seed) {}
-  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::MatchingDataType& input) override {
+  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::DataInputGetResult& input) override {
+    auto data = input.stringData();
     // Only match if the value is present.
-    if (absl::holds_alternative<absl::monostate>(input)) {
+    if (!data) {
       return ::Envoy::Matcher::MatchResult::NoMatch;
     }
 
     // Otherwise, match if feature is enabled for hash(input).
-    const auto hash_value = HashUtil::xxHash64(absl::get<std::string>(input), seed_);
+    const auto hash_value = HashUtil::xxHash64(*data, seed_);
     return (runtime_.snapshot().featureEnabled(runtime_fraction_.runtime_key(),
                                                runtime_fraction_.default_value(), hash_value))
                ? ::Envoy::Matcher::MatchResult::Matched

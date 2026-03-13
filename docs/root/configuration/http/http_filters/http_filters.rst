@@ -6,6 +6,7 @@ HTTP filters
 .. toctree::
   :maxdepth: 2
 
+  a2a_filter
   adaptive_concurrency_filter
   admission_control_filter
   aws_lambda_filter

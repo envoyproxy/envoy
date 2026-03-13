@@ -65,6 +65,16 @@ bool envoy_dynamic_module_on_lb_choose_host(
   return true;
 }
 
+void envoy_dynamic_module_on_lb_on_host_membership_update(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed) {
+  (void)lb_envoy_ptr;
+  (void)lb_module_ptr;
+  (void)num_hosts_added;
+  (void)num_hosts_removed;
+}
+
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {
   free((void*)lb_module_ptr);
 }

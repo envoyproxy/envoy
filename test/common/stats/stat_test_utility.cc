@@ -119,6 +119,10 @@ TestScope::TestScope(StatName prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store), store_(store),
       prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
 
+TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr matcher)
+    : IsolatedScopeImpl(prefix, store, std::move(matcher)), store_(store),
+      prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
+
 // Override the Stats::Store methods for name-based lookup of stats, to use
 // and update the string-maps in this class. Note that IsolatedStoreImpl
 // does not support deletion of stats, so we only have to track additions
@@ -208,8 +212,8 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-ScopeSharedPtr TestStore::makeScope(StatName name) {
-  return std::make_shared<TestScope>(name, *this);
+ScopeSharedPtr TestStore::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
+  return std::make_shared<TestScope>(name, *this, std::move(matcher));
 }
 
 TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}

@@ -93,3 +93,13 @@ envoy_cc_test(
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "regex_replace_test",
+    srcs = ["regex_replace_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/matcher:regex_replace_lib",
+        "//test/test_common:status_utility_lib",
+    ],
+)
