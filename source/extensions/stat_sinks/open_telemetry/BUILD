@@ -23,28 +23,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "metric_aggregator_lib",
-    srcs = ["metric_aggregator.cc"],
-    hdrs = ["metric_aggregator.h"],
-    deps = [
-        "//envoy/common:optref_lib",
-        "//envoy/stats:stats_interface",
-        "//source/common/common:logger_lib",
-        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
-        "@opentelemetry-proto//:metrics_proto_cc",
-        "@opentelemetry-proto//:metrics_service_proto_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "open_telemetry_lib",
     srcs = ["open_telemetry_impl.cc"],
     hdrs = ["open_telemetry_impl.h"],
     deps = [
-        ":metric_aggregator_lib",
         ":stat_match_action_lib",
+        "//envoy/common:optref_lib",
         "//envoy/grpc:async_client_interface",
         "//envoy/singleton:instance_interface",
+        "//source/common/common:logger_lib",
         "//source/common/common:matchers_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/stats:stat_match_input_lib",
