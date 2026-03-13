@@ -8,6 +8,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/matcher/regex_replace.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_extractor.h"
@@ -33,8 +34,7 @@ public:
   Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root,
        Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
-  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
+  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   uint16_t ruleId() const { return rule_id_; }
   bool matches(const ThriftProxy::MessageMetadata& metadata) const;
 
@@ -44,8 +44,7 @@ private:
     ServiceName = 2,
   };
   const ProtoRule rule_;
-  Regex::CompiledMatcherPtr regex_rewrite_{};
-  std::string regex_rewrite_substitution_{};
+  absl::optional<Matcher::RegexReplace> regex_replace_;
   std::string method_or_service_name_{};
   MatchType match_type_;
   uint16_t rule_id_;

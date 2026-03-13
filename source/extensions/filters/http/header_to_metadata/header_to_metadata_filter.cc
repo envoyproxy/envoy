@@ -102,10 +102,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
 
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
-    auto regex_rewrite_or = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
-    SET_AND_RETURN_IF_NOT_OK(regex_rewrite_or.status(), creation_status);
-    regex_rewrite_ = std::move(regex_rewrite_or.value());
-    regex_rewrite_substitution_ = rewrite_spec.substitution();
+    auto regex_replace_or = Matcher::RegexReplace::create(regex_engine, rewrite_spec);
+    SET_AND_RETURN_IF_NOT_OK(regex_replace_or.status(), creation_status);
+    regex_replace_.emplace(std::move(regex_replace_or).value());
   }
 }
 
@@ -315,10 +314,9 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
-    const auto& matcher = rule.regexRewrite();
-    if (matcher != nullptr) {
+    if (rule.regexReplace().has_value()) {
       const bool was_non_empty = !value.empty();
-      value = matcher->replaceAll(value, rule.regexSubstitution());
+      value = rule.regexReplace()->apply(value);
       // If we had a non-empty input but got an empty result from regex, it could indicate a
       // failure.
       if (was_non_empty && value.empty()) {
