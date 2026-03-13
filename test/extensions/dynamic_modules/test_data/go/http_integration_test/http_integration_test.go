@@ -35,6 +35,7 @@ func init() {
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
+		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 	})
 }
 
@@ -1328,4 +1329,89 @@ func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.
 		handle.RequestHeaders().Set(k, v)
 	}
 	return &shared.EmptyHttpFilter{}
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+type ListMetadataCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *ListMetadataCallbacksConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &ListMetadataCallbacksFilterFactory{}, nil
+}
+
+type ListMetadataCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *ListMetadataCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &ListMetadataCallbacksFilter{handle: handle}
+}
+
+type ListMetadataCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *ListMetadataCallbacksFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Build a number list: [10.0, 20.0, 30.0]
+	f.handle.AddMetadataListNumber("ns", "numbers", 10.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 20.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 30.0)
+	// Build a string list: ["hello", "world"]
+	f.handle.AddMetadataListString("ns", "strings", "hello")
+	f.handle.AddMetadataListString("ns", "strings", "world")
+	// Build a bool list: [true, false]
+	f.handle.AddMetadataListBool("ns", "bools", true)
+	f.handle.AddMetadataListBool("ns", "bools", false)
+	return shared.HeadersStatusContinue
+}
+
+func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	source := shared.MetadataSourceTypeDynamic
+
+	// Expose number list via response headers.
+	numSize, ok := f.handle.GetMetadataListSize(source, "ns", "numbers")
+	if ok {
+		headers.Set("x-list-num-size", strconv.Itoa(numSize))
+		for i := 0; i < numSize; i++ {
+			val, ok := f.handle.GetMetadataListNumber(source, "ns", "numbers", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-num-%d", i), strconv.Itoa(int(val)))
+			}
+		}
+	}
+
+	// Expose string list via response headers.
+	strSize, ok := f.handle.GetMetadataListSize(source, "ns", "strings")
+	if ok {
+		headers.Set("x-list-str-size", strconv.Itoa(strSize))
+		for i := 0; i < strSize; i++ {
+			val, ok := f.handle.GetMetadataListString(source, "ns", "strings", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-str-%d", i), string(val.ToBytes()))
+			}
+		}
+	}
+
+	// Expose bool list via response headers.
+	boolSize, ok := f.handle.GetMetadataListSize(source, "ns", "bools")
+	if ok {
+		headers.Set("x-list-bool-size", strconv.Itoa(boolSize))
+		for i := 0; i < boolSize; i++ {
+			val, ok := f.handle.GetMetadataListBool(source, "ns", "bools", i)
+			if ok {
+				if val {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "true")
+				} else {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "false")
+				}
+			}
+		}
+	}
+
+	return shared.HeadersStatusContinue
 }

@@ -9,12 +9,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
+#include "envoy/http/async_client.h"
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/utility.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -28,6 +30,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
+
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
@@ -49,6 +55,9 @@ using OnClusterServerInitializedType =
     decltype(&envoy_dynamic_module_on_cluster_server_initialized);
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
 using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown);
+using OnClusterHttpCalloutDoneType = decltype(&envoy_dynamic_module_on_cluster_http_callout_done);
+using OnClusterLbOnHostMembershipUpdateType =
+    decltype(&envoy_dynamic_module_on_cluster_lb_on_host_membership_update);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -61,12 +70,14 @@ public:
    *
    * @param cluster_name the name identifying the cluster implementation in the module.
    * @param cluster_config the configuration bytes to pass to the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
+         const std::string& metrics_namespace,
          Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
 
   ~DynamicModuleClusterConfig();
@@ -85,6 +96,8 @@ public:
   OnClusterServerInitializedType on_cluster_server_initialized_ = nullptr;
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
+  OnClusterHttpCalloutDoneType on_cluster_http_callout_done_ = nullptr;
+  OnClusterLbOnHostMembershipUpdateType on_cluster_lb_on_host_membership_update_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -255,6 +268,7 @@ public:
 
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
+                             const std::string& metrics_namespace,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
                              Stats::Scope& stats_scope);
 
@@ -308,16 +322,37 @@ public:
   }
 
   // Methods called by the dynamic module via ABI callbacks.
-  bool addHosts(const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
-                std::vector<Upstream::HostSharedPtr>& result_hosts);
+  bool addHosts(
+      const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
+      const std::vector<std::string>& regions, const std::vector<std::string>& zones,
+      const std::vector<std::string>& sub_zones,
+      const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+      std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority = 0);
   size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);
+  bool updateHostHealth(Upstream::HostSharedPtr host,
+                        envoy_dynamic_module_type_host_health health_status);
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
+  Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
+
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   * This must be called on the main thread.
+   *
+   * @param callout_id_out is a pointer to a variable where the callout ID will be stored.
+   * @param cluster_name is the name of the cluster to which the callout is sent.
+   * @param message is the HTTP request message to send.
+   * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+   * @return the result of the callout initialization.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   // Accessors.
   const DynamicModuleClusterConfigSharedPtr& config() const { return config_; }
@@ -345,6 +380,31 @@ private:
   friend class DynamicModuleClusterHandle;
   friend class DynamicModuleLoadBalancer;
 
+  /**
+   * This implementation of the AsyncClient::Callbacks handles the response from the HTTP callout.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
+        : cluster_(std::move(cluster)), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    const uint64_t callout_id_{};
+  };
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
   DynamicModuleClusterConfigSharedPtr config_;
   envoy_dynamic_module_type_cluster_module_ptr in_module_cluster_;
   Event::Dispatcher& dispatcher_;
@@ -362,6 +422,10 @@ private:
 
   // Handle for the server initialized lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr server_initialized_handle_;
+
+  // HTTP callout tracking.
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+  absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
 };
 
 /**
@@ -450,12 +514,23 @@ public:
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
   bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
 
+  // Accessors for hosts added/removed during the on_host_membership_update callback.
+  const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
+  const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
+
+  // Temporary pointers to host vectors, valid only during on_host_membership_update callback.
+  const Upstream::HostVector* hosts_added_{};
+  const Upstream::HostVector* hosts_removed_{};
+
+  // Membership update callback handle.
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 };
 
 /**

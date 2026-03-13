@@ -3504,8 +3504,14 @@ fn test_lb_config_vec_metric_invalid_id() {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _priority: u32,
   _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
   _weights: *const u32,
+  _regions: *const abi::envoy_dynamic_module_type_module_buffer,
+  _zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _sub_zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs_per_host: usize,
   _count: usize,
   _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
 ) -> bool {
@@ -3524,6 +3530,60 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _health_status: abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_find_host_by_address(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _details: *const std::ffi::c_char,
+  _details_length: usize,
 ) {
 }
 
@@ -3921,6 +3981,19 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
   _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> bool {
   false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
 }
 
 // =============================================================================

@@ -18,6 +18,10 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace DynamicModules {
 
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
 class DynamicModuleLbConfig;
 using DynamicModuleLbConfigSharedPtr = std::shared_ptr<DynamicModuleLbConfig>;
 
@@ -43,12 +47,14 @@ public:
    *
    * @param lb_policy_name the name identifying the load balancer implementation in the module.
    * @param lb_config the configuration bytes to pass to the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<DynamicModuleLbConfigSharedPtr>
   create(const std::string& lb_policy_name, const std::string& lb_config,
+         const std::string& metrics_namespace,
          Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
          Stats::Scope& stats_scope);
 
@@ -231,6 +237,7 @@ public:
 
 private:
   DynamicModuleLbConfig(const std::string& lb_policy_name, const std::string& lb_config,
+                        const std::string& metrics_namespace,
                         Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                         Stats::Scope& stats_scope);
 
