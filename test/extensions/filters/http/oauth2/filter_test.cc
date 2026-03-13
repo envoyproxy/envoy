@@ -1209,7 +1209,6 @@ TEST_F(OAuth2Test, SetBearerTokenWithEncryptionDisabled) {
 
 TEST_F(OAuth2Test, SetBearerTokenWithDisableTokenEncryptionConfig) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "true"}});
 
   constexpr auto DisabledSameSite = ::envoy::extensions::filters::http::oauth2::v3::
       CookieConfig_SameSite::CookieConfig_SameSite_DISABLED;
@@ -4405,52 +4404,6 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwarding) {
       {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
       {Http::Headers::get().Cookie.get(), "IdToken=" + TEST_ENCRYPTED_ID_TOKEN},
       {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
-      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
-  };
-
-  // cookie-validation mocking
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
-
-  // return reference mocking
-  std::string access_token{"access_code"};
-  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(access_token));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-
-  // Expect the request headers to be updated with the decrypted tokens
-  auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_EQ(cookies.at("BearerToken"), "access_code");
-  EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
-
-  // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
-}
-
-// Ensure that the token cookies are decrypted before forwarding the request
-TEST_F(OAuth2Test, CookiesDecryptedBeforeForwardingWithEncryptionDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "false"}});
-
-  // Initialize with use_refresh_token set to false
-  init(getConfig(true /* forward_bearer_token */));
-
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthHMAC=4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ="},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=1600"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=access_code"},
-      {Http::Headers::get().Cookie.get(), "IdToken=some-id-token"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some-refresh-token"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
   };
 
