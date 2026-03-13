@@ -50,7 +50,7 @@ public:
       multicluster->mutable_cluster_type()->set_name("envoy.clusters.mcp_multicluster");
 
       // Configure the MCP multicluster extension.
-      const envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig& multicluster_config;
+      envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig multicluster_config;
       for (int i = 0; i < 3; ++i) {
         auto* server = multicluster_config.add_servers();
         server->set_name(absl::StrCat("mcpserver_", i));
