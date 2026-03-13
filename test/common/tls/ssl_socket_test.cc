@@ -267,6 +267,24 @@ public:
 
   const std::string& expectedPeerIssuer() const { return expected_peer_issuer_; }
 
+  TestUtilOptions& setExpectedSha256PeerCertificateIssuerDigest(const std::string& expected_issuer_hash) {
+    expected_issuer_peer_certificate_hash_ = expected_issuer_hash;
+    return *this;
+  }
+
+  const std::string& expectedSha256PeerCertificateIssuerDigest() const {
+    return expected_issuer_peer_certificate_hash_;
+  }
+
+  TestUtilOptions& setExpectedSerialNumberPeerCertificateIssuer(const std::string& expected_issuer_serial) {
+    expected_issuer_peer_certificate_serial_ = expected_issuer_serial;
+    return *this;
+  }
+
+  const std::string& expectedSerialNumberPeerCertificateIssuer() const {
+    return expected_issuer_peer_certificate_serial_;
+  }
+
   TestUtilOptions& setExpectedPeerSubject(const std::string& expected_peer_subject) {
     expected_peer_subject_ = expected_peer_subject;
     return *this;
@@ -416,6 +434,8 @@ private:
   std::string expected_serial_number_;
   std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
+  std::string expected_issuer_peer_certificate_hash_;
+  std::string expected_issuer_peer_certificate_serial_;
   std::string expected_peer_subject_;
   Ssl::ParsedX509NamePtr expected_parsed_peer_subject_;
   std::string expected_local_subject_;
@@ -628,6 +648,20 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
+      }
+      if (!options.expectedSha256PeerCertificateIssuerDigest().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+      }
+      if (!options.expectedSerialNumberPeerCertificateIssuer().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
       }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
@@ -1357,6 +1391,107 @@ TEST_P(SslSocketTest, GetCertDigests) {
                .setExpectedSha1Digests(sha1Digests)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
                .setExpectedSerialNumbers(serialNumbers));
+}
+
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options
+               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+}
+
+// Verify that getIssuerFromValidatedChain falls back to the trust store (Path 2) when the
+// client sends only a leaf certificate with no intermediate chain. The issuer should be found
+// directly in the trusted CA store configured on the server.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
+  // no_san_cert.pem contains a single leaf cert signed directly by ca_cert.pem (Root CA).
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
+}
+
+// Verify that getIssuerFromValidatedChain correctly skips a decoy CA via AKI/SKI pre-filter
+// (Path 1) when the client sends: leaf + incorrect CA (AKI mismatch) + correct CA (AKI match).
+//
+// Chain layout:
+//   [0] leaf (san_dns3)         — AKI = Intermediate CA's SKI
+//   [1] Root CA  (incorrect)    — SKI ≠ leaf AKI  → skipped by ASN1_OCTET_STRING_cmp()
+//   [2] Intermediate CA (correct) — SKI == leaf AKI  → X509_verify() confirms → returned
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_with_decoy_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options
+               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
 
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
