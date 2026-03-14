@@ -766,10 +766,10 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
   EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), unmapped_metric.name());
   EXPECT_TRUE(unmapped_metric.has_sum());
   EXPECT_EQ(2, unmapped_metric.sum().data_points().size());
-  // data point 1: keyX: valX
+  // data point 1: keyY: valY
   EXPECT_EQ(1, unmapped_metric.sum().data_points()[0].as_int());
   expectAttributes(unmapped_metric.sum().data_points()[0].attributes(), "keyX", "valX");
-  // data point 2: keyY: valY
+  // data point 2: keyX: valX
   EXPECT_EQ(5, unmapped_metric.sum().data_points()[1].as_int());
   expectAttributes(unmapped_metric.sum().data_points()[1].attributes(), "keyY", "valY");
 }
@@ -1413,15 +1413,15 @@ TEST_F(MetricAggregatorTests, GaugeNoAggregation) {
   metric_aggregator_->addGauge("metric4", 60, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_gauge_points.size(), 3);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_gauge_points[0].as_int(), 10);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_gauge_points[1].as_int(), 30);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_gauge_points[2].as_int(), 50);
+  EXPECT_EQ(metrics.gauge_data_points.size(), 4);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data.size(), 3);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[0].as_int(), 10);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[1].as_int(), 30);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[2].as_int(), 50);
 
-  EXPECT_EQ(metrics["metric2"].non_aggregated_gauge_points.size(), 1);
-  EXPECT_EQ(metrics["metric3"].non_aggregated_gauge_points.size(), 1);
-  EXPECT_EQ(metrics["metric4"].non_aggregated_gauge_points.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, GaugeAggregation) {
@@ -1439,17 +1439,17 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
   metric_aggregator_->addGauge("metric4", 60, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].gauge_points_data.size(), 2);
+  EXPECT_EQ(metrics.gauge_data_points.size(), 4);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data.size(), 2);
 
   // metric1 with attr1 should have value 10 + 30 = 40
-  EXPECT_EQ(metrics["metric1"].gauge_points_data[0].as_int(), 40);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[0].as_int(), 40);
   // metric1 with attr2 should have value 50
-  EXPECT_EQ(metrics["metric1"].gauge_points_data[1].as_int(), 50);
+  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[1].as_int(), 50);
 
-  EXPECT_EQ(metrics["metric2"].gauge_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric3"].gauge_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric4"].gauge_points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, CounterNoAggregation) {
@@ -1485,15 +1485,15 @@ TEST_F(MetricAggregatorTests, CounterNoAggregation) {
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_sum_points.size(), 3);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_sum_points[0].as_int(), 5);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_sum_points[1].as_int(), 15);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_sum_points[2].as_int(), 15);
+  EXPECT_EQ(metrics.counter_data_points.size(), 4);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data.size(), 3);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[0].as_int(), 5);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[1].as_int(), 15);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[2].as_int(), 15);
 
-  EXPECT_EQ(metrics["metric2"].non_aggregated_sum_points.size(), 1);
-  EXPECT_EQ(metrics["metric3"].non_aggregated_sum_points.size(), 1);
-  EXPECT_EQ(metrics["metric4"].non_aggregated_sum_points.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, CounterAggregation) {
@@ -1529,14 +1529,14 @@ TEST_F(MetricAggregatorTests, CounterAggregation) {
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].sum_points_data.size(), 2);
-  EXPECT_EQ(metrics["metric1"].sum_points_data[0].as_int(), 20); // 5 + 15
-  EXPECT_EQ(metrics["metric1"].sum_points_data[1].as_int(), 15);
+  EXPECT_EQ(metrics.counter_data_points.size(), 4);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data.size(), 2);
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[0].as_int(), 20); // 5 + 15
+  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[1].as_int(), 15);
 
-  EXPECT_EQ(metrics["metric2"].sum_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric3"].sum_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric4"].sum_points_data.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.counter_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, HistogramNoAggregation) {
@@ -1579,18 +1579,18 @@ TEST_F(MetricAggregatorTests, HistogramNoAggregation) {
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points.size(), 3);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[0].count(), 6);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[0].sum(), 60);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[1].count(), 15);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[1].sum(), 150);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[2].count(), 15);
-  EXPECT_EQ(metrics["metric1"].non_aggregated_histogram_points[2].sum(), 150);
+  EXPECT_EQ(metrics.histogram_data_points.size(), 4);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data.size(), 3);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[0].count(), 6);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[0].sum(), 60);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[1].count(), 15);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[1].sum(), 150);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[2].count(), 15);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[2].sum(), 150);
 
-  EXPECT_EQ(metrics["metric2"].non_aggregated_histogram_points.size(), 1);
-  EXPECT_EQ(metrics["metric3"].non_aggregated_histogram_points.size(), 1);
-  EXPECT_EQ(metrics["metric4"].non_aggregated_histogram_points.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, HistogramAggregation) {
@@ -1633,20 +1633,20 @@ TEST_F(MetricAggregatorTests, HistogramAggregation) {
       attr1); // Datapoint 5 (New request)
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 4);
-  EXPECT_EQ(metrics["metric1"].histogram_points_data.size(), 2);
+  EXPECT_EQ(metrics.histogram_data_points.size(), 4);
+  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data.size(), 2);
 
-  auto& dp = metrics["metric1"].histogram_points_data[0];
+  auto& dp = metrics.histogram_data_points["metric1"].points_data[0];
   EXPECT_EQ(dp.count(), 21); // Sum of counts
   EXPECT_EQ(dp.sum(), 210);
 
-  auto& dp2 = metrics["metric1"].histogram_points_data[1];
+  auto& dp2 = metrics.histogram_data_points["metric1"].points_data[1];
   EXPECT_EQ(dp2.count(), 15);
   EXPECT_EQ(dp2.sum(), 150);
 
-  EXPECT_EQ(metrics["metric2"].histogram_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric3"].histogram_points_data.size(), 1);
-  EXPECT_EQ(metrics["metric4"].histogram_points_data.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric2"].points_data.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric3"].points_data.size(), 1);
+  EXPECT_EQ(metrics.histogram_data_points["metric4"].points_data.size(), 1);
 }
 
 TEST_F(MetricAggregatorTests, NoLimits) {
@@ -1659,8 +1659,8 @@ TEST_F(MetricAggregatorTests, NoLimits) {
   }
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.size(), 1000);
-  EXPECT_EQ(metrics["metric999"].non_aggregated_gauge_points.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_points.size(), 1000);
+  EXPECT_EQ(metrics.gauge_data_points["metric999"].points_data.size(), 1);
 }
 
 class RequestBuilderTests : public testing::Test {
@@ -1680,21 +1680,20 @@ public:
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestEmptyMetrics) {
   setupBuilder(true, 1);
-  absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints> empty_metrics;
+  MetricAggregator::AggregationResult empty_metrics;
   builder_->buildRequests(empty_metrics);
   EXPECT_EQ(requests_.size(), 0);
 }
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoLimits) {
   setupBuilder(true, 0);
-  absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints> metrics;
+  MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
-    MetricAggregator::MetricDataPoints metric_data;
     opentelemetry::proto::metrics::v1::NumberDataPoint data_point;
     data_point.set_as_int(i);
-    metric_data.gauge_points_data.push_back(std::move(data_point));
-    metrics["metric" + std::to_string(i)] = std::move(metric_data);
+    metrics.gauge_data_points["metric" + std::to_string(i)].points_data.push_back(
+        std::move(data_point));
   }
 
   builder_->buildRequests(metrics);
@@ -1704,22 +1703,18 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoLimits) {
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
   setupBuilder(true, 2);
-  absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints> metrics;
+  MetricAggregator::AggregationResult metrics;
 
-  MetricAggregator::MetricDataPoints metric_data1;
   opentelemetry::proto::metrics::v1::NumberDataPoint data_point1;
   data_point1.set_as_int(1);
-  metric_data1.gauge_points_data.push_back(std::move(data_point1));
+  metrics.gauge_data_points["metric1"].points_data.push_back(std::move(data_point1));
   opentelemetry::proto::metrics::v1::NumberDataPoint data_point2;
   data_point2.set_as_int(2);
-  metric_data1.gauge_points_data.push_back(std::move(data_point2));
-  metrics["metric1"] = std::move(metric_data1);
+  metrics.gauge_data_points["metric1"].points_data.push_back(std::move(data_point2));
 
-  MetricAggregator::MetricDataPoints metric_data2;
   opentelemetry::proto::metrics::v1::NumberDataPoint data_point3;
   data_point3.set_as_int(3);
-  metric_data2.gauge_points_data.push_back(std::move(data_point3));
-  metrics["metric2"] = std::move(metric_data2);
+  metrics.gauge_data_points["metric2"].points_data.push_back(std::move(data_point3));
 
   builder_->buildRequests(metrics);
   EXPECT_EQ(requests_.size(), 2);
@@ -1738,14 +1733,13 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoAggregation) {
   setupBuilder(false, 0);
-  absl::flat_hash_map<std::string, MetricAggregator::MetricDataPoints> metrics;
+  MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
-    MetricAggregator::MetricDataPoints metric_data;
     opentelemetry::proto::metrics::v1::NumberDataPoint data_point;
     data_point.set_as_int(i);
-    metric_data.non_aggregated_gauge_points.push_back(std::move(data_point));
-    metrics["metric" + std::to_string(i)] = std::move(metric_data);
+    metrics.gauge_data_points["metric" + std::to_string(i)].points_data.push_back(
+        std::move(data_point));
   }
 
   builder_->buildRequests(metrics);
