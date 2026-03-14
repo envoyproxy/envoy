@@ -118,6 +118,8 @@ public:
   bool used() const override { return true; }
   void markUnused() override {}
   bool hidden() const override { return false; }
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
@@ -141,6 +143,8 @@ public:
   void markUnused() override {}
   bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
 
   Unit unit() const override { return Unit::Null; };
   void recordValue(uint64_t) override {}

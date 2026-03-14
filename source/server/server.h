@@ -491,6 +491,7 @@ public:
   SystemTime snapshotTime() const override { return snapshot_time_; }
 
 private:
+  std::vector<Stats::ConstScopeSharedPtr> scopes_;
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
   std::vector<CounterSnapshot> counters_;
   std::vector<Stats::GaugeSharedPtr> snapped_gauges_;

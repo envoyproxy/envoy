@@ -30,6 +30,13 @@ class Allocator {
 public:
   virtual ~Allocator() = default;
 
+protected:
+  friend class AllocatorImplTest;
+  friend class AllocatorTestingPeer;
+  friend class IsolatedStoreImpl;
+  friend class MetricImplTest;
+  friend class ThreadLocalStoreImpl;
+
   /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
@@ -57,8 +64,11 @@ public:
    */
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                                const StatNameTagVector& stat_name_tags) PURE;
+
+ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
+
 
   /**
    * Mark rejected stats as deleted by moving them to a different vector, so they don't show up

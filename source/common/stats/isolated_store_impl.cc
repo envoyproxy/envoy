@@ -26,13 +26,17 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : alloc_(symbol_table),
       counters_([this](const TagUtility::TagStatNameJoiner& joiner,
                        StatNameTagVectorOptConstRef tags) -> CounterSharedPtr {
-        return alloc_.makeCounter(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                  tagVectorFromOpt(tags));
+        CounterSharedPtr counter = alloc_.makeCounter(
+            joiner.nameWithTags(), joiner.tagExtractedName(), tagVectorFromOpt(tags));
+        counter->setScoped();
+        return counter;
       }),
       gauges_([this](const TagUtility::TagStatNameJoiner& joiner, StatNameTagVectorOptConstRef tags,
                      Gauge::ImportMode import_mode) -> GaugeSharedPtr {
-        return alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                tagVectorFromOpt(tags), import_mode);
+        GaugeSharedPtr gauge = alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
+                                                tagVectorFromOpt(tags), import_mode);
+        gauge->setScoped();
+        return gauge;
       }),
       histograms_([this](const TagUtility::TagStatNameJoiner& joiner,
                          StatNameTagVectorOptConstRef tags,
@@ -43,8 +47,10 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       text_readouts_([this](const TagUtility::TagStatNameJoiner& joiner,
                             StatNameTagVectorOptConstRef tags,
                             TextReadout::Type) -> TextReadoutSharedPtr {
-        return alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                      tagVectorFromOpt(tags));
+        TextReadoutSharedPtr text_readout = alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
+                                                                   tagVectorFromOpt(tags));
+        text_readout->setScoped();
+        return text_readout;
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)) {}

@@ -171,44 +171,62 @@ void InstanceBase::failHealthcheck(bool fail) {
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
                                        Upstream::ClusterManager& cluster_manager,
                                        TimeSource& time_source) {
+  store.forEachScope(
+      [this](std::size_t size) {
+        scopes_.reserve(size);
+      },
+      [this](const Stats::Scope& scope) {
+        scopes_.push_back(scope.getConstShared());
+      });
   store.forEachSinkedCounter(
       [this](std::size_t size) {
-        snapped_counters_.reserve(size);
         counters_.reserve(size);
       },
       [this](Stats::Counter& counter) {
-        snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
-        counters_.push_back({counter.latch(), counter});
+        if (counter.scoped()) {
+          //snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
+          counters_.push_back({counter.latch(), counter});
+        } else {
+          ENVOY_LOG_MISC(error, "unexpected unscoped counter: {}", counter.name());
+          ASSERT(false);
+        }
       });
 
   store.forEachSinkedGauge(
       [this](std::size_t size) {
-        snapped_gauges_.reserve(size);
         gauges_.reserve(size);
       },
       [this](Stats::Gauge& gauge) {
-        snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
-        gauges_.push_back(gauge);
+        if (gauge.scoped()) {
+          //snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+          gauges_.push_back(gauge);
+        } else {
+          ENVOY_LOG_MISC(error, "unexpected unscoped gauge: {}", gauge.name());
+          ASSERT(false);
+        }
       });
 
   store.forEachSinkedHistogram(
       [this](std::size_t size) {
-        snapped_histograms_.reserve(size);
         histograms_.reserve(size);
+        snapped_histograms_.reserve(size);
       },
       [this](Stats::ParentHistogram& histogram) {
-        snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
-        histograms_.push_back(histogram);
+        //if (histogram.scoped()) {
+          snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
+          histograms_.push_back(histogram);
+          //}
       });
 
   store.forEachSinkedTextReadout(
       [this](std::size_t size) {
-        snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
       },
       [this](Stats::TextReadout& text_readout) {
-        snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
-        text_readouts_.push_back(text_readout);
+        if (text_readout.scoped()) {
+          //snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+          text_readouts_.push_back(text_readout);
+        }
       });
 
   Upstream::HostUtility::forEachHostMetric(

@@ -63,6 +63,8 @@ public:
   bool used() const override { return used_; }
   void markUnused() override { used_ = false; }
   bool hidden() const override { return false; }
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
 
 private:
   const Histogram::Unit unit_;
@@ -122,6 +124,8 @@ public:
   bool used() const override;
   void markUnused() override;
   bool hidden() const override;
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
 
   // RefcountInterface
   void incRefCount() override;

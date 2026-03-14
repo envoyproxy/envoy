@@ -6,6 +6,7 @@
 
 #include "source/common/stats/allocator_impl.h"
 
+#include "test/common/stats/allocator_testing_peer.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"
@@ -16,7 +17,6 @@
 
 namespace Envoy {
 namespace Stats {
-namespace {
 
 class AllocatorImplTest : public testing::Test {
 protected:
@@ -37,6 +37,22 @@ protected:
     }
   }
 
+  CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
+                               const StatNameTagVector& stat_name_tags) {
+    return alloc_.makeCounter(name, tag_extracted_name, stat_name_tags);
+  }
+
+  GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
+                           const StatNameTagVector& stat_name_tags, Gauge::ImportMode import) {
+    return alloc_.makeGauge(name, tag_extracted_name, stat_name_tags, import);
+  }
+
+  TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
+                                       const StatNameTagVector& stat_name_tags) {
+    return alloc_.makeTextReadout(name, tag_extracted_name, stat_name_tags);
+  }
+
+
   SymbolTableImpl symbol_table_;
   // Declare the pool before the allocator because the allocator could contain
   // a TestSinkPredicates object whose lifetime should be bounded by that of the pool.
@@ -48,9 +64,9 @@ protected:
 // Allocate 2 counters of the same name, and you'll get the same object.
 TEST_F(AllocatorImplTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
-  CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {});
+  CounterSharedPtr c1 = makeCounter(counter_name, StatName(), {});
   EXPECT_EQ(1, c1->use_count());
-  CounterSharedPtr c2 = alloc_.makeCounter(counter_name, StatName(), {});
+  CounterSharedPtr c2 = makeCounter(counter_name, StatName(), {});
   EXPECT_EQ(2, c1->use_count());
   EXPECT_EQ(2, c2->use_count());
   EXPECT_EQ(c1.get(), c2.get());
@@ -66,9 +82,9 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
 
 TEST_F(AllocatorImplTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
-  GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+  GaugeSharedPtr g1 = makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1, g1->use_count());
-  GaugeSharedPtr g2 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+  GaugeSharedPtr g2 = makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
   EXPECT_EQ(2, g1->use_count());
   EXPECT_EQ(2, g2->use_count());
   EXPECT_EQ(g1.get(), g2.get());
@@ -101,8 +117,8 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceOrganic) {
     threads.push_back(thread_factory.createThread([&]() {
       go.WaitForNotification();
       for (uint32_t i = 0; i < iters; ++i) {
-        alloc_.makeCounter(counter_name, StatName(), {});
-        alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::NeverImport);
+        makeCounter(counter_name, StatName(), {});
+        makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::NeverImport);
       }
     }));
   }
@@ -125,7 +141,7 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   alloc_.sync().enable();
   alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
   Thread::ThreadPtr thread = thread_factory.createThread([&]() {
-    CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
+    CounterSharedPtr counter = makeCounter(counter_name, StatName(), {});
     counter->inc();
     counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
   });
@@ -139,16 +155,16 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
 
 TEST_F(AllocatorImplTest, HiddenGauge) {
   GaugeSharedPtr hidden_gauge =
-      alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+      makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
   EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
   EXPECT_TRUE(hidden_gauge->hidden());
 
   GaugeSharedPtr non_hidden_gauge =
-      alloc_.makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
+      makeGauge(makeStat("non_hidden"), StatName(), {}, Gauge::ImportMode::Accumulate);
   EXPECT_NE(non_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
   EXPECT_FALSE(non_hidden_gauge->hidden());
 
-  GaugeSharedPtr never_import_hidden_gauge = alloc_.makeGauge(
+  GaugeSharedPtr never_import_hidden_gauge = makeGauge(
       makeStat("never_import_hidden"), StatName(), {}, Gauge::ImportMode::NeverImport);
   EXPECT_NE(never_import_hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
   EXPECT_FALSE(never_import_hidden_gauge->hidden());
@@ -163,7 +179,7 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
     stat_names.insert(stat_name);
-    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+    counters.emplace_back(makeCounter(stat_name, StatName(), {}));
   }
 
   size_t num_counters = 0;
@@ -216,7 +232,7 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
     stat_names.insert(stat_name);
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    gauges.emplace_back(makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
   }
 
   size_t num_gauges = 0;
@@ -269,7 +285,7 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
     stat_names.insert(stat_name);
-    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+    text_readouts.emplace_back(makeTextReadout(stat_name, StatName(), {}));
   }
 
   size_t num_text_readouts = 0;
@@ -326,7 +342,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
   // For each counter.
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
-    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+    counters.emplace_back(makeCounter(stat_name, StatName(), {}));
   }
   size_t num_iterations = 0;
   alloc_.forEachCounter(nullptr, [&num_iterations](Counter& counter) {
@@ -338,7 +354,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
   // For each gauge.
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    gauges.emplace_back(makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
   }
   num_iterations = 0;
   alloc_.forEachGauge(nullptr, [&num_iterations](Gauge& gauge) {
@@ -350,7 +366,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
   // For each text readout.
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
-    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+    text_readouts.emplace_back(makeTextReadout(stat_name, StatName(), {}));
   }
   num_iterations = 0;
   alloc_.forEachTextReadout(nullptr, [&num_iterations](TextReadout& text_readout) {
@@ -370,7 +386,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   std::vector<CounterSharedPtr> counters;
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
-    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+    counters.emplace_back(makeCounter(stat_name, StatName(), {}));
   }
   // Reject a stat and remove it from "scope".
   StatName const rejected_counter_name = counters[4]->statName();
@@ -383,7 +399,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   rejected_counter.inc();
 
   // Make the deleted stat again.
-  CounterSharedPtr deleted_counter = alloc_.makeCounter(rejected_counter_name, StatName(), {});
+  CounterSharedPtr deleted_counter = makeCounter(rejected_counter_name, StatName(), {});
 
   EXPECT_EQ(deleted_counter->value(), 0);
   EXPECT_EQ(rejected_counter.value(), 2);
@@ -391,7 +407,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   std::vector<GaugeSharedPtr> gauges;
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    gauges.emplace_back(makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
   }
   // Reject a stat and remove it from "scope".
   StatName const rejected_gauge_name = gauges[4]->statName();
@@ -404,7 +420,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 
   // Make the deleted stat again.
   GaugeSharedPtr deleted_gauge =
-      alloc_.makeGauge(rejected_gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+      makeGauge(rejected_gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
   EXPECT_EQ(deleted_gauge->value(), 0);
   EXPECT_EQ(rejected_gauge.value(), 10);
@@ -412,7 +428,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   std::vector<TextReadoutSharedPtr> text_readouts;
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
-    text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+    text_readouts.emplace_back(makeTextReadout(stat_name, StatName(), {}));
   }
   // Reject a stat and remove it from "scope".
   StatName const rejected_text_readout_name = text_readouts[4]->statName();
@@ -425,7 +441,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 
   // Make the deleted stat again.
   TextReadoutSharedPtr deleted_text_readout =
-      alloc_.makeTextReadout(rejected_text_readout_name, StatName(), {});
+      makeTextReadout(rejected_text_readout_name, StatName(), {});
 
   EXPECT_EQ(deleted_text_readout->value(), "");
   EXPECT_EQ(rejected_text_readout.value(), "deleted value");
@@ -447,9 +463,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
       sink_predicates->add(stat_name);
-      sinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+      sinked_counters.emplace_back(makeCounter(stat_name, StatName(), {}));
     } else {
-      unsinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+      unsinked_counters.emplace_back(makeCounter(stat_name, StatName(), {}));
     }
   }
 
@@ -493,10 +509,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
     if ((idx + 1) % 5 == 0) {
       sink_predicates->add(stat_name);
       sinked_gauges.emplace_back(
-          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+          makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
     } else {
       unsinked_gauges.emplace_back(
-          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+          makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
     }
   }
 
@@ -533,10 +549,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
   size_t num_iterations = 0;
 
   unhidden_gauge =
-      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+      makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
   hidden_gauge =
-      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+      makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                             [&num_iterations, unhidden_stat_name](Gauge& gauge) {
@@ -566,10 +582,10 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   size_t num_iterations = 0;
 
   unhidden_gauge =
-      alloc_.makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+      makeGauge(unhidden_stat_name, StatName(), {}, Gauge::ImportMode::Accumulate);
 
   hidden_gauge =
-      alloc_.makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
+      makeGauge(hidden_stat_name, StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
 
   alloc_.forEachSinkedGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                             [&num_iterations, &sink_predicates](Gauge& gauge) {
@@ -596,9 +612,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
     // sink every 2nd stat
     if ((idx + 1) % 2 == 0) {
       sink_predicates->add(stat_name);
-      sinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+      sinked_text_readouts.emplace_back(makeTextReadout(stat_name, StatName(), {}));
     } else {
-      unsinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
+      unsinked_text_readouts.emplace_back(makeTextReadout(stat_name, StatName(), {}));
     }
   }
 
@@ -626,6 +642,5 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   EXPECT_EQ(num_iterations, 0);
 }
 
-} // namespace
 } // namespace Stats
 } // namespace Envoy

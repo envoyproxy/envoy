@@ -32,6 +32,8 @@ public:
   // Metric
   bool used() const override { return false; }
   void markUnused() override {}
+  bool scoped() const override { return false; }
+  void setScoped() override {}
   bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
