@@ -85,7 +85,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   END_TRY
   CATCH(EnvoyException & e, {
     // If we did throw it must have been because of cgroup.
-    EXPECT_THAT(std::string(e.what()),
+    ASSERT_THAT(std::string(e.what()),
                 ::testing::Eq("No supported cgroup CPU implementation found"));
     GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
   });
@@ -147,10 +147,9 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   END_TRY
   CATCH(EnvoyException & e, {
     // If we did throw it must have been because of cgroup.
-    EXPECT_THAT(std::string(e.what()),
+    ASSERT_THAT(std::string(e.what()),
                 ::testing::Eq("No supported cgroup CPU implementation found"));
     GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
-    return;
   });
 }
 #endif
