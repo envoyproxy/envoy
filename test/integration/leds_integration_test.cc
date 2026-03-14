@@ -22,12 +22,14 @@ protected:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
     FakeUpstream* upstream_{};
-    absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
+    absl::flat_hash_map<std::string, std::shared_ptr<FakeStream>> stream_by_resource_name_;
 
     static constexpr char default_stream_name[] = "default";
 
     // Used for cases where only a single stream is needed.
-    FakeStreamPtr& defaultStream() { return stream_by_resource_name_[default_stream_name]; }
+    std::shared_ptr<FakeStream>& defaultStream() {
+      return stream_by_resource_name_[default_stream_name];
+    }
   };
 
   LedsIntegrationTest()
@@ -158,24 +160,24 @@ protected:
           upstream_info.upstream_->waitForHttpConnection(*dispatcher_, upstream_info.connection_);
       RELEASE_ASSERT(result, result.message());
     }
-    if (!upstream_info.stream_by_resource_name_.try_emplace(resource_name, nullptr).second) {
+    if (upstream_info.stream_by_resource_name_.contains(resource_name)) {
       RELEASE_ASSERT(false,
                      fmt::format("stream with resource name '{}' already exists!", resource_name));
     }
 
-    auto result = upstream_info.connection_->waitForNewStream(
-        *dispatcher_, upstream_info.stream_by_resource_name_[resource_name]);
+    FakeStreamPtr temp_stream;
+    auto result = upstream_info.connection_->waitForNewStream(*dispatcher_, temp_stream);
     RELEASE_ASSERT(result, result.message());
-    upstream_info.stream_by_resource_name_[resource_name]->startGrpcStream();
+    temp_stream->startGrpcStream();
+    upstream_info.stream_by_resource_name_[resource_name] =
+        std::shared_ptr<FakeStream>(temp_stream.release());
   }
 
-  // A specific function to initialize LEDS streams. This was introduced to
-  // handle the non-deterministic requests order when more than one locality is
-  // used. This method first establishes the gRPC stream, fetches the first
-  // request and reads its requested resource name, and then assigns the stream
-  // to the internal data-structure.
+  // A specific function to initialize LEDS streams. With mux sharing, all
+  // LEDS localities targeting the same ApiConfigSource use a single gRPC
+  // stream. This method establishes that stream, reads all subscribe requests
+  // (which may be batched), and maps each locality prefix to the shared stream.
   void initializeAllLedsStreams() {
-    // Create a set of localities that are expected.
     absl::flat_hash_set<std::string> expected_localities_prefixes(localities_prefixes_.begin(),
                                                                   localities_prefixes_.end());
 
@@ -185,31 +187,29 @@ protected:
       RELEASE_ASSERT(result, result.message());
     }
 
-    // Wait for the exact number of streams.
-    for (uint32_t i = 0; i < localities_prefixes_.size(); ++i) {
-      // Create the stream for the LEDS collection and fetch the name from the
-      // contents, then validate that this is an expected collection
-      FakeStreamPtr temp_stream;
+    // All LEDS subscriptions share a single mux and therefore a single stream.
+    FakeStreamPtr temp_stream;
+    auto result = leds_upstream_info_.connection_->waitForNewStream(*dispatcher_, temp_stream);
+    RELEASE_ASSERT(result, result.message());
+    temp_stream->startGrpcStream();
+    auto shared_stream = std::shared_ptr<FakeStream>(temp_stream.release());
+
+    // Read subscribe requests until all expected localities are covered.
+    // Subscriptions may arrive in a single batched request or as separate
+    // requests depending on event loop timing.
+    while (!expected_localities_prefixes.empty()) {
       envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-      auto result = leds_upstream_info_.connection_->waitForNewStream(*dispatcher_, temp_stream);
-      RELEASE_ASSERT(result, result.message());
-      temp_stream->startGrpcStream();
-      RELEASE_ASSERT(temp_stream->waitForGrpcMessage(*dispatcher_, request),
+      RELEASE_ASSERT(shared_stream->waitForGrpcMessage(*dispatcher_, request),
                      "LEDS message did not arrive as expected");
-      RELEASE_ASSERT(request.resource_names_subscribe().size() == 1,
-                     "Each LEDS request in this test must have a single resource");
-      // Remove the "*" from the collection name to match against the set
-      // contents.
-      const auto request_collection_name = *request.resource_names_subscribe().begin();
-      const auto pos = request_collection_name.find_last_of('*');
-      ASSERT(pos != std::string::npos);
-      const auto request_collection_prefix = request_collection_name.substr(0, pos);
-      auto set_it = expected_localities_prefixes.find(request_collection_prefix);
-      ASSERT(set_it != expected_localities_prefixes.end());
-      // Associate the stream with the locality prefix.
-      leds_upstream_info_.stream_by_resource_name_[*set_it] = std::move(temp_stream);
-      // Remove the locality prefix from the expected set.
-      expected_localities_prefixes.erase(set_it);
+      for (const auto& resource_name : request.resource_names_subscribe()) {
+        const auto pos = resource_name.find_last_of('*');
+        ASSERT(pos != std::string::npos);
+        const auto collection_prefix = resource_name.substr(0, pos);
+        auto set_it = expected_localities_prefixes.find(collection_prefix);
+        ASSERT(set_it != expected_localities_prefixes.end());
+        leds_upstream_info_.stream_by_resource_name_[*set_it] = shared_stream;
+        expected_localities_prefixes.erase(set_it);
+      }
     }
   }
 
@@ -362,7 +362,9 @@ protected:
     if (host_info.connection_ == nullptr) {
       ASSERT_TRUE(host_info.upstream_->waitForHttpConnection(*dispatcher_, host_info.connection_));
     }
-    ASSERT_TRUE(host_info.connection_->waitForNewStream(*dispatcher_, host_info.defaultStream()));
+    FakeStreamPtr temp_stream;
+    ASSERT_TRUE(host_info.connection_->waitForNewStream(*dispatcher_, temp_stream));
+    host_info.defaultStream() = std::shared_ptr<FakeStream>(temp_stream.release());
     ASSERT_TRUE(host_info.defaultStream()->waitForEndStream(*dispatcher_));
 
     EXPECT_EQ(host_info.defaultStream()->headers().getPathValue(), "/healthcheck");
