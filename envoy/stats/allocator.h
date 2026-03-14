@@ -65,10 +65,9 @@ protected:
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                                const StatNameTagVector& stat_name_tags) PURE;
 
- public:
+public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
-
 
   /**
    * Mark rejected stats as deleted by moving them to a different vector, so they don't show up

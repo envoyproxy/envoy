@@ -41,7 +41,7 @@ TEST_F(MetricImplTest, NoTags) {
 
 TEST_F(MetricImplTest, OneTag) {
   CounterSharedPtr counter = makeCounter(makeStat("counter.name.value"), makeStat("counter"),
-                                                {{makeStat("name"), makeStat("value")}});
+                                         {{makeStat("name"), makeStat("value")}});
   TagVector tags = counter->tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);

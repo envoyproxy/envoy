@@ -298,7 +298,7 @@ public:
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override {
     Counter& counter = store_.counters_.get(prefix(), name, tags, symbolTable());
-    //counter.setScoped();
+    // counter.setScoped();
     return counter;
   }
   ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
@@ -308,20 +308,20 @@ public:
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Gauge& gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode);
-    //gauge.setScoped();
+    // gauge.setScoped();
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     return store_.histograms_.get(prefix(), name, tags, symbolTable(), unit);
-    //histogram.setScoped();
+    // histogram.setScoped();
   }
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override {
-    TextReadout& text_readout = store_.text_readouts_.get(prefix(), name, tags, symbolTable(),
-                                     TextReadout::Type::Default);
-    //text_readout.setScoped();
+    TextReadout& text_readout =
+        store_.text_readouts_.get(prefix(), name, tags, symbolTable(), TextReadout::Type::Default);
+    // text_readout.setScoped();
     return text_readout;
   }
   CounterOptConstRef findCounter(StatName name) const override {

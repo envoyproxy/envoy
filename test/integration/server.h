@@ -177,7 +177,7 @@ class NotifyingCounter : public Stats::Counter {
 public:
   NotifyingCounter(Stats::Counter* counter, absl::Mutex& mutex, absl::CondVar& condvar)
       : counter_(counter), mutex_(mutex), condvar_(condvar) {
-    //counter_->setScoped();
+    // counter_->setScoped();
   }
 
   std::string name() const override { return counter_->name(); }

@@ -23,7 +23,7 @@ public:
   AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~AllocatorImpl() override;
 
- protected:
+protected:
   friend class AllocatorImplTest;
   friend class AllocatorTestingPeer;
   friend class IsolatedStoreImpl;
@@ -38,7 +38,7 @@ public:
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags) override;
 
- public:
+public:
   // Allocator
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
