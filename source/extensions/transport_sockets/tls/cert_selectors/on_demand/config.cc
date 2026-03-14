@@ -3,15 +3,9 @@
 #include "source/common/config/utility.h"
 #include "source/common/common/callback_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/certificate_providers/local/local_certificate_provider.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
-
-#include "absl/strings/ascii.h"
-#include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
-#include "envoy/filesystem/filesystem.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,17 +13,6 @@ namespace TransportSockets {
 namespace Tls {
 namespace CertificateSelectors {
 namespace OnDemand {
-
-namespace {
-
-constexpr uint32_t DefaultLocalCertTtlDays = 30;
-
-bool isValidRsaKeyBits(uint32_t bits) { return bits >= 2048 && bits <= 8192 && bits % 256 == 0; }
-
-std::string localSignerProviderName(const LocalSignerProto& config) {
-  return absl::StrCat("on_demand_local_signer_", MessageUtil::hash(config));
-}
-} // namespace
 
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        Server::Configuration::ServerFactoryContext& factory_context,
@@ -121,33 +104,11 @@ SecretManager::SecretManager(const ConfigProto& config,
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
       config_source_(config.config_source()), context_factory_(std::move(context_factory)),
-      local_signer_enabled_(config.has_local_signer()),
-      local_signer_config_(config.has_local_signer() ? config.local_signer()
-                                                     : LocalSignerProto()),
-      certificate_provider_enabled_(config.has_local_signer() ||
-                                    !config.certificate_provider_name().empty()),
-      certificate_provider_name_(config.has_local_signer()
-                                     ? localSignerProviderName(local_signer_config_)
-                                     : config.certificate_provider_name()),
+      certificate_provider_enabled_(!config.certificate_provider_name().empty()),
+      certificate_provider_name_(config.certificate_provider_name()),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
-  if (local_signer_enabled_) {
-    const uint32_t cert_ttl_days = local_signer_config_.cert_ttl_days() > 0
-                                       ? local_signer_config_.cert_ttl_days()
-                                       : DefaultLocalCertTtlDays;
-    const absl::Status status = factory_context_.secretManager().registerTlsCertificateProvider(
-        certificate_provider_name_,
-        std::make_shared<
-            ::Envoy::Extensions::CertificateProviders::Local::LocalNamedTlsCertificateProvider>(
-            local_signer_config_));
-    if (!status.ok() && status.code() != absl::StatusCode::kAlreadyExists) {
-      throw EnvoyException(
-          absl::StrCat("failed to register local signer certificate provider '",
-                       certificate_provider_name_, "': ", status.message()));
-    }
-    ENVOY_LOG(info, "on-demand selector using local signer provider '{}' (cert_ttl_days={})",
-              certificate_provider_name_, cert_ttl_days);
-  } else if (certificate_provider_enabled_) {
+  if (certificate_provider_enabled_) {
     ENVOY_LOG(info, "on-demand selector using certificate provider '{}'",
               certificate_provider_name_);
   }
@@ -235,10 +196,6 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
 
 absl::Status SecretManager::updateAll() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  if (local_signer_enabled_) {
-    return ::Envoy::Extensions::CertificateProviders::Local::refreshLocalSignerCertificateProviders(
-        local_signer_config_);
-  }
   for (auto& [secret_name, entry] : cache_) {
     const auto& cert_config = entry.cert_config_->certConfig();
     // Refresh only if there is a certificate present and skip notifying.
@@ -393,89 +350,10 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
   const bool has_config_source = config.has_config_source();
-  const bool has_local_signer = config.has_local_signer();
   const bool has_certificate_provider_name = !config.certificate_provider_name().empty();
-  if (!has_config_source && !has_local_signer && !has_certificate_provider_name) {
+  if (!has_config_source && !has_certificate_provider_name) {
     return absl::InvalidArgumentError(
-        "one of config_source, local_signer, or certificate_provider_name must be configured");
-  }
-  if (has_local_signer && has_certificate_provider_name) {
-    return absl::InvalidArgumentError(
-        "local_signer and certificate_provider_name are mutually exclusive");
-  }
-  if (config.has_local_signer()) {
-    if (config.local_signer().ca_cert_path().empty() || config.local_signer().ca_key_path().empty()) {
-      return absl::InvalidArgumentError("local_signer requires both ca_cert_path and ca_key_path");
-    }
-    const auto key_type = config.local_signer().key_type();
-    if (key_type != LocalSignerProto::KEY_TYPE_UNSPECIFIED &&
-        key_type != LocalSignerProto::KEY_TYPE_RSA &&
-        key_type != LocalSignerProto::KEY_TYPE_ECDSA) {
-      return absl::InvalidArgumentError("unsupported local_signer.key_type");
-    }
-    if (config.local_signer().rsa_key_bits() > 0) {
-      const uint32_t bits = config.local_signer().rsa_key_bits();
-      if (!isValidRsaKeyBits(bits)) {
-        return absl::InvalidArgumentError(
-            "local_signer.rsa_key_bits must be a multiple of 256 in [2048, 8192]");
-      }
-    }
-    const auto ecdsa_curve = config.local_signer().ecdsa_curve();
-    if (ecdsa_curve != LocalSignerProto::ECDSA_CURVE_UNSPECIFIED &&
-        ecdsa_curve != LocalSignerProto::ECDSA_CURVE_P256 &&
-        ecdsa_curve != LocalSignerProto::ECDSA_CURVE_P384) {
-      return absl::InvalidArgumentError("unsupported local_signer.ecdsa_curve");
-    }
-    const auto signature_hash = config.local_signer().signature_hash();
-    if (signature_hash != LocalSignerProto::SIGNATURE_HASH_UNSPECIFIED &&
-        signature_hash != LocalSignerProto::SIGNATURE_HASH_SHA256 &&
-        signature_hash != LocalSignerProto::SIGNATURE_HASH_SHA384 &&
-        signature_hash != LocalSignerProto::SIGNATURE_HASH_SHA512) {
-      return absl::InvalidArgumentError("unsupported local_signer.signature_hash");
-    }
-    const auto hostname_validation = config.local_signer().hostname_validation();
-    if (hostname_validation != LocalSignerProto::HOSTNAME_VALIDATION_UNSPECIFIED &&
-        hostname_validation != LocalSignerProto::HOSTNAME_VALIDATION_PERMISSIVE &&
-        hostname_validation != LocalSignerProto::HOSTNAME_VALIDATION_STRICT) {
-      return absl::InvalidArgumentError("unsupported local_signer.hostname_validation");
-    }
-    const auto ca_reload_failure_policy = config.local_signer().ca_reload_failure_policy();
-    if (ca_reload_failure_policy !=
-            LocalSignerProto::CA_RELOAD_FAILURE_POLICY_UNSPECIFIED &&
-        ca_reload_failure_policy !=
-            LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED &&
-        ca_reload_failure_policy !=
-            LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_OPEN) {
-      return absl::InvalidArgumentError("unsupported local_signer.ca_reload_failure_policy");
-    }
-    for (const auto& dns_san : config.local_signer().additional_dns_sans()) {
-      if (dns_san.empty()) {
-        return absl::InvalidArgumentError("local_signer.additional_dns_sans cannot contain empty");
-      }
-    }
-    for (const auto key_usage : config.local_signer().key_usages()) {
-      if (key_usage != LocalSignerProto::KEY_USAGE_UNSPECIFIED &&
-          key_usage != LocalSignerProto::KEY_USAGE_DIGITAL_SIGNATURE &&
-          key_usage != LocalSignerProto::KEY_USAGE_CONTENT_COMMITMENT &&
-          key_usage != LocalSignerProto::KEY_USAGE_KEY_ENCIPHERMENT &&
-          key_usage != LocalSignerProto::KEY_USAGE_DATA_ENCIPHERMENT &&
-          key_usage != LocalSignerProto::KEY_USAGE_KEY_AGREEMENT &&
-          key_usage != LocalSignerProto::KEY_USAGE_KEY_CERT_SIGN &&
-          key_usage != LocalSignerProto::KEY_USAGE_CRL_SIGN) {
-        return absl::InvalidArgumentError("unsupported local_signer.key_usages value");
-      }
-    }
-    for (const auto extended_key_usage : config.local_signer().extended_key_usages()) {
-      if (extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_UNSPECIFIED &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_SERVER_AUTH &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_CLIENT_AUTH &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_CODE_SIGNING &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_EMAIL_PROTECTION &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_TIME_STAMPING &&
-          extended_key_usage != LocalSignerProto::EXTENDED_KEY_USAGE_OCSP_SIGNING) {
-        return absl::InvalidArgumentError("unsupported local_signer.extended_key_usages value");
-      }
-    }
+        "one of config_source or certificate_provider_name must be configured");
   }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());

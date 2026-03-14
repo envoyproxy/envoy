@@ -25,6 +25,7 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -37,6 +38,10 @@ namespace {
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
+using LocalCertificateProviderProto =
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalCertificateProvider;
+using LocalSignerProto =
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalSigner;
 
 struct TestParams {
   Network::Address::IpVersion ip_version;
@@ -150,52 +155,54 @@ public:
       )EOF";
   }
 
-  std::string localSignerConfig(absl::string_view mapped_name, bool strict_hostname_validation = false) const {
-    return fmt::format(R"EOF(
-      local_signer:
-        ca_cert_path: {}
-        ca_key_path: {}
-        runtime_key_prefix: on_demand_secret.test.local_signer
-        hostname_validation: {}
-      certificate_mapper:
-        name: static-name
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
-          name: {}
-      )EOF",
-                       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"),
-                       TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"),
-                       strict_hostname_validation ? "HOSTNAME_VALIDATION_STRICT"
-                                                  : "HOSTNAME_VALIDATION_PERMISSIVE",
-                       mapped_name);
+  std::string localSignerConfig(absl::string_view mapped_name,
+                                bool strict_hostname_validation = false) {
+    LocalCertificateProviderProto provider;
+    provider.set_provider_name(default_provider_name_);
+    auto* signer = provider.mutable_local_signer();
+    signer->set_ca_cert_path(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    signer->set_ca_key_path(TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    signer->set_runtime_key_prefix("on_demand_secret.test.local_signer");
+    signer->set_hostname_validation(strict_hostname_validation
+                                        ? LocalSignerProto::HOSTNAME_VALIDATION_STRICT
+                                        : LocalSignerProto::HOSTNAME_VALIDATION_PERMISSIVE);
+    bootstrap_provider_override_ = provider;
+    return certificateProviderConfig(mapped_name);
   }
 
   std::string localSignerSniConfig(absl::string_view ca_cert_path, absl::string_view ca_key_path,
-                                   absl::string_view ca_reload_failure_policy) const {
-    return fmt::format(R"EOF(
-      local_signer:
-        ca_cert_path: {}
-        ca_key_path: {}
-        ca_reload_failure_policy: {}
+                                   absl::string_view ca_reload_failure_policy) {
+    LocalCertificateProviderProto provider;
+    provider.set_provider_name(default_provider_name_);
+    auto* signer = provider.mutable_local_signer();
+    signer->set_ca_cert_path(std::string(ca_cert_path));
+    signer->set_ca_key_path(std::string(ca_key_path));
+    if (ca_reload_failure_policy == "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN") {
+      signer->set_ca_reload_failure_policy(LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_OPEN);
+    } else {
+      signer->set_ca_reload_failure_policy(LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED);
+    }
+    bootstrap_provider_override_ = provider;
+    return R"EOF(
+      certificate_provider_name: local_cert_minter
       certificate_mapper:
         name: sni
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
           default_value: fallback.example.com
-      )EOF",
-                       ca_cert_path, ca_key_path, ca_reload_failure_policy);
+      )EOF";
   }
 
   std::string certificateProviderConfig(absl::string_view mapped_name) const {
     return fmt::format(R"EOF(
-      certificate_provider_name: local_cert_minter
+      certificate_provider_name: {}
       certificate_mapper:
         name: static-name
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
           name: {}
       )EOF",
-                       mapped_name);
+                       default_provider_name_, mapped_name);
   }
 
   void addBootstrapExtensions(
@@ -208,12 +215,17 @@ public:
 
     auto* extension = bootstrap.add_bootstrap_extensions();
     extension->set_name("envoy.bootstrap.certificate_providers.local");
-    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalCertificateProvider
-        provider;
-    provider.set_provider_name(on_demand.certificate_provider_name());
-    auto* signer = provider.mutable_local_signer();
-    signer->set_ca_cert_path(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    signer->set_ca_key_path(TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    LocalCertificateProviderProto provider;
+    if (bootstrap_provider_override_.has_value()) {
+      provider = *bootstrap_provider_override_;
+    } else {
+      provider.set_provider_name(on_demand.certificate_provider_name());
+      auto* signer = provider.mutable_local_signer();
+      signer->set_ca_cert_path(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      signer->set_ca_key_path(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    }
     extension->mutable_typed_config()->PackFrom(provider);
   }
 
@@ -240,7 +252,7 @@ public:
     }
 
     // Configure config source only in SDS mode.
-    if (!on_demand.has_local_signer() && on_demand.certificate_provider_name().empty()) {
+    if (on_demand.certificate_provider_name().empty()) {
       setConfigSource(on_demand.mutable_config_source());
     }
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
@@ -281,10 +293,12 @@ public:
   std::string cacert() const { return upstream_selector_ ? "upstreamcacert" : "cacert"; }
 
 protected:
+  const std::string default_provider_name_{"local_cert_minter"};
   const bool upstream_selector_;
   bool mtls_{false};
   bool validation_sds_{false};
   std::string filter_state_value_;
+  absl::optional<LocalCertificateProviderProto> bootstrap_provider_override_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
