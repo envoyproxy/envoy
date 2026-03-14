@@ -18,6 +18,8 @@ package(default_visibility = [
 
 test_program(name = "no_op")
 
+test_program(name = "no_op_no_optional_abi")
+
 test_program(name = "network_no_op")
 
 test_program(name = "network_config_new_fail")
@@ -115,6 +117,10 @@ test_program(name = "bootstrap_no_http_callout_done")
 test_program(name = "bootstrap_no_timer_fired")
 
 test_program(name = "bootstrap_no_admin_request")
+
+test_program(name = "bootstrap_no_cluster_add_or_update")
+
+test_program(name = "bootstrap_no_cluster_removal")
 
 test_program(name = "access_log_no_op")
 

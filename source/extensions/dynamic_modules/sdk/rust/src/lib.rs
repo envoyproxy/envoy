@@ -317,6 +317,12 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
   }
 }
 
+pub(crate) fn strs_to_module_buffers(
+  strs: &[&str],
+) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
+  strs.iter().map(|s| str_to_module_buffer(s)).collect()
+}
+
 pub(crate) fn bytes_to_module_buffer(b: &[u8]) -> abi::envoy_dynamic_module_type_module_buffer {
   abi::envoy_dynamic_module_type_module_buffer {
     ptr: b.as_ptr() as *const _ as *mut _,
@@ -739,8 +745,15 @@ macro_rules! declare_bootstrap_init_functions {
 // =================================================================================================
 
 /// The type of the factory function that creates a new cluster configuration.
-pub type NewClusterConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn cluster::ClusterConfig>>;
+///
+/// The `envoy_cluster_metrics` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during cluster lifecycle events) for recording metrics.
+pub type NewClusterConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_cluster_metrics: std::sync::Arc<dyn cluster::EnvoyClusterMetrics>,
+) -> Option<Box<dyn cluster::ClusterConfig>>;
 
 /// Global storage for the cluster config factory function.
 pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = OnceLock::new();
@@ -752,8 +765,9 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
 ///
 /// declare_cluster_init_functions!(my_program_init, my_new_cluster_config_fn);
 ///
@@ -764,32 +778,41 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// fn my_new_cluster_config_fn(
 ///   _name: &str,
 ///   _config: &[u8],
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
 /// ) -> Option<Box<dyn ClusterConfig>> {
-///   Some(Box::new(MyClusterConfig {}))
+///   let counter_id = envoy_cluster_metrics.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyClusterConfig { counter_id, envoy_cluster_metrics }))
 /// }
 ///
-/// struct MyClusterConfig {}
+/// struct MyClusterConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
 ///
 /// impl ClusterConfig for MyClusterConfig {
 ///   fn new_cluster(
 ///     &self,
 ///     _envoy_cluster: &dyn EnvoyCluster,
 ///   ) -> Box<dyn Cluster> {
-///     Box::new(MyCluster {})
+///     Box::new(MyCluster {
+///       counter_id: self.counter_id,
+///       envoy_cluster_metrics: self.envoy_cluster_metrics.clone(),
+///     })
 ///   }
 /// }
 ///
-/// struct MyCluster {}
+/// struct MyCluster {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
 ///
 /// impl Cluster for MyCluster {
 ///   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+///     self.envoy_cluster_metrics.increment_counter(self.counter_id, 1).ok();
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(
-///     &self,
-///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
-///   ) -> Box<dyn ClusterLb> {
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
 ///     Box::new(MyClusterLb {})
 ///   }
 /// }
@@ -799,9 +822,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// impl ClusterLb for MyClusterLb {
 ///   fn choose_host(
 ///     &mut self,
-///     _context: envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-///   ) -> Option<envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-///     None
+///     _context: Option<&dyn ClusterLbContext>,
+///     _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+///   ) -> HostSelectionResult {
+///     HostSelectionResult::NoHost
 ///   }
 /// }
 /// ```
@@ -827,8 +851,15 @@ macro_rules! declare_cluster_init_functions {
 // =================================================================================================
 
 /// The function signature for creating a new load balancer configuration.
-pub type NewLoadBalancerConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn load_balancer::LoadBalancerConfig>>;
+///
+/// The `envoy_lb_config` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., in `choose_host`) for recording metrics.
+pub type NewLoadBalancerConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_lb_config: std::sync::Arc<dyn load_balancer::EnvoyLbConfig>,
+) -> Option<Box<dyn load_balancer::LoadBalancerConfig>>;
 
 /// Global function for creating load balancer configurations.
 pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunction> =
@@ -842,27 +873,42 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///
 /// ```ignore
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
 ///
 /// fn program_init() -> bool {
 ///   true
 /// }
 ///
-/// fn new_lb_config(name: &str, config: &[u8]) -> Option<Box<dyn LoadBalancerConfig>> {
-///   Some(Box::new(MyLbConfig {}))
+/// fn new_lb_config(
+///   name: &str,
+///   config: &[u8],
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// ) -> Option<Box<dyn LoadBalancerConfig>> {
+///   let counter_id = envoy_lb_config.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyLbConfig { counter_id, envoy_lb_config }))
 /// }
 ///
 /// declare_load_balancer_init_functions!(program_init, new_lb_config);
 ///
-/// struct MyLbConfig {}
+/// struct MyLbConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// }
 ///
 /// impl LoadBalancerConfig for MyLbConfig {
 ///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
-///     Box::new(MyLoadBalancer { next_index: 0 })
+///     Box::new(MyLoadBalancer {
+///       next_index: 0,
+///       counter_id: self.counter_id,
+///       envoy_lb_config: self.envoy_lb_config.clone(),
+///     })
 ///   }
 /// }
 ///
 /// struct MyLoadBalancer {
 ///   next_index: usize,
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
@@ -873,6 +919,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
+///     self.envoy_lb_config.increment_counter(self.counter_id, 1).ok();
 ///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }

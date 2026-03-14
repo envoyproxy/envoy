@@ -293,6 +293,13 @@ pub trait EnvoyNetworkFilter {
   /// Returns None if the metadata is not found or is the wrong type.
   fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
 
+  /// Set the bool-typed dynamic metadata value with the given namespace and key value.
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool);
+
+  /// Get the bool-typed dynamic metadata value with the given namespace and key value.
+  /// Returns None if the metadata is not found or is the wrong type.
+  fn get_dynamic_metadata_bool(&self, namespace: &str, key: &str) -> Option<bool>;
+
   /// Set an integer socket option with the given level, name, and state.
   fn set_socket_option_int(
     &mut self,
@@ -1187,6 +1194,34 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     let mut result: f64 = 0.0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_bool(&self, namespace: &str, key: &str) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
         self.raw,
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
