@@ -4,13 +4,16 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+Datapoint
 FLUSHALL
 NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
+attr
 defragmentation
+dp
 evictable
 flushdb
 itr
