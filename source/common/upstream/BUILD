@@ -498,6 +498,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "//source/extensions/upstreams/http:config",
+        "//source/extensions/upstreams/host_specific_http:host_specific_config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
         "@abseil-cpp//absl/synchronization",

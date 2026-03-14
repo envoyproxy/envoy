@@ -830,7 +830,8 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 namespace {
 // Translate zero to UINT32_MAX so that the zero/unlimited case doesn't
 // have to be handled specially.
-uint32_t translateZeroToUnlimited(uint32_t limit) {
+uint32_t translateZeroToUnlimited(uint32_t cluster_limit, uint32_t endpoint_limit = 0) {
+  const auto limit = endpoint_limit != 0 ? endpoint_limit : cluster_limit;
   return (limit != 0) ? limit : std::numeric_limits<uint32_t>::max();
 }
 } // namespace
@@ -842,9 +843,14 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
 
 ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                            uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit)
-    : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
-      configured_stream_limit_(translateZeroToUnlimited(effective_concurrent_streams)),
-      concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
+    : parent_(parent),
+      remaining_streams_(translateZeroToUnlimited(
+          lifetime_stream_limit, parent.endpointLimits().max_requests_per_connection)),
+      configured_stream_limit_(translateZeroToUnlimited(
+          effective_concurrent_streams,
+          std::min(parent.endpointLimits().max_concurrent_streams, effective_concurrent_streams))),
+      concurrent_stream_limit_(translateZeroToUnlimited(
+          concurrent_stream_limit, parent.endpointLimits().max_concurrent_streams)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().trafficStats()->upstream_cx_connect_ms_,

@@ -7,7 +7,6 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
