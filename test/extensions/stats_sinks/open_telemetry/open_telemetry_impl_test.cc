@@ -237,6 +237,36 @@ public:
         });
   }
 
+  void sortDataPoints(opentelemetry::proto::metrics::v1::Metric& metric) {
+    auto sort_by_attr = [](const auto& a, const auto& b) {
+      auto get_attr_str = [](const auto& dp) {
+        if (dp.attributes().empty())
+          return std::string("");
+        std::vector<std::string> attrs;
+        for (const auto& attr : dp.attributes()) {
+          attrs.push_back(attr.key() + "=" + attr.value().string_value());
+        }
+        std::sort(attrs.begin(), attrs.end());
+        std::string res;
+        for (const auto& s : attrs)
+          res += s + ";";
+        return res;
+      };
+      return get_attr_str(a) < get_attr_str(b);
+    };
+
+    if (metric.has_gauge()) {
+      std::sort(metric.mutable_gauge()->mutable_data_points()->begin(),
+                metric.mutable_gauge()->mutable_data_points()->end(), sort_by_attr);
+    } else if (metric.has_sum()) {
+      std::sort(metric.mutable_sum()->mutable_data_points()->begin(),
+                metric.mutable_sum()->mutable_data_points()->end(), sort_by_attr);
+    } else if (metric.has_histogram()) {
+      std::sort(metric.mutable_histogram()->mutable_data_points()->begin(),
+                metric.mutable_histogram()->mutable_data_points()->end(), sort_by_attr);
+    }
+  }
+
   const opentelemetry::proto::metrics::v1::Metric*
   findMetric(const MetricsExportRequestSharedPtr& metrics, const std::string& name) {
     for (const auto& metric : metrics->resource_metrics()[0].scope_metrics()[0].metrics()) {
@@ -748,7 +778,9 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
-
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Counter: new_counter_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_counter_name", metric.name());
@@ -848,6 +880,9 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Gauge: new_gauge_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_gauge_name", metric.name());
@@ -947,6 +982,9 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Histogram: new_histogram_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_histogram_name", metric.name());
