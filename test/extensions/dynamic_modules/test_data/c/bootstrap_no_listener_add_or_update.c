@@ -9,7 +9,8 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
   return envoy_dynamic_modules_abi_version;
 }
 
-// A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
+// A bootstrap extension that is missing
+// envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -49,11 +50,6 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
   (void)extension_module_ptr;
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_destroy(
-    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
-  (void)extension_module_ptr;
-}
-
 void envoy_dynamic_module_on_bootstrap_extension_drain_started(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
@@ -70,6 +66,11 @@ void envoy_dynamic_module_on_bootstrap_extension_shutdown(
   completion_callback(completion_context);
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr) {
+  (void)extension_module_ptr;
+}
+
 void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
@@ -79,7 +80,30 @@ void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
   (void)event_id;
 }
 
-// NOTE: envoy_dynamic_module_on_bootstrap_extension_http_callout_done is intentionally missing.
+void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t callout_id, envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)callout_id;
+  (void)result;
+  (void)headers;
+  (void)headers_size;
+  (void)body_chunks;
+  (void)body_chunks_size;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)timer_ptr;
+}
 
 uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
@@ -112,15 +136,6 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
   (void)cluster_name;
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_envoy_buffer listener_name) {
-  (void)extension_config_envoy_ptr;
-  (void)extension_config_module_ptr;
-  (void)listener_name;
-}
-
 void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
@@ -130,3 +145,4 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
   (void)listener_name;
 }
 
+// NOTE: envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update is intentionally missing.

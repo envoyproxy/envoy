@@ -294,6 +294,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension which would allow implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added listener lifecycle event callbacks to the bootstrap dynamic module extension. Modules can
+    opt in via ``enable_listener_lifecycle`` to receive ``on_listener_add_or_update`` and
+    ``on_listener_removal`` notifications when listeners change in the ``ListenerManager``.
 - area: memory
   change: |
     Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
@@ -644,6 +649,10 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: listener_manager
+  change: |
+    Added ``ListenerUpdateCallbacks`` interface to ``ListenerManager``, similar to the existing
+    ``ClusterUpdateCallbacks`` on ``ClusterManager``.
 - area: matching
   change: |
     Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`

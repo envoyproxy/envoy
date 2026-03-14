@@ -7364,6 +7364,44 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_envoy_buffer cluster_name);
 
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update is called when a listener is
+ * added to or updated in the ListenerManager.
+ *
+ * This is only called if the module has opted in to receiving listener lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param listener_name is the name of the listener that was added or updated.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_listener_removal is called when a listener is
+ * removed from the ListenerManager.
+ *
+ * This is only called if the module has opted in to receiving listener lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param listener_name is the name of the listener that was removed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name);
+
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
@@ -7950,6 +7988,27 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
  * @return true if the cluster lifecycle callbacks were successfully registered, false otherwise.
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Listener Lifecycle --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle is called by the
+ * module to opt in to receiving listener lifecycle events
+ * (envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update and
+ * envoy_dynamic_module_on_bootstrap_extension_listener_removal).
+ *
+ * This must be called on the main thread, typically during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ListenerManager is
+ * not available until that point.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the listener lifecycle callbacks were successfully registered, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
 
 // =============================================================================
