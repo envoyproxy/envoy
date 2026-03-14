@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
@@ -38,8 +39,12 @@ test_program(name = "bootstrap_timer_test")
 
 test_program(name = "bootstrap_admin_handler_test")
 
+test_program(name = "bootstrap_cluster_lifecycle_test")
+
 test_program(name = "network_integration_test")
 
 test_program(name = "bootstrap_http_combined_test")
 
 test_program(name = "access_log_integration_test")
+
+test_program(name = "cluster_integration_test")

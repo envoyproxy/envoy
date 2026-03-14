@@ -85,8 +85,12 @@ message DynamicModuleConfig {
   // Defaults to ``dynamicmodulescustom``.
   string metrics_namespace = 5;
 
-  // The dynamic module binary to load. Currently only supports local file paths
-  // via ``local.filename``.
+  // The dynamic module binary to load. Supports local file paths via ``local.filename``
+  // and remote HTTP sources via ``remote``.
+  //
+  // When using ``remote``, the module is fetched asynchronously during listener initialization.
+  // If the fetch fails (network error, SHA256 mismatch, invalid binary, etc.), the filter
+  // is **not installed** and requests pass through unfiltered (fail-open).
   //
   // When both ``name`` and ``module`` are set, ``module`` takes precedence.
   config.core.v3.AsyncDataSource module = 6;

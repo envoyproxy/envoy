@@ -251,6 +251,10 @@ bug_fixes:
     Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
     into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
     The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
+- area: contrib
+  change: |
+    Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
+    peak_ewma loadbalancer.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -265,11 +269,6 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
-- area: dynamic_modules
-  change: |
-    Added gRPC status support for the HTTP dynamic module filter SDKs. The ``send_response`` SDK
-    methods now accept an optional gRPC status code which is passed as a ``grpc-status`` header,
-    and the ``ResponseGrpcStatus`` attribute is now available to read gRPC status from responses.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
@@ -549,6 +548,13 @@ new_features:
     via ``module.local.filename`` as an alternative to the name-based search path.
 - area: dynamic_modules
   change: |
+    Added support for fetching dynamic module binaries from remote HTTP sources via
+    ``module.remote`` in ``DynamicModuleConfig``. The module is downloaded asynchronously during
+    listener initialization with SHA256 verification, written to a temporary file, and loaded
+    via ``dlopen``. If the remote fetch fails, the filter is not installed and requests pass
+    through (fail-open).
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts
@@ -641,6 +647,17 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: matching
+  change: |
+    Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`
+    to distinguish Envoy generated local replies from upstream responses. This matcher input returns ``true``
+    for local replies and ``false`` for upstream responses, enabling ``custom_response`` filter policies to
+    selectively apply only to locally generated error responses.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` request transcoding. Support for ``tools/list`` and
+    ``tools/call`` response transcoding is planned. This filter is currently a work-in-progress and
+    not recommended for production use.
 - area: ext_proc
   change: |
     Added :ref:`allow_content_length_header
