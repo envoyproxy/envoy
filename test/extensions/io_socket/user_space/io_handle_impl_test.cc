@@ -605,7 +605,7 @@ TEST_F(IoHandleImplTest, WritevToPeer) {
 }
 
 TEST_F(IoHandleImplTest, EventScheduleBasic) {
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
       dispatcher_,
       [this](uint32_t events) {
@@ -658,7 +658,7 @@ TEST_F(IoHandleImplTest, SetEnabledTriggerEventSchedule) {
 }
 
 TEST_F(IoHandleImplTest, ReadAndWriteAreEdgeTriggered) {
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
       dispatcher_,
       [this](uint32_t events) {
@@ -688,7 +688,7 @@ TEST_F(IoHandleImplTest, ReadAndWriteAreEdgeTriggered) {
 }
 
 TEST_F(IoHandleImplTest, DisablingEventsDisablesScheduling) {
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
       dispatcher_,
       [this](uint32_t events) {
@@ -718,7 +718,7 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggersReadEvent) {
   EXPECT_TRUE(io_handle_->isReadable());
   EXPECT_FALSE(io_handle_->isWritable());
 
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   // No event is available.
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_peer_->initializeFileEvent(
@@ -982,7 +982,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   io_handle_->shutdown(ENVOY_SHUT_WR);
   ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
 
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_peer_->initializeFileEvent(
       dispatcher_,
       [this](uint32_t events) {
@@ -1138,7 +1138,7 @@ TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
 // IoHandleImpl can support EmulatedEdge trigger type but not level trigger type.
 TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
   // schedulable_cb will be destroyed by IoHandle.
-  auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_->initializeFileEvent(
