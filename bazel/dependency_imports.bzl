@@ -174,10 +174,11 @@ def envoy_dependency_imports(
         importpath = "github.com/spf13/afero",
         sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
         version = "v1.10.0",
+        build_external = "external",
         build_directives = [
-            "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes",
-            "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform",
-            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
+            "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes:go_default_library",
+            "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform:go_default_library",
+            "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm:go_default_library",
         ],
     )
     go_repository(

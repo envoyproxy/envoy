@@ -56,9 +56,9 @@ public:
                                      Server::Configuration::ServerFactoryContext& server_context,
                                      OptRef<Init::Manager> init_manager, bool warm) override;
 
-  absl::Status registerTlsCertificateProviderFactory(
+  absl::Status registerTlsCertificateProvider(
       const std::string& provider_name,
-      TlsCertificateProviderFactoryCb provider_factory) override;
+      NamedTlsCertificateProviderSharedPtr provider) override;
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const std::string& provider_name, const std::string& certificate_name,
@@ -168,9 +168,8 @@ private:
 
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
-  absl::node_hash_map<std::string, TlsCertificateProviderFactoryCb> named_certificate_providers_;
-  absl::node_hash_map<std::string, std::weak_ptr<TlsCertificateConfigProvider>>
-      named_certificate_provider_instances_;
+  absl::node_hash_map<std::string, NamedTlsCertificateProviderSharedPtr>
+      named_certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
   DynamicSecretProviders<TlsSessionTicketKeysSdsApi> session_ticket_keys_providers_;
   DynamicSecretProviders<GenericSecretSdsApi> generic_secret_providers_;

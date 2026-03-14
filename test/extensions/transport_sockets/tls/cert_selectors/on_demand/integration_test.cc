@@ -188,8 +188,7 @@ public:
 
   std::string certificateProviderConfig(absl::string_view mapped_name) const {
     return fmt::format(R"EOF(
-      certificate_provider:
-        provider_name: local_cert_minter
+      certificate_provider_name: local_cert_minter
       certificate_mapper:
         name: static-name
         typed_config:
@@ -203,7 +202,7 @@ public:
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       const envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config&
           on_demand) {
-    if (!on_demand.has_certificate_provider()) {
+    if (on_demand.certificate_provider_name().empty()) {
       return;
     }
 
@@ -211,7 +210,7 @@ public:
     extension->set_name("envoy.bootstrap.certificate_providers.local");
     envoy::extensions::bootstrap::certificate_providers::local::v3::LocalCertificateProvider
         provider;
-    provider.set_provider_name(on_demand.certificate_provider().provider_name());
+    provider.set_provider_name(on_demand.certificate_provider_name());
     auto* signer = provider.mutable_local_signer();
     signer->set_ca_cert_path(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     signer->set_ca_key_path(TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
@@ -241,7 +240,7 @@ public:
     }
 
     // Configure config source only in SDS mode.
-    if (!on_demand.has_local_signer() && !on_demand.has_certificate_provider()) {
+    if (!on_demand.has_local_signer() && on_demand.certificate_provider_name().empty()) {
       setConfigSource(on_demand.mutable_config_source());
     }
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
@@ -491,14 +490,15 @@ TEST_P(OnDemandIntegrationTest, LocalSignerDefaultPermissiveAllowsUnderscoreName
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessCertificateProvider) {
-  if (upstream_selector_) {
-    GTEST_SKIP() << "local certificate provider wiring is validated on downstream";
-  }
-
   setup(certificateProviderConfig("server"));
   auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
-  conn->waitForUpstreamConnection();
+  if (!upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());

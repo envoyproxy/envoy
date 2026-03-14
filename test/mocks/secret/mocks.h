@@ -44,8 +44,8 @@ public:
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
                bool warm));
-  MOCK_METHOD(absl::Status, registerTlsCertificateProviderFactory,
-              (const std::string& provider_name, TlsCertificateProviderFactoryCb provider_factory));
+  MOCK_METHOD(absl::Status, registerTlsCertificateProvider,
+              (const std::string& provider_name, NamedTlsCertificateProviderSharedPtr provider));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
               (const std::string& provider_name, const std::string& certificate_name,
                Server::Configuration::ServerFactoryContext& server_context,

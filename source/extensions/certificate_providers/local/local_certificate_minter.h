@@ -75,6 +75,8 @@ public:
 using LocalCertificateMinterSharedPtr = std::shared_ptr<const LocalCertificateMinter>;
 
 LocalCertificateMinterSharedPtr getDefaultLocalCertificateMinter();
+LocalCertificateMinterSharedPtr
+setDefaultLocalCertificateMinterForTest(LocalCertificateMinterSharedPtr minter);
 
 } // namespace Ssl
 } // namespace Envoy

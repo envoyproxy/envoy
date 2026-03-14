@@ -41,6 +41,38 @@ namespace {
 const ::test::common::secret::TestPrivateKeyMethodConfig _mock_test_private_key_method_config_dummy;
 using ::Envoy::Matchers::MockStringMatcher;
 
+class StaticNamedTlsCertificateProvider : public NamedTlsCertificateProvider {
+public:
+  explicit StaticNamedTlsCertificateProvider(bool dedupe_same_name) : dedupe_same_name_(dedupe_same_name) {}
+
+  TlsCertificateConfigProviderSharedPtr
+  getProvider(const std::string& certificate_name,
+              Server::Configuration::ServerFactoryContext&) override {
+    if (dedupe_same_name_) {
+      if (auto it = providers_.find(certificate_name); it != providers_.end()) {
+        if (auto existing = it->second.lock(); existing) {
+          return existing;
+        }
+      }
+    }
+
+    envoy::extensions::transport_sockets::tls::v3::TlsCertificate tls_certificate;
+    tls_certificate.mutable_certificate_chain()->set_inline_string(
+        absl::StrCat("CERT_", certificate_name));
+    tls_certificate.mutable_private_key()->set_inline_string("KEY");
+    auto provider =
+        std::make_shared<Secret::TlsCertificateConfigProviderImpl>(tls_certificate);
+    if (dedupe_same_name_) {
+      providers_[certificate_name] = provider;
+    }
+    return provider;
+  }
+
+private:
+  const bool dedupe_same_name_;
+  absl::node_hash_map<std::string, std::weak_ptr<TlsCertificateConfigProvider>> providers_;
+};
+
 class SecretManagerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::secret> {
 protected:
   SecretManagerImplTest()
@@ -129,22 +161,15 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
             "Duplicate static TlsCertificate secret name abc.com");
 }
 
-TEST_F(SecretManagerImplTest, RegisterNamedTlsCertificateProviderFactory) {
+TEST_F(SecretManagerImplTest, RegisterNamedTlsCertificateProvider) {
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
-  auto register_status = secret_manager->registerTlsCertificateProviderFactory(
-      "local_cert_minter",
-      [](const std::string&, Server::Configuration::ServerFactoryContext&) {
-        envoy::extensions::transport_sockets::tls::v3::TlsCertificate tls_certificate;
-        tls_certificate.mutable_certificate_chain()->set_inline_string("CERT");
-        tls_certificate.mutable_private_key()->set_inline_string("KEY");
-        return std::make_shared<Secret::TlsCertificateConfigProviderImpl>(tls_certificate);
-      });
+  auto register_status = secret_manager->registerTlsCertificateProvider(
+      "local_cert_minter", std::make_shared<StaticNamedTlsCertificateProvider>(true));
   EXPECT_TRUE(register_status.ok());
 
-  auto duplicate_status = secret_manager->registerTlsCertificateProviderFactory(
-      "local_cert_minter",
-      [](const std::string&, Server::Configuration::ServerFactoryContext&) { return nullptr; });
+  auto duplicate_status = secret_manager->registerTlsCertificateProvider(
+      "local_cert_minter", std::make_shared<StaticNamedTlsCertificateProvider>(true));
   EXPECT_FALSE(duplicate_status.ok());
 }
 
@@ -153,17 +178,9 @@ TEST_F(SecretManagerImplTest, FindOrCreateNamedTlsCertificateProvider) {
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
 
   EXPECT_TRUE(secret_manager
-                  ->registerTlsCertificateProviderFactory(
+                  ->registerTlsCertificateProvider(
                       "local_cert_minter",
-                      [](const std::string& certificate_name,
-                         Server::Configuration::ServerFactoryContext&) {
-                        envoy::extensions::transport_sockets::tls::v3::TlsCertificate tls_certificate;
-                        tls_certificate.mutable_certificate_chain()->set_inline_string(
-                            absl::StrCat("CERT_", certificate_name));
-                        tls_certificate.mutable_private_key()->set_inline_string("KEY");
-                        return std::make_shared<Secret::TlsCertificateConfigProviderImpl>(
-                            tls_certificate);
-                      })
+                      std::make_shared<StaticNamedTlsCertificateProvider>(true))
                   .ok());
 
   auto provider_unknown = secret_manager->findOrCreateTlsCertificateProvider(
@@ -181,6 +198,28 @@ TEST_F(SecretManagerImplTest, FindOrCreateNamedTlsCertificateProvider) {
   ASSERT_NE(provider1, nullptr);
   EXPECT_EQ(provider1, provider2);
   EXPECT_NE(provider1, provider3);
+}
+
+TEST_F(SecretManagerImplTest, NamedTlsCertificateProviderControlsDeduplication) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  EXPECT_TRUE(secret_manager
+                  ->registerTlsCertificateProvider(
+                      "non_deduping_provider",
+                      std::make_shared<StaticNamedTlsCertificateProvider>(false))
+                  .ok());
+
+  auto provider1 = secret_manager->findOrCreateTlsCertificateProvider(
+      "non_deduping_provider", "example.com", secret_context.server_context_,
+      OptRef<Init::Manager>());
+  auto provider2 = secret_manager->findOrCreateTlsCertificateProvider(
+      "non_deduping_provider", "example.com", secret_context.server_context_,
+      OptRef<Init::Manager>());
+
+  ASSERT_NE(provider1, nullptr);
+  ASSERT_NE(provider2, nullptr);
+  EXPECT_NE(provider1, provider2);
 }
 
 // Validate that secret manager adds static certificate validation context secret successfully.

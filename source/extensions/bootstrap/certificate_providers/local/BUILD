@@ -20,8 +20,7 @@ envoy_cc_extension(
         "//envoy/server:instance_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
+        "//source/extensions/certificate_providers/local:local_certificate_provider_lib",
         "@envoy_api//envoy/extensions/bootstrap/certificate_providers/local/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],
 )

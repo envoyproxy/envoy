@@ -27,8 +27,8 @@ public:
 
 private:
   const std::string provider_name_;
-  const envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config::
-      LocalSigner local_signer_config_;
+  const envoy::extensions::bootstrap::certificate_providers::local::v3::LocalSigner
+      local_signer_config_;
 };
 
 class LocalCertificateProviderFactory : public Server::Configuration::BootstrapExtensionFactory {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -17,8 +18,16 @@ class ServerFactoryContext;
 
 namespace Secret {
 
-using TlsCertificateProviderFactoryCb = std::function<TlsCertificateConfigProviderSharedPtr(
-    const std::string& certificate_name, Server::Configuration::ServerFactoryContext&)>;
+class NamedTlsCertificateProvider {
+public:
+  virtual ~NamedTlsCertificateProvider() = default;
+
+  virtual TlsCertificateConfigProviderSharedPtr
+  getProvider(const std::string& certificate_name,
+              Server::Configuration::ServerFactoryContext& server_context) PURE;
+};
+
+using NamedTlsCertificateProviderSharedPtr = std::shared_ptr<NamedTlsCertificateProvider>;
 
 /**
  * A manager for static and dynamic secrets.
@@ -120,16 +129,17 @@ public:
                                      OptRef<Init::Manager> init_manager, bool warm) PURE;
 
   /**
-   * Registers a named TLS certificate provider factory.
-   * Factory instances are looked up by name and used by
+   * Registers a named TLS certificate provider.
+   * Provider instances are looked up by name and used by
    * findOrCreateTlsCertificateProvider(provider_name, certificate_name, ...).
    */
-  virtual absl::Status registerTlsCertificateProviderFactory(
-      const std::string& provider_name, TlsCertificateProviderFactoryCb provider_factory) PURE;
+  virtual absl::Status registerTlsCertificateProvider(
+      const std::string& provider_name,
+      NamedTlsCertificateProviderSharedPtr provider) PURE;
 
   /**
-   * Finds and returns a TLS certificate provider from a named provider factory.
-   * Creates it on first use per (provider_name, certificate_name) pair.
+   * Finds and returns a TLS certificate provider from a named provider.
+   * Per-certificate provider reuse, if any, is owned by the named provider implementation.
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const std::string& provider_name, const std::string& certificate_name,

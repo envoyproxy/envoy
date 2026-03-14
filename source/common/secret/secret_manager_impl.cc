@@ -137,13 +137,16 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
                                              init_manager, warm);
 }
 
-absl::Status SecretManagerImpl::registerTlsCertificateProviderFactory(
-    const std::string& provider_name, TlsCertificateProviderFactoryCb provider_factory) {
+absl::Status SecretManagerImpl::registerTlsCertificateProvider(
+    const std::string& provider_name, NamedTlsCertificateProviderSharedPtr provider) {
   if (provider_name.empty()) {
     return absl::InvalidArgumentError("provider name cannot be empty");
   }
+  if (provider == nullptr) {
+    return absl::InvalidArgumentError("provider cannot be null");
+  }
   if (!named_certificate_providers_
-           .insert(std::make_pair(provider_name, std::move(provider_factory)))
+           .insert(std::make_pair(provider_name, std::move(provider)))
            .second) {
     return absl::AlreadyExistsError(
         absl::StrCat("duplicate TLS certificate provider name ", provider_name));
@@ -160,17 +163,12 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     return nullptr;
   }
 
-  const std::string map_key = absl::StrCat(provider_name, "#", certificate_name);
   TlsCertificateConfigProviderSharedPtr provider =
-      named_certificate_provider_instances_[map_key].lock();
+      provider_factory_it->second->getProvider(certificate_name, server_context);
   if (provider == nullptr) {
-    provider = provider_factory_it->second(certificate_name, server_context);
-    if (provider == nullptr) {
-      ENVOY_LOG_MISC(error, "TLS certificate provider '{}' failed to create certificate '{}'",
-                     provider_name, certificate_name);
-      return nullptr;
-    }
-    named_certificate_provider_instances_[map_key] = provider;
+    ENVOY_LOG_MISC(error, "TLS certificate provider '{}' failed to create certificate '{}'",
+                   provider_name, certificate_name);
+    return nullptr;
   }
 
   if (init_manager) {

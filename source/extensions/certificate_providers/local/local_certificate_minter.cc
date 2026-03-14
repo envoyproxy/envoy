@@ -352,12 +352,23 @@ public:
   }
 };
 
+LocalCertificateMinterSharedPtr& defaultLocalCertificateMinterStorage() {
+  static LocalCertificateMinterSharedPtr minter =
+      std::make_shared<OpenSslLocalCertificateMinter>();
+  return minter;
+}
+
 } // namespace
 
 LocalCertificateMinterSharedPtr getDefaultLocalCertificateMinter() {
-  static const LocalCertificateMinterSharedPtr minter =
-      std::make_shared<OpenSslLocalCertificateMinter>();
-  return minter;
+  return defaultLocalCertificateMinterStorage();
+}
+
+LocalCertificateMinterSharedPtr
+setDefaultLocalCertificateMinterForTest(LocalCertificateMinterSharedPtr minter) {
+  LocalCertificateMinterSharedPtr previous = defaultLocalCertificateMinterStorage();
+  defaultLocalCertificateMinterStorage() = std::move(minter);
+  return previous;
 }
 
 } // namespace Ssl

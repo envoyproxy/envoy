@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/bootstrap/certificate_providers/local/v3/local_certificate_provider.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
@@ -40,16 +41,10 @@ using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
 
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
+using LocalSignerProto =
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalSigner;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
 using RemoveCb = std::function<absl::Status(absl::string_view)>;
-
-absl::StatusOr<Secret::TlsCertificateConfigProviderSharedPtr>
-findOrCreateLocalSignerCertificateProvider(
-    absl::string_view secret_name, Server::Configuration::ServerFactoryContext& factory_context,
-    const ConfigProto::LocalSigner& local_signer_config);
-
-absl::Status
-refreshLocalSignerCertificateProviders(const ConfigProto::LocalSigner& local_signer_config);
 
 class AsyncContextConfig {
 public:
@@ -240,7 +235,7 @@ private:
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
   const bool local_signer_enabled_;
-  const ConfigProto::LocalSigner local_signer_config_;
+  const LocalSignerProto local_signer_config_;
   const bool certificate_provider_enabled_;
   const std::string certificate_provider_name_;
 
