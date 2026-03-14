@@ -183,12 +183,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         counters_.reserve(size);
       },
       [this](Stats::Counter& counter) {
-        if (counter.scoped()) {
+        //if (counter.scoped()) {
           //snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
           counters_.push_back({counter.latch(), counter});
-        } else {
-          ENVOY_LOG_MISC(error, "unexpected unscoped counter: {}", counter.name());
-          ASSERT(false);
+          //} else {
+          //ENVOY_LOG_MISC(error, "unexpected unscoped counter: {}", counter.name());
+          ///ASSERT(false);
         }
       });
 
@@ -197,13 +197,13 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         gauges_.reserve(size);
       },
       [this](Stats::Gauge& gauge) {
-        if (gauge.scoped()) {
-          //snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
-          gauges_.push_back(gauge);
-        } else {
-          ENVOY_LOG_MISC(error, "unexpected unscoped gauge: {}", gauge.name());
-          ASSERT(false);
-        }
+        //if (gauge.scoped()) {
+        //snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+        gauges_.push_back(gauge);
+        //} else {
+        //ENVOY_LOG_MISC(error, "unexpected unscoped gauge: {}", gauge.name());
+        //ASSERT(false);
+        //}
       });
 
   store.forEachSinkedHistogram(
@@ -213,9 +213,9 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
       },
       [this](Stats::ParentHistogram& histogram) {
         //if (histogram.scoped()) {
-          snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
-          histograms_.push_back(histogram);
-          //}
+        //snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
+        histograms_.push_back(histogram);
+        //}
       });
 
   store.forEachSinkedTextReadout(
@@ -223,10 +223,10 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         text_readouts_.reserve(size);
       },
       [this](Stats::TextReadout& text_readout) {
-        if (text_readout.scoped()) {
-          //snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
-          text_readouts_.push_back(text_readout);
-        }
+        //if (text_readout.scoped()) {
+        //snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+        text_readouts_.push_back(text_readout);
+        //}
       });
 
   Upstream::HostUtility::forEachHostMetric(

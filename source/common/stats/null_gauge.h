@@ -37,8 +37,8 @@ public:
   bool used() const override { return false; }
   void markUnused() override {}
   bool hidden() const override { return false; }
-  bool scoped() const override { return false; }
-  void setScoped() override {}
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   // RefcountInterface

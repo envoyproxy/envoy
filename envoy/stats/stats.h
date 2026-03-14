@@ -143,8 +143,8 @@ public:
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
   virtual uint64_t value() const PURE;
-  virtual bool scoped() const PURE;
-  virtual void setScoped() PURE;
+  //virtual bool scoped() const PURE;
+  //virtual void setScoped() PURE;
 };
 
 using CounterSharedPtr = RefcountPtr<Counter>;
@@ -179,8 +179,8 @@ public:
     }
   }
   virtual uint64_t value() const PURE;
-  virtual bool scoped() const PURE;
-  virtual void setScoped() PURE;
+  //virtual bool scoped() const PURE;
+  //virtual void setScoped() PURE;
 
   /**
    * Sets a value from a hot-restart parent. This parent contribution must be
@@ -233,8 +233,8 @@ public:
    * @return the copy of this TextReadout value.
    */
   virtual std::string value() const PURE;
-  virtual bool scoped() const PURE;
-  virtual void setScoped() PURE;
+  //virtual bool scoped() const PURE;
+  //virtual void setScoped() PURE;
 };
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;

@@ -541,7 +541,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     RefcountPtr<StatType> stat = make_stat(
         parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
     ASSERT(stat != nullptr);
-    stat->setScoped();
     central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
   }

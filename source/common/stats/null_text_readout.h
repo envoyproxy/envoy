@@ -36,8 +36,8 @@ public:
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
-  bool scoped() const override { return false; }
-  void setScoped() override {}
+  //bool scoped() const override { return false; }
+  //void setScoped() override {}
 
 private:
   RefcountHelper refcount_helper_;

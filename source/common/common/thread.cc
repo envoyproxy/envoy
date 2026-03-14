@@ -78,13 +78,9 @@ bool MainThread::isMainThread() { return ThreadIds::get().inMainThread(); }
 
 bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
 
-MainThread::MainThread() {
-  ThreadIds::get().registerMainThread();
-}
+MainThread::MainThread() { ThreadIds::get().registerMainThread(); }
 
-MainThread::~MainThread() {
-  ThreadIds::get().releaseMainThread();
-}
+MainThread::~MainThread() { ThreadIds::get().releaseMainThread(); }
 
 #if TEST_THREAD_SUPPORTED
 bool TestThread::isTestThread() {
