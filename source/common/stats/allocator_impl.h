@@ -24,11 +24,15 @@ public:
   ~AllocatorImpl() override;
 
 protected:
+  // Please refer to the comment on the protected section in Allocator.
+  //
+  // TODO(jmarantz): consider dropping the pure interface for Allocator,
+  // merging AllocatorImpl and Allocator. In the distant past there were
+  // two implementations of Allocator, one in shared memory, but this is
+  // no longer needed.
   friend class AllocatorImplTest;
-  friend class AllocatorTestingPeer;
   friend class IsolatedStoreImpl;
   friend class MetricImplTest;
-  friend class ThreadLocalStoreImpl;
 
   CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                const StatNameTagVector& stat_name_tags) override;

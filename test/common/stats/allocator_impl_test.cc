@@ -6,7 +6,6 @@
 
 #include "source/common/stats/allocator_impl.h"
 
-#include "test/common/stats/allocator_testing_peer.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"

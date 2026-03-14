@@ -31,10 +31,20 @@ public:
   virtual ~Allocator() = default;
 
 protected:
-  friend class AllocatorImplTest;
-  friend class AllocatorTestingPeer;
-  friend class IsolatedStoreImpl;
-  friend class MetricImplTest;
+  // We use a protected section for makeCounter, makeGauge, and makeTextReadout.
+  // We do not want general filter code to be creating stats in this way, they
+  // must go through the Scope interface.
+  //
+  // This allows the MetricSnapshotImpl to hold onto references to the stats
+  // holding onto references to the Scopes, rather than holding onto each
+  // individual stat. In other words, all the stats must be owned by one or
+  // more scopes.
+  //
+  // The alternative is to have that function hold onto reference to every stat,
+  // which requires incrementing and decrementing reference counts to each stat,
+  // which is very slow, particularly on ARM processors.
+  //
+  // Note that we must 'friend' a different set of classes from AllocatorImpl.
   friend class ThreadLocalStoreImpl;
 
   /**

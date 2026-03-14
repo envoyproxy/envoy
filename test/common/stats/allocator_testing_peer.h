@@ -5,13 +5,13 @@ namespace Stats {
 
 class AllocatorTestingPeer {
 public:
-  static CounterSharedPtr makeCounter(Stats::Allocator& alloc, StatName name,
+  static CounterSharedPtr makeCounter(Stats::AllocatorImpl& alloc, StatName name,
                                       StatName tag_extracted_name,
                                       const StatNameTagVector& stat_name_tags) {
     return alloc.makeCounter(name, tag_extracted_name, stat_name_tags);
   }
 
-  static GaugeSharedPtr makeGauge(Stats::Allocator& alloc, StatName name,
+  static GaugeSharedPtr makeGauge(Stats::AllocatorImpl& alloc, StatName name,
                                   StatName tag_extracted_name,
                                   const StatNameTagVector& stat_name_tags,
                                   Gauge::ImportMode import) {

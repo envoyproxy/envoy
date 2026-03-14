@@ -17,17 +17,6 @@ envoy_cc_test(
     srcs = ["allocator_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        ":allocator_testing_peer",
-        "//source/common/stats:allocator_lib",
-        "//test/test_common:logging_lib",
-        "//test/test_common:thread_factory_for_test_lib",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "allocator_testing_peer",
-    hdrs = ["allocator_testing_peer.h"],
-    deps = [
         "//source/common/stats:allocator_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:thread_factory_for_test_lib",
