@@ -334,9 +334,6 @@ public:
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addRemoveCallback(std::function<absl::Status()> callback) override {
-    if (terminal_failure_) {
-      THROW_IF_NOT_OK(callback());
-    }
     return remove_callback_manager_.add(callback);
   }
 
@@ -376,7 +373,6 @@ private:
   Common::CallbackManager<absl::Status> remove_callback_manager_;
   bool mint_in_flight_{false};
   bool refresh_requested_{false};
-  bool terminal_failure_{false};
   uint64_t next_mint_id_{1};
 };
 
@@ -628,7 +624,6 @@ absl::Status LocalSignerCertificateProvider::applyMintedCertificate(
   tls_certificate->mutable_private_key()->set_inline_bytes(minted.private_key_pem);
 
   tls_certificate_ = std::move(tls_certificate);
-  terminal_failure_ = false;
   RETURN_IF_NOT_OK(update_callback_manager_.runCallbacks());
   return absl::OkStatus();
 }
@@ -675,13 +670,6 @@ void LocalSignerCertificateProvider::onMintFinished(
   if (!result.ok()) {
     ENVOY_LOG(error, "local certificate mint failed for '{}': {}", secret_name_,
               result.status().message());
-    if (tls_certificate_ == nullptr) {
-      terminal_failure_ = true;
-      if (const absl::Status status = remove_callback_manager_.runCallbacks(); !status.ok()) {
-        ENVOY_LOG(error, "local certificate provider remove callback failed for '{}': {}",
-                  secret_name_, status.message());
-      }
-    }
   } else if (const absl::Status status = applyMintedCertificate(result.value()); !status.ok()) {
     ENVOY_LOG(error, "local certificate provider apply failed for '{}': {}", secret_name_,
               status.message());
@@ -689,14 +677,7 @@ void LocalSignerCertificateProvider::onMintFinished(
 
   if (should_refresh && !mint_in_flight_) {
     const absl::Status status = scheduleMint();
-    if (!status.ok() && tls_certificate_ == nullptr) {
-      terminal_failure_ = true;
-      if (const absl::Status remove_status = remove_callback_manager_.runCallbacks();
-          !remove_status.ok()) {
-        ENVOY_LOG(error, "local certificate provider remove callback failed for '{}': {}",
-                  secret_name_, remove_status.message());
-      }
-    } else if (!status.ok()) {
+    if (!status.ok()) {
       ENVOY_LOG(error, "local certificate provider refresh scheduling failed for '{}': {}",
                 secret_name_, status.message());
     }

@@ -25,6 +25,10 @@ namespace {
 constexpr uint32_t DefaultLocalCertTtlDays = 30;
 
 bool isValidRsaKeyBits(uint32_t bits) { return bits >= 2048 && bits <= 8192 && bits % 256 == 0; }
+
+std::string localSignerProviderName(const LocalSignerProto& config) {
+  return absl::StrCat("on_demand_local_signer_", MessageUtil::hash(config));
+}
 } // namespace
 
 AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
@@ -120,23 +124,36 @@ SecretManager::SecretManager(const ConfigProto& config,
       local_signer_enabled_(config.has_local_signer()),
       local_signer_config_(config.has_local_signer() ? config.local_signer()
                                                      : LocalSignerProto()),
-      certificate_provider_enabled_(!config.certificate_provider_name().empty()),
-      certificate_provider_name_(config.certificate_provider_name()),
+      certificate_provider_enabled_(config.has_local_signer() ||
+                                    !config.certificate_provider_name().empty()),
+      certificate_provider_name_(config.has_local_signer()
+                                     ? localSignerProviderName(local_signer_config_)
+                                     : config.certificate_provider_name()),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
   if (local_signer_enabled_) {
     const uint32_t cert_ttl_days = local_signer_config_.cert_ttl_days() > 0
                                        ? local_signer_config_.cert_ttl_days()
                                        : DefaultLocalCertTtlDays;
-    ENVOY_LOG(info, "on-demand selector using local signer (cert_ttl_days={})", cert_ttl_days);
+    const absl::Status status = factory_context_.secretManager().registerTlsCertificateProvider(
+        certificate_provider_name_,
+        std::make_shared<
+            ::Envoy::Extensions::CertificateProviders::Local::LocalNamedTlsCertificateProvider>(
+            local_signer_config_));
+    if (!status.ok() && status.code() != absl::StatusCode::kAlreadyExists) {
+      throw EnvoyException(
+          absl::StrCat("failed to register local signer certificate provider '",
+                       certificate_provider_name_, "': ", status.message()));
+    }
+    ENVOY_LOG(info, "on-demand selector using local signer provider '{}' (cert_ttl_days={})",
+              certificate_provider_name_, cert_ttl_days);
   } else if (certificate_provider_enabled_) {
     ENVOY_LOG(info, "on-demand selector using certificate provider '{}'",
               certificate_provider_name_);
   }
   for (const auto& name : config.prefetch_secret_names()) {
     const OptRef<Init::Manager> init_manager =
-        (local_signer_enabled_ || certificate_provider_enabled_) ? OptRef<Init::Manager>()
-                                                                 : factory_context.initManager();
+        certificate_provider_enabled_ ? OptRef<Init::Manager>() : factory_context.initManager();
     addCertificateConfig(name, nullptr, init_manager);
   }
 }
@@ -158,29 +175,6 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   if (entry.cert_config_ == nullptr) {
     stats_->cert_requested_.inc();
     stats_->cert_active_.inc();
-    if (local_signer_enabled_) {
-      auto provider = createLocalCertificateProvider(secret_name);
-      if (!provider) {
-        ENVOY_LOG(error, "failed to create local certificate provider for '{}'", secret_name);
-        for (auto fetch_handle : entry.callbacks_) {
-          if (auto cb_handle = fetch_handle.lock(); cb_handle) {
-            cb_handle->notify(nullptr);
-          }
-        }
-        entry.callbacks_.clear();
-        cache_.erase(std::string(secret_name));
-        stats_->cert_active_.dec();
-      } else {
-        entry.cert_config_ = std::make_unique<AsyncContextConfig>(
-            secret_name, factory_context_, std::move(provider),
-            [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
-                -> absl::Status { return updateCertificate(secret_name, cert_config); },
-            [this](absl::string_view secret_name) -> absl::Status {
-              return removeCertificateConfig(secret_name);
-            });
-      }
-      return;
-    }
     if (certificate_provider_enabled_) {
       entry.cert_config_ = std::make_unique<AsyncContextConfig>(
           secret_name, factory_context_, certificate_provider_name_, init_manager,
@@ -257,20 +251,6 @@ absl::Status SecretManager::updateAll() {
     }
   }
   return absl::OkStatus();
-}
-
-Secret::TlsCertificateConfigProviderSharedPtr
-SecretManager::createLocalCertificateProvider(absl::string_view secret_name) const {
-  ASSERT(local_signer_enabled_);
-  auto provider_or_error =
-      ::Envoy::Extensions::CertificateProviders::Local::findOrCreateLocalSignerCertificateProvider(
-          secret_name, factory_context_, local_signer_config_);
-  if (!provider_or_error.ok()) {
-    ENVOY_LOG(error, "failed to create local signer provider for '{}': {}", secret_name,
-              provider_or_error.status().message());
-    return nullptr;
-  }
-  return *std::move(provider_or_error);
 }
 
 absl::Status SecretManager::removeCertificateConfig(absl::string_view secret_name) {

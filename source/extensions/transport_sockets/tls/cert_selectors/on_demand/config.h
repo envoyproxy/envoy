@@ -225,9 +225,6 @@ public:
                                    bool client_ocsp_capable);
 
 private:
-  Secret::TlsCertificateConfigProviderSharedPtr
-  createLocalCertificateProvider(absl::string_view secret_name) const;
-
   void doRemoveCertificateConfig(absl::string_view);
   const Stats::ScopeSharedPtr stats_scope_;
   CertSelectionStatsSharedPtr stats_;
