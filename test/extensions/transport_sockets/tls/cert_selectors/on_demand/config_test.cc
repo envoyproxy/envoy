@@ -67,12 +67,27 @@ protected:
     )EOF";
   }
 
+  std::string certificateProviderConfig() const {
+    return R"EOF(
+      certificate_provider_name: local_cert_minter
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF";
+  }
+
 protected:
   bool disable_stateless_resumption_{true};
   bool disable_stateful_resumption_{true};
 };
 
 TEST_F(OnDemandTest, BasicLoadTest) { EXPECT_OK(create(defaultConfig())); }
+
+TEST_F(OnDemandTest, BasicLoadTestCertificateProvider) {
+  EXPECT_OK(create(certificateProviderConfig()));
+}
 
 TEST_F(OnDemandTest, BasicLoadTestQuic) {
   EXPECT_THAT(create(defaultConfig(), true), StatusIs(absl::StatusCode::kInvalidArgument));
@@ -86,6 +101,30 @@ TEST_F(OnDemandTest, BasicLoadTestStatelessResumption) {
 TEST_F(OnDemandTest, BasicLoadTestStatefulResumption) {
   disable_stateful_resumption_ = false;
   EXPECT_THAT(create(defaultConfig()), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, MustConfigureSourceOrCertificateProvider) {
+  EXPECT_THAT(create(R"EOF(
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(OnDemandTest, CertificateProviderCanOverrideConfigSource) {
+  EXPECT_OK(create(R"EOF(
+      config_source:
+        ads: {}
+      certificate_provider_name: local_cert_minter
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: server
+    )EOF"));
 }
 
 TEST_F(OnDemandTest, QuicCall) {

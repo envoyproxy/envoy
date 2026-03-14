@@ -63,6 +63,7 @@ EXTENSIONS = {
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
     "envoy.bootstrap.dynamic_modules":                  "//source/extensions/bootstrap/dynamic_modules:config",
+    "envoy.bootstrap.certificate_providers.local":      "//source/extensions/bootstrap/certificate_providers/local:config",
 
     #
     # Reverse Connection

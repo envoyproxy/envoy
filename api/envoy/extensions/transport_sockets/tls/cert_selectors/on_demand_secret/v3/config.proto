@@ -4,7 +4,6 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -27,7 +26,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // e.g. by setting the FIPS compliance policy on the loaded certificate.
 message Config {
   // Defines the configuration source of the secrets.
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  // If ``certificate_provider_name`` is set, this field is ignored.
+  config.core.v3.ConfigSource config_source = 1;
 
   // Extension point to specify a function to compute the secret name. The extension is called
   // during the TLS handshake after receiving the *CLIENT HELLO* message from the client for the
@@ -41,4 +41,9 @@ message Config {
   // requests). The parent resource initializes immediately without waiting for the fetch to
   // complete.
   repeated string prefetch_secret_names = 3;
+
+  // Optional name of a registered certificate provider instance.
+  // When set, Envoy resolves mapped certificate names through the registered provider instance
+  // instead of SDS.
+  string certificate_provider_name = 4;
 }

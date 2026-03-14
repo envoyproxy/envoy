@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.validate.h"
+#include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/handshaker.h"
@@ -10,6 +11,8 @@
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
+
+#include <vector>
 
 namespace Envoy {
 namespace Extensions {
@@ -46,7 +49,16 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
                      OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
+  AsyncContextConfig(absl::string_view cert_name,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     absl::string_view provider_name, OptRef<Init::Manager> init_manager,
+                     UpdateCb update_cb, RemoveCb remove_cb);
+  AsyncContextConfig(absl::string_view cert_name,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     Secret::TlsCertificateConfigProviderSharedPtr cert_provider, UpdateCb update_cb,
+                     RemoveCb remove_cb);
   const absl::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
+  bool hasProvider() const { return cert_provider_ != nullptr; }
 
 private:
   absl::Status loadCert();
@@ -216,6 +228,8 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
   AsyncContextFactory context_factory_;
+  const bool certificate_provider_enabled_;
+  const std::string certificate_provider_name_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
