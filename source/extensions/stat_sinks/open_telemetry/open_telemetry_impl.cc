@@ -92,7 +92,6 @@ void RequestBuilder::handleGaugePointsList(
     const std::string& metric_name,
     std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints) {
   Metric* metric = nullptr;
-  std::reverse(datapoints.begin(), datapoints.end());
   while (!datapoints.empty()) {
     ensureRequest();
     // Create a new metric entry if we just started a request, don't have one yet, or if we must
@@ -112,7 +111,6 @@ void RequestBuilder::handleSumPointsList(
     std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint>& datapoints,
     AggregationTemporality temporality) {
   Metric* metric = nullptr;
-  std::reverse(datapoints.begin(), datapoints.end());
   while (!datapoints.empty()) {
     ensureRequest();
     // Create a new metric entry if we just started a request, don't have one yet, or if we must
@@ -134,7 +132,6 @@ void RequestBuilder::handleHistogramPointsList(
     std::vector<::opentelemetry::proto::metrics::v1::HistogramDataPoint>& datapoints,
     AggregationTemporality temporality) {
   Metric* metric = nullptr;
-  std::reverse(datapoints.begin(), datapoints.end());
   while (!datapoints.empty()) {
     ensureRequest();
     // Create a new metric entry if we just started a request, don't have one yet, or if we must
