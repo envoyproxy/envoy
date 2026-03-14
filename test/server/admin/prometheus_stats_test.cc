@@ -61,20 +61,17 @@ protected:
   ~PrometheusStatsFormatterTest() override { scope_.reset(); }
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    // Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     counters_.push_back(&scope_->counterFromStatNameWithTags(pool_.add(name), cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
                 Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
-    // Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     gauges_.push_back(
         &scope_->gaugeFromStatNameWithTags(pool_.add(name), cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
                       Stats::StatNameTagVector cluster_tags) {
-    // Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::TextReadoutSharedPtr textReadout =
         &scope_->textReadoutFromStatNameWithTags(pool_.add(name), cluster_tags);
     textReadout->set(value);

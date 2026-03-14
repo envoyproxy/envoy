@@ -146,9 +146,6 @@ public:
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
 
-  // bool scoped() const override { return false; }
-  // void setScoped() override {}
-
   bool used_;
   bool hidden_;
   uint64_t value_;
@@ -173,9 +170,6 @@ public:
   MOCK_METHOD(uint64_t, value, (), (const));
   MOCK_METHOD(absl::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
-
-  // bool scoped() const override { return false; }
-  // void setScoped() override {}
 
   bool used_;
   bool hidden_;
@@ -250,9 +244,6 @@ public:
   MOCK_METHOD(bool, used, (), (const, override));
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(std::string, value, (), (const, override));
-
-  // bool scoped() const override { return false; }
-  // void setScoped() override {}
 
   bool used_;
   bool hidden_;

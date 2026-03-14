@@ -179,9 +179,7 @@ private:
 class NotifyingCounter : public Stats::Counter {
 public:
   NotifyingCounter(Stats::Counter* counter, absl::Mutex& mutex, absl::CondVar& condvar)
-      : counter_(counter), mutex_(mutex), condvar_(condvar) {
-    // counter_->setScoped();
-  }
+      : counter_(counter), mutex_(mutex), condvar_(condvar) {}
 
   std::string name() const override { return counter_->name(); }
   StatName statName() const override { return counter_->statName(); }
@@ -208,8 +206,6 @@ public:
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
-  // bool scoped() const override { return counter_->scoped(); }
-  // void setScoped() override { counter_->setScoped(); }
 
 private:
   std::unique_ptr<Stats::Counter> counter_;

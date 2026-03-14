@@ -171,6 +171,9 @@ void InstanceBase::failHealthcheck(bool fail) {
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
                                        Upstream::ClusterManager& cluster_manager,
                                        TimeSource& time_source) {
+  // Capture references to all the scopes in this, which will in turn keep all
+  // of the contained counters, gauges, text readouts, and histograms live for
+  // the duration of the MetricsSnapshot.
   store.forEachScope(
       [this](std::size_t size) { scopes_.reserve(size); },
       [this](const Stats::Scope& scope) { scopes_.push_back(scope.getConstShared()); });

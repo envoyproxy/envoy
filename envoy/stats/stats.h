@@ -113,21 +113,10 @@ public:
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
     static constexpr uint8_t Hidden = 0x08;
-    static constexpr uint8_t Scoped = 0x10;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
 };
-
-// Counters, Gauges, and TextReadouts (scalar stats) are all managed by Scopes,
-// which hold a reference-counted copy. Histograms are not held this way. To
-// avoid a potential delete-before-use race during stats sinks, we capture a
-// reference to the Scopes during the sink. This guarantees that scalar stats
-// cannot be deleted, as long as they are held in scopes. It is possible to
-// create a stats object directly in the Stats::Allocator, that will not be
-// held in any scope. However we must
-//
-// stats
 
 /**
  * An always incrementing counter with latching capability. Each increment is added both to a
@@ -143,8 +132,6 @@ public:
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
   virtual uint64_t value() const PURE;
-  // virtual bool scoped() const PURE;
-  // virtual void setScoped() PURE;
 };
 
 using CounterSharedPtr = RefcountPtr<Counter>;
@@ -179,8 +166,6 @@ public:
     }
   }
   virtual uint64_t value() const PURE;
-  // virtual bool scoped() const PURE;
-  // virtual void setScoped() PURE;
 
   /**
    * Sets a value from a hot-restart parent. This parent contribution must be
@@ -233,8 +218,6 @@ public:
    * @return the copy of this TextReadout value.
    */
   virtual std::string value() const PURE;
-  // virtual bool scoped() const PURE;
-  // virtual void setScoped() PURE;
 };
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;

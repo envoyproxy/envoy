@@ -87,8 +87,6 @@ public:
   bool used() const override { return flags_ & Metric::Flags::Used; }
   void markUnused() override { flags_ &= ~Metric::Flags::Used; }
   bool hidden() const override { return flags_ & Metric::Flags::Hidden; }
-  // bool scoped() const override { return flags_ & Metric::Flags::Scoped; }
-  // void setScoped() override { flags_ |= Metric::Flags::Scoped; }
 
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }

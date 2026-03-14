@@ -36,6 +36,10 @@ protected:
     }
   }
 
+  // Wrappers for Allocator stats construction methods, held in the test fixture
+  // so they can be friended by AllocatorImpl. Those methods are protected in
+  // order to prevent filters from creating stats directly on the allocator;
+  // they should exclusively be managed by Scopes.
   CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                const StatNameTagVector& stat_name_tags) {
     return alloc_.makeCounter(name, tag_extracted_name, stat_name_tags);
