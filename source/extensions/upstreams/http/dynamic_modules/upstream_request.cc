@@ -262,6 +262,9 @@ void HttpTcpBridge::sendUpstreamData(absl::string_view data, bool end_stream) {
     buffer.add(data);
   }
   if (buffer.length() > 0 || end_stream) {
+    if (end_stream) {
+      upstream_conn_data_->connection().enableHalfClose(true);
+    }
     bytes_meter_->addWireBytesSent(buffer.length());
     upstream_conn_data_->connection().write(buffer, end_stream);
   }

@@ -55,18 +55,14 @@ impl UpstreamHttpTcpBridge for TestBridge {
           let prefix = format!("METHOD={} ", method_str);
           envoy_bridge.send_upstream_data(prefix.as_bytes(), false);
         }
-      }
+      },
       BridgeMode::LocalReply => {
         envoy_bridge.send_response(403, &[], b"access denied");
-      }
+      },
     }
   }
 
-  fn on_encode_data(
-    &mut self,
-    envoy_bridge: &dyn EnvoyUpstreamHttpTcpBridge,
-    end_of_stream: bool,
-  ) {
+  fn on_encode_data(&mut self, envoy_bridge: &dyn EnvoyUpstreamHttpTcpBridge, end_of_stream: bool) {
     let data = envoy_bridge.get_request_buffer();
     envoy_bridge.send_upstream_data(&data, end_of_stream);
   }
