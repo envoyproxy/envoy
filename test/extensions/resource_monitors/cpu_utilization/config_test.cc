@@ -1,7 +1,9 @@
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/thread.h"
 #include "source/extensions/resource_monitors/cpu_utilization/config.h"
+#include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -85,8 +87,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   END_TRY
   CATCH(EnvoyException & e, {
     // If we did throw it must have been because of cgroup.
-    ASSERT_THAT(std::string(e.what()),
-                ::testing::Eq("No supported cgroup CPU implementation found"));
+    ASSERT_THAT(std::string(e.what()), ::testing::Eq(NoSupportedCGroupMessage));
     GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
   });
 #else
@@ -147,8 +148,7 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   END_TRY
   CATCH(EnvoyException & e, {
     // If we did throw it must have been because of cgroup.
-    ASSERT_THAT(std::string(e.what()),
-                ::testing::Eq("No supported cgroup CPU implementation found"));
+    ASSERT_THAT(std::string(e.what()), ::testing::Eq(NoSupportedCGroupMessage));
     GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
   });
 }
