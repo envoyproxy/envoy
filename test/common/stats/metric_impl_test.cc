@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Stats {
-namespace {
 
 class MetricImplTest : public testing::Test {
 protected:
@@ -24,6 +23,11 @@ protected:
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
+  CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
+                               const StatNameTagVector& stat_name_tags) {
+    return alloc_.makeCounter(name, tag_extracted_name, stat_name_tags);
+  }
+
   SymbolTableImpl symbol_table_;
   AllocatorImpl alloc_;
   StatNamePool pool_;
@@ -31,13 +35,13 @@ protected:
 
 // No truncation occurs in the implementation of HeapStatData.
 TEST_F(MetricImplTest, NoTags) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter"), StatName(), {});
+  CounterSharedPtr counter = makeCounter(makeStat("counter"), StatName(), {});
   EXPECT_EQ(0, counter->tags().size());
 }
 
 TEST_F(MetricImplTest, OneTag) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), makeStat("counter"),
-                                                {{makeStat("name"), makeStat("value")}});
+  CounterSharedPtr counter = makeCounter(makeStat("counter.name.value"), makeStat("counter"),
+                                         {{makeStat("name"), makeStat("value")}});
   TagVector tags = counter->tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
@@ -48,7 +52,7 @@ TEST_F(MetricImplTest, OneTag) {
 }
 
 TEST_F(MetricImplTest, TwoTagsIterOnce) {
-  CounterSharedPtr counter = alloc_.makeCounter(
+  CounterSharedPtr counter = makeCounter(
       makeStat("counter.name.value"), makeStat("counter"),
       {{makeStat("name1"), makeStat("value1")}, {makeStat("name2"), makeStat("value2")}});
   StatName name1 = makeStat("name1");
@@ -64,7 +68,7 @@ TEST_F(MetricImplTest, TwoTagsIterOnce) {
 }
 
 TEST_F(MetricImplTest, FindTag) {
-  CounterSharedPtr counter = alloc_.makeCounter(
+  CounterSharedPtr counter = makeCounter(
       makeStat("counter.name.value"), makeStat("counter"),
       {{makeStat("name1"), makeStat("value1")}, {makeStat("name2"), makeStat("value2")}});
   EXPECT_EQ(makeStat("value1"), Utility::findTag(*counter, makeStat("name1")));
@@ -84,6 +88,5 @@ TEST(GaugeHelperTest, AdjustSubtractsWhenSubIsBigger) {
   gauge.adjust(2, 5);
 }
 
-} // namespace
 } // namespace Stats
 } // namespace Envoy

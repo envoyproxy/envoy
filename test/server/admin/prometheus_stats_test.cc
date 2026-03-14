@@ -54,32 +54,26 @@ private:
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest()
-      : alloc_(*symbol_table_), pool_(*symbol_table_),
+      : alloc_(*symbol_table_), store_(alloc_), scope_(store_.createScope("")),
+        pool_(*symbol_table_),
         endpoints_helper_(std::make_unique<Upstream::PerEndpointMetricsTestHelper>()) {}
 
-  ~PrometheusStatsFormatterTest() override { clearStorage(); }
+  ~PrometheusStatsFormatterTest() override { scope_.reset(); }
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    counters_.push_back(alloc_.makeCounter(name_storage.statName(),
-                                           tag_extracted_name_storage.statName(), cluster_tags));
+    counters_.push_back(&scope_->counterFromStatNameWithTags(pool_.add(name), cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
                 Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(
-        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags, import_mode));
+    gauges_.push_back(
+        &scope_->gaugeFromStatNameWithTags(pool_.add(name), cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
                       Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    Stats::TextReadoutSharedPtr textReadout = alloc_.makeTextReadout(
-        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags);
+    Stats::TextReadoutSharedPtr textReadout =
+        &scope_->textReadoutFromStatNameWithTags(pool_.add(name), cluster_tags);
     textReadout->set(value);
     textReadouts_.push_back(textReadout);
   }
@@ -124,6 +118,7 @@ protected:
 
   void clearStorage() {
     pool_.clear();
+    scope_.reset();
     counters_.clear();
     gauges_.clear();
     histograms_.clear();
@@ -134,6 +129,8 @@ protected:
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::AllocatorImpl alloc_;
+  Stats::ThreadLocalStoreImpl store_;
+  Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;

@@ -23,7 +23,17 @@ public:
   AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~AllocatorImpl() override;
 
-  // Allocator
+protected:
+  // Please refer to the comment on the protected section in Allocator.
+  //
+  // TODO(jmarantz): consider dropping the pure interface for Allocator,
+  // merging AllocatorImpl and Allocator. In the distant past there were
+  // two implementations of Allocator, one in shared memory, but this is
+  // no longer needed.
+  friend class AllocatorImplTest;
+  friend class IsolatedStoreImpl;
+  friend class MetricImplTest;
+
   CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                const StatNameTagVector& stat_name_tags) override;
   GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
@@ -31,6 +41,9 @@ public:
                            Gauge::ImportMode import_mode) override;
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags) override;
+
+public:
+  // Allocator
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 

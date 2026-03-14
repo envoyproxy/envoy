@@ -30,6 +30,23 @@ class Allocator {
 public:
   virtual ~Allocator() = default;
 
+protected:
+  // We use a protected section for makeCounter, makeGauge, and makeTextReadout.
+  // We do not want general filter code to be creating stats in this way, they
+  // must go through the Scope interface.
+  //
+  // This allows the MetricSnapshotImpl to hold onto references to the stats
+  // holding onto references to the Scopes, rather than holding onto each
+  // individual stat. In other words, all the stats must be owned by one or
+  // more scopes.
+  //
+  // The alternative is to have that function hold onto reference to every stat,
+  // which requires incrementing and decrementing reference counts to each stat,
+  // which is very slow, particularly on ARM processors.
+  //
+  // Note that we must 'friend' a different set of classes from AllocatorImpl.
+  friend class ThreadLocalStoreImpl;
+
   /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
@@ -57,6 +74,8 @@ public:
    */
   virtual TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                                const StatNameTagVector& stat_name_tags) PURE;
+
+public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
