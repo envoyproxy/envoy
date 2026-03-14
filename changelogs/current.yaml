@@ -682,5 +682,8 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: formatter
+  change: |
+    Fixed a bug where the ``%TRACE_ID%`` string doesn't get substituted correctly in response body formatter.
 
 deprecated:
