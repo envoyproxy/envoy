@@ -74,6 +74,8 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
+  // Returns true if sendLocalReply() has been called, aborting the filter chain.
+  bool isAborted() { return state().decoder_filter_chain_aborted_; }
   UpstreamRequest& upstream_request_;
 };
 
@@ -421,10 +423,17 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     }
   }
 
-  // Kick off creation of the upstream connection immediately upon receiving headers.
-  // In future it may be possible for upstream HTTP filters to delay this, or influence connection
-  // creation but for now optimize for minimal latency and fetch the connection
-  // as soon as possible.
+  // Allow upstream HTTP filters to inspect the selected host before the connection is initiated.
+  auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
+  Upstream::HostDescriptionConstSharedPtr host = conn_pool_->host();
+  ASSERT(host != nullptr);
+  for (auto* callback : upstream_callbacks_) {
+    callback->onHostSelected(host);
+    if (upstream_fm->isAborted()) {
+      return;
+    }
+  }
+
   conn_pool_->newStream(this);
 
   if (parent_.config().upstream_log_flush_interval_.has_value()) {
