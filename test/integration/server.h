@@ -205,8 +205,8 @@ public:
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
-  bool scoped() const override { return counter_->scoped(); }
-  void setScoped() override { counter_->setScoped(); }
+  // bool scoped() const override { return counter_->scoped(); }
+  // void setScoped() override { counter_->setScoped(); }
 
 private:
   std::unique_ptr<Stats::Counter> counter_;

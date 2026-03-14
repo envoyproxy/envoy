@@ -317,7 +317,6 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
