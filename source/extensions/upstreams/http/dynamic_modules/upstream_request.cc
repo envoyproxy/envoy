@@ -174,6 +174,9 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
 
   (*config_->on_bridge_encode_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
+  // Drain the request buffer after the module has processed it, matching the standard
+  // TcpUpstream::encodeData behavior where Connection::write drains the buffer.
+  data.drain(data.length());
   request_buffer_ = nullptr;
 }
 
@@ -209,6 +212,9 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
   (*config_->on_bridge_on_upstream_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
+  // Drain the response buffer after the module has processed it, matching the standard
+  // TcpUpstream::onUpstreamData behavior where decodeData drains the buffer.
+  data.drain(data.length());
   response_buffer_ = nullptr;
 }
 
