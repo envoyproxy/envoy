@@ -1344,7 +1344,7 @@ toolchains_llvm:
   project_name: "LLVM toolchain for Bazel"
   project_desc: "LLVM toolchain for Bazel"
   project_url: "https://github.com/bazel-contrib/toolchains_llvm"
-  release_date: "2025-12-09"
+  release_date: "2026-03-13"
   use_category:
   - build
   - dataplane_core

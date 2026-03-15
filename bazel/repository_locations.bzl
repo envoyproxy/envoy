@@ -24,8 +24,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
     ),
     bazel_features = dict(
-        version = "1.39.0",
-        sha256 = "5ab1a90d09fd74555e0df22809ad589627ddff263cff82535815aa80ca3e3562",
+        version = "1.41.0",
+        sha256 = "966c211ec42c4deb2af4c6dd6948408100b752f61753c97055bdac9bfb5cc0c7",
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
@@ -672,8 +672,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.6.0",
-        sha256 = "2b298a1d7ea99679f5edf8af09367363e64cb9fbc46e0b7c1b1ba2b1b1b51058",
+        version = "1.7.0",
+        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6d",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),
