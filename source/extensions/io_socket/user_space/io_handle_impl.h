@@ -144,13 +144,13 @@ public:
   }
 
   // Set the peer which will populate the owned pending_received_data.
-  void setPeerHandle(UserSpace::IoHandle* peer) {
+  void setPeerHandle(UserSpace::IoHandle* peer_handle) {
     // Swapping peers is undefined behavior.
     ASSERT(!peer_handle_);
     ASSERT(!sent_eof_);
-    peer_handle_ = peer;
+    peer_handle_ = peer_handle;
     ENVOY_LOG(trace, "io handle {} set peer handle to {}.", static_cast<void*>(this),
-              static_cast<void*>(peer));
+              static_cast<void*>(peer_handle));
   }
 
   PassthroughStateSharedPtr passthroughState() override { return passthrough_state_; }
@@ -176,8 +176,8 @@ private:
   // socket and drained by read operations of this socket.
   Buffer::WatermarkBuffer pending_received_data_;
 
-  // write() calls to this handle will populate the receive buffer of the peer handle. Guaranteed
-  // to be non-null until close() is called on either this handle or the peer handle.
+  // write() calls will populate the receive buffer of the peer handle. Guaranteed to be non-null
+  // until close() is called on either this handle or the peer handle.
   UserSpace::IoHandle* peer_handle_{nullptr};
 
   // Indicates whether this handle has sent EOF to the peer by calling setEof().
