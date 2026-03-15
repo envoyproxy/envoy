@@ -135,6 +135,7 @@ public:
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
+      return false;
     }
     return true;
   }
