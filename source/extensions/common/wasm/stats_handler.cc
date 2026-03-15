@@ -75,6 +75,9 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     lifecycle_stats_.active_.set(++active_wasms);
     lifecycle_stats_.created_.inc();
     break;
+  case WasmEvent::RuntimeError:
+    lifecycle_stats_.crashed_.inc();
+    break;
   default:
     break;
   }
