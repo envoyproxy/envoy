@@ -627,7 +627,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
         version = "0.68.1",

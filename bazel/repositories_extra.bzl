@@ -3,11 +3,11 @@ load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_baze
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
-load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
+load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", wasmtime_crate_repositories = "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 load("@toolchains_llvm//toolchain:deps.bzl", "bazel_toolchain_dependencies")
-load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
+load("//bazel/external/cargo/remote:crates.bzl", wasm_examples_crate_repositories = "crate_repositories")
 
 def _python_minor_version(python_version):
     return "_".join(python_version.split(".")[:-1])
@@ -28,8 +28,8 @@ def envoy_dependencies_extra(
     setup_libcxx_libs()
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
-    raze_fetch_remote_crates()
-    crate_repositories()
+    wasm_examples_crate_repositories()
+    wasmtime_crate_repositories()
     py_repositories()
 
     # Registers underscored Python minor version - eg `python3_10`
