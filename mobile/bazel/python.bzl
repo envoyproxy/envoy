@@ -24,6 +24,11 @@ def _get_python_bin(rctx):
     if python_bin != None:
         return python_bin
 
+    # Fallback to just "python"
+    python_bin = rctx.which("python")
+    if python_bin != None:
+        return python_bin
+
     fail("cannot find python binary")
 
 def _get_python_tag(rctx, python_bin):

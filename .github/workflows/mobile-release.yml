@@ -76,6 +76,56 @@ jobs:
             //:android_dist
           output: envoy
 
+  build-python:
+    permissions:
+      contents: read
+      packages: read
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    needs: env
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: python-wheel-linux
+          platform_flag: manylinux2014_x86_64
+          python_tag: cp312
+          abi_tag: cp312
+          os: ubuntu-22.04
+        - target: python-wheel-macos
+          platform_flag: macosx_11_0_arm64
+          python_tag: cp312
+          abi_tag: cp312
+          os: macos-12
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      runs-on: ${{ matrix.os }}
+      args: >-
+        build
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-release
+        --//library/python:python_platform=${{ matrix.platform_flag }}
+        --//library/python:python_tag=${{ matrix.python_tag }}
+        --//library/python:abi_tag=${{ matrix.abi_tag }}
+        //library/python:envoy_mobile_wheel
+      container: ${{ fromJSON(needs.env.outputs.build-image).mobile }}
+      container-output: |
+        "bazel-bin/library/python/*.whl": build/
+      request: ${{ needs.env.outputs.request }}
+      steps-post: |
+        - run: |
+            mkdir -p /tmp/output
+            cp /tmp/container-output/build/*.whl /tmp/output/ || true
+          shell: bash
+      target: ${{ matrix.target }}
+      upload-name: python_wheel
+      upload-path: /tmp/output/*.whl
+
   deploy:
     needs: release
     permissions:
@@ -141,3 +191,17 @@ jobs:
             ${{ matrix.output }}-pom.xml.asc \
             ${{ matrix.output }}-sources.jar.asc \
             ${{ matrix.output }}-javadoc.jar.asc
+
+  deploy-python:
+    needs: build-python
+    runs-on: ubuntu-22.04
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+      with:
+        name: python_wheel
+        path: dist
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@v1.8.14
