@@ -433,6 +433,87 @@ public:
   }
 
   /**
+   * Appends a numeric value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The number to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, double value) = 0;
+
+  /**
+   * Appends a string value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The string to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key,
+                               std::string_view value) = 0;
+
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  bool addMetadataList(std::string_view ns, std::string_view key, const char* value) {
+    return addMetadataList(ns, key, std::string_view(value));
+  }
+
+  /**
+   * Appends a bool value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The bool to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, bool value) = 0;
+
+  /**
+   * Returns the number of elements in the metadata list stored under the given namespace and key.
+   * Returns nullopt if the metadata is not accessible, the namespace or key does not exist, or the
+   * value is not a list.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   */
+  virtual std::optional<size_t> getMetadataListSize(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Returns the number element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a number.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<double> getMetadataListNumber(std::string_view ns, std::string_view key,
+                                                      size_t index) = 0;
+
+  /**
+   * Returns the string element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a string.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<std::string_view>
+  getMetadataListString(std::string_view ns, std::string_view key, size_t index) = 0;
+
+  /**
+   * Returns the bool element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a bool.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<bool> getMetadataListBool(std::string_view ns, std::string_view key,
+                                                  size_t index) = 0;
+
+  /**
    * Retrieves the serialized filter state value of the stream.
    * @param key The filter state key.
    * @return The filter state value if found, otherwise empty.

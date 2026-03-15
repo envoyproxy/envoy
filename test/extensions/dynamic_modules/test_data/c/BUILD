@@ -118,6 +118,10 @@ test_program(name = "bootstrap_no_timer_fired")
 
 test_program(name = "bootstrap_no_admin_request")
 
+test_program(name = "bootstrap_no_cluster_add_or_update")
+
+test_program(name = "bootstrap_no_cluster_removal")
+
 test_program(name = "access_log_no_op")
 
 test_program(name = "access_log_missing_config_new")

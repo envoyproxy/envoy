@@ -369,6 +369,46 @@ type HttpFilterHandle interface {
 	// copy the data if you need to keep it and use it later.
 	GetMetadataNamespaces(source MetadataSourceType) []UnsafeEnvoyBuffer
 
+	// AddMetadataListNumber appends a number value to the dynamic metadata list stored under the
+	// given namespace and key. If the key does not exist, a new list is created. Returns false if
+	// the key exists but is not a list, or if the metadata is not accessible.
+	AddMetadataListNumber(metadataNamespace, key string, value float64) bool
+
+	// AddMetadataListString appends a string value to the dynamic metadata list stored under the
+	// given namespace and key. If the key does not exist, a new list is created. Returns false if
+	// the key exists but is not a list, or if the metadata is not accessible.
+	AddMetadataListString(metadataNamespace, key string, value string) bool
+
+	// AddMetadataListBool appends a bool value to the dynamic metadata list stored under the
+	// given namespace and key. If the key does not exist, a new list is created. Returns false if
+	// the key exists but is not a list, or if the metadata is not accessible.
+	AddMetadataListBool(metadataNamespace, key string, value bool) bool
+
+	// GetMetadataListSize returns the number of elements in the metadata list stored under the
+	// given namespace and key. Returns (0, false) if the metadata is not accessible, the namespace
+	// or key does not exist, or the value is not a list.
+	GetMetadataListSize(source MetadataSourceType, metadataNamespace, key string) (int, bool)
+
+	// GetMetadataListNumber returns the number element at the given index in the metadata list
+	// stored under the given namespace and key. Returns (0, false) if the metadata is not
+	// accessible, the namespace or key does not exist, the value is not a list, the index is out
+	// of range, or the element is not a number.
+	GetMetadataListNumber(source MetadataSourceType, metadataNamespace, key string, index int) (float64, bool)
+
+	// GetMetadataListString returns the string element at the given index in the metadata list
+	// stored under the given namespace and key. Returns an empty buffer and false if the metadata is
+	// not accessible, the namespace or key does not exist, the value is not a list, the index is
+	// out of range, or the element is not a string.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetMetadataListString(source MetadataSourceType, metadataNamespace, key string, index int) (UnsafeEnvoyBuffer, bool)
+
+	// GetMetadataListBool returns the bool element at the given index in the metadata list stored
+	// under the given namespace and key. Returns (false, false) if the metadata is not accessible,
+	// the namespace or key does not exist, the value is not a list, the index is out of range, or
+	// the element is not a bool.
+	GetMetadataListBool(source MetadataSourceType, metadataNamespace, key string, index int) (bool, bool)
+
 	// GetFilterState retrieves the serialized filter state value of the stream.
 	// @Param key the filter state key.
 	// @Return the filter state value if found, otherwise an empty UnsafeEnvoyBuffer.
