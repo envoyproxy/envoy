@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -104,6 +105,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -152,6 +154,7 @@ envoy_cc_test(
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_config_lib",
@@ -295,10 +298,17 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cert_compression_test",
-    srcs = ["cert_compression_test.cc"],
-    external_deps = ["ssl"],
-    deps = [
-        "//source/common/tls:cert_compression_lib",
+    srcs = select({
+        "//bazel:using_openssl": [],
+        "//conditions:default": ["cert_compression_test.cc"],
+    }),
+    external_deps = [],
+    deps = select({
+        "//bazel:using_openssl": [],
+        "//conditions:default": [
+            "//source/common/tls:cert_compression_lib",
+        ],
+    }) + [
         "//test/test_common:logging_lib",
     ],
 )

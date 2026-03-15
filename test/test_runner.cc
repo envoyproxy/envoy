@@ -18,6 +18,50 @@
 #include "absl/debugging/leak_check.h"
 #include "gmock/gmock.h"
 
+#ifdef ENVOY_SSL_OPENSSL
+
+// Configure OpenSSL to use security level 0, allowing legacy TLS versions (1.0/1.1)
+// and weaker keys (e.g., RSA 1024-bit) so that Envoy's own validation can handle
+// rejections with specific error messages rather than OpenSSL blocking them first.
+class OpenSSLConf {
+public:
+  OpenSSLConf(const char* config) {
+    int fd = mkstemp(path_.data());
+    if (fd != -1) {
+      FILE* file = fdopen(fd, "w");
+      if (file) {
+        if (fwrite(config, 1, strlen(config), file) == strlen(config)) {
+          fclose(file);
+          if (setenv("OPENSSL_CONF", path_.c_str(), 1) == 0) {
+            return;
+          }
+        }
+      }
+    }
+    throw std::runtime_error("Failed to set up OPENSSL_CONF");
+  }
+
+  ~OpenSSLConf() { unlink(path_.c_str()); }
+
+private:
+  std::string path_{"/tmp/openssl.conf.XXXXXX"};
+};
+
+static OpenSSLConf openssl_conf(R"(
+  openssl_conf = openssl_init
+
+  [openssl_init]
+  ssl_conf = ssl_sect
+
+  [ssl_sect]
+  system_default = system_default_sect
+
+  [system_default_sect]
+  CipherString = DEFAULT:@SECLEVEL=0
+  Options = IgnoreUnexpectedEof
+)");
+#endif
+
 namespace Envoy {
 
 namespace {

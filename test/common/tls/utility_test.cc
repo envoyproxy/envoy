@@ -300,7 +300,9 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
       {SSL_ERROR_SSL, "SSL"},
       {SSL_ERROR_WANT_READ, "WANT_READ"},
       {SSL_ERROR_WANT_WRITE, "WANT_WRITE"},
+#ifdef SSL_ERROR_WANT_PRIVATE_KEY_OPERATION
       {SSL_ERROR_WANT_PRIVATE_KEY_OPERATION, "WANT_PRIVATE_KEY_OPERATION"},
+#endif
   };
 
   for (const auto& test_data : test_set) {

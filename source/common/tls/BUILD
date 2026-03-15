@@ -150,6 +150,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -162,6 +163,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":server_context_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -181,8 +183,10 @@ envoy_cc_library(
     external_deps = ["ssl"],
     # TLS is core functionality.
     visibility = ["//visibility:public"],
-    deps = [
-        ":cert_compression_lib",
+    deps = select({
+        "//bazel:using_openssl": [],
+        "//conditions:default": [":cert_compression_lib"],
+    }) + [
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -265,6 +269,7 @@ envoy_cc_library(
     name = "cert_compression_lib",
     srcs = ["cert_compression.cc"],
     hdrs = ["cert_compression.h"],
+    defines = ["ENVOY_ENABLE_CERT_COMPRESSION"],
     external_deps = ["ssl"],
     deps = [
         "//bazel:zlib",

@@ -92,24 +92,43 @@ def envoy_contrib_package():
 def _envoy_directory_genrule_impl(ctx):
     tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
     ctx.actions.run_shell(
-        inputs = ctx.files.srcs,
+        inputs = ctx.files.srcs + ctx.files.openssl_libs,
         tools = ctx.files.tools,
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
-        env = {"GENRULE_OUTPUT_DIR": tree.path},
+        env = {
+            "GENRULE_OUTPUT_DIR": tree.path,
+            "LD_LIBRARY_PATH": ":".join([f.dirname for f in ctx.files.openssl_libs]),
+        },
         use_default_shell_env = True,
         toolchain = None,
     )
     return [DefaultInfo(files = depset([tree]))]
 
-envoy_directory_genrule = rule(
+_envoy_directory_genrule = rule(
     implementation = _envoy_directory_genrule_impl,
     attrs = {
         "srcs": attr.label_list(),
         "cmd": attr.string(),
         "tools": attr.label_list(),
+        "openssl_libs": attr.label(
+            allow_files = True,
+        ),
     },
 )
+
+# We need this extra macro to invoke the _envoy_directory_genrule rule because
+# we want the @openssl//:libs dependency to be conditional, but select() cannot
+# be used in a rule definition.
+def envoy_directory_genrule(name, **kwargs):
+    _envoy_directory_genrule(
+        name = name,
+        openssl_libs = select({
+            "//bazel:using_openssl": "@openssl//:libs",
+            "//conditions:default": None,
+        }),
+        **kwargs
+    )
 
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
