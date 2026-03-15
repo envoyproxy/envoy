@@ -1,40 +1,22 @@
-"""
-@generated
-cargo-raze generated Bazel file.
+load("@rules_rust//crate_universe:defs.bzl", "crates_vendor")
 
-DO NOT EDIT! Replaced on runs of cargo-raze
-"""
-
-package(default_visibility = ["//visibility:public"])
-
-licenses([
-    "notice",  # See individual crates for specific licenses
-])
-
-# Aliased targets
-alias(
-    name = "protobuf",
-    actual = "@raze__protobuf__2_24_1//:protobuf",
-    tags = [
-        "cargo-raze",
-        "manual",
+exports_files(
+    [
+        "Cargo.toml",
+        "Cargo.Bazel.lock",
     ],
 )
 
-# Export file for Stardoc support
-exports_files(
-    glob([
-        "**/*.bazel",
-        "**/*.bzl",
-    ]),
-    visibility = ["//visibility:public"],
+# Run this target to regenerate cargo_lockfile and vendor_path/*.
+# $ bazelisk run bazel/external/cargo:crates_vendor -- --repin
+crates_vendor(
+    name = "crates_vendor",
+    cargo_lockfile = ":Cargo.Bazel.lock",
+    generate_target_compatible_with = False,
+    manifests = [":Cargo.toml"],
+    mode = "remote",
+    repository_name = "cu",
+    tags = ["manual"],
+    vendor_path = "remote",
 )
 
-filegroup(
-    name = "srcs",
-    srcs = glob([
-        "**/*.bazel",
-        "**/*.bzl",
-    ]),
-    visibility = ["//visibility:public"],
-)
