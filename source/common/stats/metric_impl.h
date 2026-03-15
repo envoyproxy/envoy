@@ -12,8 +12,6 @@
 namespace Envoy {
 namespace Stats {
 
-class Allocator;
-
 /**
  * Helper class for implementing Metrics. This does not participate in any
  * inheritance chains, but can be instantiated by classes that do. It just
