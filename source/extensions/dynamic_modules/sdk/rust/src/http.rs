@@ -401,7 +401,7 @@ pub trait EnvoyHttpFilterConfig {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
@@ -411,7 +411,7 @@ pub trait EnvoyHttpFilterConfig {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
@@ -439,7 +439,7 @@ pub trait EnvoyHttpFilterConfig {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool;
 
   /// Reset an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
@@ -580,13 +580,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -610,14 +610,14 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -658,9 +658,9 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
         self.raw_ptr,
@@ -849,7 +849,7 @@ pub trait EnvoyHttpFilter {
   fn send_response<'a>(
     &mut self,
     status_code: u32,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     details: Option<&'a str>,
   );
@@ -858,7 +858,7 @@ pub trait EnvoyHttpFilter {
   /// Necessary pseudo headers such as :status should be present.
   ///
   /// The headers are passed as a list of key-value pairs.
-  fn send_response_headers<'a>(&mut self, headers: Vec<(&'a str, &'a [u8])>, end_stream: bool);
+  fn send_response_headers<'a>(&mut self, headers: &'a [(&'a str, &'a [u8])], end_stream: bool);
 
   /// Send response body data to the downstream, optionally indicating end of stream.
   fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
@@ -866,7 +866,7 @@ pub trait EnvoyHttpFilter {
   /// Send response trailers to the downstream. This implicitly ends the stream.
   ///
   /// The trailers are passed as a list of key-value pairs.
-  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
+  fn send_response_trailers<'a>(&mut self, trailers: &'a [(&'a str, &'a [u8])]);
 
   /// add a custom flag to indicate a noteworthy event of this stream. Mutliple flags could be added
   /// and will be concatenated with comma. It should not contain any empty or space characters (' ',
@@ -938,6 +938,70 @@ pub trait EnvoyHttpFilter {
     source: abi::envoy_dynamic_module_type_metadata_source,
   ) -> Option<Vec<EnvoyBuffer<'a>>>;
 
+  /// Append a number value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Append a string value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Append a bool value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool;
+
+  /// Get the number of elements in the metadata list stored under the given namespace and key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// or the value is not a list.
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize>;
+
+  /// Get the number value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a number.
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64>;
+
+  /// Get the string value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a string.
+  ///
+  /// The returned buffer's lifetime is tied to the current event hook.
+  fn get_metadata_list_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the bool value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a bool.
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -987,7 +1051,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_request_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_request_body()
   ///   .return_const(true);
@@ -1089,7 +1153,7 @@ pub trait EnvoyHttpFilter {
   /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_received_response_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
   /// envoy_filter
   ///   .expect_drain_received_response_body()
   ///   .return_const(true);
@@ -1238,7 +1302,7 @@ pub trait EnvoyHttpFilter {
   fn send_http_callout<'a>(
     &mut self,
     _cluster_name: &'a str,
-    _headers: Vec<(&'a str, &'a [u8])>,
+    _headers: &'a [(&'a str, &'a [u8])],
     _body: Option<&'a [u8]>,
     _timeout_milliseconds: u64,
   ) -> (
@@ -1265,7 +1329,7 @@ pub trait EnvoyHttpFilter {
   fn start_http_stream<'a>(
     &mut self,
     _cluster_name: &'a str,
-    _headers: Vec<(&'a str, &'a [u8])>,
+    _headers: &'a [(&'a str, &'a [u8])],
     _body: Option<&'a [u8]>,
     _end_stream: bool,
     _timeout_milliseconds: u64,
@@ -1301,7 +1365,7 @@ pub trait EnvoyHttpFilter {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     _stream_handle: u64,
-    _trailers: Vec<(&'a str, &'a [u8])>,
+    _trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool;
 
   /// Reset (cancel) an active HTTP stream.
@@ -1625,7 +1689,7 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns `true` if the stream recreation was initiated successfully, `false` otherwise (e.g.,
   /// if the request body has not been fully received yet or if the stream cannot be recreated).
-  fn recreate_stream<'a>(&mut self, headers: Option<Vec<(&'a str, &'a [u8])>>) -> bool;
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool;
 
   /// Clear only the cluster selection for the current route without clearing the entire route
   /// cache.
@@ -2125,7 +2189,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn send_response(
     &mut self,
     status_code: u32,
-    headers: Vec<(&str, &[u8])>,
+    headers: &[(&str, &[u8])],
     body: Option<&[u8]>,
     details: Option<&str>,
   ) {
@@ -2134,7 +2198,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
@@ -2154,8 +2218,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+  fn send_response_headers(&mut self, headers: &[(&str, &[u8])], end_stream: bool) {
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_headers(
@@ -2177,8 +2241,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+  fn send_response_trailers(&mut self, trailers: &[(&str, &[u8])]) {
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_trailers(
@@ -2376,6 +2440,140 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
           .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
           .collect(),
       )
+    } else {
+      None
+    }
+  }
+
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize> {
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
     } else {
       None
     }
@@ -2790,13 +2988,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn send_http_callout<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut callout_id: u64 = 0;
 
     let result = unsafe {
@@ -2820,14 +3018,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn start_http_stream<'a>(
     &mut self,
     cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
+    headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
     end_stream: bool,
     timeout_milliseconds: u64,
   ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let HeaderPairSlice(headers_ptr, headers_len) = headers.as_slice().into();
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
     let mut stream_id: u64 = 0;
 
     let result = unsafe {
@@ -2868,9 +3066,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     stream_handle: u64,
-    trailers: Vec<(&'a str, &'a [u8])>,
+    trailers: &'a [(&'a str, &'a [u8])],
   ) -> bool {
-    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.as_slice().into();
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
     unsafe {
       abi::envoy_dynamic_module_callback_http_stream_send_trailers(
         self.raw_ptr,
@@ -3351,10 +3549,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn recreate_stream<'a>(&mut self, headers: Option<Vec<(&'a str, &'a [u8])>>) -> bool {
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool {
     match headers {
-      Some(header_vec) => {
-        let HeaderPairSlice(headers_ptr, headers_len) = header_vec.as_slice().into();
+      Some(headers) => {
+        let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
         unsafe {
           abi::envoy_dynamic_module_callback_http_filter_recreate_stream(
             self.raw_ptr,
