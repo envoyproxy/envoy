@@ -92,6 +92,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register, retrieve, and overwrite
+// shared data via the process-wide shared data registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SharedDataRegistryRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap shared data registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_data_test"));
+}
+
 // This test verifies that Envoy automatically registers an init target for every bootstrap
 // extension and that the module can signal readiness to unblock startup.
 TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {

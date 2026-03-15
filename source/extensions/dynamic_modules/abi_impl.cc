@@ -22,6 +22,13 @@ namespace {
 absl::Mutex function_registry_mutex;
 absl::flat_hash_map<std::string, void*> function_registry ABSL_GUARDED_BY(function_registry_mutex);
 
+// Process-wide shared data registry. Modules register opaque data pointers by name during
+// bootstrap, and other modules resolve them by name during configuration creation. Unlike the
+// function registry, this allows overwriting existing entries.
+absl::Mutex shared_data_registry_mutex;
+absl::flat_hash_map<std::string, void*>
+    shared_data_registry ABSL_GUARDED_BY(shared_data_registry_mutex);
+
 } // namespace
 
 extern "C" {
@@ -87,6 +94,31 @@ bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module
   auto it = function_registry.find(key_str);
   if (it != function_registry.end()) {
     *function_ptr_out = it->second;
+    return true;
+  }
+  return false;
+}
+
+// ---------------------- Shared data registry callbacks --------------------------------
+
+bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                        void* data_ptr) {
+  if (data_ptr == nullptr) {
+    return false;
+  }
+  std::string key_str(key.ptr, key.length);
+  absl::WriterMutexLock lock(shared_data_registry_mutex);
+  shared_data_registry[key_str] = data_ptr;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                   void** data_ptr_out) {
+  std::string key_str(key.ptr, key.length);
+  absl::ReaderMutexLock lock(shared_data_registry_mutex);
+  auto it = shared_data_registry.find(key_str);
+  if (it != shared_data_registry.end()) {
+    *data_ptr_out = it->second;
     return true;
   }
   return false;
