@@ -1,0 +1,51 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 1
+  }
+  grpc_health_check {
+    retriable_serving_statuses: NOT_SERVING
+  }
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+      }
+      status: 200
+      body: ""
+    }
+    tcp_respond {
+      data: ""
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        headers {
+        }
+        status: 200
+      }
+      grpc_respond_bytes {
+        status: NOT_SERVING
+        chunk_size_for_structured_response: 1
+      }
+      grpc_respond_trailers {
+        trailers {
+          headers {
+          }
+        }
+      }
+    }
+  }
+}

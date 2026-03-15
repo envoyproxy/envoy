@@ -15,6 +15,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "grpc/health/v1/health.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -227,6 +229,16 @@ message HealthCheck {
     // see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated HeaderValueOption initial_metadata = 3 [(validate.rules).repeated = {max_items: 1000}];
+
+    // Specifies a list of gRPC `grpc.health.v1.HealthCheckResponse.ServingStatus
+    // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L33>`_ that will be treated
+    // as retriable health check failures and respect the unhealthy threshold instead of immediately marking the
+    // host unhealthy. SERVING status is not retriable because that is a successful health check.
+    repeated grpc.health.v1.HealthCheckResponse.ServingStatus retriable_serving_statuses = 4
+        [(validate.rules).repeated = {
+          unique: true
+          items {enum {defined_only: true not_in: 1}}
+        }];
   }
 
   // Custom health check.

@@ -40,6 +40,16 @@ const std::string& getHostname(const HostSharedPtr& host,
   }
   return HealthCheckerFactory::getHostname(host, EMPTY_STRING, cluster);
 }
+
+absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+buildRetriableStatuses(const envoy::config::core::v3::HealthCheck::GrpcHealthCheck& config) {
+  absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus> statuses;
+  statuses.reserve(config.retriable_serving_statuses_size());
+  for (const auto status : config.retriable_serving_statuses()) {
+    statuses.insert(static_cast<grpc::health::v1::HealthCheckResponse::ServingStatus>(status));
+  }
+  return statuses;
+}
 } // namespace
 
 Upstream::HealthCheckerSharedPtr GrpcHealthCheckerFactory::createCustomHealthChecker(
@@ -64,7 +74,8 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
           "grpc.health.v1.Health.Check")),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(config.grpc_health_check().initial_metadata()),
-          Router::HeaderParserPtr)) {
+          Router::HeaderParserPtr)),
+      retriable_statuses_(buildRetriableStatuses(config.grpc_health_check())) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -290,27 +301,16 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway(
   }
 }
 
-bool GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::isHealthCheckSucceeded(
-    Grpc::Status::GrpcStatus grpc_status) const {
-  if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    return false;
-  }
-
-  if (!health_check_response_ ||
-      health_check_response_->status() != grpc::health::v1::HealthCheckResponse::SERVING) {
-    return false;
-  }
-
-  return true;
-}
-
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
     Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message, bool end_stream) {
   logHealthCheckStatus(grpc_status, grpc_message);
-  if (isHealthCheckSucceeded(grpc_status)) {
+  if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok || !health_check_response_) {
+    handleFailure(envoy::data::core::v3::ACTIVE);
+  } else if (health_check_response_->status() == grpc::health::v1::HealthCheckResponse::SERVING) {
     handleSuccess(false);
   } else {
-    handleFailure(envoy::data::core::v3::ACTIVE);
+    const bool retriable = parent_.retriable_statuses_.contains(health_check_response_->status());
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/retriable);
   }
 
   // Read the value as we may call resetState() and clear it.

@@ -23,7 +23,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/health_checker_event_logger.h"
 
-#include "src/proto/grpc/health/v1/health.pb.h"
+#include "grpc/health/v1/health.pb.h"
 
 namespace Envoy {
 namespace Upstream {
