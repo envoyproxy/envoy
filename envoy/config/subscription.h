@@ -65,6 +65,12 @@ public:
    * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
    */
   virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
+
+  /**
+   * @return optional ref<envoy::service::discovery::v3::DynamicParameterConstraints> of a resource.
+   */
+  virtual const OptRef<const envoy::service::discovery::v3::DynamicParameterConstraints>
+  dynamicParameterConstraints() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
