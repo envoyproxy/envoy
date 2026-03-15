@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "allocator_lib",
     srcs = ["allocator.cc"],
-    hdrs = ["allocator.h"],
+    hdrs = [
+        "allocator.h",
+        "allocator_impl.h",
+    ],
     deps = [
         ":metric_impl_lib",
         ":stat_merger_lib",
