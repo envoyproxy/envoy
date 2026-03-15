@@ -4,12 +4,14 @@
 // as we have deprecated the pure interface and impl pattern.
 //
 // Please remove references to this file and instead include
-// source/common/stats/allocator.h.
+// source/common/stats/allocator.h directly.
+
+#include "source3/common/stats/allocator.h"
 
 namespace Envoy {
 namespace Stats {
 
-class Allocator;
+using AllocatorImpl = Allocator;
 
 } // namespace Stats
 } // namespace Envoy
