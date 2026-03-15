@@ -85,50 +85,51 @@ TEST_P(A2aFilterIntegrationTest, ValidA2aPostRequestWithRichMetadata) {
   Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   bool metadata_verified = false;
-  factory.setLogCallback([&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
-    const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
-    auto it = dynamic_metadata.find("envoy.filters.http.a2a");
-    if (it != dynamic_metadata.end()) {
-      const auto& fields = it->second.fields();
-      
-      auto it_jsonrpc = fields.find("jsonrpc");
-      EXPECT_NE(it_jsonrpc, fields.end());
-      if (it_jsonrpc != fields.end()) {
-        EXPECT_EQ("2.0", it_jsonrpc->second.string_value());
-      }
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.a2a");
+        if (it != dynamic_metadata.end()) {
+          const auto& fields = it->second.fields();
 
-      auto it_method = fields.find("method");
-      EXPECT_NE(it_method, fields.end());
-      if (it_method != fields.end()) {
-        EXPECT_EQ("message/send", it_method->second.string_value());
-      }
-
-      auto it_id = fields.find("id");
-      EXPECT_NE(it_id, fields.end());
-      if (it_id != fields.end()) {
-        EXPECT_EQ("123", it_id->second.string_value());
-      }
-      
-      auto it_params = fields.find("params");
-      if (it_params != fields.end()) {
-        const auto& params = it_params->second.struct_value().fields();
-        auto it_taskId = params.find("taskId");
-        if (it_taskId != params.end()) {
-          EXPECT_EQ("task-abc", it_taskId->second.string_value());
-        }
-        
-        auto it_msg = params.find("message");
-        if (it_msg != params.end()) {
-          const auto& msg = it_msg->second.struct_value().fields();
-          auto it_msg_taskId = msg.find("taskId");
-          if (it_msg_taskId != msg.end()) {
-            EXPECT_EQ("msg-task-123", it_msg_taskId->second.string_value());
+          auto it_jsonrpc = fields.find("jsonrpc");
+          EXPECT_NE(it_jsonrpc, fields.end());
+          if (it_jsonrpc != fields.end()) {
+            EXPECT_EQ("2.0", it_jsonrpc->second.string_value());
           }
+
+          auto it_method = fields.find("method");
+          EXPECT_NE(it_method, fields.end());
+          if (it_method != fields.end()) {
+            EXPECT_EQ("message/send", it_method->second.string_value());
+          }
+
+          auto it_id = fields.find("id");
+          EXPECT_NE(it_id, fields.end());
+          if (it_id != fields.end()) {
+            EXPECT_EQ("123", it_id->second.string_value());
+          }
+
+          auto it_params = fields.find("params");
+          if (it_params != fields.end()) {
+            const auto& params = it_params->second.struct_value().fields();
+            auto it_taskId = params.find("taskId");
+            if (it_taskId != params.end()) {
+              EXPECT_EQ("task-abc", it_taskId->second.string_value());
+            }
+
+            auto it_msg = params.find("message");
+            if (it_msg != params.end()) {
+              const auto& msg = it_msg->second.struct_value().fields();
+              auto it_msg_taskId = msg.find("taskId");
+              if (it_msg_taskId != msg.end()) {
+                EXPECT_EQ("msg-task-123", it_msg_taskId->second.string_value());
+              }
+            }
+          }
+          metadata_verified = true;
         }
-      }
-      metadata_verified = true;
-    }
-  });
+      });
 
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
     auto* access_log = hcm.add_access_log();
@@ -167,7 +168,7 @@ TEST_P(A2aFilterIntegrationTest, ValidA2aPostRequestWithRichMetadata) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_body, upstream_request_->body().toString());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  
+
   EXPECT_TRUE(metadata_verified);
 }
 
