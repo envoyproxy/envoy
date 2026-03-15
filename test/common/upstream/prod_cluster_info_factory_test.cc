@@ -55,6 +55,7 @@ TEST_F(ProdClusterInfoFactoryTest, NoMetadataStatsMatcher) {
 
   auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
   ASSERT_NE(nullptr, info);
+  info->trafficStats();
 
   // Without a scope matcher, stats of any name are accepted.
   EXPECT_NE("", info->statsScope().counterFromString("upstream_cx_total").name());
@@ -88,6 +89,7 @@ TEST_F(ProdClusterInfoFactoryTest, MetadataStatsMatcherInclusionList) {
 
   auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
   ASSERT_NE(nullptr, info);
+  info->trafficStats();
 
   // "cluster.my_cluster.upstream_cx_total" starts with the inclusion prefix — accepted.
   EXPECT_NE("", info->statsScope().counterFromString("upstream_cx_total").name());
@@ -122,6 +124,7 @@ TEST_F(ProdClusterInfoFactoryTest, MetadataStatsMatcherExclusionList) {
 
   auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
   ASSERT_NE(nullptr, info);
+  info->trafficStats();
 
   // "cluster.my_cluster.upstream_cx_total" does not match the exclusion prefix — accepted.
   EXPECT_NE("", info->statsScope().counterFromString("upstream_cx_total").name());
