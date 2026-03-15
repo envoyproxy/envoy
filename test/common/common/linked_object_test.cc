@@ -56,7 +56,7 @@ TEST(IntrusiveListNodeTest, MoveIntoListFront) {
 
   auto obj1 = std::make_unique<IntrusiveTestObject>(1);
   IntrusiveTestObject* obj1_ptr = obj1.get();
-  IntrusiveList<IntrusiveTestObject>::moveIntoList(std::move(obj1), list);
+  list.push(std::move(obj1));
   ASSERT_EQ(1u, list.size());
   ASSERT_FALSE(list.empty());
   ASSERT_EQ(obj1_ptr, list.front());
@@ -65,7 +65,7 @@ TEST(IntrusiveListNodeTest, MoveIntoListFront) {
 
   auto obj2 = std::make_unique<IntrusiveTestObject>(2);
   IntrusiveTestObject* obj2_ptr = obj2.get();
-  IntrusiveList<IntrusiveTestObject>::moveIntoList(std::move(obj2), list);
+  list.push(std::move(obj2));
   ASSERT_EQ(2u, list.size());
   ASSERT_EQ(obj2_ptr, list.front());
   ASSERT_EQ(obj1_ptr, list.back());
@@ -76,14 +76,14 @@ TEST(IntrusiveListNodeTest, MoveIntoListBack) {
 
   auto obj1 = std::make_unique<IntrusiveTestObject>(1);
   IntrusiveTestObject* obj1_ptr = obj1.get();
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj1), list);
+  list.pushBack(std::move(obj1));
   ASSERT_EQ(1u, list.size());
   ASSERT_EQ(obj1_ptr, list.front());
   ASSERT_EQ(obj1_ptr, list.back());
 
   auto obj2 = std::make_unique<IntrusiveTestObject>(2);
   IntrusiveTestObject* obj2_ptr = obj2.get();
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj2), list);
+  list.pushBack(std::move(obj2));
   ASSERT_EQ(2u, list.size());
   ASSERT_EQ(obj1_ptr, list.front());
   ASSERT_EQ(obj2_ptr, list.back());
@@ -99,9 +99,9 @@ TEST(IntrusiveListNodeTest, RemoveFromList) {
   IntrusiveTestObject* obj2_ptr = obj2.get();
   IntrusiveTestObject* obj3_ptr = obj3.get();
 
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj1), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj2), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj3), list);
+  list.pushBack(std::move(obj1));
+  list.pushBack(std::move(obj2));
+  list.pushBack(std::move(obj3));
   ASSERT_EQ(3u, list.size());
 
   // Remove middle element.
@@ -133,9 +133,9 @@ TEST(IntrusiveListNodeTest, RemoveFromListFrontThenBackThenMiddle) {
   IntrusiveTestObject* obj2_ptr = obj2.get();
   IntrusiveTestObject* obj3_ptr = obj3.get();
 
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj1), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj2), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj3), list);
+  list.pushBack(std::move(obj1));
+  list.pushBack(std::move(obj2));
+  list.pushBack(std::move(obj3));
 
   // Remove front first.
   auto r1 = obj1_ptr->removeFromList(list);
@@ -168,9 +168,9 @@ TEST(IntrusiveListNodeTest, RemoveFromListBackThenFrontThenMiddle) {
   IntrusiveTestObject* obj2_ptr = obj2.get();
   IntrusiveTestObject* obj3_ptr = obj3.get();
 
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj1), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj2), list);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj3), list);
+  list.pushBack(std::move(obj1));
+  list.pushBack(std::move(obj2));
+  list.pushBack(std::move(obj3));
 
   // Remove back first.
   auto r3 = obj3_ptr->removeFromList(list);
@@ -204,9 +204,9 @@ TEST(IntrusiveListNodeTest, MoveBetweenLists) {
   IntrusiveTestObject* obj2_ptr = obj2.get();
   IntrusiveTestObject* obj3_ptr = obj3.get();
 
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj1), src);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj2), src);
-  IntrusiveList<IntrusiveTestObject>::moveIntoListBack(std::move(obj3), src);
+  src.pushBack(std::move(obj1));
+  src.pushBack(std::move(obj2));
+  src.pushBack(std::move(obj3));
 
   // Move middle element to dst.
   obj2_ptr->moveBetweenLists(src, dst);

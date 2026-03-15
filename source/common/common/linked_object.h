@@ -128,7 +128,7 @@ template <class T> class IntrusiveList;
  *   class MyObject : public IntrusiveListNode<MyObject> { ... };
  *
  *   IntrusiveList<MyObject> list;
- *   IntrusiveList<MyObject>::moveIntoListBack(std::make_unique<MyObject>(), list);
+ *   list.pushBack(std::make_unique<MyObject>());
  *   MyObject* obj = list.front();
  *   auto reclaimed = obj->removeFromList(list); // reclaims unique_ptr ownership
  *
@@ -140,6 +140,28 @@ public:
    * @return whether this object is currently inserted into an IntrusiveList.
    */
   bool inserted() const { return inserted_; }
+
+  /**
+   * Check whether this object is currently in the given list. This is O(n) so should only be used
+   * for sanity checking in debug builds.
+   * @param list supplies the list to check for membership.
+   * @return whether this object is in the list.
+   */
+  bool insertedIntoList(const IntrusiveList<T>& list) const {
+    if (!inserted_) {
+      return false;
+    }
+    // Check if this node is in the list by walking the next chain. This is O(n) but should only
+    // be used for sanity checking in debug builds, so it is not a problem.
+    const T* current = list.front();
+    while (current != nullptr) {
+      if (current == this) {
+        return true;
+      }
+      current = current->next_;
+    }
+    return false;
+  }
 
   /**
    * Remove this item from the given intrusive list and reclaim ownership.
@@ -154,6 +176,7 @@ public:
    */
   std::unique_ptr<T> removeFromList(IntrusiveList<T>& list) {
     ASSERT(inserted_);
+    ASSERT(insertedIntoList(list));
     // Patch up the predecessor's next pointer, or advance the list head.
     if (prev_ != nullptr) {
       prev_->next_ = next_;
@@ -182,14 +205,15 @@ public:
    * Move this item from src to the front of dst without transferring unique_ptr ownership
    * (the list continues to own the object; only the containing list changes).
    *
-   * Implemented by composing removeFromList() and moveIntoList() so that
+   * Implemented by composing removeFromList() and push() so that
    * all pointer-manipulation logic lives in exactly one place.
    *
    * @param src supplies the intrusive list this item is currently in.
    * @param dst supplies the destination intrusive list (must differ from src).
    */
   void moveBetweenLists(IntrusiveList<T>& src, IntrusiveList<T>& dst) {
-    IntrusiveList<T>::moveIntoList(removeFromList(src), dst);
+    ASSERT(&src != &dst);
+    dst.push(removeFromList(src));
   }
 
 protected:
@@ -221,7 +245,7 @@ private:
  *
  * Ownership
  * ---------
- * Objects are inserted via unique_ptr (moveIntoList / moveIntoListBack).
+ * Objects are inserted via unique_ptr (push / pushBack).
  * The list takes ownership by releasing the unique_ptr and tracking the raw pointer
  * through its intrusive chain. Ownership is reclaimed as a unique_ptr via
  * IntrusiveListNode::removeFromList(). The destructor deletes all remaining objects.
@@ -272,57 +296,71 @@ public:
   bool empty() const noexcept { return size_ == 0; }
 
   /**
-   * Transfer ownership of item into the front of list.
+   * Transfer ownership of item into the front of the list.
    *
    * Releases the unique_ptr, marks the node as inserted, and prepends it
    * by making it the new head_ (updating the old head_'s prev_ pointer, or
    * setting tail_ if the list was empty).
    *
    * @param item the object to insert; must not already be in a list.
-   * @param list the target IntrusiveList.
    */
-  template <typename U>
-  static void moveIntoList(std::unique_ptr<U>&& item, IntrusiveList<T>& list) {
+  template <typename U> void push(std::unique_ptr<U>&& item) {
+    // Compile-time checks to ensure that the item can be safely owned by this list.
+    static_assert(std::is_base_of<T, U>::value,
+                  "IntrusiveList::moveIntoListBack requires U to be T or derived from T.");
+    if constexpr (!std::is_same<T, U>::value) {
+      static_assert(std::has_virtual_destructor<T>::value,
+                    "Deleting derived U objects through base T* is undefined unless T has a "
+                    "virtual destructor.");
+    }
+
     ASSERT(!item->inserted_);
     T* raw = item.release();
     raw->inserted_ = true;
     raw->prev_ = nullptr;
-    raw->next_ = list.head_;
-    if (list.head_ != nullptr) {
-      list.head_->prev_ = raw;
+    raw->next_ = head_;
+    if (head_ != nullptr) {
+      head_->prev_ = raw;
     } else {
       // List was empty; the new node is also the tail.
-      list.tail_ = raw;
+      tail_ = raw;
     }
-    list.head_ = raw;
-    list.size_++;
+    head_ = raw;
+    size_++;
   }
 
   /**
-   * Transfer ownership of item onto the back of list.
+   * Transfer ownership of item onto the back of the list.
    *
    * Releases the unique_ptr, marks the node as inserted, and appends it
    * by making it the new tail_ (updating the old tail_'s next_ pointer, or
    * setting head_ if the list was empty).
    *
    * @param item the object to insert; must not already be in a list.
-   * @param list the target IntrusiveList.
    */
-  template <typename U>
-  static void moveIntoListBack(std::unique_ptr<U>&& item, IntrusiveList<T>& list) {
+  template <typename U> void pushBack(std::unique_ptr<U>&& item) {
+    // Compile-time checks to ensure that the item can be safely owned by this list.
+    static_assert(std::is_base_of<T, U>::value,
+                  "IntrusiveList::moveIntoListBack requires U to be T or derived from T.");
+    if constexpr (!std::is_same<T, U>::value) {
+      static_assert(std::has_virtual_destructor<T>::value,
+                    "Deleting derived U objects through base T* is undefined unless T has a "
+                    "virtual destructor.");
+    }
+
     ASSERT(!item->inserted_);
     T* raw = item.release();
     raw->inserted_ = true;
     raw->next_ = nullptr;
-    raw->prev_ = list.tail_;
-    if (list.tail_ != nullptr) {
-      list.tail_->next_ = raw;
+    raw->prev_ = tail_;
+    if (tail_ != nullptr) {
+      tail_->next_ = raw;
     } else {
       // List was empty; the new node is also the head.
-      list.head_ = raw;
+      head_ = raw;
     }
-    list.tail_ = raw;
-    list.size_++;
+    tail_ = raw;
+    size_++;
   }
 
 private:
