@@ -1,0 +1,70 @@
+node:
+  id: envoy_node_id
+  cluster: envoy_cluster
+cluster_manager:
+  local_cluster_name: cluster_a
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: cluster_b
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: cluster_a
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        resource_api_version: V3
+        api_config_source:
+          api_type: GRPC
+          transport_api_version: V3
+          grpc_services:
+            - envoy_grpc:
+                cluster_name: xds_cluster
+
+  - name: cluster_b
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        resource_api_version: V3
+        api_config_source:
+          api_type: GRPC
+          transport_api_version: V3
+          grpc_services:
+            - envoy_grpc:
+                cluster_name: xds_cluster
+
+  - name: xds_cluster
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: xds-server
+                port_value: 18000
