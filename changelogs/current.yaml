@@ -257,6 +257,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tcp_proxy
+  change: |
+    Added runtime-guarded support for propagating upstream TCP RST through tunneled tcp_proxy
+    to downstream connections. When enabled, upstream connection resets are forwarded as TCP RST
+    instead of FIN. This behavior can be enabled by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to ``true``.
 - area: filters
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.

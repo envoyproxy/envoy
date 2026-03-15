@@ -1,5 +1,6 @@
 #include "source/common/tls/ssl_socket.h"
 
+#include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -144,6 +145,12 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
             // Non-graceful shutdown by closing the underlying socket.
             end_stream = true;
             break;
+          }
+          // Detect ECONNRESET to propagate TCP RST, matching RawBufferSocket behavior.
+          if (errno == SOCKET_ERROR_CONNRESET) {
+            drainErrorQueue();
+            return {PostIoAction::Close, bytes_read, false,
+                    Api::IoError::IoErrorCode::ConnectionReset};
           }
           FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
@@ -316,6 +323,14 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
         break;
+      case SSL_ERROR_SYSCALL:
+        drainErrorQueue();
+        // Detect ECONNRESET to propagate TCP RST.
+        if (errno == SOCKET_ERROR_CONNRESET) {
+          return {PostIoAction::Close, total_bytes_written, false,
+                  Api::IoError::IoErrorCode::ConnectionReset};
+        }
+        return {PostIoAction::Close, total_bytes_written, false};
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:

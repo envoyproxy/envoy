@@ -1277,9 +1277,19 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         enableRetryTimer();
       }
     } else {
-      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
-        read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        // Propagate upstream RST to downstream via AbortReset (SO_LINGER=0).
+        if (event == Network::ConnectionEvent::RemoteClose &&
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features."
+                "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
+          ENVOY_CONN_LOG(debug,
+                         "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
+                         read_callbacks_->connection());
+          read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
+        } else {
+          read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        }
       }
     }
   }
