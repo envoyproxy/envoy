@@ -6,7 +6,7 @@
 // Please remove references to this file and instead include
 // source/common/stats/allocator.h directly.
 
-#include "source3/common/stats/allocator.h"
+#include "source/common/stats/allocator.h"
 
 namespace Envoy {
 namespace Stats {
