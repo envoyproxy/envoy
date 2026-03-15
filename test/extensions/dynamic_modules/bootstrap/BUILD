@@ -114,6 +114,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_http_combined_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_init_target_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_shared_data_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_timer_test",
     ],

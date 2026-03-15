@@ -539,6 +539,9 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added a process-wide shared data registry to the dynamic modules ABI.
+- area: dynamic_modules
+  change: |
     Added support for loading dynamic module binaries from local file paths via the new
     :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
     field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
