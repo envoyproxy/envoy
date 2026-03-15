@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/upstream/locality.h"
 
@@ -156,6 +157,12 @@ DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
 DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
   cluster_.reset();
+  // Release lifecycle handles eagerly while the lifecycle notifier is still valid. When the
+  // dispatcher destructor clears pending callbacks, the cluster destructor would otherwise try to
+  // unregister from already-destroyed lifecycle notifier lists.
+  cluster->server_initialized_handle_.reset();
+  cluster->shutdown_handle_.reset();
+  cluster->drain_handle_.reset();
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
@@ -615,6 +622,14 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
+  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
+  // module. The module's choose_host may spawn a background thread that calls
+  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
+  // a happens-before relationship via the thread::spawn synchronization in the module.
+  const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
+  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
+  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
@@ -624,9 +639,13 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     // Async pending: the module will call the completion callback later.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }
+
+  // Synchronous result or no host. Clear the async state.
+  active_async_dispatcher_ = nullptr;
+  active_async_cancelled_ = nullptr;
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -637,10 +656,17 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   return {host};
 }
 
-void DynamicModuleAsyncHostSelectionHandle::cancel() {
-  if (cancel_fn_ != nullptr) {
+DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Free the module-side async handle. The cancel function takes ownership of the handle and
+  // drops it, so this works for both cancellation and normal completion paths.
+  if (async_handle_ != nullptr && cancel_fn_ != nullptr) {
     cancel_fn_(in_module_lb_, async_handle_);
+    async_handle_ = nullptr;
   }
+}
+
+void DynamicModuleAsyncHostSelectionHandle::cancel() {
+  cancelled_->store(true, std::memory_order_release);
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
