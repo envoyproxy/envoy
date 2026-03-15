@@ -323,6 +323,19 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
+
+  /**
+   * Store the HTTP status code from the last active health check response.
+   * Used by HDS to report richer health state to the control plane.
+   * 0 means no response has been recorded yet.
+   */
+  virtual void setLastHealthCheckHttpStatus(uint32_t) {}
+
+  /**
+   * @return the HTTP status code from the last active health check response, or
+   * 0 if no response has been recorded.
+   */
+  virtual uint32_t lastHealthCheckHttpStatus() const { return 0; }
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
