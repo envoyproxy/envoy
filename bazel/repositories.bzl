@@ -262,12 +262,23 @@ def envoy_dependencies(skip_targets = []):
     _wamr()
     _wasmtime()
 
+    _org_openldap()
+
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
         cc = True,
         go = True,
         python = True,
         grpc = True,
+    )
+
+def _org_openldap():
+    external_http_archive(
+	name = "org_openldap",
+        build_file_content = BUILD_ALL_CONTENT,
+        #build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
+        patches = ["@envoy//bazel/foreign_cc:openldap.patch"],
+        patch_args = ["-p1"],
     )
 
 def _boringssl():

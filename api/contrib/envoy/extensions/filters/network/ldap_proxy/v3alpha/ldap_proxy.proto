@@ -1,0 +1,36 @@
+// © 2026 Nokia
+// Licensed under the Apache License 2.0
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package envoy.extensions.filters.network.ldap_proxy.v3alpha;
+
+//import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.ldap_proxy.v3alpha";
+option java_outer_classname = "LdapProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/ldap_proxy/v3alpha";
+//option (udpa.annotations.file_status).work_in_progress = true;
+//option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: LDAP StartTLS Proxy]
+// [#extension: envoy.filters.network.ldap_proxy]
+
+enum StartTlsMode {
+  // Only upgrade when client requests StartTLS
+  ON_DEMAND = 0;
+
+  // Send StartTLS to upstream immediately, downstream stays plaintext
+  ALWAYS = 1;
+}
+
+message LdapProxy {
+  // Stats prefix, e.g. "ldap.<stat_prefix>.starttls_success"
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // When to send StartTLS upstream
+  StartTlsMode upstream_starttls_mode = 2;
+}
