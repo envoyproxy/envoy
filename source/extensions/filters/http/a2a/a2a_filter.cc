@@ -189,6 +189,15 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  const auto& metadata = parser_->metadata();
+  if (!metadata.fields().empty()) {
+    // TODO(tyxia): Use the filter config name from the config. Also, it can be controlled by the
+    // configuration.
+    decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(decoder_callbacks_->filterConfigName()),
+                                                        metadata);
+    ENVOY_LOG(debug, "A2A filter set dynamic metadata: {}", metadata.DebugString());
+  }
+
   return Http::FilterDataStatus::Continue;
 }
 

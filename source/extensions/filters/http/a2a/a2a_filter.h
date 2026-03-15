@@ -72,6 +72,10 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
+  }
+
 private:
   bool isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const;
   bool isValidA2aPostRequest(const Http::RequestHeaderMap& headers) const;
