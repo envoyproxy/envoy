@@ -270,6 +270,11 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: dynamic_modules
+  change: |
+    Rust SDK now provides an opt-in ``CatchUnwind`` wrapper for filter callbacks. When a
+    wrapped callback panics, Envoy logs the panic and returns a fail-closed error (e.g.
+    HTTP 500, stream reset, connection close) instead of aborting the process.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,

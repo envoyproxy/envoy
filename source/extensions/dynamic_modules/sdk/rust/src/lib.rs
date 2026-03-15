@@ -7,6 +7,7 @@
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
+pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
 pub mod http;
@@ -18,6 +19,7 @@ pub mod udp_listener;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
+pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
 pub use http::*;
@@ -34,6 +36,16 @@ mod mod_test;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
+
+pub(crate) fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+  match payload.downcast::<String>() {
+    Ok(s) => *s,
+    Err(payload) => match payload.downcast::<&str>() {
+      Ok(s) => s.to_string(),
+      Err(_) => "<non-string panic payload>".to_string(),
+    },
+  }
+}
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
