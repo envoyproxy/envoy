@@ -5022,6 +5022,8 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   validateField("field_response_trailer_effect");
   validateField("field_bytes_sent");
   validateField("field_bytes_received");
+  validateField("field_header_bytes_sent");
+  validateField("field_header_bytes_received");
 
   // Test non-existent field handling (coverage for getField fallback).
   // When a field doesn't exist, it's not included in the JSON output at all.
@@ -5033,12 +5035,23 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Bytes are only populated for Envoy gRPC, not Google gRPC.
   auto bytes_sent = json_log->getString("field_bytes_sent");
   auto bytes_received = json_log->getString("field_bytes_received");
+  auto header_bytes_sent = json_log->getString("field_header_bytes_sent");
+  auto header_bytes_received = json_log->getString("field_header_bytes_received");
   if (IsEnvoyGrpc()) {
     EXPECT_THAT(*bytes_sent, testing::Not(testing::Eq("0")));
     EXPECT_THAT(*bytes_received, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*header_bytes_sent, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*header_bytes_received, testing::Not(testing::Eq("0")));
+
+    // Header bytes should be strictly less than total bytes when a body is present.
+    // Note: Comparing strings as integers.
+    EXPECT_LT(std::stoull(*header_bytes_sent), std::stoull(*bytes_sent));
+    EXPECT_LT(std::stoull(*header_bytes_received), std::stoull(*bytes_received));
   } else {
     EXPECT_EQ(*bytes_sent, "0");
     EXPECT_EQ(*bytes_received, "0");
+    EXPECT_EQ(*header_bytes_sent, "0");
+    EXPECT_EQ(*header_bytes_received, "0");
   }
 
   // Verify all three serialization methods produce different output.

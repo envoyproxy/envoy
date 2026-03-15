@@ -118,6 +118,8 @@ public:
                          Extensions::Filters::Common::ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setHeaderBytesSent(uint64_t bytes_sent) { header_bytes_sent_ = bytes_sent; }
+  void setHeaderBytesReceived(uint64_t bytes_received) { header_bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
     if (cluster_info) {
       cluster_info_ = cluster_info.value();
@@ -138,6 +140,8 @@ public:
 
   uint64_t bytesSent() const { return bytes_sent_; }
   uint64_t bytesReceived() const { return bytes_received_; }
+  uint64_t headerBytesSent() const { return header_bytes_sent_; }
+  uint64_t headerBytesReceived() const { return header_bytes_received_; }
   bool failedOpen() const { return failed_open_; }
   bool immediateResponseReceived() const { return received_immediate_response_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
@@ -167,6 +171,8 @@ private:
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
   uint64_t bytes_sent_{0}, bytes_received_{0};
+  // The bytes sent and received are for the headers only.
+  uint64_t header_bytes_sent_{0}, header_bytes_received_{0};
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
