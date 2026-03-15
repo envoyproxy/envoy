@@ -2,6 +2,7 @@
 
 #include <list>
 #include <memory>
+#include <type_traits>
 
 #include "source/common/common/assert.h"
 
@@ -153,7 +154,7 @@ public:
     }
     // Check if this node is in the list by walking the next chain. This is O(n) but should only
     // be used for sanity checking in debug builds, so it is not a problem.
-    const T* current = list.front();
+    const T* current = list.head_;
     while (current != nullptr) {
       if (current == this) {
         return true;
@@ -250,7 +251,7 @@ private:
  * through its intrusive chain. Ownership is reclaimed as a unique_ptr via
  * IntrusiveListNode::removeFromList(). The destructor deletes all remaining objects.
  *
- * The list is non-copyable and non-moveable to keep ownership semantics simple.
+ * The list is non-copyable and non-movable to keep ownership semantics simple.
  *
  * T must publicly inherit from IntrusiveListNode<T>.
  */
@@ -272,7 +273,7 @@ public:
     }
   }
 
-  // Not copyable or moveable; ownership of raw pointers must not be aliased.
+  // Not copyable or movable; ownership of raw pointers must not be aliased.
   IntrusiveList(const IntrusiveList&) = delete;
   IntrusiveList& operator=(const IntrusiveList&) = delete;
   IntrusiveList(IntrusiveList&&) = delete;
@@ -283,9 +284,17 @@ public:
    */
   T* front() noexcept { return head_; }
   /**
+   * @return pointer to the first element, or nullptr if the list is empty.
+   */
+  const T* front() const noexcept { return head_; }
+  /**
    * @return pointer to the last element, or nullptr if the list is empty.
    */
   T* back() noexcept { return tail_; }
+  /**
+   * @return pointer to the last element, or nullptr if the list is empty.
+   */
+  const T* back() const noexcept { return tail_; }
   /**
    * @return the number of elements currently in the list.
    */
@@ -306,8 +315,7 @@ public:
    */
   template <typename U> void push(std::unique_ptr<U>&& item) {
     // Compile-time checks to ensure that the item can be safely owned by this list.
-    static_assert(std::is_base_of<T, U>::value,
-                  "IntrusiveList::moveIntoListBack requires U to be T or derived from T.");
+    static_assert(std::is_base_of<T, U>::value, "push requires U to be T or derived from T.");
     if constexpr (!std::is_same<T, U>::value) {
       static_assert(std::has_virtual_destructor<T>::value,
                     "Deleting derived U objects through base T* is undefined unless T has a "
@@ -340,8 +348,7 @@ public:
    */
   template <typename U> void pushBack(std::unique_ptr<U>&& item) {
     // Compile-time checks to ensure that the item can be safely owned by this list.
-    static_assert(std::is_base_of<T, U>::value,
-                  "IntrusiveList::moveIntoListBack requires U to be T or derived from T.");
+    static_assert(std::is_base_of<T, U>::value, "pushBack requires U to be T or derived from T.");
     if constexpr (!std::is_same<T, U>::value) {
       static_assert(std::has_virtual_destructor<T>::value,
                     "Deleting derived U objects through base T* is undefined unless T has a "
