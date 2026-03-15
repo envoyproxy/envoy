@@ -151,6 +151,12 @@ bug_fixes:
     added after server initialization completed. The ``SrdsFactory`` interface
     was incorrectly using the server-level init manager instead of the listener-level init manager,
     causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
