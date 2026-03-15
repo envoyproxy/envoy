@@ -336,6 +336,12 @@ new_features:
     endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
     when using the prometheus protobuf exposition format, using query
     ``/stats/prometheus?histogram_buckets=prometheusnative``.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
