@@ -4574,6 +4574,33 @@ TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
 }
 
+/**
+ * Scenario: A malicious client sends x-envoy-oauth-status and x-envoy-oauth-failure-reason headers
+ * on a request that matches pass_through_matcher (OPTIONS method).
+ *
+ * Expected behavior: The injected headers should be sanitized even on pass-through requests,
+ * since sanitization happens before the pass_through_matcher check.
+ */
+TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeadersOnPassThroughPath) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      // Malicious client trying to inject OAuth status headers on a pass-through request
+      {"x-envoy-oauth-status", "injected-success"},
+      {"x-envoy-oauth-failure-reason", "injected-reason"},
+  };
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify the injected headers were sanitized even though the request was passed through
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthStatus).empty());
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+}
+
 // Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
 // signout.
 TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {

@@ -633,6 +633,11 @@ void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Sanitize OAuth status headers unconditionally at the start of the filter to prevent clients
+  // from spoofing them. These headers are only supposed to be set by the OAuth2 filter itself.
+  headers.remove(OAuth2Headers::get().OAuthStatus);
+  headers.remove(OAuth2Headers::get().OAuthFailureReason);
+
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
@@ -656,11 +661,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // before forwarding the request upstream.
     headers.removeInline(authorization_handle.handle());
   }
-
-  // Sanitize OAuth status headers to prevent header injection attacks.
-  // These headers are only set by the filter itself when allow_failed_matcher is used.
-  headers.remove(OAuth2Headers::get().OAuthStatus);
-  headers.remove(OAuth2Headers::get().OAuthFailureReason);
 
   // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
   // writing test code to not forget these important variables in mock requests

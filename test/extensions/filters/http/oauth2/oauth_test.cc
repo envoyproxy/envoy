@@ -403,8 +403,9 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("auth_code", "client_id", "secret", "cb", "verifier",
-                               AuthType::TlsClientAuth);
+  EXPECT_TRUE(client_->asyncGetAccessToken("auth_code", "client_id", "secret", "cb", "verifier",
+                                           AuthType::TlsClientAuth)
+                  .ok());
   EXPECT_EQ(1, callbacks_.size());
 }
 
@@ -423,7 +424,9 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenTlsClientAuthNoClientSecret) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::TlsClientAuth);
+  EXPECT_TRUE(
+      client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::TlsClientAuth)
+          .ok());
   EXPECT_EQ(1, callbacks_.size());
 }
 
