@@ -627,11 +627,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
-        version = "0.68.1",
-        sha256 = "c8aa806cf6066679ac23463241ee80ad692265dad0465f51111cbbe30b890352",
+        version = "0.69.0",
+        sha256 = "bbc764c252d061281b2359277a4d46480e2dcfaf72afc1ce6e00ada58ccbfd4c",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
