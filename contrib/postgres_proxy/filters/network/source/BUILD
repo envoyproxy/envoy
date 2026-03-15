@@ -39,6 +39,8 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
+        "//source/common/stream_info:uint64_accessor_lib",
+        "//source/common/tls:tls_filter_state_keys_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],

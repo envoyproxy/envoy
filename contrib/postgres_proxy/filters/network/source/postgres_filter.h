@@ -8,6 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
+#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_encoder.h"
@@ -75,6 +76,7 @@ public:
         upstream_ssl_;
     envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
         downstream_ssl_;
+    absl::optional<uint32_t> max_downstream_tls_record_size_bytes_;
   };
   PostgresFilterConfig(const PostgresFilterConfigOptions& config_options, Stats::Scope& scope);
 
@@ -86,6 +88,7 @@ public:
   envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
       downstream_ssl_{
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
+  absl::optional<uint32_t> max_downstream_tls_record_size_bytes_;
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 

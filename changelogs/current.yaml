@@ -671,6 +671,12 @@ new_features:
     check against provided CRLs failed: unable to get certificate CRL, certificate CRL distribution points:
     [http://crl.example.com/ca.crl, http://backup-crl.example.com/ca.crl]``). This provides better visibility into CRL
     validation failures and helps operators identify connectivity or CRL server issues without requiring debug-level logging.
+- area: postgres_proxy
+  change: |
+    Added :ref:`max_downstream_tls_record_size_bytes
+    <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.max_downstream_tls_record_size_bytes>`
+    to the postgres proxy filter to allow limiting TLS record sizes on the downstream connection via filter state.
+    This is useful for working around bugs in clients like ``libpq`` that cannot handle large TLS records.
 - area: lua
   change: |
     Added :ref:`set() <config_http_filters_lua_stream_info_filter_state_wrapper>` to the Lua filter
