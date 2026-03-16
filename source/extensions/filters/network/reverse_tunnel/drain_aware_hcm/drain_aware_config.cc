@@ -10,11 +10,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
+Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createBaseCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
+  return HttpConnectionManager::HttpConnectionManagerConfig::createCodec(
+      connection, data, callbacks, overload_manager);
+}
+
 Http::ServerConnectionPtr DrainAwareHttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
-  auto codec = HttpConnectionManager::HttpConnectionManagerConfig::createCodec(
-      connection, data, callbacks, overload_manager);
+  auto codec = createBaseCodec(connection, data, callbacks, overload_manager);
   if (codec == nullptr) {
     ENVOY_LOG_MISC(warn, "drain_aware_hcm: base createCodec returned nullptr for connection id={}",
                    connection.id());

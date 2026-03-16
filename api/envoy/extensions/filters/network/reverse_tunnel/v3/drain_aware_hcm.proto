@@ -7,7 +7,7 @@ import "envoy/extensions/filters/network/http_connection_manager/v3/http_connect
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
-option java_outer_classname = "DrainingAwareHcmProto";
+option java_outer_classname = "DrainAwareHcmProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/reverse_tunnel/v3;reverse_tunnelv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -25,5 +25,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // connection is closed.
 message DrainAwareHttpConnectionManager {
   // The underlying HCM configuration to apply.
-  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
+  http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
 }

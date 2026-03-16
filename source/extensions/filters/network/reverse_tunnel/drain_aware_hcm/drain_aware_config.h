@@ -37,6 +37,14 @@ public:
                                         Http::ServerConnectionCallbacks& callbacks,
                                         Server::OverloadManager& overload_manager) override;
 
+protected:
+  // Virtual seam for testing: allows tests to override the base codec creation
+  // to exercise the nullptr defensive check in createCodec().
+  virtual Http::ServerConnectionPtr createBaseCodec(Network::Connection& connection,
+                                                    const Buffer::Instance& data,
+                                                    Http::ServerConnectionCallbacks& callbacks,
+                                                    Server::OverloadManager& overload_manager);
+
 private:
   Server::Configuration::FactoryContext& factory_context_;
 };

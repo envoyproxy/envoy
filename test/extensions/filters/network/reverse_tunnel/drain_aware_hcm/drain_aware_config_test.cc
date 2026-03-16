@@ -2,6 +2,8 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,7 +39,7 @@ hcm_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 )EOF";
 
-class DrainAwareConfigTest : public testing::Test {
+class DrainAwareConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   DrainAwareConfigTest() {
     ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
@@ -84,6 +86,40 @@ TEST_F(DrainAwareConfigTest, FilterFactoryCallbackIsNonNull) {
   // Verify a callable callback was produced. The actual ConnectionManagerImpl
   // installation path is exercised end-to-end in integration_test.cc.
   EXPECT_NE(nullptr, result.value());
+}
+
+// Subclass that overrides createBaseCodec to return nullptr, exercising the defensive
+// nullptr check in createCodec().
+class NullCodecDrainAwareConfig : public DrainAwareHttpConnectionManagerConfig {
+public:
+  using DrainAwareHttpConnectionManagerConfig::DrainAwareHttpConnectionManagerConfig;
+
+  Http::ServerConnectionPtr createBaseCodec(Network::Connection&, const Buffer::Instance&,
+                                            Http::ServerConnectionCallbacks&,
+                                            Server::OverloadManager&) override {
+    return nullptr;
+  }
+};
+
+TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
+  auto proto_config = parseConfig(kMinimalConfig);
+  const auto& hcm_config = proto_config.hcm_config();
+  auto singletons = HttpConnectionManager::Utility::createSingletons(context_);
+
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<NullCodecDrainAwareConfig>(
+      hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
+      *singletons.filter_config_provider_manager_, creation_status);
+  ASSERT_TRUE(creation_status.ok()) << creation_status.message();
+
+  NiceMock<Network::MockConnection> connection;
+  NiceMock<Http::MockServerConnectionCallbacks> callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Buffer::OwnedImpl data;
+
+  auto codec = config->createCodec(connection, data, callbacks, overload_manager);
+  EXPECT_EQ(nullptr, codec);
 }
 
 } // namespace
