@@ -6,6 +6,7 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -30,9 +31,13 @@ public:
   void apply(RequestHeaderMap& headers) const;
 
 private:
-  TimeSource& time_source_;
   std::vector<std::pair<const LowerCaseString, std::string>> static_headers_;
   std::vector<std::pair<const LowerCaseString, Formatter::FormatterPtr>> formatted_headers_;
+
+  // A `StreamInfo` is required, but in this context we don't have one, so create an empty one.
+  // This allows formatters that don't require any stream info to succeed, such as extensions that
+  // load data externally for API keys and similar.
+  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Http

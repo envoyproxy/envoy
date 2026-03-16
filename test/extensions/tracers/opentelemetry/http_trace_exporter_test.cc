@@ -154,7 +154,7 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
   )EOF",
-                                          token_path);
+                                        token_path);
 
   envoy::config::core::v3::HttpService http_service;
   TestUtility::loadFromYaml(yaml_string, http_service);

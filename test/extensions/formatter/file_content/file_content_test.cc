@@ -1,6 +1,5 @@
-#include "source/extensions/formatter/file_content/config.h"
-
 #include "source/common/formatter/substitution_format_string.h"
+#include "source/extensions/formatter/file_content/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"

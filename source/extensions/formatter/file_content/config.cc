@@ -52,8 +52,7 @@ private:
  */
 class FileContentCommandParser : public Envoy::Formatter::CommandParser {
 public:
-  explicit FileContentCommandParser(
-      Server::Configuration::ServerFactoryContext& server_context)
+  explicit FileContentCommandParser(Server::Configuration::ServerFactoryContext& server_context)
       : server_context_(server_context) {}
 
   Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
