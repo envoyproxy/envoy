@@ -34,7 +34,8 @@ public:
     if (value == 0) {
       return;
     }
-    auto [it, inserted] = inflight_gauges_.try_emplace(&gauge, InflightGauge{Stats::GaugeSharedPtr(&gauge), 0});
+    auto [it, inserted] =
+        inflight_gauges_.try_emplace(&gauge, InflightGauge{Stats::GaugeSharedPtr(&gauge), 0});
     it->second.value_ += value;
     gauge.add(value);
   }

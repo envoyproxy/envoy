@@ -752,6 +752,47 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.
 }
 
+TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+      - stat:
+          name: gauge
+        value_fixed: 20
+        add_subtract:
+          add_log_type: TcpUpstreamConnected
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD for the first definition (DownstreamStart)
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(*gauge_, add(10));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger ADD for the second definition (TcpUpstreamConnected)
+  formatter_context_.setAccessLogType(
+      envoy::data::accesslog::v3::AccessLogType::TcpUpstreamConnected);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  // The second gauge is added on TcpUpstreamConnected
+  EXPECT_CALL(*gauge_, add(20));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT for both (DownstreamEnd)
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
+  EXPECT_CALL(*gauge_, sub(10));
+  EXPECT_CALL(*gauge_, sub(20));
+  logger_->log(formatter_context_, stream_info_);
+}
+
 TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
@@ -1143,47 +1184,6 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
         return store_.mockScope().histogramFromStatNameWithTags(name, tags,
                                                                 Stats::Histogram::Unit::Bytes);
       }));
-  logger_->log(formatter_context_, stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 10
-        add_subtract:
-          add_log_type: DownstreamStart
-          sub_log_type: DownstreamEnd
-      - stat:
-          name: gauge
-        value_fixed: 20
-        add_subtract:
-          add_log_type: TcpUpstreamConnected
-          sub_log_type: DownstreamEnd
-)EOF";
-  initialize(yaml);
-
-  // Trigger ADD for the first definition (DownstreamStart)
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(*gauge_, add(10));
-  logger_->log(formatter_context_, stream_info_);
-
-  // Trigger ADD for the second definition (TcpUpstreamConnected)
-  formatter_context_.setAccessLogType(
-      envoy::data::accesslog::v3::AccessLogType::TcpUpstreamConnected);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  // The second gauge is added on TcpUpstreamConnected
-  EXPECT_CALL(*gauge_, add(20));
-  logger_->log(formatter_context_, stream_info_);
-
-  // Trigger SUBTRACT for both (DownstreamEnd)
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
-  // It should sub(30) once, as they are accumulated into one stored map entry prior to removal
-  EXPECT_CALL(*gauge_, sub(30));
   logger_->log(formatter_context_, stream_info_);
 }
 
