@@ -481,8 +481,9 @@ HostDescriptionImplBase::HostDescriptionImplBase(
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value()),
-      endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
-      locality_(std::move(locality)),
+      endpoint_metadata_(endpoint_metadata),
+      endpoint_metadata_hash_(endpoint_metadata ? MessageUtil::hash(*endpoint_metadata) : 0),
+      locality_metadata_(locality_metadata), locality_(std::move(locality)),
       locality_zone_stat_name_(locality_->zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
       socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
@@ -574,7 +575,8 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
     const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    HostDescriptionConstSharedPtr host) {
+    HostDescriptionConstSharedPtr host,
+    const Network::UpstreamTransportSocketFactory& socket_factory) {
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     return transport_socket_options->http11ProxyInfo()->proxy_address;
   }
@@ -617,6 +619,11 @@ absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetP
     return resolve_status.value();
   }
 
+  // Proxy address was not found in the metadata. If a default proxy address is set, return that.
+  if (socket_factory.defaultHttp11ProxyInfo().has_value()) {
+    return socket_factory.defaultHttp11ProxyInfo()->proxy_address;
+  }
+
   return absl::nullopt;
 }
 
@@ -631,7 +638,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
   absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
-      maybeGetProxyRedirectAddress(transport_socket_options, host);
+      maybeGetProxyRedirectAddress(transport_socket_options, host, socket_factory);
 
   Network::ClientConnectionPtr connection;
   // If the transport socket options or endpoint/locality metadata indicate the connection should
@@ -648,13 +655,10 @@ Host::CreateConnectionData HostImplBase::createConnection(
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
     ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
-        happy_eyeballs_config;
-    if (cluster.happyEyeballsConfig().has_value()) {
-      happy_eyeballs_config = cluster.happyEyeballsConfig();
-    } else {
-      happy_eyeballs_config = defaultHappyEyeballsConfig();
-    }
+    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+        happy_eyeballs_config =
+            cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
+                                                      : defaultHappyEyeballsConfig();
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,
         transport_socket_options, host, options, happy_eyeballs_config);
@@ -1215,7 +1219,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 #endif
 
-  // Both LoadStatsReporter and per_endpoint_stats need to `latch()` the counters, so if both are
+  // Both LoadStatsReporter interface implementations and per_endpoint_stats need to `latch()` the
+  // counters, so if both are
   // configured they will interfere with each other and both get incorrect values.
   // TODO(ggreenway): Verify that bypassing virtual dispatch here was intentional
   if (ClusterInfoImpl::perEndpointStatsEnabled() &&
@@ -2343,14 +2348,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
 
-      // Did metadata change?
-      bool metadata_changed = true;
-      if (host->metadata() && existing_host->second->metadata()) {
-        metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
-            *host->metadata(), *existing_host->second->metadata());
-      } else if (!host->metadata() && !existing_host->second->metadata()) {
-        metadata_changed = false;
-      }
+      // Did metadata change? Compare cached hashes for O(1) comparison.
+      const bool metadata_changed = host->metadataHash() != existing_host->second->metadataHash();
 
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.

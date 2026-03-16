@@ -46,10 +46,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.28",
-        sha256 = "8f4c01104e41eefaf08cbe7a678f50a2aff00e45ba873a2c0d3514e9b2debdb8",
-        strip_prefix = "toolshed-bazel-v{version}/bazel",
-        urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
+        version = "0.3.31",
+        sha256 = "e6878f21ab2c7e80d6600a4c597fe5a95f196f534a8a4b9588e35c0e8d901717",
+        strip_prefix = "toolshed-bazel-v{version}",
+        urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
     rules_fuzzing = dict(
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
@@ -165,8 +165,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
     ),
     tcmalloc = dict(
-        version = "5da4a882003102fba0c0c0e8f6372567057332eb",
-        sha256 = "fd92d64d8302f1677570fdff844e8152c314e559a6c788c6bfc3844954d0dabd",
+        version = "12f255231938d30493186b0a037feedd70f5a1c1",
+        sha256 = "2a6bef88f8cccda4a63a2f4bb09e655b3ee5ea0a2ce68d16e6ea2d5f5c4be9c1",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
     ),
@@ -312,9 +312,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
         # TODO(zhxie): Update to the next release version when it is released.
         version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
-        sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
-        strip_prefix = "colm-{version}",
-        urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
+        sha256 = "f11e62f0e7fd8b26f75a9034af43fd4622a0829b29a7cfb70c0742959bd9cfec",
+        strip_prefix = "colm-suite-{version}",
+        urls = ["https://github.com/adrian-thurston/colm-suite/archive/{version}.tar.gz"],
     ),
     ragel = dict(
         # We used the stable release Ragel 6.10 previously and it is under GPLv2 license (see
@@ -500,10 +500,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     v8 = dict(
         # NOTE: Update together with proxy_wasm_cpp_host, highway, fast_float, dragonbox, simdutf, and fp16.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "13.8.258.26",
+        version = "14.6.202.10",
         # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
         strip_prefix = "v8-{version}",
-        sha256 = "4ffc27074d3f79e8e6401e390443dcf02755349002be4a1b01e72a3cd9457d15",
+        sha256 = "09c3d9f796a671fb9630c7190032f00171ce99effd7c80c7aaeba148a7bcbc1b",
         urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
     ),
     fast_float = dict(
@@ -530,20 +530,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     fp16 = dict(
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "0a92994d729ff76a58f692d3028ca1b64b145d91",
+        version = "3d2de1816307bac63c16a297e8c4dc501b4076df",
         strip_prefix = "FP16-{version}",
-        sha256 = "e66e65515fa09927b348d3d584c68be4215cfe664100d01c9dbc7655a5716d70",
+        sha256 = "e2da4f41bae8869f8dee56f4c104e699e7de3a483b5e451fda8e76fbcc66c59a",
         urls = ["https://github.com/Maratyszcza/FP16/archive/{version}.zip"],
     ),
     simdutf = dict(
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "7.3.4",
-        sha256 = "a8d2b481a2089280b84df7dc234223b658056b5bbd40bd4d476902d25d353a1f",
+        version = "8.1.0",
+        sha256 = "c3565a8567b21d0096d0366654db473597ea6e5408e464198dce0897be71e4d0",
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "4b9143d5a85d6bd89b281ddc69606edf7934734f",
-        sha256 = "5abc4d44c53f7b51e4c5e060e292c1ea1413feb3a876f2fe5b18b3c80a1fb7c4",
+        version = "3a1960c518a0201b1b34384bcc89ea81add484cf",
+        sha256 = "edc92981797fddf5ff355cba9b83e00b1e0ce180812c5ca0fd139a2120482e0c",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

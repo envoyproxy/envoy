@@ -1,6 +1,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -30,8 +31,9 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
       testDataDir() + "/libbootstrap_extension_new_null.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -40,7 +42,8 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   extension->initializeInModuleExtension();
 
   // These should not crash due to the null checks in the implementation.
-  extension->onServerInitialized();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
   extension->onWorkerThreadInitialized();
 
   // Extension should not be destroyed yet.
@@ -56,8 +59,9 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -82,8 +86,9 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -96,7 +101,8 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   EXPECT_FALSE(extension->isDestroyed());
 
   // Call lifecycle methods.
-  extension->onServerInitialized();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
   extension->onWorkerThreadInitialized();
 
   // Verify getExtensionConfig.
@@ -122,15 +128,17 @@ TEST_F(ExtensionTest, DrainCallbackInvoked) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
 
   // This triggers registerLifecycleCallbacks() which registers the drain callback.
-  extension->onServerInitialized();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
 
   // Invoke the captured drain callback to exercise the drain notification path.
   EXPECT_TRUE(captured_drain_cb(std::chrono::milliseconds(0)).ok());
@@ -154,13 +162,15 @@ TEST_F(ExtensionTest, ShutdownCallbackWithCompletion) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
-  extension->onServerInitialized();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
 
   // Invoke the captured shutdown callback with a completion callback.
   bool completion_called = false;
@@ -186,13 +196,15 @@ TEST_F(ExtensionTest, ShutdownCallbackAfterDestroy) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
   extension->initializeInModuleExtension();
-  extension->onServerInitialized();
+  NiceMock<Server::MockInstance> instance;
+  extension->onServerInitialized(instance);
 
   // Call destroy() to set in_module_extension_ to nullptr while keeping the extension alive.
   // This simulates the scenario where the module is torn down before the shutdown callback fires.

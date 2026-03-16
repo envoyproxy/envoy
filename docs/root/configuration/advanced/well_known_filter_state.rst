@@ -99,8 +99,8 @@ The following lists the filter state object keys used by the Envoy extensions to
 
 ``envoy.filters.http.mcp.request``
   :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
-  request attributes when ``emit_filter_state`` is enabled. The object stores extracted fields
-  from the parsed request.
+  request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
+  ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
 
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
@@ -116,6 +116,10 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.tls.certificate_mappers.on_demand_secret``
   Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
   <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
+
+``envoy.tls.cert_validator.spiffe.workload_trust_domain``
+  Specifies per-connection workload trust domain to be used in the :ref:`SPIFFE certificate validator
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`.
 
 Filter state object factories
 -----------------------------

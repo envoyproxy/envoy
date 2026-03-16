@@ -1,6 +1,6 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=22.04
-ARG BUILD_SHA=104ae83764a5119017b8e8d6218fa0832b09df65aae7d5a6de29a85d813da2fb
+ARG BUILD_SHA=3ba65aa20f86a0fad9df2b2c259c613df006b2e6d0bfcc8a146afb8c525a9751
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
@@ -59,7 +59,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:16b3bc268fe2aafecdb36fd896afd1f0b7578fecbd2d9e53894cf30ad70f465d AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:c8430558b9a8688298c060ddc5e6f2993c8a092dee8a6b7058139ac8472e8ad0 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]

@@ -34,14 +34,27 @@ envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr co
   return NULL;
 }
 
-int64_t
-envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
-                                       envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
-                                       envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr) {
+bool envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index) {
   (void)lb_envoy_ptr;
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
-  return -1;
+  (void)result_priority;
+  (void)result_index;
+  return false;
+}
+
+void envoy_dynamic_module_on_lb_on_host_membership_update(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed) {
+  (void)lb_envoy_ptr;
+  (void)lb_module_ptr;
+  (void)num_hosts_added;
+  (void)num_hosts_removed;
 }
 
 void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr) {

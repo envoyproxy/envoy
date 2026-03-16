@@ -2472,6 +2472,36 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupClosesEstablishedConnections) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 }
 
+// Test that cleanup() resets file events before closing trigger pipe FDs to prevent busy loop.
+TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  int callback_call_count = 0;
+  Event::FileReadyCb mock_callback = [&callback_call_count](uint32_t) -> absl::Status {
+    callback_call_count++;
+    return absl::OkStatus();
+  };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  EXPECT_TRUE(isTriggerPipeReady());
+  EXPECT_GE(getTriggerPipeReadFd(), 0);
+  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
+
+  cleanup();
+
+  EXPECT_FALSE(isTriggerPipeReady());
+  EXPECT_EQ(getTriggerPipeReadFd(), -1);
+  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
+
+  // Verify the file event callback is not triggered after cleanup (no busy loop).
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(callback_call_count, 0);
+}
+
 // Test initializeFileEvent early-return path when already started.
 TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventSkipWhenAlreadyStarted) {
   auto config = createDefaultTestConfig();

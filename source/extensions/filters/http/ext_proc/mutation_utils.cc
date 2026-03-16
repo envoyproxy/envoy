@@ -8,7 +8,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -20,6 +20,7 @@ namespace ExternalProcessing {
 using Filters::Common::MutationRules::Checker;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
+using Filters::Common::ProcessingEffect::Effect;
 using Http::Headers;
 using Http::LowerCaseString;
 using Stats::Counter;
@@ -144,26 +145,25 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
-                                                 Counter& rejected_mutations,
-                                                 ProcessingEffect::Effect& effect,
+                                                 Counter& rejected_mutations, Effect& effect,
                                                  bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
   const auto result = responseHeaderSizeCheck(headers, mutation, rejected_mutations);
   if (!result.ok()) {
-    effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
+    effect = Effect::MutationRejectedSizeLimitExceeded;
     return result;
   }
 
   // Set default value to None for effect
-  effect = ProcessingEffect::Effect::None;
+  effect = Effect::None;
 
   for (const auto& hdr : mutation.remove_headers()) {
     if (!Http::HeaderUtility::headerNameIsValid(hdr)) {
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "remove_headers contain invalid character, may not be removed.");
       rejected_mutations.inc();
-      effect = ProcessingEffect::Effect::InvalidMutationRejected;
+      effect = Effect::InvalidMutationRejected;
       return absl::InvalidArgumentError(kInvalidCharacterInRemoveMsg);
     }
     const LowerCaseString remove_header(hdr);
@@ -173,7 +173,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       // int removals;
       int removals = headers.remove(remove_header);
       if (removals > 0) {
-        effect = ProcessingEffect::Effect::MutationApplied;
+        effect = Effect::MutationApplied;
       }
     } break;
     case CheckResult::IGNORE:
@@ -184,7 +184,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "Header {} may not be removed. Returning error", remove_header);
       rejected_mutations.inc();
-      effect = ProcessingEffect::Effect::MutationFailed;
+      effect = Effect::MutationFailed;
       return absl::InvalidArgumentError(kRemoveFailedMsg);
     }
   }
@@ -213,7 +213,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       invalid_character = true;
     }
     if (invalid_character) {
-      effect = ProcessingEffect::Effect::InvalidMutationRejected;
+      effect = Effect::InvalidMutationRejected;
       rejected_mutations.inc();
       return absl::InvalidArgumentError(kInvalidCharacterInSetMsg);
     }
@@ -236,7 +236,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       } else {
         headers.setCopy(header_name, header_value);
       }
-      effect = ProcessingEffect::Effect::MutationApplied;
+      effect = Effect::MutationApplied;
       break;
     case CheckResult::IGNORE:
       ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
@@ -246,7 +246,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
                          "Header {} may not be modified. Returning error", header_name);
       rejected_mutations.inc();
-      effect = ProcessingEffect::Effect::MutationFailed;
+      effect = Effect::MutationFailed;
       return absl::InvalidArgumentError(kSetFailedMsg);
     }
   }
@@ -254,19 +254,18 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   // After header mutation, check the ending headers are not exceeding the HCM limit.
   auto status = headerMutationResultCheck(headers, rejected_mutations);
   if (!status.ok()) {
-    effect = ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded;
+    effect = Effect::MutationRejectedSizeLimitExceeded;
   }
   return status;
 }
 
-ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation,
-                                                           Buffer::Instance& buffer) {
+Effect MutationUtils::applyBodyMutations(const BodyMutation& mutation, Buffer::Instance& buffer) {
   switch (mutation.mutation_case()) {
   case BodyMutation::MutationCase::kClearBody:
     if (mutation.clear_body()) {
       ENVOY_LOG(trace, "Clearing HTTP body");
       buffer.drain(buffer.length());
-      return ProcessingEffect::Effect::MutationApplied;
+      return Effect::MutationApplied;
     }
     break;
   case BodyMutation::MutationCase::kBody:
@@ -274,12 +273,12 @@ ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& m
               mutation.body().size());
     buffer.drain(buffer.length());
     buffer.add(mutation.body());
-    return ProcessingEffect::Effect::MutationApplied;
+    return Effect::MutationApplied;
   default:
     // Nothing to do on default
     break;
   }
-  return ProcessingEffect::Effect::None;
+  return Effect::None;
 }
 
 bool MutationUtils::isValidHttpStatus(int code) { return (code >= 200); }

@@ -2985,7 +2985,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_quiche_stream_lib",
     srcs = [],
-    hdrs = ["quiche/common/quiche_stream.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -5081,10 +5080,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_lib",
     srcs = [
+        "quiche/common/moq_varint.cc",
         "quiche/common/quiche_data_reader.cc",
         "quiche/common/quiche_data_writer.cc",
     ],
     hdrs = [
+        "quiche/common/moq_varint.h",
         "quiche/common/quiche_data_reader.h",
         "quiche/common/quiche_data_writer.h",
         "quiche/common/quiche_linked_hash_map.h",
@@ -5094,6 +5095,8 @@ envoy_cc_library(
     deps = [
         ":quiche_common_endian_lib",
         ":quiche_common_platform",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/numeric:bits",
     ],
 )
 

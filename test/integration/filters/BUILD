@@ -208,6 +208,25 @@ envoy_cc_test_library(
 )
 
 envoy_proto_library(
+    name = "block_filter_proto",
+    srcs = ["block_filter.proto"],
+)
+
+envoy_cc_test_library(
+    name = "block_filter_lib",
+    srcs = ["block_filter.cc"],
+    deps = [
+        ":block_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
     name = "crash_filter_proto",
     srcs = ["crash_filter.proto"],
 )
