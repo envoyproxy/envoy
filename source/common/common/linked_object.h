@@ -143,6 +143,18 @@ public:
   bool inserted() const { return inserted_; }
 
   /**
+   * @return pointer to the next element in the list, or nullptr if this is the tail or the node
+   *         is not currently inserted.
+   */
+  T* next() const noexcept { return next_; }
+
+  /**
+   * @return pointer to the previous element in the list, or nullptr if this is the head or the
+   *         node is not currently inserted.
+   */
+  T* prev() const noexcept { return prev_; }
+
+  /**
    * Check whether this object is currently in the given list. This is O(n) so should only be used
    * for sanity checking in debug builds.
    * @param list supplies the list to check for membership.
