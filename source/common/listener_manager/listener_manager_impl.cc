@@ -689,6 +689,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_modified_.inc();
   }
 
+  // Notify callbacks when the listener is directly placed into the active list (workers not
+  // started). When workers are started, the notification will be fired from onListenerWarmed()
+  // or inPlaceFilterChainUpdate() instead.
+  if (!workers_started_) {
+    notifyListenerUpdateCallbacks(name, new_listener_ref);
+  }
+
   new_listener_ref.initialize();
   return true;
 }
@@ -875,6 +882,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), listener);
 }
 
 void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
@@ -903,6 +912,8 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
+
+  notifyListenerUpdateCallbacks(listener.name(), **existing_active_listener);
 }
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
@@ -1000,6 +1011,8 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
       drainListener(std::move(listener));
     }
   }
+
+  notifyListenerRemovalCallbacks(name);
 
   stats_.listener_removed_.inc();
   updateWarmingActiveGauges();
@@ -1331,6 +1344,33 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+}
+
+ListenerUpdateCallbacksHandlePtr
+ListenerManagerImpl::addListenerUpdateCallbacks(ListenerUpdateCallbacks& cb) {
+  return std::make_unique<ListenerUpdateCallbacksHandleImpl>(cb, update_callbacks_);
+}
+
+template <typename F> void ListenerManagerImpl::notifyListenerCallbacks(F notify_fn) {
+  for (auto cb_it = update_callbacks_.begin(); cb_it != update_callbacks_.end();) {
+    // The current callback may remove itself from the list, so a handle for
+    // the next item is fetched before calling the callback.
+    auto curr_cb_it = cb_it;
+    ++cb_it;
+    notify_fn(*curr_cb_it);
+  }
+}
+
+void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                                        Network::ListenerConfig& listener_config) {
+  notifyListenerCallbacks([&](ListenerUpdateCallbacks* cb) {
+    cb->onListenerAddOrUpdate(listener_name, listener_config);
+  });
+}
+
+void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {
+  notifyListenerCallbacks(
+      [&](ListenerUpdateCallbacks* cb) { cb->onListenerRemoval(listener_name); });
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);
