@@ -587,12 +587,12 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
-        "//source/extensions/formatter/generic_secret:config",
+        "//source/extensions/formatter/file_content:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/file_content/v3:pkg_cc_proto",
     ],
 )
 

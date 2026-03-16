@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.file_content.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.file_content.v3";
+option java_outer_classname = "FileContentProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/file_content/v3;file_contentv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Formatter extension for reading file contents]
+// [#extension: envoy.formatter.file_content]
+
+// FileContent formatter extension implements the ``%FILE_CONTENT(/path/to/file)%`` command operator
+// that reads the contents of the specified file. File-based data is automatically re-read when the
+// file is modified on disk, so that updates are reflected in subsequent format calls without
+// restarting Envoy.
+message FileContent {
+  // [#comment:TODO(ggreenway): This currently doesn't support directory watching. This could be added via configuration later.]
+}

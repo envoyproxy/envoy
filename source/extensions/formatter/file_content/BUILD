@@ -12,14 +12,14 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//source/common/config:datasource_lib",
-        "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/strings",
-        "@envoy_api//envoy/extensions/formatter/datasource/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/file_content/v3:pkg_cc_proto",
     ],
 )

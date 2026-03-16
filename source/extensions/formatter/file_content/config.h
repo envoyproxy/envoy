@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/formatter/datasource/v3/datasource.pb.h"
+#include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
 #include "envoy/formatter/substitution_formatter_base.h"
 #include "envoy/server/factory_context.h"
 
@@ -9,13 +9,12 @@ namespace Extensions {
 namespace Formatter {
 
 /**
- * CommandParserFactory for the %DATASOURCE(name)% formatter.
+ * CommandParserFactory for the %FILE_CONTENT(/path/to/file)% formatter.
  *
- * Resolves the current value of a named DataSource. File-based DataSources are
- * automatically re-read when the file is modified on disk, so that updates are
- * reflected in subsequent format calls without restarting Envoy.
+ * Reads the contents of the specified file and watches for changes on disk,
+ * so that updates are automatically reflected in subsequent format calls.
  */
-class DataSourceFormatterFactory : public Envoy::Formatter::CommandParserFactory {
+class FileContentFormatterFactory : public Envoy::Formatter::CommandParserFactory {
 public:
   Envoy::Formatter::CommandParserPtr
   createCommandParserFromProto(const Protobuf::Message& config,

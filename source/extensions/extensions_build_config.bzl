@@ -501,7 +501,7 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
-    "envoy.formatter.datasource":                       "//source/extensions/formatter/datasource:config",
+    "envoy.formatter.file_content":                     "//source/extensions/formatter/file_content:config",
     "envoy.formatter.generic_secret":                   "//source/extensions/formatter/generic_secret:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",

@@ -9,6 +9,7 @@
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +27,16 @@ using testing::ReturnRef;
 
 class OpenTelemetryHttpTraceExporterTest : public testing::Test {
 public:
-  OpenTelemetryHttpTraceExporterTest() = default;
+  OpenTelemetryHttpTraceExporterTest() {
+    // Wire up a real API and dispatcher so that DataSourceProvider (used by the
+    // FILE_CONTENT formatter) can read files and set up file watching.
+    api_ = Api::createApiForTest();
+    dispatcher_ = api_->allocateDispatcher("test_thread");
+
+    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(*dispatcher_));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void setup(envoy::config::core::v3::HttpService http_service) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
@@ -43,6 +53,8 @@ public:
   }
 
 protected:
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -123,7 +135,9 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
 
 // Test that formatted value headers are evaluated and applied to the outgoing request.
 TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
-  std::string yaml_string = R"EOF(
+  const std::string token_path =
+      TestEnvironment::writeStringToFileForTest("otel_api_token.txt", "my-secret-token");
+  std::string yaml_string = fmt::format(R"EOF(
   http_uri:
     uri: "https://some-o11y.com/otlp/v1/traces"
     cluster: "my_o11y_backend"
@@ -131,18 +145,16 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
   request_headers_to_add:
   - header:
       key: "authorization"
-      value: "Bearer %DATASOURCE(api-token)%"
+      value: "Bearer %FILE_CONTENT({})%"
   - header:
       key: "x-static-header"
       value: "static-value"
   formatters:
-  - name: envoy.formatter.datasource
+  - name: envoy.formatter.file_content
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.formatter.datasource.v3.DataSource
-      datasources:
-        api-token:
-          inline_string: "my-secret-token"
-  )EOF";
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+  )EOF",
+                                          token_path);
 
   envoy::config::core::v3::HttpService http_service;
   TestUtility::loadFromYaml(yaml_string, http_service);

@@ -1,0 +1,105 @@
+#include "source/extensions/formatter/file_content/config.h"
+
+#include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/config/datasource.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Formatter {
+
+namespace {
+
+constexpr absl::string_view FileContentCommand = "FILE_CONTENT";
+
+/**
+ * FormatterProvider backed by a DataSourceProvider with file watching.
+ * The DataSourceProvider automatically re-reads the file when it changes on disk.
+ */
+class FileContentFormatterProvider : public Envoy::Formatter::FormatterProvider {
+public:
+  explicit FileContentFormatterProvider(
+      Config::DataSource::DataSourceProviderSharedPtr<std::string> provider)
+      : provider_(std::move(provider)) {}
+
+  absl::optional<std::string> format(const Envoy::Formatter::Context&,
+                                     const StreamInfo::StreamInfo&) const override {
+    const auto data = provider_->data();
+    if (!data) {
+      return absl::nullopt;
+    }
+    return *data;
+  }
+
+  Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override {
+    Protobuf::Value val;
+    const auto opt = format(context, stream_info);
+    if (opt.has_value()) {
+      val.set_string_value(*opt);
+    }
+    return val;
+  }
+
+private:
+  Config::DataSource::DataSourceProviderSharedPtr<std::string> provider_;
+};
+
+/**
+ * CommandParser that handles the %FILE_CONTENT(/path/to/file)% command.
+ * Creates a DataSourceProvider with file watching for each parsed file path.
+ */
+class FileContentCommandParser : public Envoy::Formatter::CommandParser {
+public:
+  explicit FileContentCommandParser(
+      Server::Configuration::ServerFactoryContext& server_context)
+      : server_context_(server_context) {}
+
+  Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
+                                               absl::string_view subcommand,
+                                               absl::optional<size_t>) const override {
+    if (command != FileContentCommand) {
+      return nullptr;
+    }
+
+    envoy::config::core::v3::DataSource source;
+    source.set_filename(std::string(subcommand));
+    const Config::DataSource::ProviderOptions options{.allow_empty = true, .modify_watch = true};
+
+    auto provider = THROW_OR_RETURN_VALUE(
+        Config::DataSource::DataSourceProvider<std::string>::create(
+            source, server_context_.mainThreadDispatcher(), server_context_.threadLocal(),
+            server_context_.api(),
+            [](absl::string_view data) -> absl::StatusOr<std::shared_ptr<std::string>> {
+              return std::make_shared<std::string>(data);
+            },
+            options),
+        Config::DataSource::DataSourceProviderPtr<std::string>);
+
+    return std::make_unique<FileContentFormatterProvider>(
+        Config::DataSource::DataSourceProviderSharedPtr<std::string>(std::move(provider)));
+  }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+};
+
+} // namespace
+
+Envoy::Formatter::CommandParserPtr FileContentFormatterFactory::createCommandParserFromProto(
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext& context) {
+  return std::make_unique<FileContentCommandParser>(context.serverFactoryContext());
+}
+
+ProtobufTypes::MessagePtr FileContentFormatterFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::formatter::file_content::v3::FileContent>();
+}
+
+std::string FileContentFormatterFactory::name() const { return "envoy.formatter.file_content"; }
+
+REGISTER_FACTORY(FileContentFormatterFactory, Envoy::Formatter::CommandParserFactory);
+
+} // namespace Formatter
+} // namespace Extensions
+} // namespace Envoy

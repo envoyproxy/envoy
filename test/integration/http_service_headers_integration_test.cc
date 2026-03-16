@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/formatter/generic_secret/v3/generic_secret.pb.h"
+#include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
@@ -27,9 +27,8 @@ public:
   }
 
   void initialize() override {
-    // Write the initial SDS YAML with the secret as an inline_string.
-    writeSdsYaml("initial-token");
-    const std::string sds_yaml_path = TestEnvironment::temporaryPath("otel_token_sds.yaml");
+    // Write the initial token file.
+    token_path_ = TestEnvironment::writeStringToFileForTest("otel_api_token.txt", "initial-token");
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -39,7 +38,7 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [this, sds_yaml_path](
+        [this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* access_log = hcm.add_access_log();
@@ -58,20 +57,17 @@ public:
           http->mutable_http_uri()->set_cluster("accesslog");
           http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
 
-          // Authorization header using %SECRET(api-token)% from a file-based SDS source.
+          // Authorization header using %FILE_CONTENT(path)% for the token file.
           auto* header_option = http->add_request_headers_to_add();
           auto* header = header_option->mutable_header();
           header->set_key("authorization");
-          header->set_value("Bearer %SECRET(api-token)%");
+          header->set_value(fmt::format("Bearer %FILE_CONTENT({})%", token_path_));
 
-          // Configure the generic_secret formatter extension at the HttpService level.
-          auto* formatter_ext = http->add_formatters();
-          formatter_ext->set_name("envoy.formatter.generic_secret");
-          envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret_cfg;
-          auto& secret_cfg = (*generic_secret_cfg.mutable_secret_configs())["api-token"];
-          secret_cfg.set_name("api-token");
-          secret_cfg.mutable_sds_config()->mutable_path_config_source()->set_path(sds_yaml_path);
-          formatter_ext->mutable_typed_config()->PackFrom(generic_secret_cfg);
+          // FILE_CONTENT requires explicit formatter configuration.
+          auto* formatter = http->add_formatters();
+          formatter->set_name("envoy.formatter.file_content");
+          envoy::extensions::formatter::file_content::v3::FileContent file_content_config;
+          formatter->mutable_typed_config()->PackFrom(file_content_config);
 
           access_log->mutable_typed_config()->PackFrom(config);
         });
@@ -84,35 +80,10 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  // Write an SDS YAML file with the given token value.
-  static void writeSdsYaml(const std::string& token) {
-    TestEnvironment::writeStringToFileForTest("otel_token_sds.yaml", fmt::format(R"EOF(
-resources:
-- "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
-  name: api-token
-  generic_secret:
-    secret:
-      inline_string: "{}"
-)EOF",
-                                                                                 token));
-  }
-
-  // Rotate the secret by atomically replacing the SDS YAML file.
-  // FilesystemSubscriptionImpl watches for MovedTo (rename) events only, so we
-  // write to a temp file and rename to trigger the watcher.
-  void rotateSecret(const std::string& new_token) {
-    const std::string new_yaml = fmt::format(R"EOF(
-resources:
-- "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
-  name: api-token
-  generic_secret:
-    secret:
-      inline_string: "{}"
-)EOF",
-                                             new_token);
-    TestEnvironment::writeStringToFileForTest("otel_token_sds.yaml.tmp", new_yaml);
-    TestEnvironment::renameFile(TestEnvironment::temporaryPath("otel_token_sds.yaml.tmp"),
-                                TestEnvironment::temporaryPath("otel_token_sds.yaml"));
+  // Rotate the token by overwriting the file in place.
+  // DataSourceProvider with modify_watch watches for Modified events.
+  void rotateToken(const std::string& new_token) {
+    TestEnvironment::writeStringToFileForTest("otel_api_token.txt", new_token);
   }
 
   std::string captureAuthorizationHeader() {
@@ -132,6 +103,8 @@ resources:
     EXPECT_TRUE(log_connection->waitForDisconnect());
     return auth_value;
   }
+
+  std::string token_path_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HttpServiceHeadersRotationIntegrationTest,
@@ -140,7 +113,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpServiceHeadersRotationIntegrationTest,
                            return TestUtility::ipVersionToString(info.param);
                          });
 
-TEST_P(HttpServiceHeadersRotationIntegrationTest, SecretRotationReflectedInExportHeaders) {
+TEST_P(HttpServiceHeadersRotationIntegrationTest, FileRotationReflectedInExportHeaders) {
   autonomous_upstream_ = true;
   initialize();
 
@@ -150,11 +123,11 @@ TEST_P(HttpServiceHeadersRotationIntegrationTest, SecretRotationReflectedInExpor
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("Bearer initial-token", captureAuthorizationHeader());
 
-  // Rotate the secret and wait for the SDS update to propagate.
-  rotateSecret("rotated-token");
-  test_server_->waitForCounterGe("sds.api-token.update_success", 2);
+  // Rotate the token file and wait briefly for the file watcher to pick it up.
+  rotateToken("rotated-token");
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
 
-  // Trigger a second access log entry; the flush will use the rotated secret value.
+  // Trigger a second access log entry; the flush will use the rotated token value.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("Bearer rotated-token", captureAuthorizationHeader());

@@ -96,12 +96,13 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.opentelemetry"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/formatter/datasource:config",
+        "//source/extensions/formatter/file_content:config",
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
