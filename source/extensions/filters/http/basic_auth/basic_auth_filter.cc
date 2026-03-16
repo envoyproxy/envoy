@@ -35,10 +35,11 @@ std::string computeSHA1(absl::string_view password) {
 
 FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
                            const std::string& authentication_header, bool allow_missing,
-                           const std::string& stats_prefix, Stats::Scope& scope)
+                           bool emit_dynamic_metadata, const std::string& stats_prefix,
+                           Stats::Scope& scope)
     : users_(std::move(users)), forward_username_header_(forward_username_header),
       authentication_header_(Http::LowerCaseString(authentication_header)),
-      allow_missing_(allow_missing),
+      allow_missing_(allow_missing), emit_dynamic_metadata_(emit_dynamic_metadata),
       stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
@@ -100,7 +101,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
     headers.setCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
   }
 
-  setDynamicMetadata(username);
+  if (config_->emitDynamicMetadata()) {
+    setDynamicMetadata(username);
+  }
   config_->stats().allowed_.inc();
   return Http::FilterHeadersStatus::Continue;
 }

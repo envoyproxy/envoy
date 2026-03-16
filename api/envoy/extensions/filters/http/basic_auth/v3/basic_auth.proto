@@ -56,12 +56,17 @@ message BasicAuth {
   // achieve OR semantics: a request is accepted if any one configured auth method succeeds.
   // When allow_missing is true on all auth filters, pair it with an RBAC filter that checks
   // the ``envoy.filters.http.basic_auth`` dynamic metadata to ensure at least one method
-  // authenticated the request.
-  //
-  // On successful authentication, this filter always emits dynamic metadata under the
-  // ``envoy.filters.http.basic_auth`` namespace with key ``username`` set to the
-  // authenticated username, regardless of this field.
+  // authenticated the request. Requires ``emit_dynamic_metadata`` to be set to true.
   bool allow_missing = 4;
+
+  // If set to true, the filter emits dynamic metadata on successful authentication under the
+  // ``envoy.filters.http.basic_auth`` namespace with key ``username`` set to the authenticated
+  // username.
+  //
+  // This is typically enabled together with ``allow_missing`` when combining BasicAuth with
+  // other authentication methods (e.g. JWT) and using a downstream RBAC filter to enforce
+  // OR semantics.
+  bool emit_dynamic_metadata = 5;
 }
 
 // Extra settings that may be added to per-route configuration for

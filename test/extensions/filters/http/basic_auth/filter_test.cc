@@ -19,7 +19,8 @@ public:
     users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
-                                             /*allow_missing=*/false, "stats",
+                                             /*allow_missing=*/false,
+                                             /*emit_dynamic_metadata=*/false, "stats",
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -53,8 +54,16 @@ TEST_F(FilterTest, BasicAuth) {
   EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
 }
 
-TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccess) {
-  // user1:test1
+TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
+  auto config = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
+                                               /*allow_missing=*/false,
+                                               /*emit_dynamic_metadata=*/true, "stats",
+                                               *stats_.rootScope());
+  auto filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
   Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
   request_headers.setScheme("http");
   request_headers.setHost("host");
@@ -67,10 +76,21 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccess) {
         captured_metadata = metadata;
       }));
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
 
   ASSERT_TRUE(captured_metadata.fields().contains("username"));
   EXPECT_EQ("user1", captured_metadata.fields().at("username").string_value());
+}
+
+TEST_F(FilterTest, BasicAuthDoesNotSetDynamicMetadataByDefault) {
+  // emit_dynamic_metadata defaults to false — no metadata call on successful auth.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(FilterTest, UserNotExist) {
@@ -298,8 +318,8 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
 
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
-      std::move(users), "x-username", "x-authorization-override", /*allow_missing=*/false, "stats",
-      *stats_.rootScope());
+      std::move(users), "x-username", "x-authorization-override", /*allow_missing=*/false,
+      /*emit_dynamic_metadata=*/false, "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -322,7 +342,8 @@ public:
     UserMap users;
     users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
-                                             /*allow_missing=*/true, "stats",
+                                             /*allow_missing=*/true,
+                                             /*emit_dynamic_metadata=*/true, "stats",
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);

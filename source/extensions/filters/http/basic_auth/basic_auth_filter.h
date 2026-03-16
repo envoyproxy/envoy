@@ -46,12 +46,13 @@ class FilterConfig {
 public:
   FilterConfig(UserMap&& users, const std::string& forward_username_header,
                const std::string& authentication_header, bool allow_missing,
-               const std::string& stats_prefix, Stats::Scope& scope);
+               bool emit_dynamic_metadata, const std::string& stats_prefix, Stats::Scope& scope);
   const BasicAuthStats& stats() const { return stats_; }
   const std::string& forwardUsernameHeader() const { return forward_username_header_; }
   const UserMap& users() const { return users_; }
   const Http::LowerCaseString& authenticationHeader() const { return authentication_header_; }
   bool allowMissing() const { return allow_missing_; }
+  bool emitDynamicMetadata() const { return emit_dynamic_metadata_; }
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -62,6 +63,7 @@ private:
   const std::string forward_username_header_;
   const Http::LowerCaseString authentication_header_;
   const bool allow_missing_;
+  const bool emit_dynamic_metadata_;
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
