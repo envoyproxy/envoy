@@ -12,6 +12,11 @@ HttpServiceHeadersApplicator::HttpServiceHeadersApplicator(
     Server::Configuration::ServerFactoryContext& server_context, absl::Status& creation_status)
     : stream_info_(server_context.timeSource(), nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain) {
+
+  // Formatters can only be instantiated on the main thread because some create thread local
+  // storage.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
   Server::GenericFactoryContextImpl generic_context{server_context,
                                                     server_context.messageValidationVisitor()};
 

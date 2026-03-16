@@ -18,9 +18,9 @@ namespace OpenTelemetry {
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
     Upstream::ClusterManager& cluster_manager,
     const envoy::config::core::v3::HttpService& http_service,
-    Server::Configuration::ServerFactoryContext& server_context, absl::Status& creation_status)
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator)
     : cluster_manager_(cluster_manager), http_service_(http_service),
-      headers_applicator_(http_service_, server_context, creation_status) {}
+      headers_applicator_(std::move(headers_applicator)) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
   std::string request_body;
@@ -52,7 +52,7 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
 
   // Add all custom headers to the request (static values set once; formatted values
   // re-evaluated now so that runtime updates, e.g. SDS rotation, are reflected).
-  headers_applicator_.apply(message->headers());
+  headers_applicator_->apply(message->headers());
 
   message->body().add(request_body);
 

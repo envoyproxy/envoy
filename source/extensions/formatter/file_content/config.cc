@@ -67,6 +67,9 @@ public:
       return nullptr;
     }
 
+    // This formatter creates thread locals which can only happen on the main thread.
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+
     envoy::config::core::v3::DataSource source;
     source.set_filename(std::string(subcommand));
     const Config::DataSource::ProviderOptions options{.allow_empty = true, .modify_watch = true};

@@ -25,10 +25,10 @@ namespace OpenTelemetry {
 class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
                                        public Http::AsyncClient::Callbacks {
 public:
-  OpenTelemetryHttpTraceExporter(Upstream::ClusterManager& cluster_manager,
-                                 const envoy::config::core::v3::HttpService& http_service,
-                                 Server::Configuration::ServerFactoryContext& server_context,
-                                 absl::Status& creation_status);
+  OpenTelemetryHttpTraceExporter(
+      Upstream::ClusterManager& cluster_manager,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator);
 
   bool log(const ExportTraceServiceRequest& request) override;
 
@@ -42,7 +42,7 @@ private:
   envoy::config::core::v3::HttpService http_service_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
-  Http::HttpServiceHeadersApplicator headers_applicator_;
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
 };
 
 } // namespace OpenTelemetry

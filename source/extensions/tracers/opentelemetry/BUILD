@@ -44,6 +44,7 @@ envoy_cc_library(
         ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",

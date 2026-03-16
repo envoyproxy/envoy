@@ -1,3 +1,4 @@
+#include "source/common/http/http_service_headers.h"
 #include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -56,10 +57,12 @@ public:
         .WillByDefault(ReturnRef(NODE_NAME));
 
     absl::Status creation_status = absl::OkStatus();
-    http_access_logger_ = std::make_unique<HttpAccessLoggerImpl>(
-        cluster_manager_, http_service, config, dispatcher_,
-        factory_context_.server_factory_context_, creation_status);
+    auto headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
+        http_service, factory_context_.server_factory_context_, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
+    http_access_logger_ = std::make_unique<HttpAccessLoggerImpl>(
+        cluster_manager_, http_service, std::move(headers_applicator), config, dispatcher_,
+        factory_context_.server_factory_context_);
   }
 
 protected:
@@ -364,10 +367,15 @@ TEST(HttpAccessLoggerCacheTest, CacheHitReturnsSameLogger) {
 
   auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(factory_context.server_factory_context_);
 
-  auto logger1 = cache->getOrCreateLogger(config, http_service);
+  absl::Status creation_status = absl::OkStatus();
+  auto headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
+      http_service, factory_context.server_factory_context_, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
+
+  auto logger1 = cache->getOrCreateLogger(config, http_service, headers_applicator);
   ASSERT_NE(nullptr, logger1);
 
-  auto logger2 = cache->getOrCreateLogger(config, http_service);
+  auto logger2 = cache->getOrCreateLogger(config, http_service, headers_applicator);
   EXPECT_EQ(logger1.get(), logger2.get());
 }
 

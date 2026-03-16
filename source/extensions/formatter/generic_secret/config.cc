@@ -93,6 +93,9 @@ Envoy::Formatter::CommandParserPtr GenericSecretFormatterFactory::createCommandP
       const envoy::extensions::formatter::generic_secret::v3::GenericSecret&>(
       config, context.messageValidationVisitor());
 
+  // This formatter creates thread locals which can only happen on the main thread.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
   auto& server_context = context.serverFactoryContext();
 
   GenericSecretCommandParser::ProviderMap providers;

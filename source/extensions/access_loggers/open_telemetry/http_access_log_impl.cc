@@ -24,12 +24,12 @@ namespace OpenTelemetry {
 HttpAccessLoggerImpl::HttpAccessLoggerImpl(
     Upstream::ClusterManager& cluster_manager,
     const envoy::config::core::v3::HttpService& http_service,
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context,
-    absl::Status& creation_status)
+    Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context)
     : cluster_manager_(cluster_manager), http_service_(http_service),
-      headers_applicator_(http_service_, server_context, creation_status),
+      headers_applicator_(std::move(headers_applicator)),
       buffer_flush_interval_(getBufferFlushInterval(config)),
       max_buffer_size_bytes_(getBufferSizeBytes(config)),
       stats_({ALL_OTLP_ACCESS_LOG_STATS(
@@ -92,7 +92,7 @@ void HttpAccessLoggerImpl::flush() {
 
   // Adds all custom headers to the request (static values set once; formatted values
   // re-evaluated now so that runtime updates, e.g. SDS rotation, are reflected).
-  headers_applicator_.apply(message->headers());
+  headers_applicator_->apply(message->headers());
 
   message->body().add(request_body);
 
@@ -152,7 +152,8 @@ HttpAccessLoggerCacheImpl::HttpAccessLoggerCacheImpl(
 HttpAccessLoggerImpl::SharedPtr HttpAccessLoggerCacheImpl::getOrCreateLogger(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    const envoy::config::core::v3::HttpService& http_service) {
+    const envoy::config::core::v3::HttpService& http_service,
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator) {
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const std::size_t config_hash = MessageUtil::hash(config) ^ MessageUtil::hash(http_service);
 
@@ -161,13 +162,31 @@ HttpAccessLoggerImpl::SharedPtr HttpAccessLoggerCacheImpl::getOrCreateLogger(
     return it->second;
   }
 
-  absl::Status creation_status = absl::OkStatus();
-  auto logger =
-      std::make_shared<HttpAccessLoggerImpl>(server_context_.clusterManager(), http_service, config,
-                                             cache.dispatcher_, server_context_, creation_status);
-  THROW_IF_NOT_OK_REF(creation_status);
+  auto logger = std::make_shared<HttpAccessLoggerImpl>(server_context_.clusterManager(),
+                                                       http_service, std::move(headers_applicator),
+                                                       config, cache.dispatcher_, server_context_);
   cache.access_loggers_.emplace(config_hash, logger);
   return logger;
+}
+
+std::shared_ptr<const Http::HttpServiceHeadersApplicator>
+HttpAccessLoggerCacheImpl::getOrCreateApplicator(
+    const envoy::config::core::v3::HttpService& http_service,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  const std::size_t config_hash = MessageUtil::hash(http_service);
+
+  const auto it = applicators_.find(config_hash);
+  if (it != applicators_.end()) {
+    return it->second;
+  }
+
+  absl::Status creation_status = absl::OkStatus();
+  auto applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
+      http_service, server_context, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
+  applicators_.emplace(config_hash, applicator);
+  return applicator;
 }
 
 HttpAccessLog::ThreadLocalLogger::ThreadLocalLogger(HttpAccessLoggerImpl::SharedPtr logger)
@@ -176,15 +195,24 @@ HttpAccessLog::ThreadLocalLogger::ThreadLocalLogger(HttpAccessLoggerImpl::Shared
 HttpAccessLog::HttpAccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, HttpAccessLoggerCacheSharedPtr access_logger_cache,
+    HttpAccessLoggerCacheSharedPtr access_logger_cache,
+    Server::Configuration::ServerFactoryContext& server_context,
     const std::vector<Formatter::CommandParserPtr>& commands)
-    : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
+    : Common::ImplBase(std::move(filter)), tls_slot_(server_context.threadLocal().allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)), http_service_(config.http_service()),
       filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),
       custom_tags_(getCustomTags(config)) {
 
-  tls_slot_->set([config, logger = access_logger_cache_->getOrCreateLogger(config, http_service_)](
-                     Event::Dispatcher&) { return std::make_shared<ThreadLocalLogger>(logger); });
+  // Get or create the headers applicator on the main thread. This is required because
+  // DataSourceProvider (used by FILE_CONTENT formatter) allocates TLS slots,
+  // which can only happen on the main thread.
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator =
+      access_logger_cache_->getOrCreateApplicator(http_service_, server_context);
+
+  tls_slot_->set([this, config, headers_applicator](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalLogger>(
+        access_logger_cache_->getOrCreateLogger(config, http_service_, headers_applicator));
+  });
 
   // Packs the body "AnyValue" to a "KeyValueList" only if it's not empty. Otherwise the
   // formatter would fail to parse it.

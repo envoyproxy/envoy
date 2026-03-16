@@ -79,8 +79,9 @@ getHttpAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& c
   // Create appropriate access log based on transport type.
   if (has_http_service) {
     return std::make_shared<HttpAccessLog>(
-        std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
-        getHttpAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
+        std::move(filter), proto_config,
+        getHttpAccessLoggerCacheSingleton(context.serverFactoryContext()),
+        context.serverFactoryContext(), commands);
   }
 
   return std::make_shared<AccessLog>(
