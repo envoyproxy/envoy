@@ -15,7 +15,7 @@ public:
   ~MockListenerUpdateCallbacks() override;
 
   MOCK_METHOD(void, onListenerAddOrUpdate,
-              (absl::string_view listener_name, const ListenerConfigCommand& command));
+              (absl::string_view listener_name, const Network::ListenerConfig& listener_config));
   MOCK_METHOD(void, onListenerRemoval, (const std::string& listener_name));
 };
 } // namespace Server

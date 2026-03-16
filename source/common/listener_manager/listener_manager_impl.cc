@@ -1363,11 +1363,9 @@ template <typename F> void ListenerManagerImpl::notifyListenerCallbacks(F notify
 
 void ListenerManagerImpl::notifyListenerUpdateCallbacks(absl::string_view listener_name,
                                                         Network::ListenerConfig& listener_config) {
-  const ListenerConfigCommand command = [&listener_config]() -> Network::ListenerConfig& {
-    return listener_config;
-  };
-  notifyListenerCallbacks(
-      [&](ListenerUpdateCallbacks* cb) { cb->onListenerAddOrUpdate(listener_name, command); });
+  notifyListenerCallbacks([&](ListenerUpdateCallbacks* cb) {
+    cb->onListenerAddOrUpdate(listener_name, listener_config);
+  });
 }
 
 void ListenerManagerImpl::notifyListenerRemovalCallbacks(const std::string& listener_name) {

@@ -8974,7 +8974,7 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
       .WillOnce(Invoke(
-          [&cb_handle](absl::string_view, const ListenerConfigCommand&) { cb_handle.reset(); }));
+          [&cb_handle](absl::string_view, const Network::ListenerConfig&) { cb_handle.reset(); }));
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
@@ -9128,9 +9128,8 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(false, false);
   EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
-      .WillOnce(Invoke([](absl::string_view, const ListenerConfigCommand& get_listener) {
-        Network::ListenerConfig& config = get_listener();
-        EXPECT_EQ("foo", config.name());
+      .WillOnce(Invoke([](absl::string_view, const Network::ListenerConfig& listener_config) {
+        EXPECT_EQ("foo", listener_config.name());
       }));
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false);

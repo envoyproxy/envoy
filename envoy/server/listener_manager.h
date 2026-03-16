@@ -29,7 +29,6 @@ namespace Server {
  * ListenerUpdateCallbacks provide a way to expose Listener lifecycle events in the
  * ListenerManager.
  */
-using ListenerConfigCommand = std::function<Network::ListenerConfig&()>;
 class ListenerUpdateCallbacks {
 public:
   virtual ~ListenerUpdateCallbacks() = default;
@@ -38,11 +37,10 @@ public:
    * onListenerAddOrUpdate is called when a new listener is added or an existing listener
    * is updated in the ListenerManager.
    * @param listener_name the name of the changed listener.
-   * @param get_listener is a callable that will provide the ListenerConfig that represents the
-   * updated listener. It should be used within the call or discarded.
+   * @param listener_config the ListenerConfig that represents the updated listener.
    */
   virtual void onListenerAddOrUpdate(absl::string_view listener_name,
-                                     const ListenerConfigCommand& get_listener) PURE;
+                                     const Network::ListenerConfig& listener_config) PURE;
   /**
    * onListenerRemoval is called when a listener is removed; the argument is the listener name.
    * @param listener_name is the name of the removed listener.
