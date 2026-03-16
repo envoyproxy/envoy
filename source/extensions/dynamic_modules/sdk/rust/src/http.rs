@@ -846,16 +846,11 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
-  ///
-  /// The `grpc_status` parameter is the gRPC status code for gRPC requests. Use `None` to indicate
-  /// no gRPC status (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC
-  /// status codes. This is only meaningful when the downstream request is a gRPC request.
   fn send_response<'a>(
     &mut self,
     status_code: u32,
     headers: &'a [(&'a str, &'a [u8])],
     body: Option<&'a [u8]>,
-    grpc_status: Option<i32>,
     details: Option<&'a str>,
   );
 
@@ -942,6 +937,70 @@ pub trait EnvoyHttpFilter {
     &'a self,
     source: abi::envoy_dynamic_module_type_metadata_source,
   ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Append a number value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Append a string value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Append a bool value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool;
+
+  /// Get the number of elements in the metadata list stored under the given namespace and key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// or the value is not a list.
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize>;
+
+  /// Get the number value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a number.
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64>;
+
+  /// Get the string value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a string.
+  ///
+  /// The returned buffer's lifetime is tied to the current event hook.
+  fn get_metadata_list_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the bool value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a bool.
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool>;
 
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
@@ -1220,14 +1279,6 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
-
-  /// Get the gRPC status code from the response.
-  ///
-  /// This checks response trailers, response headers, and infers from the HTTP status code.
-  /// Returns `None` if no gRPC status is available (e.g., the response is not a gRPC response).
-  fn get_response_grpc_status(&self) -> Option<i64> {
-    self.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseGrpcStatus)
-  }
 
   /// Send an HTTP callout to the given cluster with the given headers and body.
   /// Multiple callouts can be made from the same filter. Different callouts can be
@@ -2140,7 +2191,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     status_code: u32,
     headers: &[(&str, &[u8])],
     body: Option<&[u8]>,
-    grpc_status: Option<i32>,
     details: Option<&str>,
   ) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
@@ -2148,29 +2198,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let details_length = details.map(|s| s.len()).unwrap_or(0);
 
-    // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
-    // picks it up via modify_headers without requiring an ABI change.
-    let grpc_status_str;
-    let merged_headers;
-    let (final_headers_ptr, final_headers_len) = if let Some(status) = grpc_status {
-      grpc_status_str = status.to_string();
-      let mut h: Vec<(&str, &[u8])> = Vec::with_capacity(headers.len() + 1);
-      h.extend_from_slice(headers);
-      h.push(("grpc-status", grpc_status_str.as_bytes()));
-      merged_headers = h;
-      let HeaderPairSlice(ptr, len) = merged_headers.as_slice().into();
-      (ptr, len)
-    } else {
-      let HeaderPairSlice(ptr, len) = headers.into();
-      (ptr, len)
-    };
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        final_headers_ptr as *mut _,
-        final_headers_len,
+        headers_ptr as *mut _,
+        headers_len,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: body_ptr as *mut _,
           length: body_length,
@@ -2405,6 +2440,140 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
           .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
           .collect(),
       )
+    } else {
+      None
+    }
+  }
+
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize> {
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
     } else {
       None
     }

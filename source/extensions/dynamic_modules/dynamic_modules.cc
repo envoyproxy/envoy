@@ -1,11 +1,14 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include <dlfcn.h>
+#include <unistd.h>
 
+#include <cerrno>
 #include <string>
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "absl/strings/str_cat.h"
@@ -146,6 +149,53 @@ void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   // avoid unnecessary copy because it is likely that this is only called for a constant string,
   // though this is not a performance critical path.
   return dlsym(handle_, std::string(symbol_ref).c_str());
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  std::filesystem::path temp_file_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+
+  // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
+  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
+  // returns the existing handle without re-init.
+  std::string staging_template = temp_file_path.string() + ".XXXXXX";
+  int fd = mkstemp(staging_template.data());
+  if (fd == -1) {
+    return absl::InternalError(absl::StrCat(
+        "Failed to create temporary staging file for dynamic module: ", staging_template, ": ",
+        errorDetails(errno)));
+  }
+
+  size_t total_written = 0;
+  while (total_written < module_bytes.size()) {
+    ssize_t written =
+        write(fd, module_bytes.data() + total_written, module_bytes.size() - total_written);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      close(fd);
+      std::filesystem::remove(staging_template);
+      return absl::InternalError(
+          absl::StrCat("Failed to write to staging file for dynamic module: ", staging_template));
+    }
+    total_written += written;
+  }
+  close(fd);
+
+  std::filesystem::path staging_path(staging_template);
+  std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
+                               std::filesystem::perm_options::replace);
+  std::filesystem::rename(staging_path, temp_file_path);
+  auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
+  if (!result.ok()) {
+    // Clean up the invalid file.
+    std::filesystem::remove(temp_file_path);
+  }
+  return result;
 }
 
 absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {

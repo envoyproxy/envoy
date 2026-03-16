@@ -13,7 +13,6 @@
 #import "library/objective-c/EnvoyKeyValueStore.h"
 #import "library/objective-c/EnvoyLogger.h"
 #import "library/objective-c/EnvoyNativeFilterConfig.h"
-#import "library/objective-c/EnvoyNetworkMonitor.h"
 #import "library/objective-c/EnvoyStringAccessor.h"
 
 #import "library/common/types/c_types.h"
@@ -32,12 +31,10 @@ NS_ASSUME_NONNULL_BEGIN
  running.
  @param logger Logging interface.
  @param eventTracker Event tracking interface.
- @param networkMonitoringMode Configure how the engines observe network reachability.
  */
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
-                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode;
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker;
 /**
  Run the Envoy engine with the provided configuration and log level.
 

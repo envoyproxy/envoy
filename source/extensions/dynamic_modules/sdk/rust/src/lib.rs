@@ -823,10 +823,9 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///   fn choose_host(
 ///     &mut self,
 ///     _context: Option<&dyn ClusterLbContext>,
-///   ) -> Option<
-///     envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
-///   > {
-///     None
+///     _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+///   ) -> HostSelectionResult {
+///     HostSelectionResult::NoHost
 ///   }
 /// }
 /// ```

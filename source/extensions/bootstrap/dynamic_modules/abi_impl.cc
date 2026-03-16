@@ -575,4 +575,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
   return admin->removeHandler(prefix_str);
 }
 
+// -------------------- Cluster Lifecycle Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableClusterLifecycle();
+}
+
 } // extern "C"

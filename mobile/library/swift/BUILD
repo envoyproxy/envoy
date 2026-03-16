@@ -23,7 +23,6 @@ swift_library(
         "HeadersContainer.swift",
         "KeyValueStore.swift",
         "LogLevel.swift",
-        "NetworkMonitoringMode.swift",
         "PulseClient.swift",
         "PulseClientImpl.swift",
         "RequestHeaders.swift",
