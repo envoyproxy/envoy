@@ -57,25 +57,6 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       target: python-tests
 
-  python-wheel:
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-python }}
-    needs: load
-    name: python-wheel
-    uses: ./.github/workflows/_mobile_container_ci.yml
-    with:
-      args: >-
-        build
-        --config=ci
-        --config=mobile-rbe
-        //library/python:envoy_mobile_wheel
-      bind-mount: false
-      request: ${{ needs.load.outputs.request }}
-      target: python-wheel
-
   request:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
@@ -94,7 +75,6 @@ jobs:
     needs:
     - load
     - python-tests
-    - python-wheel
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}
