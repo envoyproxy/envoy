@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -20,5 +21,15 @@ envoy_cc_extension(
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "rping_interceptor_lib",
+    srcs = ["rping_interceptor.cc"],
+    hdrs = ["rping_interceptor.h"],
+    deps = [
+        ":reverse_connection_utility_lib",
+        "//source/common/network:default_socket_interface_lib",
     ],
 )

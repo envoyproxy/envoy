@@ -17,6 +17,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/common:utility_lib",
         "//source/extensions/dynamic_modules/abi",
     ],
 )
@@ -32,6 +33,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ],
+    alwayslink = True,
 )
 
 go_library(

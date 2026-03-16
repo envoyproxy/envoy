@@ -3952,6 +3952,59 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_request_attributes()->Add("xds.virtual_host_metadata");
+
+  config_helper_.addConfigModifier([](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* metadata = vh->mutable_metadata();
+
+    Protobuf::Struct struct_val;
+    (*struct_val.mutable_fields())["apiIdentifier"].set_string_value("test-api");
+    (*struct_val.mutable_fields())["extHost"].set_string_value("test-host");
+    (*metadata->mutable_filter_metadata())["someKey"] = struct_val;
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true,
+      [](const ProcessingRequest& req, ProcessingResponse& resp) -> bool {
+        // Send a valid request-headers response for this request-headers processing step.
+        resp.mutable_request_headers();
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_TRUE(proto_struct.fields().contains("xds.virtual_host_metadata"));
+        const auto& metadata_textproto =
+            proto_struct.fields().at("xds.virtual_host_metadata").string_value();
+        envoy::config::core::v3::Metadata parsed_metadata;
+        const bool parsed =
+            Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
+        EXPECT_TRUE(parsed);
+        EXPECT_TRUE(parsed_metadata.filter_metadata().contains("someKey"));
+        EXPECT_EQ(parsed_metadata.filter_metadata()
+                      .at("someKey")
+                      .fields()
+                      .at("apiIdentifier")
+                      .string_value(),
+                  "test-api");
+        EXPECT_EQ(
+            parsed_metadata.filter_metadata().at("someKey").fields().at("extHost").string_value(),
+            "test-host");
+        return true;
+      });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);

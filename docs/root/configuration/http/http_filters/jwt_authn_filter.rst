@@ -217,35 +217,21 @@ In this example the `tenants` claim is an object, therefore the JWT claim ("sub"
     x-jwt-claim-nested-key: <JWT Claim>
     x-jwt-tenants: <Base64 encoded JSON JWT Claim>
 
+Statistics
+----------
 
-.. _config_jwt_authn_extract_only_security:
+The JWT authentication filter outputs statistics in the ``http.<stat_prefix>.jwt_authn.`` namespace.
+The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
 
-Extract-Only Mode Security Considerations
-------------------------------------------
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
 
-.. warning::
-
-   **CRITICAL SECURITY WARNING**: The ``extract_only_without_validation``
-   requirement type does **NOT** verify JWT signatures. Any party can craft
-   a JWT with arbitrary claims using ``alg:none`` or a self-signed key,
-   and those claims will be extracted and forwarded as HTTP headers.
-
-   **You MUST NOT use this mode if:**
-
-   - RBAC policies match on JWT-derived headers (e.g., ``x-jwt-claim-role``)
-   - ``ext_authz`` services use JWT-derived headers for authorization decisions
-   - Backend services trust JWT-derived headers for access control
-
-   **Behavior (v1.38+):**
-
-   Headers from ``extract_only_without_validation`` are prefixed with
-   ``x-jwt-unverified-`` by default. A ``x-jwt-signature-verified: false``
-   header is also set. Configure ``allow_unprefixed_headers: true`` to
-   restore the previous behavior (NOT RECOMMENDED).
-
-   This change is runtime-guarded by
-   ``envoy.reloadable_features.jwt_authn_prefix_unverified_claims``.
-
-   **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
-   or ``local_jwks`` for full signature verification.
-
+  allowed, Counter, Total requests that passed JWT authentication
+  denied, Counter, Total requests that failed JWT authentication
+  cors_preflight_bypassed, Counter, Total CORS preflight requests that bypassed JWT authentication
+  jwks_fetch_success, Counter, Total successful JWKS (JSON Web Key Set) remote fetches
+  jwks_fetch_failed, Counter, Total failed JWKS remote fetch attempts
+  jwt_cache_hit, Counter, Total JWT cache hits where a previously validated token was reused
+  jwt_cache_miss, Counter, Total JWT cache misses requiring full token validation

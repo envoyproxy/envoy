@@ -23,11 +23,16 @@ public:
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
                    bool upstream_filter = false) {
-    TestEnvironment::setEnvVar(
-        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
-                                    GetParam()),
-        1);
+    std::string module_name = "http_integration_test";
+    if (GetParam() != "rust_static") {
+      TestEnvironment::setEnvVar(
+          "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+          TestEnvironment::substitute(
+              "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam()),
+          1);
+    } else {
+      module_name += "_static";
+    }
     TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
     constexpr auto filter_config = R"EOF(
@@ -35,7 +40,7 @@ name: envoy.extensions.filters.http.dynamic_modules
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
   dynamic_module_config:
-    name: http_integration_test
+    name: {}
   filter_name: {}
   filter_config:
     "@type": {}
@@ -45,7 +50,7 @@ typed_config:
     if (!per_route_config.empty()) {
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
-  name: http_integration_test
+  name: {}
 per_route_config_name: {}
 filter_config:
   "@type": {}
@@ -53,9 +58,9 @@ filter_config:
 )EOF";
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
-      TestUtility::loadFromYaml(
-          fmt::format(filter_per_route_config, filter_name, type_url, per_route_config),
-          per_route_config_proto);
+      TestUtility::loadFromYaml(fmt::format(filter_per_route_config, module_name, filter_name,
+                                            type_url, per_route_config),
+                                per_route_config_proto);
 
       config_helper_.addConfigModifier(
           [per_route_config_proto](envoy::extensions::filters::network::http_connection_manager::
@@ -72,8 +77,8 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
-                                 !upstream_filter);
+    config_helper_.prependFilter(
+        fmt::format(filter_config, module_name, filter_name, type_url, config), !upstream_filter);
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
@@ -130,9 +135,9 @@ filter_config:
 #ifndef __SANITIZE_ADDRESS__
 // TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
 // and we need to figure out a way to fix it.
-auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go", "cpp");
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "rust_static", "go", "cpp");
 #else
-auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go");
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "rust_static", "go");
 #endif
 
 INSTANTIATE_TEST_SUITE_P(
@@ -169,6 +174,47 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
   runHeaderCallbacksTest(true);
 }
 
+TEST_P(DynamicModulesIntegrationTest, StructConfig) {
+  if (GetParam() != "go") {
+    // The struct config test is only for Golang filter because it's easy to verify.
+    return;
+  }
+
+  initializeFilter("http_struct_config", R"({"dog":"cat"})", "",
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */, "",
                    "type.googleapis.com/google.protobuf.BytesValue");
@@ -202,6 +248,41 @@ TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   EXPECT_EQ(
       "cat",
       upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksOnCreation) {
+  initializeFilter("header_callbacks_on_creation", "dog:cat", "",
+                   "type.googleapis.com/google.protobuf.StringValue");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers are added as expected in the filter.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
 }
 
 TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
@@ -936,6 +1017,53 @@ TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   } else {
     EXPECT_EQ(current_limit, 65536);
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
+  initializeFilter("list_metadata_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify number list (3 elements: 10, 20, 30).
+  auto num_size = response->headers().get(Http::LowerCaseString("x-list-num-size"));
+  ASSERT_FALSE(num_size.empty());
+  EXPECT_EQ("3", num_size[0]->value().getStringView());
+  auto num_0 = response->headers().get(Http::LowerCaseString("x-list-num-0"));
+  ASSERT_FALSE(num_0.empty());
+  EXPECT_EQ("10", num_0[0]->value().getStringView());
+  auto num_1 = response->headers().get(Http::LowerCaseString("x-list-num-1"));
+  ASSERT_FALSE(num_1.empty());
+  EXPECT_EQ("20", num_1[0]->value().getStringView());
+  auto num_2 = response->headers().get(Http::LowerCaseString("x-list-num-2"));
+  ASSERT_FALSE(num_2.empty());
+  EXPECT_EQ("30", num_2[0]->value().getStringView());
+
+  // Verify string list (2 elements: "hello", "world").
+  auto str_size = response->headers().get(Http::LowerCaseString("x-list-str-size"));
+  ASSERT_FALSE(str_size.empty());
+  EXPECT_EQ("2", str_size[0]->value().getStringView());
+  auto str_0 = response->headers().get(Http::LowerCaseString("x-list-str-0"));
+  ASSERT_FALSE(str_0.empty());
+  EXPECT_EQ("hello", str_0[0]->value().getStringView());
+  auto str_1 = response->headers().get(Http::LowerCaseString("x-list-str-1"));
+  ASSERT_FALSE(str_1.empty());
+  EXPECT_EQ("world", str_1[0]->value().getStringView());
+
+  // Verify bool list (2 elements: true, false).
+  auto bool_size = response->headers().get(Http::LowerCaseString("x-list-bool-size"));
+  ASSERT_FALSE(bool_size.empty());
+  EXPECT_EQ("2", bool_size[0]->value().getStringView());
+  auto bool_0 = response->headers().get(Http::LowerCaseString("x-list-bool-0"));
+  ASSERT_FALSE(bool_0.empty());
+  EXPECT_EQ("true", bool_0[0]->value().getStringView());
+  auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
+  ASSERT_FALSE(bool_1.empty());
+  EXPECT_EQ("false", bool_1[0]->value().getStringView());
 }
 
 } // namespace Envoy

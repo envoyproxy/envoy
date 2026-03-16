@@ -1,6 +1,9 @@
+#include <fcntl.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "source/common/network/utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
@@ -49,6 +52,14 @@ protected:
     EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
     EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
     socket->io_handle_ = std::move(mock_io_handle);
+    return socket;
+  }
+
+  Network::ConnectionSocketPtr createSocketWithFd(int fd) {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*io_handle));
+    socket->io_handle_ = std::move(io_handle);
     return socket;
   }
 
@@ -272,6 +283,103 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownWhenNotOwned) {
   // Now shutdown should call IoSocketHandleImpl::shutdown().
   auto result = io_handle_->shutdown(SHUT_RDWR);
   EXPECT_GE(result.return_value_, -1);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesFullRping) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster");
+
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+
+  Buffer::OwnedImpl buffer;
+  auto result = io_handle_->read(buffer, absl::nullopt);
+
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, rping.size());
+  EXPECT_EQ(buffer.length(), 0);
+
+  close(fds[1]);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesRpingAndReturnsTrailingPayload) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster");
+
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  const std::string payload = " value";
+  const std::string combined = rping + payload;
+  ASSERT_EQ(write(fds[1], combined.data(), combined.size()), static_cast<ssize_t>(combined.size()));
+
+  Buffer::OwnedImpl buffer;
+  auto result = io_handle_->read(buffer, absl::nullopt);
+
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, payload.size());
+  EXPECT_EQ(buffer.toString(), payload);
+
+  close(fds[1]);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, OnPingMessageIsNoOpAndDoesNotWriteToSocket) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster");
+
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+
+  Buffer::OwnedImpl buffer;
+  auto result = io_handle_->read(buffer, absl::nullopt);
+  EXPECT_EQ(result.err_, nullptr);
+  EXPECT_EQ(result.return_value_, rping.size());
+
+  char peer_buffer[16];
+  const int flags = fcntl(fds[1], F_GETFL, 0);
+  ASSERT_NE(flags, -1);
+  ASSERT_EQ(fcntl(fds[1], F_SETFL, flags | O_NONBLOCK), 0);
+  const ssize_t peer_read = read(fds[1], peer_buffer, sizeof(peer_buffer));
+  EXPECT_EQ(peer_read, -1);
+  EXPECT_EQ(errno, EAGAIN);
+
+  close(fds[1]);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenRpingPassesThrough) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
+                                                                   "test-cluster");
+
+  const std::string non_rping = "HELLO";
+  ASSERT_EQ(write(fds[1], non_rping.data(), non_rping.size()),
+            static_cast<ssize_t>(non_rping.size()));
+
+  Buffer::OwnedImpl first_buffer;
+  auto first = io_handle_->read(first_buffer, absl::nullopt);
+  EXPECT_EQ(first.err_, nullptr);
+  EXPECT_EQ(first.return_value_, non_rping.size());
+  EXPECT_EQ(first_buffer.toString(), non_rping);
+
+  const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
+
+  Buffer::OwnedImpl second_buffer;
+  auto second = io_handle_->read(second_buffer, absl::nullopt);
+  EXPECT_EQ(second.err_, nullptr);
+  EXPECT_EQ(second.return_value_, rping.size());
+  EXPECT_EQ(second_buffer.toString(), rping);
+
+  close(fds[1]);
 }
 
 } // namespace ReverseConnection

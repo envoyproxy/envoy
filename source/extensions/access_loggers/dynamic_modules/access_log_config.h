@@ -24,8 +24,9 @@ using OnAccessLoggerLogType = decltype(&envoy_dynamic_module_on_access_logger_lo
 using OnAccessLoggerDestroyType = decltype(&envoy_dynamic_module_on_access_logger_destroy);
 using OnAccessLoggerFlushType = decltype(&envoy_dynamic_module_on_access_logger_flush);
 
-// Custom namespace prefix for access logger stats.
-constexpr char AccessLogStatsNamespace[] = "dynamic_module_access_logger";
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 /**
  * Configuration for dynamic module access loggers. This resolves and holds the symbols used for
@@ -41,11 +42,13 @@ public:
    * Constructor for the config. Symbol resolution is done in newDynamicModuleAccessLogConfig().
    * @param logger_name the name of the logger.
    * @param logger_config the configuration bytes for the logger.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the dynamic module to use.
    * @param stats_scope the stats scope for metrics.
    */
   DynamicModuleAccessLogConfig(const absl::string_view logger_name,
                                const absl::string_view logger_config,
+                               const absl::string_view metrics_namespace,
                                Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                Stats::Scope& stats_scope);
 
@@ -95,45 +98,46 @@ public:
     Stats::Histogram& histogram_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
 
   // Stats scope for metric creation.
@@ -145,6 +149,7 @@ private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleAccessLogConfig>>
   newDynamicModuleAccessLogConfig(const absl::string_view logger_name,
                                   const absl::string_view logger_config,
+                                  const absl::string_view metrics_namespace,
                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                   Stats::Scope& stats_scope);
 
@@ -169,12 +174,14 @@ using DynamicModuleAccessLogConfigSharedPtr = std::shared_ptr<DynamicModuleAcces
  * Creates a new DynamicModuleAccessLogConfig for the given configuration.
  * @param logger_name the name of the logger.
  * @param logger_config the configuration bytes for the logger.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param stats_scope the stats scope for metrics.
  * @return a shared pointer to the new config object or an error if symbol resolution failed.
  */
 absl::StatusOr<DynamicModuleAccessLogConfigSharedPtr> newDynamicModuleAccessLogConfig(
     const absl::string_view logger_name, const absl::string_view logger_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope);
 
 } // namespace DynamicModules

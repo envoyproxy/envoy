@@ -1149,6 +1149,96 @@ bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
 }
 
 // -----------------------------------------------------------------------------
+// Access Logger Callbacks - Additional Stream Info
+// -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_access_logger_get_ja3_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  const auto& hash = provider.ja3Hash();
+  if (hash.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(hash.data()), hash.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_ja4_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
+  const auto& hash = provider.ja4Hash();
+  if (hash.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(hash.data()), hash.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& reason = logger->stream_info_->downstreamTransportFailureReason();
+  if (reason.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(reason.data()), reason.size()};
+  return true;
+}
+
+uint64_t envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& headers = logger->log_context_->requestHeaders();
+  return headers.has_value() ? headers->byteSize() : 0;
+}
+
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& headers = logger->log_context_->responseHeaders();
+  return headers.has_value() ? headers->byteSize() : 0;
+}
+
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& trailers = logger->log_context_->responseTrailers();
+  return trailers.has_value() ? trailers->byteSize() : 0;
+}
+
+bool envoy_dynamic_module_callback_access_logger_get_upstream_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamProtocol().has_value()) {
+    return false;
+  }
+  const auto& protocol_str = Http::Utility::getProtocolString(upstream->upstreamProtocol().value());
+  *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
+  return true;
+}
+
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
+  if (!upstream.has_value()) {
+    return -1;
+  }
+  const auto& latency = upstream->upstreamTiming().connectionPoolCallbackLatency();
+  if (!latency.has_value()) {
+    return -1;
+  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(latency.value()).count();
+}
+
+// -----------------------------------------------------------------------------
 // Metrics Callbacks
 // -----------------------------------------------------------------------------
 
