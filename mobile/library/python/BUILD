@@ -12,16 +12,6 @@ string_flag(
     build_setting_default = "any",
 )
 
-string_flag(
-    name = "python_tag",
-    build_setting_default = "py3",
-)
-
-string_flag(
-    name = "abi_tag",
-    build_setting_default = "none",
-)
-
 config_setting(
     name = "is_linux_x86_64",
     flag_values = {":python_platform": "manylinux2014_x86_64"},
@@ -93,6 +83,7 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
+# 2. Revert the library so srcs ONLY contains .py files
 py_library(
     name = "envoy_mobile_lib",
     srcs = glob(["envoy_mobile/**/*.py"]),
@@ -107,15 +98,12 @@ py_library(
 
 py_package(
     name = "envoy_mobile_package",
-    packages = ["envoy_mobile"],
     deps = [":envoy_mobile_lib"],
 )
 
-# The version and platform of the package. These can be customized via flags like:
-# --//library/python:python_platform=manylinux2014_x86_64
+# 3. Explicitly pass the rules into the wheel's deps
 py_wheel(
     name = "envoy_mobile_wheel",
-    abi = ":abi_tag",
     distribution = "envoy-mobile-client",
     platform = select({
         ":is_linux_x86_64": "manylinux2014_x86_64",
@@ -123,12 +111,11 @@ py_wheel(
         ":is_macos_arm64": "macosx_11_0_arm64",
         "//conditions:default": "any",
     }),
-    python_tag = ":python_tag",
     strip_path_prefixes = [
         "mobile/library/python",
         "library/python",
     ],
     version = "0.5.0",
     visibility = ["//visibility:public"],
-    deps = [":envoy_mobile_package"],
+    deps = [ ":envoy_mobile_package" ],
 )
