@@ -84,7 +84,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<std::string> config_path(
       "c", "config-path",
       "Path to configuration file or directory. If a directory is provided, Envoy loads all "
-      "*.yaml/*.yml files in sorted filename order and merges them into the bootstrap config.",
+      "*.yaml/*.yml files in sorted filename order and merges them into the bootstrap config. If "
+      "a YAML bootstrap file is provided, it may use a top-level \"include\" key (string or list) "
+      "to load additional YAML files, directories, or wildcard patterns.",
       false, "", "string", cmd);
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",

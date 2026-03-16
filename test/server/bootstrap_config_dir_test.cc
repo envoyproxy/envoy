@@ -110,6 +110,104 @@ TEST(BootstrapConfigDirectoryTest, EmptyDirectoryIsRejected) {
   TestEnvironment::removePath(empty_dir);
 }
 
+TEST(BootstrapConfigDirectoryTest, IncludeGlobLoadsFragmentsAndMainFileOverridesThem) {
+  Api::ApiPtr api = Api::createApiForTest();
+
+  const std::string config_root = TestEnvironment::temporaryPath("bootstrap_config_include_glob");
+  TestEnvironment::removePath(config_root);
+  TestEnvironment::createPath(config_root);
+  TestEnvironment::createPath(absl::StrCat(config_root, "/conf.d"));
+
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/conf.d/00-base.yaml"),
+                                            R"EOF(
+node:
+  id: included-id
+  cluster: included-cluster
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                                            /*fully_qualified_path=*/true);
+
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/conf.d/10-cluster.yaml"),
+                                            R"EOF(
+static_resources:
+  clusters:
+  - name: service
+    type: STATIC
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
+)EOF",
+                                            /*fully_qualified_path=*/true);
+
+  const std::string root_config_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/bootstrap.yaml"),
+                                                R"EOF(
+include: conf.d/*.yaml
+node:
+  id: root-id
+)EOF",
+                                                /*fully_qualified_path=*/true);
+
+  OptionsImplBase options;
+  options.setConfigPath(root_config_path);
+  options.setLocalAddressIpVersion(Network::Address::IpVersion::v4);
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  ASSERT_TRUE(InstanceUtil::loadBootstrapConfig(bootstrap, options,
+                                                ProtobufMessage::getStrictValidationVisitor(), *api)
+                  .ok());
+  EXPECT_EQ("root-id", bootstrap.node().id());
+  EXPECT_EQ("included-cluster", bootstrap.node().cluster());
+  ASSERT_EQ(1, bootstrap.static_resources().clusters_size());
+  EXPECT_EQ("service", bootstrap.static_resources().clusters(0).name());
+
+  TestEnvironment::removePath(config_root);
+}
+
+TEST(BootstrapConfigDirectoryTest, IncludeCycleIsRejected) {
+  Api::ApiPtr api = Api::createApiForTest();
+
+  const std::string config_root = TestEnvironment::temporaryPath("bootstrap_config_include_cycle");
+  TestEnvironment::removePath(config_root);
+  TestEnvironment::createPath(config_root);
+
+  const std::string config_a_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/a.yaml"),
+                                                R"EOF(
+include: b.yaml
+)EOF",
+                                                /*fully_qualified_path=*/true);
+
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/b.yaml"),
+                                            R"EOF(
+include: ./a.yaml
+)EOF",
+                                            /*fully_qualified_path=*/true);
+
+  OptionsImplBase options;
+  options.setConfigPath(config_a_path);
+  options.setLocalAddressIpVersion(Network::Address::IpVersion::v4);
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  EXPECT_FALSE(InstanceUtil::loadBootstrapConfig(
+                   bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
+                   .ok());
+
+  TestEnvironment::removePath(config_root);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
