@@ -22,6 +22,10 @@ constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr absl::string_view METHOD_FIELD = "method";
 constexpr absl::string_view ID_FIELD = "id";
 constexpr absl::string_view RESULT_FIELD = "result";
+constexpr absl::string_view PARAMS_FIELD = "params";
+constexpr absl::string_view ARGUMENTS_FIELD = "arguments";
+constexpr absl::string_view ERROR_CODE_FIELD = "code";
+constexpr absl::string_view ERROR_MESSAGE_FIELD = "message";
 
 // MCP Initialize constants
 constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";

@@ -38,6 +38,7 @@ envoy_cc_library(
         ":abi_impl",
         ":filter_config_lib",
         ":filter_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
@@ -58,7 +59,6 @@ envoy_cc_library(
     deps = [
         ":filter_lib",
         "//envoy/registry",
-        "//source/common/grpc:common_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/router:string_accessor_lib",
