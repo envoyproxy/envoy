@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "envoy/common/optref.h"
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 
@@ -115,7 +114,6 @@ private:
   friend class CounterImpl;
   friend class GaugeImpl;
   friend class TextReadoutImpl;
-  friend class NotifyingAllocator;
 
   // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,
