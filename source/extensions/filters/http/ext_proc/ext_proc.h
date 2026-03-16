@@ -175,8 +175,7 @@ private:
   uint64_t bytes_sent_{0}, bytes_received_{0};
   // The number of body ProcessingRequests sent to the external processor. This number may not be
   // equal to call_count_ if using FULL_DUPLEX_STREAMED_MODE.
-  int32_t request_body_sent_ = 0;
-  int32_t response_body_sent_ = 0;
+  uint32_t request_body_sent_{0}, response_body_sent_{0};
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
