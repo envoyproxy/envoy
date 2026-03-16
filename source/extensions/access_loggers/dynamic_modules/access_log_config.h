@@ -24,8 +24,9 @@ using OnAccessLoggerLogType = decltype(&envoy_dynamic_module_on_access_logger_lo
 using OnAccessLoggerDestroyType = decltype(&envoy_dynamic_module_on_access_logger_destroy);
 using OnAccessLoggerFlushType = decltype(&envoy_dynamic_module_on_access_logger_flush);
 
-// Custom namespace prefix for access logger stats.
-constexpr char AccessLogStatsNamespace[] = "dynamic_module_access_logger";
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 /**
  * Configuration for dynamic module access loggers. This resolves and holds the symbols used for
@@ -41,11 +42,13 @@ public:
    * Constructor for the config. Symbol resolution is done in newDynamicModuleAccessLogConfig().
    * @param logger_name the name of the logger.
    * @param logger_config the configuration bytes for the logger.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the dynamic module to use.
    * @param stats_scope the stats scope for metrics.
    */
   DynamicModuleAccessLogConfig(const absl::string_view logger_name,
                                const absl::string_view logger_config,
+                               const absl::string_view metrics_namespace,
                                Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                Stats::Scope& stats_scope);
 
@@ -146,6 +149,7 @@ private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleAccessLogConfig>>
   newDynamicModuleAccessLogConfig(const absl::string_view logger_name,
                                   const absl::string_view logger_config,
+                                  const absl::string_view metrics_namespace,
                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                   Stats::Scope& stats_scope);
 
@@ -170,12 +174,14 @@ using DynamicModuleAccessLogConfigSharedPtr = std::shared_ptr<DynamicModuleAcces
  * Creates a new DynamicModuleAccessLogConfig for the given configuration.
  * @param logger_name the name of the logger.
  * @param logger_config the configuration bytes for the logger.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param stats_scope the stats scope for metrics.
  * @return a shared pointer to the new config object or an error if symbol resolution failed.
  */
 absl::StatusOr<DynamicModuleAccessLogConfigSharedPtr> newDynamicModuleAccessLogConfig(
     const absl::string_view logger_name, const absl::string_view logger_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope);
 
 } // namespace DynamicModules

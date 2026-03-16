@@ -223,18 +223,18 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 common:fips-common --test_tag_filters=-nofips
 common:fips-common --build_tag_filters=-nofips
-common:fips-common --//bazel:fips=True
+common:fips-common --@envoy//bazel:fips=True
 
 # BoringSSL FIPS
 common:boringssl-fips --config=fips-common
-common:boringssl-fips --//bazel:ssl=@boringssl_fips//:ssl
-common:boringssl-fips --//bazel:crypto=@boringssl_fips//:crypto
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
 
 # AWS-LC FIPS
 common:aws-lc-fips --config=fips-common
-common:aws-lc-fips --//bazel:ssl=@aws_lc//:ssl
-common:aws-lc-fips --//bazel:crypto=@aws_lc//:crypto
-common:aws-lc-fips --//bazel:http3=False
+common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
+common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
+common:aws-lc-fips --@envoy//bazel:http3=False
 
 
 #############################################################################
