@@ -27,6 +27,8 @@ public:
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
 
 private:
   absl::flat_hash_map<std::string,

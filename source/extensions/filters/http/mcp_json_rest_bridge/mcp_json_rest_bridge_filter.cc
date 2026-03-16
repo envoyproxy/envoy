@@ -65,10 +65,10 @@ json generateInitializeResponse(int session_id, absl::string_view server_name) {
 }
 
 json generateErrorJsonResponse(int error_code, absl::string_view error_message) {
-  json error = json::object();
-  error[McpConstants::ERROR_CODE_FIELD] = error_code;
-  error[McpConstants::ERROR_MESSAGE_FIELD] = error_message;
-  return error;
+  return json{
+      {McpConstants::ERROR_CODE_FIELD, error_code},
+      {McpConstants::ERROR_MESSAGE_FIELD, error_message},
+  };
 }
 
 int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
@@ -104,10 +104,23 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   return it->second;
 }
 
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
+  if (!proto_config_.tool_config().has_tool_list_http_rule()) {
+    return absl::NotFoundError("tools_list_http_rule is not configured.");
+  }
+  return proto_config_.tool_config().tool_list_http_rule();
+}
+
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
+  absl::string_view path = request_headers.getPathValue();
+  auto query_idx = path.find('?');
+  if (query_idx != absl::string_view::npos) {
+    path = path.substr(0, query_idx);
+  }
   // TODO(guoyilin42): Make the MCP endpoint configurable.
-  if (request_headers.getPathValue() != "/mcp") {
+  if (path != "/mcp") {
     // Only intercept /mcp requests and pass through other requests.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -119,10 +132,13 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
                      *decoder_callbacks_, request_headers.getMethodValue());
-    // TODO(guoyilin42): Consider adding an Allow header when doing error handling.
-    decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed, "Method Not Allowed", nullptr,
-                                       Grpc::Status::WellKnownGrpcStatus::InvalidArgument,
-                                       "mcp_json_rest_bridge_filter_not_post");
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::MethodNotAllowed, "Method Not Allowed",
+        [](Http::ResponseHeaderMap& response_headers) {
+          response_headers.addCopy(Http::LowerCaseString("allow"),
+                                   Http::Headers::get().MethodValues.Post);
+        },
+        Grpc::Status::WellKnownGrpcStatus::InvalidArgument, "mcp_json_rest_bridge_filter_not_post");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -157,7 +173,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   }
 
   handleMcpMethod(request_body_json);
-  data.add(std::move(request_body_str_));
+  data.add(request_body_str_);
+  request_body_str_.clear();
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
@@ -206,7 +223,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   }
 
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());
-  data.add(std::move(response_body_str_));
+  data.add(response_body_str_);
+  response_body_str_.clear();
   return Http::FilterDataStatus::Continue;
 }
 
@@ -228,7 +246,26 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
   if (method == McpConstants::Methods::TOOLS_LIST) {
     mcp_operation_ = McpOperation::ToolsList;
-    // TODO(guoyilin42): handle tools/list request.
+    absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
+        config_->getToolsListHttpRule();
+    if (http_rule.ok() && !http_rule->get().empty()) {
+      // We don't support pagination for the tools/list request for now.
+      auto request_headers = decoder_callbacks_->requestHeaders();
+      if (request_headers.has_value()) {
+        // tools/list should be mapped to a GET request with empty body.
+        request_headers->setPath(http_rule->get());
+        request_headers->setMethod(Http::Headers::get().MethodValues.Get);
+        request_headers->removeContentLength();
+        request_headers->removeContentType();
+        // Set AcceptEncoding to "identity" to prevent server encoding the response.
+        request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
+                                 Http::CustomHeaders::get().AcceptEncodingValues.Identity);
+      }
+
+      if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+        decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+      }
+    }
   } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&
@@ -273,7 +310,26 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
                    absl::string_view(json_ptr, total_size));
   switch (mcp_operation_) {
   case McpOperation::ToolsList: {
-    // TODO(guoyilin42): handle tools/list response.
+    json tools = json::parse(json_ptr, json_ptr + total_size, /*parser_callback_t=*/nullptr,
+                             /*allow_exceptions=*/false);
+    if (tools.is_discarded() ||
+        getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest)) {
+      ENVOY_STREAM_LOG(error, "Tool list response is invalid or has error status code.",
+                       *encoder_callbacks_);
+      json ret = {
+          {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+          {McpConstants::ID_FIELD, *session_id_},
+          {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
+      };
+      response_body_str_ = ret.dump();
+      break;
+    }
+    json ret = {
+        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        {McpConstants::ID_FIELD, *session_id_},
+        {McpConstants::RESULT_FIELD, tools},
+    };
+    response_body_str_ = ret.dump();
     break;
   }
   case McpOperation::ToolsCall: {
@@ -318,11 +374,16 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
-    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
-    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
-    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
-    // 2. If Content-Length is present, update it with the new value.
-    response_headers->setContentLength(response_body_str_.size());
+    const auto transfer_encoding = response_headers->TransferEncoding();
+    const bool is_chunked =
+        transfer_encoding != nullptr &&
+        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
+                               Http::Headers::get().TransferEncodingValues.Chunked);
+    if (is_chunked) {
+      response_headers->removeContentLength();
+    } else {
+      response_headers->setContentLength(response_body_str_.size());
+    }
     response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 }
@@ -374,7 +435,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
-                     *decoder_callbacks_, tool_name, http_request.status().message());
+                     *decoder_callbacks_, tool_name, http_request.status());
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_invalid_tool_arguments",
                       generateErrorJsonResponse(-32602, "Invalid tool arguments").dump());
     return;
@@ -388,11 +449,16 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   if (request_headers.has_value()) {
     request_headers->setPath(http_request->url);
     request_headers->setMethod(http_request->method);
-    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
-    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
-    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
-    // 2. If Content-Length is present, update it with the new value.
-    request_headers->setContentLength(request_body_str_.size());
+    const auto transfer_encoding = request_headers->TransferEncoding();
+    const bool is_chunked =
+        transfer_encoding != nullptr &&
+        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
+                               Http::Headers::get().TransferEncodingValues.Chunked);
+    if (is_chunked) {
+      request_headers->removeContentLength();
+    } else {
+      request_headers->setContentLength(request_body_str_.size());
+    }
     request_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
     request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,

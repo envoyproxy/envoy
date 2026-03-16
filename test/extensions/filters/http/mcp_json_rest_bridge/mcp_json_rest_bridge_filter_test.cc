@@ -46,6 +46,9 @@ public:
             get: "/v1/apiKeys"
           }
         }
+        tool_list_http_rule {
+          get: "/discovery/v1/service/foo.googleapis.com/mcptools"
+        }
       }
     )pb");
     config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
@@ -725,6 +728,206 @@ TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
           R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"Backend response returns an invalid UTF-8 payload.","type":"text"}],"isError":true}})json"));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateResponse) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Assumes the request body is split into different parts.
+  Buffer::OwnedImpl request_first_body(R"json({"jsonrpc":"2.0")json");
+  EXPECT_EQ(filter_->decodeData(request_first_body, /*end_stream=*/false),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl request_second_body(R"json(,"id":12,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_second_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(R"json({"tools":[{"name":"google.api.CreateApiKey"}]})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":12,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolListWithNumericStringId) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":"12","method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(R"json({"tools":[{"name":"google.api.CreateApiKey"}]})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":12,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ErrorToolListResponseReturnsServerError) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0", "id":123,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "500"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body("Some internal error");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32000,"message":"Server error"},"id":123,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InvalidToolListResponseReturnsServerError) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0", "id":123,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(R"json({"foo")json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32000,"message":"Server error"},"id":123,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, InvalidResponseStatusCodeReturnsServerError) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0", "id":123,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "invalid"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body("");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32000,"message":"Server error"},"id":123,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, QueryParamsFromMcpPathIsIgnored) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp?foo=bar"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl request_body(R"json({"jsonrpc":"2.0","id":12,"method":"tools/list"})json");
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(),
+              StrEq("/discovery/v1/service/foo.googleapis.com/mcptools"));
+  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
+
+  response_headers_ = {
+      {"content-type", "application/json"}, {"content-length", "123456"}, {":status", "200"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(R"json({"tools":[{"name":"google.api.CreateApiKey"}]})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":12,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithTransferEncodingChunkedRemovesContentLength) {
+  // 1. Request Path
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"content-type", "application/json"},
+                      {"transfer-encoding", "chunked"}};
+  Envoy::Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/projects/test-codelab/apiKeys"));
+  EXPECT_FALSE(request_headers_.has(Envoy::Http::Headers::get().ContentLength));
+
+  // 2. Response Path
+  response_headers_ = {{"content-type", "application/json"},
+                       {"content-length", "123456"},
+                       {":status", "200"},
+                       {"transfer-encoding", "chunked"}};
+
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  Envoy::Buffer::OwnedImpl response_body(R"json({"displayName":"display-key"})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+}
+
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
 public:
   void SetUp() override {
@@ -755,15 +958,21 @@ INSTANTIATE_TEST_SUITE_P(NonPostMethods, McpHttpMethodFilterTest,
                          });
 
 TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
-  request_headers_ = {{":path", "/mcp"}, {":method", GetParam()}};
-
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Http::Code::MethodNotAllowed, Eq("Method Not Allowed"), _,
                              Eq(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
                              Eq("mcp_json_rest_bridge_filter_not_post")));
-
+  Envoy::Http::TestResponseHeaderMapImpl additional_response_headers;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_)
+      .WillOnce(testing::SaveArg<0>(&additional_response_headers));
+  request_headers_ = {{":path", "/mcp"}, {":method", GetParam()}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
+
+  ASSERT_TRUE(additional_response_headers.has(Http::LowerCaseString("allow")));
+  EXPECT_THAT(
+      additional_response_headers.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+      StrEq("POST"));
 }
 
 } // namespace
