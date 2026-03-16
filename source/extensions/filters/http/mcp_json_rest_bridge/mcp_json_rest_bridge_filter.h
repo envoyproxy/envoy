@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/filter.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/filter_config.h"
 
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
@@ -14,28 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
-
-/**
- * Configuration for the MCP JSON REST Bridge filter.
- */
-class McpJsonRestBridgeFilterConfig : public Router::RouteSpecificFilterConfig,
-                                      public Logger::Loggable<Logger::Id::config> {
-public:
-  explicit McpJsonRestBridgeFilterConfig(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
-
-  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
-
-private:
-  absl::flat_hash_map<std::string,
-                      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-      tool_to_http_rule_;
-  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
-};
-
-using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 
 /**
  * MCP JSON REST Bridge proxy implementation.

@@ -13,16 +13,29 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "filter_config_lib",
+    srcs = ["filter_config.cc"],
+    hdrs = ["filter_config.h"],
+    deps = [
+        "//envoy/server:filter_config_interface",
+        "//source/common/common:regex_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/matcher:regex_replace_lib",
+        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "header_to_metadata_filter_lib",
     srcs = ["header_to_metadata_filter.cc"],
     hdrs = ["header_to_metadata_filter.h"],
     deps = [
+        ":filter_config_lib",
         "//envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
         "//source/common/config:well_known_names",
-        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
-        "//source/common/matcher:regex_replace_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],

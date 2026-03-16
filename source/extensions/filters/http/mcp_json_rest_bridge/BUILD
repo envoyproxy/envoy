@@ -10,13 +10,25 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "filter_config_lib",
+    srcs = ["filter_config.cc"],
+    hdrs = ["filter_config.h"],
+    deps = [
+        "//envoy/router:router_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/common:logger_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "mcp_json_rest_bridge_filter_lib",
     srcs = ["mcp_json_rest_bridge_filter.cc"],
     hdrs = ["mcp_json_rest_bridge_filter.h"],
     deps = [
+        ":filter_config_lib",
         ":http_request_builder_lib",
         "//envoy/http:filter_interface",
-        "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",

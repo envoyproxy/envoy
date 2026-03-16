@@ -23,16 +23,32 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tunneling_connection_pool_lib",
+    srcs = ["tunneling_connection_pool.cc"],
+    hdrs = ["tunneling_connection_pool.h"],
+    deps = [
+        "//envoy/http:header_evaluator",
+        "//envoy/stream_info:uint32_accessor_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:response_decoder_impl_base",
+        "//source/common/http:utility_lib",
+        "//source/common/router:header_parser_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "udp_proxy_filter_lib",
     srcs = ["udp_proxy_filter.cc"],
     hdrs = ["udp_proxy_filter.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":hash_policy_lib",
+        ":tunneling_connection_pool_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/event:file_event_interface",
         "//envoy/event:timer_interface",
-        "//envoy/http:header_evaluator",
         "//envoy/network:filter_interface",
         "//envoy/network:listener_interface",
         "//envoy/stream_info:uint32_accessor_interface",
@@ -42,11 +58,9 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:random_generator_lib",
-        "//source/common/http:response_decoder_impl_base",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
-        "//source/common/router:header_parser_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/udp/udp_proxy/router:router_lib",

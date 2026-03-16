@@ -27,13 +27,14 @@ public:
   struct Result {
     bool allowed{};
     std::shared_ptr<const TokenBucketContext> token_bucket_context;
-    RateLimit::XRateLimitOption x_ratelimit_option{};
+    Envoy::RateLimit::XRateLimitOption x_ratelimit_option{};
   };
 
   virtual ~LocalRateLimiter() = default;
 
   // Returns true if the request should be rate limited.
-  virtual Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) = 0;
+  virtual Result
+  requestAllowed(absl::Span<const Envoy::RateLimit::Descriptor> request_descriptors) = 0;
 };
 using LocalRateLimiterSharedPtr = std::shared_ptr<LocalRateLimiter>;
 
