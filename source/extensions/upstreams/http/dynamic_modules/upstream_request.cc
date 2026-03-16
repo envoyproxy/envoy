@@ -170,14 +170,18 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   downstream_complete_ = end_stream;
-  request_buffer_ = &data;
 
+  // Move into a local buffer so the module reads from a stable copy. The module is expected
+  // to forward the data via send_upstream_data, which writes to the connection and drains
+  // naturally.
+  Buffer::OwnedImpl local_buffer;
+  local_buffer.move(data);
+  request_buffer_ = &local_buffer;
+
+  // The module callback may trigger decodeData with end_stream=true (e.g., via sendResponse),
+  // which can cause the router to destroy this object. Do not access any member variables after
+  // this call.
   (*config_->on_bridge_encode_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
-
-  // Drain the request buffer after the module has processed it, matching the standard
-  // TcpUpstream::encodeData behavior where Connection::write drains the buffer.
-  data.drain(data.length());
-  request_buffer_ = nullptr;
 }
 
 void HttpTcpBridge::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
@@ -217,9 +221,10 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   response_buffer_ = &local_buffer;
   bytes_meter_->addWireBytesReceived(local_buffer.length());
 
+  // The module callback may trigger decodeData with end_stream=true, which can cause the router
+  // to call resetStream() and ultimately destroy this object. Do not access any member variables
+  // after this call.
   (*config_->on_bridge_on_upstream_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
-
-  response_buffer_ = nullptr;
 }
 
 void HttpTcpBridge::onEvent(Network::ConnectionEvent event) {
