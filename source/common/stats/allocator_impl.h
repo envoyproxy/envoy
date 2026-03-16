@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Stats {
 
+// This alias is provided for out-of-repository includes of allocator_impl.h,
+// who will be expecting the concrete class to be called AllocatorImpl.
 using AllocatorImpl = Allocator;
 
 } // namespace Stats

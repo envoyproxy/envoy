@@ -476,7 +476,8 @@ void Allocator::markCounterForDeletion(const CounterSharedPtr& counter) {
     return;
   }
   ASSERT(counter.get() == *iter);
-  // Duplicates are ASSERTed in ~Allocator.
+  // Duplicates are ASSERTed in ~Allocator. These might occur if there was
+  // a race bug in reference counting, causing a stat to be double-deleted.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
   sinked_counters_.erase(counter.get());
