@@ -5,11 +5,11 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/stats/metric_impl.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
