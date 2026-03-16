@@ -21,7 +21,7 @@ envoy_cc_extension(
         "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:secret_provider_impl_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
     ],
 )
