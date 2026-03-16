@@ -443,9 +443,9 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
 
   // Second call: use createFilterFactory directly with init_manager=nullptr.
   // Without the cache this would fail with "Remote module sources require an init manager".
-  auto result2 = factory.createFilterFactory(proto_config, "",
-                                             context_.server_factory_context_, stats_scope_,
-                                             /*init_manager=*/nullptr);
+  auto result2 =
+      factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
+                                  /*init_manager=*/nullptr);
   EXPECT_TRUE(result2.ok()) << result2.status().message();
 
   // Verify the cache-loaded factory callback installs the filter.
@@ -523,9 +523,9 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
 
   // Second call with init_manager=nullptr: cache entry exists but file is gone,
   // so the factory should erase the stale entry and require an init manager.
-  auto result2 = factory.createFilterFactory(proto_config, "",
-                                             context_.server_factory_context_, stats_scope_,
-                                             /*init_manager=*/nullptr);
+  auto result2 =
+      factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
+                                  /*init_manager=*/nullptr);
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(),
               testing::HasSubstr("Remote module sources require an init manager"));
