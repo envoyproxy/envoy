@@ -372,14 +372,14 @@ TEST_F(HttpTcpBridgeHeadersEndStreamTest, SendResponseWithoutBody) {
   EXPECT_TRUE(status.ok());
 }
 
-TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventSuppressedAfterResponseStarted) {
+TEST_F(HttpTcpBridgeHeadersEndStreamTest, OnEventAfterResponseStarted) {
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
   EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
 
   Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
   EXPECT_TRUE(bridge_->encodeHeaders(headers, true).ok());
 
-  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _)).Times(0);
+  EXPECT_CALL(mock_upstream_to_downstream_, onResetStream(_, _));
   bridge_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 

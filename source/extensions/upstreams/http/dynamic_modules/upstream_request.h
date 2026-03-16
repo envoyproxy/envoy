@@ -171,7 +171,6 @@ private:
   BridgeConfigSharedPtr config_;
   envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr in_module_bridge_ = nullptr;
 
-  bool response_started_ = false;
   bool downstream_complete_ = false;
 
   const Envoy::Http::RequestHeaderMap* request_headers_ = nullptr;

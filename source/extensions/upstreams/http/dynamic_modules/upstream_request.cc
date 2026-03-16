@@ -207,14 +207,18 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  response_buffer_ = &data;
-  bytes_meter_->addWireBytesReceived(data.length());
+  // Move data into a local buffer before calling the module. The module callback may trigger
+  // downstream processing that re-enables upstream reads, causing a re-entrant onUpstreamData
+  // call. Moving the data first ensures the connection's read buffer is empty, preventing the
+  // same data from being delivered twice.
+  Buffer::OwnedImpl local_buffer;
+  local_buffer.move(data);
+
+  response_buffer_ = &local_buffer;
+  bytes_meter_->addWireBytesReceived(local_buffer.length());
 
   (*config_->on_bridge_on_upstream_data_)(static_cast<void*>(this), in_module_bridge_, end_stream);
 
-  // Drain the response buffer after the module has processed it, matching the standard
-  // TcpUpstream::onUpstreamData behavior where decodeData drains the buffer.
-  data.drain(data.length());
   response_buffer_ = nullptr;
 }
 
@@ -222,9 +226,6 @@ void HttpTcpBridge::onEvent(Network::ConnectionEvent event) {
   if ((event == Network::ConnectionEvent::LocalClose ||
        event == Network::ConnectionEvent::RemoteClose) &&
       upstream_request_ != nullptr) {
-    if (response_started_) {
-      return;
-    }
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }
 }
@@ -282,7 +283,6 @@ void HttpTcpBridge::sendResponse(uint32_t status_code,
   if (upstream_request_ == nullptr) {
     return;
   }
-  response_started_ = true;
   auto headers = buildResponseHeaders(status_code, headers_vector, headers_vector_size);
   if (!body.empty()) {
     upstream_request_->decodeHeaders(std::move(headers), false);
@@ -299,7 +299,6 @@ void HttpTcpBridge::sendResponseHeaders(
   if (upstream_request_ == nullptr) {
     return;
   }
-  response_started_ = true;
   auto headers = buildResponseHeaders(status_code, headers_vector, headers_vector_size);
   upstream_request_->decodeHeaders(std::move(headers), end_stream);
 }
