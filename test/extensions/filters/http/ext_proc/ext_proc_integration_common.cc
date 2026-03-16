@@ -566,6 +566,34 @@ void ExtProcIntegrationTest::processAndRespondImmediately(
   processor_stream_->sendGrpcMessage(response);
 }
 
+void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
+    FakeUpstream& grpc_upstream, bool immediate_response,
+    absl::optional<std::function<void(ImmediateResponse&)>> cb) {
+  ProcessingRequest request;
+  ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  processor_stream_->startGrpcStream();
+
+  ProcessingResponse response1;
+  if (immediate_response) {
+    auto* immediate = response1.mutable_immediate_response();
+    if (cb) {
+      (*cb)(*immediate);
+    }
+  } else {
+    response1.mutable_request_trailers();
+  }
+  auto serialized_response1 = Grpc::Common::serializeToGrpcFrame(response1);
+  Buffer::OwnedImpl combined_buffer;
+  combined_buffer.add(*serialized_response1);
+  ProcessingResponse response2;
+  response2.mutable_response_trailers();
+  auto serialized_response2 = Grpc::Common::serializeToGrpcFrame(response2);
+  combined_buffer.add(*serialized_response2);
+  processor_stream_->encodeData(combined_buffer, false);
+}
+
 // ext_proc server sends back a response to tell Envoy to stop the
 // original timer and start a new timer.
 void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
