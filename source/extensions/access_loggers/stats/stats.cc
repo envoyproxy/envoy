@@ -25,26 +25,28 @@ public:
 
   ~AccessLogState() override {
     while (!inflight_gauges_.empty()) {
-      removeInflightGauge(inflight_gauges_.begin()->first);
+      auto& gauge = *inflight_gauges_.begin()->first;
+      removeInflightGauge(gauge, inflight_gauges_.begin()->second.value_);
     }
   }
 
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
+  void addInflightGauge(Stats::Gauge& gauge, uint64_t value) {
     if (value == 0) {
-      // We rely on the stats scope to evict the gauge if its value is 0.
       return;
     }
-    auto it = inflight_gauges_.try_emplace(gauge, 0).first;
-    it->second += value;
-    gauge->add(value);
+    auto [it, inserted] = inflight_gauges_.try_emplace(&gauge, InflightGauge{Stats::GaugeSharedPtr(&gauge), 0});
+    it->second.value_ += value;
+    gauge.add(value);
   }
 
-  void removeInflightGauge(Stats::Gauge* gauge) {
-    auto it = inflight_gauges_.find(gauge);
+  void removeInflightGauge(Stats::Gauge& gauge, uint64_t value) {
+    auto it = inflight_gauges_.find(&gauge);
     if (it != inflight_gauges_.end()) {
-      uint64_t value = it->second;
-      inflight_gauges_.erase(it);
-      gauge->sub(value);
+      it->second.value_ -= value;
+      gauge.sub(value);
+      if (it->second.value_ == 0) {
+        inflight_gauges_.erase(it);
+      }
     }
   }
 
@@ -53,9 +55,19 @@ public:
 private:
   Stats::ScopeSharedPtr scope_;
 
+  // InflightGauge holds the state of a gauge that is currently in-flight (incremented but not
+  // yet decremented).
+  struct InflightGauge {
+    // gauge_ref_ is a strong reference (RefcountPtr) that "pins" the gauge in memory.
+    // This prevents the gauge object from being deleted if the Stats::Store evicts it
+    // from its registry while the request is still active, avoiding dangling pointer crashes.
+    Stats::GaugeSharedPtr gauge_ref_;
+    uint64_t value_;
+  };
+
   // The map key holds a raw pointer to the gauge to enable fast O(1) lookups during
-  // PAIRED_SUBTRACT.
-  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
+  // PAIRED_SUBTRACT. The InflightGauge value ensures the gauge object survives eviction.
+  absl::flat_hash_map<Stats::Gauge*, InflightGauge> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -408,9 +420,9 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(&gauge_stat, value);
+      state->addInflightGauge(gauge_stat, value);
     } else {
-      state->removeInflightGauge(&gauge_stat);
+      state->removeInflightGauge(gauge_stat, value);
     }
     return;
   }
