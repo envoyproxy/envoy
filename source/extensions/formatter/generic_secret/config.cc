@@ -7,6 +7,7 @@
 #include "envoy/secret/secret_provider.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/secret/secret_provider_impl.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -25,9 +26,10 @@ constexpr absl::string_view SecretCommand = "SECRET";
  */
 class GenericSecretFormatterProvider : public Envoy::Formatter::FormatterProvider {
 public:
-  explicit GenericSecretFormatterProvider(
-      std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider)
-      : secret_provider_(std::move(secret_provider)) {}
+  GenericSecretFormatterProvider(
+      std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider,
+      absl::optional<size_t> max_length)
+      : secret_provider_(std::move(secret_provider)), max_length_(max_length) {}
 
   absl::optional<std::string> format(const Envoy::Formatter::Context&,
                                      const StreamInfo::StreamInfo&) const override {
@@ -35,7 +37,9 @@ public:
     if (value.empty()) {
       return absl::nullopt;
     }
-    return value;
+    std::string result = value;
+    Envoy::Formatter::SubstitutionFormatUtils::truncate(result, max_length_);
+    return result;
   }
 
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
@@ -50,6 +54,7 @@ public:
 
 private:
   std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> secret_provider_;
+  const absl::optional<size_t> max_length_;
 };
 
 /**
@@ -65,7 +70,7 @@ public:
 
   Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                absl::string_view subcommand,
-                                               absl::optional<size_t>) const override {
+                                               absl::optional<size_t> max_length) const override {
     if (command != SecretCommand) {
       return nullptr;
     }
@@ -73,7 +78,7 @@ public:
     if (it == providers_.end()) {
       return nullptr;
     }
-    return std::make_unique<GenericSecretFormatterProvider>(it->second);
+    return std::make_unique<GenericSecretFormatterProvider>(it->second, max_length);
   }
 
 private:

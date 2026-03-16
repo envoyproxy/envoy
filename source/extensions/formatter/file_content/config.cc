@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/formatter/substitution_format_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,9 +20,10 @@ constexpr absl::string_view FileContentCommand = "FILE_CONTENT";
  */
 class FileContentFormatterProvider : public Envoy::Formatter::FormatterProvider {
 public:
-  explicit FileContentFormatterProvider(
-      Config::DataSource::DataSourceProviderSharedPtr<std::string> provider)
-      : provider_(std::move(provider)) {}
+  FileContentFormatterProvider(
+      Config::DataSource::DataSourceProviderSharedPtr<std::string> provider,
+      absl::optional<size_t> max_length)
+      : provider_(std::move(provider)), max_length_(max_length) {}
 
   absl::optional<std::string> format(const Envoy::Formatter::Context&,
                                      const StreamInfo::StreamInfo&) const override {
@@ -29,7 +31,9 @@ public:
     if (!data) {
       return absl::nullopt;
     }
-    return *data;
+    std::string result = *data;
+    Envoy::Formatter::SubstitutionFormatUtils::truncate(result, max_length_);
+    return result;
   }
 
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
@@ -44,6 +48,7 @@ public:
 
 private:
   Config::DataSource::DataSourceProviderSharedPtr<std::string> provider_;
+  const absl::optional<size_t> max_length_;
 };
 
 /**
@@ -57,7 +62,7 @@ public:
 
   Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                absl::string_view subcommand,
-                                               absl::optional<size_t>) const override {
+                                               absl::optional<size_t> max_length) const override {
     if (command != FileContentCommand) {
       return nullptr;
     }
@@ -77,7 +82,8 @@ public:
         Config::DataSource::DataSourceProviderPtr<std::string>);
 
     return std::make_unique<FileContentFormatterProvider>(
-        Config::DataSource::DataSourceProviderSharedPtr<std::string>(std::move(provider)));
+        Config::DataSource::DataSourceProviderSharedPtr<std::string>(std::move(provider)),
+        max_length);
   }
 
 private:

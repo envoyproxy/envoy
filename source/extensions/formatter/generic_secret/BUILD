@@ -18,6 +18,7 @@ envoy_cc_extension(
         "//envoy/secret:secret_manager_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/common:logger_lib",
+        "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:secret_provider_impl_lib",
         "@com_google_absl//absl/container:flat_hash_map",

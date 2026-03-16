@@ -86,6 +86,41 @@ formatters:
   EXPECT_EQ("alpha:bravo", formatter->format(formatter_context_, stream_info_));
 }
 
+TEST_F(FileContentFormatterTest, MaxLengthWithinLimit) {
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("small.txt", "short");
+  // max_length 100 is larger than file content (5 bytes), so it should succeed.
+  const std::string yaml = fmt::format(R"EOF(
+text_format_source:
+  inline_string: "%FILE_CONTENT({0}):100%"
+formatters:
+- name: envoy.formatter.file_content
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+)EOF",
+                                       file_path);
+
+  auto formatter = makeFormatter(yaml);
+  EXPECT_EQ("short", formatter->format(formatter_context_, stream_info_));
+}
+
+TEST_F(FileContentFormatterTest, MaxLengthExceeded) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("large.txt", "this-content-is-too-long");
+  // max_length 5 truncates the file content to 5 characters.
+  const std::string yaml = fmt::format(R"EOF(
+text_format_source:
+  inline_string: "%FILE_CONTENT({0}):5%"
+formatters:
+- name: envoy.formatter.file_content
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+)EOF",
+                                       file_path);
+
+  auto formatter = makeFormatter(yaml);
+  EXPECT_EQ("this-", formatter->format(formatter_context_, stream_info_));
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy
