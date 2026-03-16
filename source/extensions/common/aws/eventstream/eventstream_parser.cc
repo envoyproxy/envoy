@@ -117,12 +117,8 @@ EventstreamParser::parseHeaders(absl::string_view headers_bytes) {
 
     switch (header.value.type) {
     case HeaderValueType::BoolTrue:
-      header.value.value = true;
-      bytes_consumed = value_offset;
-      break;
-
     case HeaderValueType::BoolFalse:
-      header.value.value = false;
+      header.value.value = (header.value.type == HeaderValueType::BoolTrue);
       bytes_consumed = value_offset;
       break;
 
