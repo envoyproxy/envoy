@@ -93,15 +93,13 @@ def envoy_dependency_imports(
     protoc_gen_jsonschema_go_dependencies()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
-    # These repos also have transient dependencies - `build_external` allows them to use them.
-    # TODO(phlax): remove `build_external` and pin all transients
+    # All transitive dependencies are pinned explicitly below to keep builds hermetic.
     go_repository(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
         sum = "h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=",
         version = "v1.68.0",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
             "gazelle:resolve go golang.org/x/net/http2 @org_golang_x_net//http2",
@@ -115,26 +113,30 @@ def envoy_dependency_imports(
         importpath = "golang.org/x/net",
         sum = "h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=",
         version = "v0.34.0",
-        build_external = "external",
         build_directives = [
+            "gazelle:resolve go golang.org/x/sys/unix @org_golang_x_sys//unix",
             "gazelle:resolve go golang.org/x/text/secure/bidirule @org_golang_x_text//secure/bidirule",
             "gazelle:resolve go golang.org/x/text/unicode/bidi @org_golang_x_text//unicode/bidi",
             "gazelle:resolve go golang.org/x/text/unicode/norm @org_golang_x_text//unicode/norm",
         ],
     )
     go_repository(
+        name = "org_golang_x_sys",
+        importpath = "golang.org/x/sys",
+        sum = "h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=",
+        version = "v0.38.0",
+    )
+    go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
         sum = "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=",
         version = "v0.21.0",
-        build_external = "external",
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_api",
         importpath = "google.golang.org/genproto/googleapis/api",
         sum = "h1:+2XxjfsAu6vqFxwGBRcHiMaDCuZiqXGDUDVWVtrFAnE=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/rpc/status @org_golang_google_genproto_googleapis_rpc//status",
         ],
@@ -144,7 +146,6 @@ def envoy_dependency_imports(
         importpath = "google.golang.org/genproto/googleapis/rpc",
         sum = "h1:i/Q+bfisr7gq6feoJnS/DlpdwEL4ihp41fvRiM3Ork0=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
-        build_external = "external",
     )
     go_repository(
         name = "org_golang_google_protobuf",
@@ -152,14 +153,12 @@ def envoy_dependency_imports(
         importpath = "google.golang.org/protobuf",
         sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
         version = "v1.36.10",
-        build_external = "external",
     )
     go_repository(
         name = "xds_go",
         importpath = "github.com/cncf/xds/go",
         sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
         version = "v0.0.0-20251110193048-8bfbf64dc13e",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go google.golang.org/genproto/googleapis/api/expr/v1alpha1 @org_golang_google_genproto_googleapis_api//expr/v1alpha1",
         ],
@@ -169,14 +168,12 @@ def envoy_dependency_imports(
         importpath = "cel.dev/expr",
         sum = "h1:1KrZg61W6TWSxuNZ37Xy49ps13NUovb66QLprthtwi4=",
         version = "v0.25.1",
-        build_external = "external",
     )
     go_repository(
         name = "com_github_spf13_afero",
         importpath = "github.com/spf13/afero",
         sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
         version = "v1.10.0",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go golang.org/x/text/runes @org_golang_x_text//runes",
             "gazelle:resolve go golang.org/x/text/transform @org_golang_x_text//transform",
@@ -188,9 +185,9 @@ def envoy_dependency_imports(
         importpath = "github.com/lyft/protoc-gen-star/v2",
         sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
         version = "v2.0.4-0.20230330145011-496ad1ac90a4",
-        build_external = "external",
         build_directives = [
             "gazelle:resolve go github.com/spf13/afero @com_github_spf13_afero//:afero",
+            "gazelle:resolve go golang.org/x/tools/imports @org_golang_x_tools//imports",
         ],
     )
     go_repository(
@@ -198,14 +195,12 @@ def envoy_dependency_imports(
         importpath = "github.com/iancoleman/strcase",
         sum = "h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=",
         version = "v0.3.0",
-        build_external = "external",
     )
     go_repository(
         name = "com_github_planetscale_vtprotobuf",
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
-        build_external = "external",
     )
 
     go_repository(
@@ -213,7 +208,6 @@ def envoy_dependency_imports(
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",
-        build_external = "external",
     )
 
     rules_proto_grpc_toolchains()

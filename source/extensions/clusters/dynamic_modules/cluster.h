@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,6 +53,8 @@ using OnClusterServerInitializedType =
 using OnClusterDrainStartedType = decltype(&envoy_dynamic_module_on_cluster_drain_started);
 using OnClusterShutdownType = decltype(&envoy_dynamic_module_on_cluster_shutdown);
 using OnClusterHttpCalloutDoneType = decltype(&envoy_dynamic_module_on_cluster_http_callout_done);
+using OnClusterLbOnHostMembershipUpdateType =
+    decltype(&envoy_dynamic_module_on_cluster_lb_on_host_membership_update);
 
 /**
  * Configuration for a dynamic module cluster. This holds the loaded dynamic module, resolved
@@ -89,6 +92,7 @@ public:
   OnClusterDrainStartedType on_cluster_drain_started_ = nullptr;
   OnClusterShutdownType on_cluster_shutdown_ = nullptr;
   OnClusterHttpCalloutDoneType on_cluster_http_callout_done_ = nullptr;
+  OnClusterLbOnHostMembershipUpdateType on_cluster_lb_on_host_membership_update_ = nullptr;
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
@@ -312,10 +316,17 @@ public:
   }
 
   // Methods called by the dynamic module via ABI callbacks.
-  bool addHosts(const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
-                std::vector<Upstream::HostSharedPtr>& result_hosts);
+  bool addHosts(
+      const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
+      const std::vector<std::string>& regions, const std::vector<std::string>& zones,
+      const std::vector<std::string>& sub_zones,
+      const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+      std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority = 0);
   size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);
+  bool updateHostHealth(Upstream::HostSharedPtr host,
+                        envoy_dynamic_module_type_host_health health_status);
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
+  Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
 
   /**
@@ -454,8 +465,11 @@ public:
   DynamicModuleAsyncHostSelectionHandle(
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
-      OnClusterLbCancelHostSelectionType cancel_fn)
-      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn) {}
+      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled)
+      : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn),
+        cancelled_(std::move(cancelled)) {}
+
+  ~DynamicModuleAsyncHostSelectionHandle() override;
 
   void cancel() override;
 
@@ -463,6 +477,7 @@ private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
   OnClusterLbCancelHostSelectionType cancel_fn_;
+  std::shared_ptr<std::atomic<bool>> cancelled_;
 };
 
 /**
@@ -493,16 +508,50 @@ public:
   // Access the handle for async host selection completion.
   const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
 
+  /**
+   * Returns the shared cancellation flag for the current async host selection. When the router
+   * cancels the selection (e.g., stream timeout), the flag is set so the posted completion
+   * callback becomes a no-op. Returns nullptr when there is no active async selection.
+   */
+  std::shared_ptr<std::atomic<bool>> activeAsyncCancelled() const {
+    return active_async_cancelled_;
+  }
+
+  /**
+   * Returns the worker thread's dispatcher captured during chooseHost. Used by the async
+   * completion callback in abi_impl.cc to post to the correct worker thread without accessing
+   * the LoadBalancerContext from a background thread.
+   */
+  Event::Dispatcher* activeAsyncDispatcher() const { return active_async_dispatcher_; }
+
   // Per-host custom data storage.
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
   bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
+
+  // Accessors for hosts added/removed during the on_host_membership_update callback.
+  const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
+  const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
+  // Shared cancellation flag for the active async host selection. Set in chooseHost when the
+  // module returns AsyncPending, and read by the posted completion callback in abi_impl.cc.
+  std::shared_ptr<std::atomic<bool>> active_async_cancelled_;
+
+  // Worker thread dispatcher captured during chooseHost for async completion posting.
+  Event::Dispatcher* active_async_dispatcher_{nullptr};
+
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;
+
+  // Temporary pointers to host vectors, valid only during on_host_membership_update callback.
+  const Upstream::HostVector* hosts_added_{};
+  const Upstream::HostVector* hosts_removed_{};
+
+  // Membership update callback handle.
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 };
 
 /**

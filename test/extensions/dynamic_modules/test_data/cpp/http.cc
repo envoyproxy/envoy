@@ -419,6 +419,15 @@ public:
     assert(ns_set.count("ns_keys_test") && "missing ns_keys_test in namespaces");
     assert(ns_set.count("ns_res_body_bool") && "missing ns_res_body_bool in namespaces");
 
+    // Test list metadata.
+    handle_.addMetadataList("ns_list", "list_key", 1.0);
+    handle_.addMetadataList("ns_list", "list_key", 2.0);
+    handle_.addMetadataList("ns_list", "list_key", 3.0);
+    handle_.addMetadataList("ns_list", "str_list_key", "hello");
+    handle_.addMetadataList("ns_list", "str_list_key", "world");
+    handle_.addMetadataList("ns_list", "bool_list_key", true);
+    handle_.addMetadataList("ns_list", "bool_list_key", false);
+
     return BodyStatus::Continue;
   }
 

@@ -723,6 +723,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_atomic_ref.patch",
             "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
@@ -734,6 +735,12 @@ def _v8():
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
+            # TODO(jwendell): Remove the atomic_ref polyfill injection once the LLVM toolchain is
+            # bumped to a version whose libc++ provides std::atomic_ref (LLVM 19+).
+            "grep -rl 'std::atomic_ref' src/ include/ --include='*.h' --include='*.cc' | grep -v atomic_ref_polyfill | xargs -r sed -i '1s!^!#include \"src/base/atomic_ref_polyfill.h\"\\n!'",
+            # TODO(jwendell): Remove consteval->constexpr workaround once the LLVM toolchain is
+            # bumped. Clang 18 has bugs with consteval in template contexts (fixed in clang 19+).
+            "find ./src -type f \\( -name '*.h' -o -name '*.cc' \\) -exec sed -i 's/consteval/constexpr/g' {} \\;",
         ],
     )
 
@@ -767,6 +774,40 @@ def _simdutf():
     external_http_archive(
         name = "simdutf",
         build_file = "@envoy//bazel/external:simdutf.BUILD",
+        patch_cmds = [
+            # TODO(jwendell): Remove this polyfill once the LLVM toolchain is bumped to a
+            # version whose libc++ provides std::atomic_ref (LLVM 19+).
+            # LLVM 18's libc++ lacks std::atomic_ref; without it SIMDUTF_ATOMIC_REF is 0
+            # and the atomic_base64/atomic_binary functions are excluded from compilation.
+            """cat > atomic_ref_polyfill.h << 'EOF'
+#ifndef ATOMIC_REF_POLYFILL_H_
+#define ATOMIC_REF_POLYFILL_H_
+#include <atomic>
+#include <type_traits>
+#if !defined(__cpp_lib_atomic_ref)
+#define __cpp_lib_atomic_ref 201806L
+namespace std {
+template <typename T> struct atomic_ref {
+  static_assert(std::is_trivially_copyable_v<T>);
+  static constexpr std::size_t required_alignment = alignof(T);
+  explicit atomic_ref(T& obj) : ptr_(&obj) {}
+  atomic_ref(const atomic_ref&) = default;
+  T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
+    return reinterpret_cast<const std::atomic<T>*>(ptr_)->load(order);
+  }
+  void store(T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
+    reinterpret_cast<std::atomic<T>*>(ptr_)->store(desired, order);
+  }
+private:
+  T* ptr_;
+};
+template <typename T> atomic_ref(T&) -> atomic_ref<T>;
+}  // namespace std
+#endif
+#endif
+EOF""",
+            "sed -i '1s!^!#include \"atomic_ref_polyfill.h\"\\n!' simdutf.cpp",
+        ],
     )
 
 def _quiche():

@@ -1019,4 +1019,51 @@ TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   }
 }
 
+TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
+  initializeFilter("list_metadata_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify number list (3 elements: 10, 20, 30).
+  auto num_size = response->headers().get(Http::LowerCaseString("x-list-num-size"));
+  ASSERT_FALSE(num_size.empty());
+  EXPECT_EQ("3", num_size[0]->value().getStringView());
+  auto num_0 = response->headers().get(Http::LowerCaseString("x-list-num-0"));
+  ASSERT_FALSE(num_0.empty());
+  EXPECT_EQ("10", num_0[0]->value().getStringView());
+  auto num_1 = response->headers().get(Http::LowerCaseString("x-list-num-1"));
+  ASSERT_FALSE(num_1.empty());
+  EXPECT_EQ("20", num_1[0]->value().getStringView());
+  auto num_2 = response->headers().get(Http::LowerCaseString("x-list-num-2"));
+  ASSERT_FALSE(num_2.empty());
+  EXPECT_EQ("30", num_2[0]->value().getStringView());
+
+  // Verify string list (2 elements: "hello", "world").
+  auto str_size = response->headers().get(Http::LowerCaseString("x-list-str-size"));
+  ASSERT_FALSE(str_size.empty());
+  EXPECT_EQ("2", str_size[0]->value().getStringView());
+  auto str_0 = response->headers().get(Http::LowerCaseString("x-list-str-0"));
+  ASSERT_FALSE(str_0.empty());
+  EXPECT_EQ("hello", str_0[0]->value().getStringView());
+  auto str_1 = response->headers().get(Http::LowerCaseString("x-list-str-1"));
+  ASSERT_FALSE(str_1.empty());
+  EXPECT_EQ("world", str_1[0]->value().getStringView());
+
+  // Verify bool list (2 elements: true, false).
+  auto bool_size = response->headers().get(Http::LowerCaseString("x-list-bool-size"));
+  ASSERT_FALSE(bool_size.empty());
+  EXPECT_EQ("2", bool_size[0]->value().getStringView());
+  auto bool_0 = response->headers().get(Http::LowerCaseString("x-list-bool-0"));
+  ASSERT_FALSE(bool_0.empty());
+  EXPECT_EQ("true", bool_0[0]->value().getStringView());
+  auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
+  ASSERT_FALSE(bool_1.empty());
+  EXPECT_EQ("false", bool_1[0]->value().getStringView());
+}
+
 } // namespace Envoy
