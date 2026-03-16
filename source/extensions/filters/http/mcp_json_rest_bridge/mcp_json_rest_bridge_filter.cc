@@ -34,8 +34,6 @@ absl::StatusOr<int> getSessionId(const json& json_rpc) {
 
 json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, int session_id,
                                         bool is_error) {
-  std::vector<std::string> contents;
-  contents.push_back(std::string(tool_call_response));
   json j;
 
   j[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
@@ -44,12 +42,10 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, in
   json result_obj;
   // Creates the "content" array
   json content_array = json::array();
-  for (absl::string_view content : contents) {
-    json content_item;
-    content_item[McpConstants::TYPE_FIELD] = "text";
-    content_item[McpConstants::TEXT_FIELD] = content;
-    content_array.push_back(std::move(content_item));
-  }
+  json content_item;
+  content_item[McpConstants::TYPE_FIELD] = "text";
+  content_item[McpConstants::TEXT_FIELD] = tool_call_response;
+  content_array.push_back(std::move(content_item));
   // Adds the "content" array and "isError" to the "result" object
   result_obj[McpConstants::CONTENT_FIELD] = content_array;
   result_obj[McpConstants::IS_ERROR_FIELD] = is_error;
@@ -247,6 +243,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
             .dump());
   } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     mcp_operation_ = McpOperation::InitializationAck;
+    // TODO(guoyilin42): We may need to explicitly set `content-length: 0` to prevent curl from
+    // hanging. `modify_headers` fails here as `sendLocalReply` removes it for empty bodies.
     decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
                                        Grpc::Status::WellKnownGrpcStatus::Ok,
                                        "mcp_json_rest_bridge_filter_initialize_ack");
@@ -293,6 +291,8 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
     break;
   }
   case McpOperation::OperationFailed: {
+    // TODO(guoyilin42): Construct the full JSON-RPC error response directly in `sendErrorResponse`
+    // to avoid this inefficient serialization-then-deserialization cycle and simplify the code.
     json error = json::parse(json_ptr, json_ptr + total_size, /*parser_callback_t=*/nullptr,
                              /*allow_exceptions=*/false);
     if (error.is_discarded()) {
