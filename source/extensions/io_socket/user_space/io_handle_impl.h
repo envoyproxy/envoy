@@ -124,6 +124,11 @@ public:
   void onPeerDestroy() override {
     peer_handle_ = nullptr;
     write_shutdown_ = true;
+    if (user_file_event_) {
+      // The connection may be waiting to flush a write to the socket, so activate the Write event
+      // so that the connection can clean up.
+      user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    }
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
