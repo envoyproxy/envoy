@@ -110,3 +110,20 @@ uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
   return 200;
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)cluster_name;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)cluster_name;
+}

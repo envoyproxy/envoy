@@ -174,6 +174,44 @@ public:
         ->assign("5xx");
   }
 
+  // Set up a config that matches only local replies with 5xx status using an and_matcher.
+  void setLocalResponseFor5xxLocalRepliesOnly() {
+    custom_response_filter_config_ = TestUtility::parseYaml<CustomResponse>(R"EOF(
+      custom_response_matcher:
+        matcher_list:
+          matchers:
+          - predicate:
+              and_matcher:
+                predicate:
+                - single_predicate:
+                    input:
+                      name: 5xx_response
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
+                    value_match:
+                      exact: "5xx"
+                - single_predicate:
+                    input:
+                      name: local_reply_check
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
+                    value_match:
+                      exact: "true"
+            on_match:
+              action:
+                name: local_reply_action
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+                  status_code: 499
+                  body:
+                    inline_string: "local reply intercepted"
+                  response_headers_to_add:
+                  - header:
+                      key: "x-local-reply"
+                      value: "true"
+    )EOF");
+  }
+
 protected:
   ::Envoy::Http::TestResponseHeaderMapImpl unauthorized_response_{{":status", "401"},
                                                                   {"content-length", "0"}};
@@ -813,6 +851,47 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   // override.
   EXPECT_EQ("520", response->headers().getStatusValue());
   EXPECT_EQ("Modify action response body", response->body());
+}
+
+// Verify that a local reply with a 5xx status code is intercepted when using the local_reply
+// matcher input combined with a status code class matcher.
+TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherInterceptsLocalReply) {
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+
+  setLocalResponseFor5xxLocalRepliesOnly();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("499", response->headers().getStatusValue());
+  EXPECT_EQ("local reply intercepted", response->body());
+  EXPECT_EQ("true", response->headers()
+                        .get(::Envoy::Http::LowerCaseString("x-local-reply"))[0]
+                        ->value()
+                        .getStringView());
+}
+
+// Verify that an upstream 5xx response is not intercepted when using the local_reply matcher
+// input that requires local replies only.
+TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherIgnoresUpstreamResponse) {
+  setLocalResponseFor5xxLocalRepliesOnly();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, internal_server_error_, 0);
+  EXPECT_TRUE(response->complete());
+  // The upstream 500 response should pass through unmodified.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_TRUE(response->headers().get(::Envoy::Http::LowerCaseString("x-local-reply")).empty());
 }
 
 // TODO(#26236): Fix test suite for HTTP/3.

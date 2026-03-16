@@ -384,6 +384,8 @@ paths:
     - test/extensions/bootstrap/wasm/wasm_speed_test.cc
     - test/extensions/bootstrap/wasm/wasm_test.cc
     - test/extensions/common/wasm/wasm_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/http.cc
     - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
     - test/test_common/wasm_base.h
 

@@ -68,20 +68,23 @@ pub struct EnvoyMutBuffer<'a> {
 }
 
 impl EnvoyMutBuffer<'_> {
-  /// This is a helper function to create an [`EnvoyMutBuffer`] from a static mutable storage.
-  /// This is only meant to be used in unit tests.
+  /// This is a helper function to create an [`EnvoyMutBuffer`] from a raw pointer to static
+  /// mutable storage. This is only meant to be used in unit tests.
   ///
-  /// Mutability is required because the data can be written in-place. Therefore, this needs to be
-  /// used with "unsafe" block for most of the cases like the following:
+  /// # Safety
+  ///
+  /// The caller must ensure that the pointer is valid for the lifetime of the returned buffer and
+  /// that no other references to the data exist while the buffer is in use.
   ///
   /// ```
   /// static mut BUF: [u8; 1024] = [0; 1024];
-  /// let mut buffer = envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer::new(unsafe { &mut BUF });
+  /// let _buffer = unsafe { envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer::new(&raw mut BUF) };
   /// ```
-  pub fn new(static_str: &'static mut [u8]) -> Self {
+  #[allow(unknown_lints, dangerous_implicit_autorefs)]
+  pub unsafe fn new(static_buf: *mut [u8]) -> Self {
     Self {
-      raw_ptr: static_str.as_mut_ptr(),
-      length: static_str.len(),
+      raw_ptr: static_buf as *mut u8,
+      length: (*static_buf).len(),
       _marker: std::marker::PhantomData,
     }
   }
