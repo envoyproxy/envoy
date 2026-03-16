@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
+#include <filesystem>
+
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
@@ -85,6 +87,26 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   absl::StatusOr<Extensions::DynamicModules::DynamicModulePtr> dynamic_module;
   if (module_config.has_module()) {
     if (module_config.module().has_remote()) {
+      const auto& sha256 = module_config.module().remote().sha256();
+
+      // Check cache for previously fetched remote module.
+      auto cache_it = remote_module_cache_.find(sha256);
+      if (cache_it != remote_module_cache_.end()) {
+        std::filesystem::path cached_path(cache_it->second);
+        if (std::filesystem::exists(cached_path)) {
+          dynamic_module = Extensions::DynamicModules::newDynamicModule(
+              cached_path, module_config.do_not_close(), module_config.load_globally());
+          if (dynamic_module.ok()) {
+            // Cache hit — skip async fetch entirely.
+            return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
+                                              module_config, context, scope);
+          }
+        }
+        // Cached file is invalid or missing, remove entry and fall through to re-fetch.
+        remote_module_cache_.erase(cache_it);
+      }
+
+      // Cache miss — need async fetch, which requires init_manager.
       if (init_manager == nullptr) {
         return absl::InvalidArgumentError("Remote module sources require an init manager");
       }
@@ -143,8 +165,8 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
       context.clusterManager(), init_manager, module_config.module().remote(),
       context.mainThreadDispatcher(), context.api().randomGenerator(),
       /*allow_empty=*/true,
-      [weak_state, proto_config_copy, module_config_copy, &context,
-       &scope](const std::string& data) {
+      [weak_state, proto_config_copy, module_config_copy, &context, &scope,
+       this](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {
           return;
@@ -164,6 +186,13 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
                               module_or_error.status().message());
           return;
         }
+
+        // Cache the module's file path for future config updates.
+        const auto& fetch_sha256 = module_config_copy.module().remote().sha256();
+        auto cached_path = std::filesystem::temp_directory_path() /
+                           fmt::format("envoy_dynamic_module_{}.so", fetch_sha256);
+        remote_module_cache_[fetch_sha256] = cached_path.string();
+
         auto cb_or_error =
             buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,
                                        module_config_copy, context, scope);
