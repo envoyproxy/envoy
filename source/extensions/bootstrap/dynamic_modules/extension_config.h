@@ -9,6 +9,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -23,6 +24,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
+
+// The default custom stat namespace which prepends all user-defined metrics.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 using OnBootstrapExtensionConfigDestroyType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_config_destroy);
@@ -45,6 +50,10 @@ using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
 using OnBootstrapExtensionAdminRequestType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
+using OnBootstrapExtensionClusterAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update);
+using OnBootstrapExtensionClusterRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_removal);
 
 class DynamicModuleBootstrapExtension;
 
@@ -54,12 +63,14 @@ class DynamicModuleBootstrapExtension;
  */
 class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
+      public Upstream::ClusterUpdateCallbacks,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
    * Constructor for the config.
    * @param extension_name the name of the extension.
    * @param extension_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics emitted by this module.
    * @param dynamic_module the dynamic module to use.
    * @param main_thread_dispatcher the main thread dispatcher.
    * @param context the server factory context for accessing cluster manager lazily.
@@ -67,6 +78,7 @@ public:
    */
   DynamicModuleBootstrapExtensionConfig(const absl::string_view extension_name,
                                         const absl::string_view extension_config,
+                                        const absl::string_view metrics_namespace,
                                         Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                         Event::Dispatcher& main_thread_dispatcher,
                                         Server::Configuration::ServerFactoryContext& context,
@@ -106,6 +118,23 @@ public:
    */
   void signalInitComplete();
 
+  /**
+   * Enables cluster lifecycle event notifications. When enabled, the module will receive
+   * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
+   * callbacks when clusters are added, updated, or removed.
+   *
+   * This must be called on the main thread after the server is initialized, since the
+   * ClusterManager is not available during bootstrap extension creation.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableClusterLifecycle();
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -124,6 +153,9 @@ public:
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
   OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
+  OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
+      nullptr;
+  OnBootstrapExtensionClusterRemovalType on_bootstrap_extension_cluster_removal_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -368,6 +400,14 @@ private:
   std::vector<ModuleGaugeVecHandle> gauge_vecs_;
   std::vector<ModuleHistogramHandle> histograms_;
   std::vector<ModuleHistogramVecHandle> histogram_vecs_;
+
+  // Cluster lifecycle callback handle. Set when the module enables cluster lifecycle events
+  // via enableClusterLifecycle(). Reset during shutdown to avoid use-after-free since the
+  // underlying TLS data is destroyed before the config.
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
+  bool cluster_lifecycle_enabled_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -435,6 +475,7 @@ private:
  * Creates a new DynamicModuleBootstrapExtensionConfig from the given module and configuration.
  * @param extension_name the name of the extension.
  * @param extension_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
@@ -445,6 +486,7 @@ private:
 absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store);
