@@ -31,11 +31,11 @@ message HttpService {
 
   // Specifies a list of HTTP headers that should be added to each request
   // handled by this virtual host.
-  // Substition formatters are supported for some uses of this field.
+  // Substitution formatters are supported for some uses of this field.
   repeated HeaderValueOption request_headers_to_add = 2
       [(validate.rules).repeated = {max_items: 1000}];
 
-  // Specifies a collection of Formatter plugins that can be used in substition formatters
+  // Specifies a collection of Formatter plugins that can be used in substitution formatters
   // in ``request_headers_to_add``.
   // See the formatters extensions documentation for details.
   // [#extension-category: envoy.formatter]
