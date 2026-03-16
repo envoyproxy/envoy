@@ -457,6 +457,33 @@ TEST_F(HttpTcpBridgeTest, OnUpstreamDataAfterResetStream) {
   bridge_->onUpstreamData(data, false);
 }
 
+TEST_F(HttpTcpBridgeTest, SendCallbacksAfterResetStreamAreNoOps) {
+  EXPECT_CALL(mock_connection_,
+              close(Network::ConnectionCloseType::NoFlush, "dynamic_module_bridge_reset_stream"));
+  bridge_->resetStream();
+
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeTrailers(_)).Times(0);
+
+  bridge_->sendResponse(200, nullptr, 0, "body");
+  bridge_->sendResponseHeaders(200, nullptr, 0, false);
+  bridge_->sendResponseData("data", false);
+  bridge_->sendResponseTrailers(nullptr, 0);
+}
+
+TEST_F(HttpTcpBridgeTest, SendResponseTrailersWithContent) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
+  bridge_->sendResponseHeaders(200, nullptr, 0, false);
+
+  envoy_dynamic_module_type_module_http_header trailers[2];
+  trailers[0] = {"grpc-status", 11, "0", 1};
+  trailers[1] = {"grpc-message", 12, "ok", 2};
+
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeTrailers(_));
+  bridge_->sendResponseTrailers(trailers, 2);
+}
+
 TEST_F(HttpTcpBridgeTest, BytesMeter) {
   auto& meter = bridge_->bytesMeter();
   EXPECT_NE(meter, nullptr);
