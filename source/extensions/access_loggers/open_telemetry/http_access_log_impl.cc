@@ -90,8 +90,7 @@ void HttpAccessLoggerImpl::flush() {
   // User-Agent header follows the OTLP specification.
   message->headers().setReferenceUserAgent(getOtlpUserAgentHeader());
 
-  // Adds all custom headers to the request (static values set once; formatted values
-  // re-evaluated now so that runtime updates, e.g. SDS rotation, are reflected).
+  // Adds all custom headers to the request.
   headers_applicator_->apply(message->headers());
 
   message->body().add(request_body);
