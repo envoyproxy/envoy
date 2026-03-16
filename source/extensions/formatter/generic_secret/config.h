@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Formatter {
 
 /**
- * CommandParserFactory for the %GENERIC_SECRET% formatter.
+ * CommandParserFactory for the %SECRET% formatter.
  *
  * This formatter resolves the value of a generic secret (from SDS or static bootstrap config)
  * and makes it available as a substitution format command.
