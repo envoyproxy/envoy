@@ -2472,6 +2472,13 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin
   false
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -4674,4 +4681,208 @@ fn test_async_host_selection_with_stored_completion() {
   // Simulate async DNS resolution completing.
   let completion = lb.pending_completion.take().unwrap();
   completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
+  static mut CLUSTER_NAME_RECEIVED: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_ADDED.store(true, Ordering::SeqCst);
+      unsafe {
+        CLUSTER_NAME_RECEIVED = cluster_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(CLUSTER_NAME_RECEIVED, "test_cluster");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static mut REMOVED_CLUSTER_NAME: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_REMOVED.store(true, Ordering::SeqCst);
+      unsafe {
+        REMOVED_CLUSTER_NAME = cluster_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "removed_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(REMOVED_CLUSTER_NAME, "removed_cluster");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling cluster lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
 }
