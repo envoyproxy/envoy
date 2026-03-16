@@ -77,8 +77,9 @@ formatters:
         name: my-token
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(makeFormatter(yaml), EnvoyException,
-                            "Not supported field in StreamInfo: SECRET");
+  EXPECT_THROW_WITH_MESSAGE(
+      makeFormatter(yaml), EnvoyException,
+      "envoy.formatter.generic_secret: secret 'unknown' is not configured in secret_configs");
 }
 
 // Multiple secrets can be configured and resolve independently.

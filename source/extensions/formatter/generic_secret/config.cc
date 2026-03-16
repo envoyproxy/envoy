@@ -76,7 +76,9 @@ public:
     }
     const auto it = providers_.find(subcommand);
     if (it == providers_.end()) {
-      return nullptr;
+      throw EnvoyException(fmt::format(
+          "envoy.formatter.generic_secret: secret '{}' is not configured in secret_configs",
+          subcommand));
     }
     return std::make_unique<GenericSecretFormatterProvider>(it->second, max_length);
   }

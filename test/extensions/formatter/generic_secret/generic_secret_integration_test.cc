@@ -144,5 +144,46 @@ TEST_P(GenericSecretStaticIntegrationTest, StaticSecretResolvedInAccessLog) {
   codec_client_->close();
 }
 
+// Integration test verifying that referencing a secret name in the format string
+// that is not listed in secret_configs causes a config rejection.
+class GenericSecretUnknownNameIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  GenericSecretUnknownNameIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("known-token");
+      secret->mutable_generic_secret()->mutable_secret()->set_inline_string("value");
+    });
+
+    // Reference "unknown-token" in the format string but only configure "known-token"
+    // in secret_configs.
+    envoy::config::core::v3::TypedExtensionConfig formatter_ext;
+    formatter_ext.set_name("envoy.formatter.generic_secret");
+    envoy::extensions::formatter::generic_secret::v3::GenericSecret generic_secret_cfg;
+    (*generic_secret_cfg.mutable_secret_configs())["known-token"].set_name("known-token");
+    formatter_ext.mutable_typed_config()->PackFrom(generic_secret_cfg);
+
+    useAccessLog("%SECRET(unknown-token)%", {formatter_ext});
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, GenericSecretUnknownNameIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         [](const testing::TestParamInfo<Network::Address::IpVersion>& info) {
+                           return TestUtility::ipVersionToString(info.param);
+                         });
+
+TEST_P(GenericSecretUnknownNameIntegrationTest, UnknownSecretNameRejected) {
+  EXPECT_DEATH(initialize(), "Lds update failed");
+}
+
 } // namespace
 } // namespace Envoy
