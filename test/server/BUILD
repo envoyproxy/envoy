@@ -105,6 +105,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "bootstrap_config_dir_test",
+    srcs = ["bootstrap_config_dir_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/api:api_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/server:options_base",
+        "//source/server:server_base_lib",
+        "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "active_tcp_listener_test",
     srcs = ["active_tcp_listener_test.cc"],
     rbe_pool = "6gig",

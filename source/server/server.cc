@@ -1,11 +1,14 @@
 #include "source/server/server.h"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdint>
 #include <ctime>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -34,6 +37,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_manager_impl.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/filesystem/directory.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
@@ -62,6 +66,57 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+bool isYamlFilePath(absl::string_view path) {
+  return absl::EndsWithIgnoreCase(path, MessageUtil::FileExtensions::get().Yaml) ||
+         absl::EndsWithIgnoreCase(path, MessageUtil::FileExtensions::get().Yml);
+}
+
+std::string normalizePath(absl::string_view path) {
+  if (path.empty()) {
+    return "";
+  }
+  return std::filesystem::path{std::string(path)}.lexically_normal().string();
+}
+
+std::string joinPath(absl::string_view directory, absl::string_view filename) {
+  if (directory.empty()) {
+    return normalizePath(filename);
+  }
+  const std::filesystem::path joined_path =
+      std::filesystem::path{std::string(directory)} /
+      std::filesystem::path{std::string(filename)};
+  return joined_path.lexically_normal().string();
+}
+
+absl::StatusOr<std::vector<std::string>>
+collectYamlFilesInDirectory(const std::string& directory_path) {
+  const std::string effective_directory_path = directory_path.empty() ? "." : directory_path;
+  std::vector<std::string> yaml_files;
+  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(effective_directory_path)) {
+    if (entry.type_ != Filesystem::FileType::Regular || !isYamlFilePath(entry.name_)) {
+      continue;
+    }
+    yaml_files.push_back(joinPath(effective_directory_path, entry.name_));
+  }
+  std::sort(yaml_files.begin(), yaml_files.end());
+  if (yaml_files.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("No YAML configuration files found in directory \"", effective_directory_path,
+                     "\""));
+  }
+  return yaml_files;
+}
+
+absl::Status loadBootstrapFromPath(const std::string& path,
+                                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api) {
+  envoy::config::bootstrap::v3::Bootstrap fragment;
+  RETURN_IF_NOT_OK(MessageUtil::loadFromFile(path, fragment, validation_visitor, api));
+  bootstrap.MergeFrom(fragment);
+  return absl::OkStatus();
+}
+
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
 
   auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
@@ -376,7 +431,15 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-    RETURN_IF_NOT_OK(MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api));
+    if (api.fileSystem().directoryExists(config_path)) {
+      auto yaml_files_or_error = collectYamlFilesInDirectory(config_path);
+      RETURN_IF_NOT_OK_REF(yaml_files_or_error.status());
+      for (const std::string& yaml_file : yaml_files_or_error.value()) {
+        RETURN_IF_NOT_OK(loadBootstrapFromPath(yaml_file, bootstrap, validation_visitor, api));
+      }
+    } else {
+      RETURN_IF_NOT_OK(loadBootstrapFromPath(config_path, bootstrap, validation_visitor, api));
+    }
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
