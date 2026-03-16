@@ -141,6 +141,24 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "listener_update_callbacks_mocks",
+    srcs = ["listener_update_callbacks.cc"],
+    hdrs = ["listener_update_callbacks.h"],
+    deps = [
+        "//envoy/server:listener_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "listener_update_callbacks_handle_mocks",
+    srcs = ["listener_update_callbacks_handle.cc"],
+    hdrs = ["listener_update_callbacks_handle.h"],
+    deps = [
+        "//envoy/server:listener_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "server_lifecycle_notifier_mocks",
     srcs = ["server_lifecycle_notifier.cc"],
     hdrs = ["server_lifecycle_notifier.h"],
@@ -341,6 +359,8 @@ envoy_cc_mock(
         ":listener_component_factory_mocks",
         ":listener_factory_context_mocks",
         ":listener_manager_mocks",
+        ":listener_update_callbacks_handle_mocks",
+        ":listener_update_callbacks_mocks",
         ":main_mocks",
         ":options_mocks",
         ":overload_manager_mocks",
