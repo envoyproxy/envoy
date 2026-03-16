@@ -82,7 +82,7 @@ public:
     if (downstream_protocol_ == Http::CodecType::HTTP2 ||
         downstream_protocol_ == Http::CodecType::HTTP3) {
       // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path.
-      // HTTP/3 also defaults to allowing it for alignment with HTTP/2 (Shinkansen).
+      // HTTP/3 also defaults to allowing it for alignment with HTTP/2.
       additionally_allowed_characters += generateExtendedAsciiString();
     }
     return additionally_allowed_characters;

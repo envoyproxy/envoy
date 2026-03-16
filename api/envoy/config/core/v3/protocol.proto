@@ -775,8 +775,7 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value max_header_field_size_kb = 19
       [(validate.rules).uint32 = {lte: 256 gte: 64}];
 
-  // Whether to allow `obs-text` (characters from hexadecimal 0x80 to 0xff) in
-  // header field values.
+  // Whether to allow obselete text in header field values.
   // If not set, it defaults to true.
   google.protobuf.BoolValue allow_obs_text = 20;
 }
@@ -833,9 +832,8 @@ message Http3ProtocolOptions {
   // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
   bool disable_connection_flow_control_for_streams = 8;
 
-  // Whether to allow `obs-text` (characters from hexadecimal 0x80 to 0xff) in
-  // header field values.
-  // If not set, it defaults to true for alignment with HTTP/2 (Shinkansen).
+  // Whether to allow obselete text in header field values.
+  // If not set, it defaults to true for alignment with HTTP/2.
   google.protobuf.BoolValue allow_obs_text = 9;
 }
 
