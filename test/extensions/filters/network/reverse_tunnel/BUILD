@@ -53,6 +53,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = [
+        "envoy.clusters.reverse_connection",
         "envoy.filters.http.router",
         "envoy.filters.network.reverse_tunnel",
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
@@ -68,6 +69,7 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/clusters/reverse_connection:reverse_connection_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/reverse_tunnel:config",
@@ -80,6 +82,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
     ],

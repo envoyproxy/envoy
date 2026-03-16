@@ -2,6 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 
@@ -707,6 +708,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
           validation:
             node_id_format: "test-node"
             cluster_id_format: "test-cluster"
+            tenant_id_format: "test-tenant"
             emit_dynamic_metadata: true)";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
@@ -728,13 +730,14 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
   const std::string validation_config = R"(
           validation:
             node_id_format: "expected-node"
-            cluster_id_format: "expected-cluster")";
+            cluster_id_format: "expected-cluster"
+            tenant_id_format: "expected-tenant")";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
   initialize();
 
   std::string http_request = createHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "wrong-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   (void)tcp_client->write(http_request);
@@ -808,12 +811,45 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
 }
 
+// Test validation with only tenant_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
+  const std::string validation_config = R"(
+          validation:
+            tenant_id_format: "expected-tenant")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: tenant_id matches, node_id and cluster_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "expected-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: tenant_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "wrong-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  (void)tcp_client2->write(http_request_fail);
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
 // Test validation with empty format strings. In this case validation is skipped.
 TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
   const std::string validation_config = R"(
           validation:
             node_id_format: ""
-            cluster_id_format: "")";
+            cluster_id_format: ""
+            tenant_id_format: "")";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
   initialize();
@@ -1408,6 +1444,151 @@ typed_config:
   tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test end-to-end tenant isolation flow.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationEndToEnd) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster with tenant_id_format.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+    tenant_id_format: "%REQ(x-tenant-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  initialize();
+
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                            "node1", "cluster1", "tenant1");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test multiple tenants are isolated correctly.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationMultipleTenants) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster with tenant_id_format.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+    tenant_id_format: "%REQ(x-tenant-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  initialize();
+
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  std::string http_request_tenant_a = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node-a", "cluster-a", "tenant-a");
+
+  IntegrationTcpClientPtr tcp_client_a = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client_a->write(http_request_tenant_a));
+  tcp_client_a->waitForData("HTTP/1.1 200 OK");
+  tcp_client_a->close();
+
+  std::string http_request_tenant_b = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node-b", "cluster-b", "tenant-b");
+
+  IntegrationTcpClientPtr tcp_client_b = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client_b->write(http_request_tenant_b));
+  tcp_client_b->waitForData("HTTP/1.1 200 OK");
+  tcp_client_b->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+}
+
+// Test startup validation fails when tenant isolation enabled but tenant_id_format missing.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationStartupValidation) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster WITHOUT tenant_id_format - should fail at startup.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  // Should fail to start with validation error.
+  EXPECT_DEATH(initialize(), "tenant_id_format must be configured");
 }
 
 } // namespace
