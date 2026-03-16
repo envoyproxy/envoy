@@ -58,20 +58,15 @@ void envoy_dynamic_module_on_cluster_lb_destroy(
   (void)lb_module_ptr;
 }
 
-envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+void envoy_dynamic_module_on_cluster_lb_choose_host(
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr) {
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out) {
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
-  return NULL;
-}
-
-void envoy_dynamic_module_on_cluster_scheduled(
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id) {
-  (void)cluster_envoy_ptr;
-  (void)cluster_module_ptr;
-  (void)event_id;
+  *host_out = NULL;
+  *async_handle_out = NULL;
 }
 
 void envoy_dynamic_module_on_cluster_server_initialized(
