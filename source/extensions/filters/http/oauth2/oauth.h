@@ -31,9 +31,11 @@ public:
 
   virtual void onRefreshAccessTokenFailure() PURE;
 
-  virtual void asyncOnUnauthorized(const std::string& details) PURE;
+  virtual void asyncOnUnauthorized(const std::string& reason,
+                                   const std::string& extra_details = "") PURE;
 
-  virtual Http::FilterHeadersStatus onUnauthorized(const std::string& details) PURE;
+  virtual Http::FilterHeadersStatus onUnauthorized(const std::string& reason,
+                                                   const std::string& extra_details = "") PURE;
 };
 
 /**

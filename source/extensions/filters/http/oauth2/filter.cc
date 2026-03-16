@@ -1306,9 +1306,10 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
   }
 }
 
-void OAuth2Filter::asyncOnUnauthorized(const std::string& details) {
+void OAuth2Filter::asyncOnUnauthorized(const std::string& reason,
+                                       const std::string& extra_details) {
   // Handle unauthorized request in async context
-  const auto status = onUnauthorized(details);
+  const auto status = onUnauthorized(reason, extra_details);
   if (status == Http::FilterHeadersStatus::Continue) {
     decoder_callbacks_->continueDecoding();
   }
@@ -1457,20 +1458,27 @@ bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) con
   return false;
 }
 
-void OAuth2Filter::continueAsUnauthorized(const std::string& failure_reason) {
+void OAuth2Filter::continueAsUnauthorized(const std::string& reason,
+                                          const std::string& extra_details) {
   removeOAuthTokenCookies(*request_headers_);
   removeOAuthFlowCookies(*request_headers_);
   request_headers_->setCopy(OAuth2Headers::get().OAuthStatus, "failed");
-  request_headers_->setCopy(OAuth2Headers::get().OAuthFailureReason, failure_reason);
+  request_headers_->setCopy(OAuth2Headers::get().OAuthFailureReason, reason);
   config_->stats().oauth_allow_failed_passthrough_.inc();
-  ENVOY_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}", failure_reason);
+  const std::string log_details =
+      extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
+  ENVOY_STREAM_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}",
+                   *decoder_callbacks_, log_details);
 }
 
-Http::FilterHeadersStatus OAuth2Filter::onUnauthorized(const std::string& details) {
+Http::FilterHeadersStatus OAuth2Filter::onUnauthorized(const std::string& reason,
+                                                       const std::string& extra_details) {
   if (shouldAllowFailed(*request_headers_)) {
-    continueAsUnauthorized(details);
+    continueAsUnauthorized(reason, extra_details);
     return Http::FilterHeadersStatus::Continue;
   } else {
+    const std::string details =
+        extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
     sendUnauthorizedResponse(details);
     return Http::FilterHeadersStatus::StopIteration;
   }

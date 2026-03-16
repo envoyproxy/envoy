@@ -168,9 +168,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                      message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->asyncOnUnauthorized(
-          fmt::format("Failed to get access token, response code: {}, response body: {}",
-                      response_code, message->bodyAsString()));
+      parent_->asyncOnUnauthorized("Failed to get access token",
+                                   fmt::format("response code: {}, response body: {}",
+                                               response_code, message->bodyAsString()));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
       parent_->onRefreshAccessTokenFailure();
@@ -188,16 +188,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    parent_->asyncOnUnauthorized(fmt::format(
-        "Failed to parse oauth response body: {}, exception: {}", response_body, e.what()));
+    parent_->asyncOnUnauthorized(
+        "Failed to parse oauth response body",
+        fmt::format("response body: {}, exception: {}", response_body, e.what()));
     return;
   }
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    parent_->asyncOnUnauthorized(
-        fmt::format("No access token found in the token exchange response: {}", response_body));
+    parent_->asyncOnUnauthorized("No access token found in the token exchange response",
+                                 fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -210,9 +211,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    parent_->asyncOnUnauthorized(fmt::format(
-        "No default or explicit access token expiration found in the token exchange response: {}",
-        response_body));
+    parent_->asyncOnUnauthorized(
+        "No default or explicit access token expiration found in the token exchange response",
+        fmt::format("response body: {}", response_body));
     return;
   }
 
