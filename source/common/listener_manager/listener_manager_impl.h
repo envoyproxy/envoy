@@ -19,6 +19,7 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
@@ -241,6 +242,8 @@ public:
   bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
+  ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -248,6 +251,13 @@ public:
   std::unique_ptr<ListenerComponentFactory> factory_;
 
 private:
+  struct ListenerUpdateCallbacksHandleImpl : public ListenerUpdateCallbacksHandle,
+                                             RaiiListElement<ListenerUpdateCallbacks*> {
+    ListenerUpdateCallbacksHandleImpl(ListenerUpdateCallbacks& cb,
+                                      std::list<ListenerUpdateCallbacks*>& parent)
+        : RaiiListElement<ListenerUpdateCallbacks*>(parent, &cb) {}
+  };
+
   using ListenerList = std::list<ListenerImplPtr>;
   /**
    * Callback invoked when a listener initialization is completed on worker.
@@ -334,6 +344,11 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  template <typename F> void notifyListenerCallbacks(F notify_fn);
+  void notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                     Network::ListenerConfig& listener_config);
+  void notifyListenerRemovalCallbacks(const std::string& listener_name);
+
   absl::Status setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
   absl::Status createListenSocketFactory(ListenerImpl& listener);
 
@@ -368,6 +383,7 @@ private:
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
+  std::list<ListenerUpdateCallbacks*> update_callbacks_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

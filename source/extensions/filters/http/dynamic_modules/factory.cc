@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -8,34 +9,14 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
-    const FilterConfig& proto_config, const std::string&,
+namespace {
+
+// Builds a FilterFactoryCb from an already-loaded DynamicModule.
+// Extracted because both the synchronous path and the remote fetch callback need it.
+absl::StatusOr<Http::FilterFactoryCb> buildFilterFactoryCallback(
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, const FilterConfig& proto_config,
+    const envoy::extensions::dynamic_modules::v3::DynamicModuleConfig& module_config,
     Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
-
-  const auto& module_config = proto_config.dynamic_module_config();
-
-  // Load the module: either from a local file path or by name.
-  absl::StatusOr<Extensions::DynamicModules::DynamicModulePtr> dynamic_module;
-  if (module_config.has_module()) {
-    if (!module_config.module().has_local() || !module_config.module().local().has_filename()) {
-      return absl::InvalidArgumentError(
-          "Only local file path is supported for module sources (via module.local.filename)");
-    }
-    dynamic_module = Extensions::DynamicModules::newDynamicModule(
-        module_config.module().local().filename(), module_config.do_not_close(),
-        module_config.load_globally());
-  } else {
-    if (module_config.name().empty()) {
-      return absl::InvalidArgumentError(
-          "Either 'name' or 'module' must be specified in dynamic_module_config");
-    }
-    dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-        module_config.name(), module_config.do_not_close(), module_config.load_globally());
-  }
-  if (!dynamic_module.ok()) {
-    return absl::InvalidArgumentError("Failed to load dynamic module: " +
-                                      std::string(dynamic_module.status().message()));
-  }
 
   std::string config;
   if (proto_config.has_filter_config()) {
@@ -55,7 +36,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
               proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
-              std::move(dynamic_module.value()), scope, context);
+              std::move(dynamic_module), scope, context);
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +
@@ -88,6 +69,120 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     // We can initialize the in-module filter after we have both callbacks to ensure the in module
     // filter can access all the necessary information during creation.
     filter->initializeInModuleFilter();
+  };
+}
+
+} // namespace
+
+absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
+    const FilterConfig& proto_config, const std::string&,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+    Init::Manager* init_manager) {
+
+  const auto& module_config = proto_config.dynamic_module_config();
+
+  // Load the module: local file, remote HTTP source, or by name.
+  absl::StatusOr<Extensions::DynamicModules::DynamicModulePtr> dynamic_module;
+  if (module_config.has_module()) {
+    if (module_config.module().has_remote()) {
+      if (init_manager == nullptr) {
+        return absl::InvalidArgumentError("Remote module sources require an init manager");
+      }
+      return createFilterFactoryFromRemoteSource(proto_config, module_config, context, scope,
+                                                 *init_manager);
+    }
+    if (!module_config.module().has_local() || !module_config.module().local().has_filename()) {
+      return absl::InvalidArgumentError(
+          "Only local file path or remote HTTP source is supported for module sources");
+    }
+    dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        module_config.module().local().filename(), module_config.do_not_close(),
+        module_config.load_globally());
+  } else {
+    if (module_config.name().empty()) {
+      return absl::InvalidArgumentError(
+          "Either 'name' or 'module' must be specified in dynamic_module_config");
+    }
+    dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
+        module_config.name(), module_config.do_not_close(), module_config.load_globally());
+  }
+  if (!dynamic_module.ok()) {
+    return absl::InvalidArgumentError("Failed to load dynamic module: " +
+                                      std::string(dynamic_module.status().message()));
+  }
+
+  return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config, module_config,
+                                    context, scope);
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
+    const FilterConfig& proto_config,
+    const envoy::extensions::dynamic_modules::v3::DynamicModuleConfig& module_config,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+    Init::Manager& init_manager) {
+
+  // Shared state: the filter factory callback is populated asynchronously after the remote fetch
+  // completes, then used by per-request lambda below. The RemoteAsyncDataProvider is stored here
+  // to keep it alive for the duration of the fetch (including retries).
+  struct AsyncState {
+    Http::FilterFactoryCb filter_factory_cb;
+    RemoteAsyncDataProviderPtr remote_provider;
+  };
+  auto async_state = std::make_shared<AsyncState>();
+
+  // Copies for use in the callback — the originals may not outlive the async fetch.
+  const FilterConfig proto_config_copy = proto_config;
+  const auto module_config_copy = module_config;
+
+  // Use a weak_ptr in the callback to break the reference cycle:
+  // async_state -> remote_provider -> callback -> async_state.
+  std::weak_ptr<AsyncState> weak_state = async_state;
+
+  async_state->remote_provider = std::make_unique<RemoteAsyncDataProvider>(
+      context.clusterManager(), init_manager, module_config.module().remote(),
+      context.mainThreadDispatcher(), context.api().randomGenerator(),
+      /*allow_empty=*/true,
+      [weak_state, proto_config_copy, module_config_copy, &context,
+       &scope](const std::string& data) {
+        auto state = weak_state.lock();
+        if (!state) {
+          return;
+        }
+        if (data.empty()) {
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+              "Remote dynamic module fetch returned empty data; filter will not be installed");
+          return;
+        }
+        auto module_or_error = Extensions::DynamicModules::newDynamicModuleFromBytes(
+            data, module_config_copy.module().remote().sha256(), module_config_copy.do_not_close(),
+            module_config_copy.load_globally());
+        if (!module_or_error.ok()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
+                              error, "Failed to load remote dynamic module from bytes: {}",
+                              module_or_error.status().message());
+          return;
+        }
+        auto cb_or_error =
+            buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,
+                                       module_config_copy, context, scope);
+        if (!cb_or_error.ok()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
+                              error, "Failed to create filter config from remote module: {}",
+                              cb_or_error.status().message());
+          return;
+        }
+        state->filter_factory_cb = cb_or_error.value();
+      });
+
+  // Note: if the remote fetch fails (network error, bad data, etc.), filter_factory_cb remains
+  // empty and this lambda becomes a no-op — the filter is not installed and requests pass through.
+  // This is fail-open, consistent with how Wasm remote data providers handle fetch failures.
+  return [async_state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    if (async_state->filter_factory_cb) {
+      async_state->filter_factory_cb(callbacks);
+    }
   };
 }
 

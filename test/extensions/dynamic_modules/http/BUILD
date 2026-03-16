@@ -12,12 +12,18 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
