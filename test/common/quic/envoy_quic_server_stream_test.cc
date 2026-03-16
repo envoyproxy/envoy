@@ -966,6 +966,7 @@ TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, AllowObsTextBehavior) {
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
   {
     envoy::config::core::v3::Http3ProtocolOptions options;
     options.mutable_allow_obs_text()->set_value(false);
