@@ -33,7 +33,7 @@ bazel_features:
   project_name: "Bazel features"
   project_desc: "Support Bazel feature detection from starlark"
   project_url: "https://github.com/bazel-contrib/bazel_features"
-  release_date: "2026-01-02"
+  release_date: "2026-03-09"
   use_category:
   - build
   license: "Apache-2.0"
