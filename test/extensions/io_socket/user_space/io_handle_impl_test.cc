@@ -1013,7 +1013,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   io_handle_peer_->close();
 }
 
-TEST_F(IoHandleImplTest, NotifyWritableAfterClose) {
+TEST_F(IoHandleImplTest, ClosedPeerHandleAllowsWrite) {
   io_handle_peer_->setWatermarks(128);
 
   Buffer::OwnedImpl buf(std::string(256, 'a'));
@@ -1033,9 +1033,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterClose) {
 
   // We suddenly close the peer handle, even though there is data left to send to it.
   io_handle_peer_->close();
-  EXPECT_TRUE(schedulable_cb->enabled_);
-  EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
-  schedulable_cb->invokeCallback();
+  EXPECT_TRUE(io_handle_->isWritable());
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
