@@ -8,6 +8,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -258,8 +259,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
   cb_or_error.value()(filter_callbacks);
 
   // Clean up the temp file.
-  std::filesystem::path temp_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
 }
 
@@ -380,8 +380,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
   cb_or_error.value()(filter_callbacks);
 
   // Clean up the temp file.
-  std::filesystem::path temp_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
 }
 
@@ -456,8 +455,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   result2.value()(filter_callbacks);
 
   // Clean up.
-  std::filesystem::path temp_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
 }
 
@@ -516,8 +514,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   context_.initManager().initialize(init_watcher_);
 
   // Delete the cached temp file to simulate invalidation.
-  std::filesystem::path temp_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
   ASSERT_FALSE(std::filesystem::exists(temp_path));
 

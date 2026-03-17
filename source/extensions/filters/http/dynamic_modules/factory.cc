@@ -189,9 +189,8 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
 
         // Cache the module's file path for future config updates.
         const auto& fetch_sha256 = module_config_copy.module().remote().sha256();
-        auto cached_path = std::filesystem::temp_directory_path() /
-                           fmt::format("envoy_dynamic_module_{}.so", fetch_sha256);
-        remote_module_cache_[fetch_sha256] = cached_path.string();
+        remote_module_cache_[fetch_sha256] =
+            Extensions::DynamicModules::moduleTempPath(fetch_sha256).string();
 
         auto cb_or_error =
             buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,
