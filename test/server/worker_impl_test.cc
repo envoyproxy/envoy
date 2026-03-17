@@ -10,6 +10,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -157,6 +158,65 @@ TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
 
   callback_ran.WaitForNotification();
   worker_.stop();
+}
+
+class WorkerOverloadTest : public testing::Test, public Event::TestUsingSimulatedTime {
+public:
+  WorkerOverloadTest()
+      : api_(Api::createApiForTest(simTime())),
+        dispatcher_(api_->allocateDispatcher("worker_test")),
+        stat_names_(api_->rootScope().symbolTable()) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  DefaultListenerHooks hooks_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  WorkerStatNames stat_names_;
+  NiceMock<MockOverloadManager> overload_manager_;
+};
+
+TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
+  OverloadActionCb captured_cb;
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillRepeatedly(Invoke([&](const std::string& name, Event::Dispatcher&, OverloadActionCb cb) {
+        if (name == OverloadActionNames::get().CloseIdleHttpConnections) {
+          captured_cb = cb;
+        }
+        return true;
+      }));
+
+  auto* handler = new NiceMock<Network::MockConnectionHandler>();
+  auto* dispatcher_ptr = dispatcher_.get();
+  WorkerImpl worker(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler},
+                    overload_manager_, *api_, stat_names_);
+
+  ASSERT_TRUE(captured_cb != nullptr);
+
+  // 1. Transition to scaling (active)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  captured_cb(OverloadActionState(UnitFloat(0.5)));
+
+  // 2. Advance time - the timer should fire and call again.
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
+                              Event::Dispatcher::RunType::NonBlock);
+
+  // 3. Transition to saturated
+  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
+  captured_cb(OverloadActionState::saturated());
+
+  // 4. Advance time - timer fires with saturated=true.
+  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
+  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
+                              Event::Dispatcher::RunType::NonBlock);
+
+  // 5. Transition to inactive
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  captured_cb(OverloadActionState::inactive());
+
+  // 6. Advance time - timer should NOT fire anymore.
+  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
+                              Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace

@@ -64,21 +64,10 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().ResetStreams, *dispatcher_,
       [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_overload_"
-                                     "manager_close_idle_http_connections")) {
-    const bool is_registered = overload_manager.registerForAction(
-        OverloadActionNames::get().CloseIdleHttpConnections, *dispatcher_,
-        [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state); });
-    if (is_registered) {
-      idle_connection_timer_ = dispatcher_->createTimer([this]() {
-        if (handler_) {
-          handler_->closeIdleHttpConnections(close_idle_http_connections_state_.isSaturated());
-        }
-        idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
-      });
-      idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
-    }
-  }
+
+  overload_manager.registerForAction(
+      OverloadActionNames::get().CloseIdleHttpConnections, *dispatcher_,
+      [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -208,6 +197,31 @@ void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
 
 void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
   close_idle_http_connections_state_ = state;
+
+  // Lazy initialize the timer if it does not exist.
+  if (idle_connection_timer_ == nullptr) {
+    idle_connection_timer_ = dispatcher_->createTimer([this]() {
+      if (handler_) {
+        handler_->closeIdleHttpConnections(close_idle_http_connections_state_.isSaturated());
+      }
+      // Re-enable the timer only if the worker is still in an active overload
+      // state
+      if (close_idle_http_connections_state_.value().value() > 0.0) {
+        idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+      }
+    });
+  }
+
+  if (state.value().value() > 0.0) {
+    if (!idle_connection_timer_->enabled()) {
+      idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+    }
+    if (handler_) {
+      handler_->closeIdleHttpConnections(state.isSaturated());
+    }
+  } else {
+    idle_connection_timer_->disableTimer();
+  }
 }
 
 } // namespace Server

@@ -685,8 +685,6 @@ new_features:
 - area: http
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
-    which will close idle HTTP connections when the overload manager enters the saturated state. This behavior can be
-    temporarily disabled by setting the runtime guard ``envoy.reloadable_features.enable_overload_manager_close_idle_http_connections``
-    to ``false``.
+    which will close idle HTTP connections when the overload manager enters the active state.
 
 deprecated:
