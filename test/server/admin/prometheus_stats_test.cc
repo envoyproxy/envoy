@@ -128,7 +128,7 @@ protected:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool pool_;
@@ -1743,7 +1743,7 @@ public:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   Stats::Scope& scope_;

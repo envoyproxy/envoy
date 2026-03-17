@@ -85,6 +85,82 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
 }
 
 // =============================================================================
+// Shared Data Registry Tests
+// =============================================================================
+
+// Test registering and retrieving shared data.
+TEST(CommonAbiImplTest, SharedDataRegistryRegisterAndGet) {
+  int data = 42;
+  envoy_dynamic_module_type_module_buffer key = {"sd_basic", 8};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data)));
+
+  void* out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_NE(out, nullptr);
+  EXPECT_EQ(*reinterpret_cast<int*>(out), 42);
+}
+
+// Test that getting a non-existent key returns false.
+TEST(CommonAbiImplTest, SharedDataRegistryGetNonExistent) {
+  envoy_dynamic_module_type_module_buffer key = {"sd_nonexistent", 14};
+  void* out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_EQ(out, nullptr);
+}
+
+// Test that registering nullptr returns false.
+TEST(CommonAbiImplTest, SharedDataRegistryRegisterNull) {
+  envoy_dynamic_module_type_module_buffer key = {"sd_null", 7};
+  EXPECT_FALSE(envoy_dynamic_module_callback_register_shared_data(key, nullptr));
+
+  // Key should not exist in the registry.
+  void* out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+}
+
+// Test that overwriting an existing key succeeds and updates the pointer.
+TEST(CommonAbiImplTest, SharedDataRegistryOverwrite) {
+  int data1 = 100;
+  int data2 = 200;
+  envoy_dynamic_module_type_module_buffer key = {"sd_overwrite", 12};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data1)));
+
+  // Overwrite with a new pointer.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key, reinterpret_cast<void*>(&data2)));
+
+  // The new pointer should be returned.
+  void* out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key, &out));
+  EXPECT_EQ(*reinterpret_cast<int*>(out), 200);
+}
+
+// Test multiple independent keys.
+TEST(CommonAbiImplTest, SharedDataRegistryMultipleKeys) {
+  int data_a = 10;
+  int data_b = 20;
+  envoy_dynamic_module_type_module_buffer key_a = {"sd_multi_a", 10};
+  envoy_dynamic_module_type_module_buffer key_b = {"sd_multi_b", 10};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key_a, reinterpret_cast<void*>(&data_a)));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_shared_data(key_b, reinterpret_cast<void*>(&data_b)));
+
+  void* out_a = nullptr;
+  void* out_b = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key_a, &out_a));
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_shared_data(key_b, &out_b));
+
+  EXPECT_EQ(*reinterpret_cast<int*>(out_a), 10);
+  EXPECT_EQ(*reinterpret_cast<int*>(out_b), 20);
+}
+
+// =============================================================================
 // Weak symbol stub tests for network filter, listener filter, access logger, and
 // UDP listener filter callbacks. These verify that the weak stubs installed in
 // abi_impl.cc trigger ENVOY_BUG when called from a context that does not compile
@@ -956,6 +1032,41 @@ WEAK_STUB(NetworkFilterGetConnectionState,
           envoy_dynamic_module_callback_network_filter_get_connection_state(nullptr))
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
+
+WEAK_STUB(UpstreamBridgeGetRequestHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeadersSize,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
+                                                                                    nullptr,
+                                                                                    nullptr))
+WEAK_STUB(UpstreamBridgeGetResponseBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(nullptr,
+                                                                                     nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeSendUpstreamData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponse,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(nullptr, 0, nullptr,
+                                                                               0, {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeSendResponseHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(nullptr, 0,
+                                                                                       nullptr, 0,
+                                                                                       false))
+WEAK_STUB(UpstreamBridgeSendResponseData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponseTrailers,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(nullptr,
+                                                                                        nullptr, 0))
 
 WEAK_STUB(NetworkSetDynamicMetadataBool,
           envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},
