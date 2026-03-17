@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/extensions/formatter/file_content/config.h"
 
@@ -144,6 +146,58 @@ TEST_F(FileContentFormatterTest, FormatValueMissingFileReturnsEmpty) {
 
   auto provider = parser->parse("NOT_FILE_CONTENT", "/some/path", absl::nullopt);
   EXPECT_EQ(nullptr, provider);
+}
+
+TEST_F(FileContentFormatterTest, WatchDirectoryUpdatesOnSymlinkSwap) {
+  const std::string dir = TestEnvironment::temporaryPath("file_content_watch");
+  TestEnvironment::createPath(dir);
+  const std::string target = fmt::format("{}/target", dir);
+  const std::string link = fmt::format("{}/link", dir);
+  const std::string new_target = fmt::format("{}/new_target", dir);
+  const std::string new_link = fmt::format("{}/new_link", dir);
+
+  {
+    std::ofstream file(target);
+    file << "original";
+  }
+  TestEnvironment::createSymlink(target, link);
+
+  {
+    std::ofstream file(new_target);
+    file << "updated";
+  }
+  TestEnvironment::createSymlink(new_target, new_link);
+
+  FileContentFormatterFactory factory;
+  auto empty_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*empty_config, context_);
+
+  const std::string subcommand = fmt::format("{}:{}", link, dir);
+  auto provider = parser->parse("FILE_CONTENT", subcommand, absl::nullopt);
+  ASSERT_NE(nullptr, provider);
+
+  // Initial content.
+  auto result = provider->format(formatter_context_, stream_info_);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("original", *result);
+
+  // Atomically swap the symlink by renaming new_link over link.
+  TestEnvironment::renameFile(new_link, link);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Content should reflect the updated file.
+  result = provider->format(formatter_context_, stream_info_);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ("updated", *result);
+}
+
+TEST_F(FileContentFormatterTest, TooManyColonsThrows) {
+  FileContentFormatterFactory factory;
+  auto empty_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*empty_config, context_);
+
+  EXPECT_THROW_WITH_REGEX(parser->parse("FILE_CONTENT", "/a:/b:/c", absl::nullopt), EnvoyException,
+                          "FILE_CONTENT: expected format");
 }
 
 } // namespace Formatter

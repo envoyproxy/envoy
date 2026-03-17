@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_format_utility.h"
 
 namespace Envoy {
@@ -48,8 +49,10 @@ private:
 };
 
 /**
- * CommandParser that handles the %FILE_CONTENT(/path/to/file)% command.
+ * CommandParser that handles the %FILE_CONTENT(/path/to/file)% or
+ * %FILE_CONTENT(/path/to/file:/path/to/watch)% command.
  * Creates a DataSourceProvider with file watching for each parsed file path.
+ * When a watch directory is specified, changes in that directory trigger a re-read of the file.
  */
 class FileContentCommandParser : public Envoy::Formatter::CommandParser {
 public:
@@ -67,7 +70,18 @@ public:
     ASSERT_IS_MAIN_OR_TEST_THREAD();
 
     envoy::config::core::v3::DataSource source;
-    source.set_filename(std::string(subcommand));
+    // Split subcommand on ':' to extract filename and optional watch directory.
+    // Format: /path/to/file or /path/to/file:/path/to/watch
+    const auto parts = StringUtil::splitToken(subcommand, ":", /*keep_empty_string=*/false);
+    if (parts.empty() || parts.size() > 2) {
+      throw EnvoyException(
+          fmt::format("FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'",
+                      subcommand));
+    }
+    source.set_filename(std::string(parts[0]));
+    if (parts.size() == 2) {
+      source.mutable_watched_directory()->set_path(std::string(parts[1]));
+    }
     const Config::DataSource::ProviderOptions options{.allow_empty = true, .modify_watch = true};
 
     auto provider = THROW_OR_RETURN_VALUE(
