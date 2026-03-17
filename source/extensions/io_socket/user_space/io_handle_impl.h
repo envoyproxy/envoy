@@ -124,9 +124,6 @@ public:
   void onPeerDestroy() override {
     peer_handle_ = nullptr;
     write_shutdown_ = true;
-    if (user_file_event_) {
-      user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
-    }
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
