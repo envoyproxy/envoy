@@ -1033,7 +1033,7 @@ TEST_F(IoHandleImplTest, ClosedPeerHandleAllowsWrite) {
 
   // We suddenly close the peer handle, even though there is data left to send to it.
   io_handle_peer_->close();
-  EXPECT_TRUE(io_handle_->isWritable());
+  EXPECT_TRUE(io_handle_->isPeerWritable());
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
