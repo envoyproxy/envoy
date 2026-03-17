@@ -21,7 +21,7 @@ using Extensions::Matching::Actions::TransformStat::ActionContext;
 // that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  explicit AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
+  AccessLogState() = default;
 
   ~AccessLogState() override {
     while (!inflight_gauges_.empty()) {
@@ -54,14 +54,10 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  Stats::ScopeSharedPtr scope_;
-
   // InflightGauge holds the state of a gauge that is currently in-flight (incremented but not
   // yet decremented).
   struct InflightGauge {
-    // gauge_ref_ is a strong reference (RefcountPtr) that "pins" the gauge in memory.
-    // This prevents the gauge object from being deleted if the Stats::Store evicts it
-    // from its registry while the request is still active, avoiding dangling pointer crashes.
+
     Stats::GaugeSharedPtr gauge_ref_;
     uint64_t value_;
   };
@@ -414,7 +410,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }
