@@ -1391,6 +1391,36 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
   }
 }
 
+// Verify that a CLUSTER SLOTS response with port > 0xffff triggers validation failure.
+TEST_F(RedisClusterTest, RedisErrorResponsePortOverflow) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  // First, a valid response to initialize.
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // Now send a response with port > 0xffff (65535). This should fail validation.
+  expectRedisResolve();
+  resolve_timer_->invokeCallback();
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
+  expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 70000));
+  EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
+}
+
 TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
   setupFromV3Yaml(BasicConfig);
   testDnsResolve("foo.bar.com", 22120);

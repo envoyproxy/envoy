@@ -117,6 +117,28 @@ TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr).host);
 };
 
+// Verify stub LB interface methods return expected defaults.
+TEST_F(RedisClusterLoadBalancerTest, LoadBalancerStubMethods) {
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90")};
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(
+      std::vector<ClusterSlot>{ClusterSlot(0, 16383, hosts[0]->address())});
+  Upstream::HostMap all_hosts = generateHostMap(hosts);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+
+  // peekAnotherHost is not implemented and always returns nullptr.
+  EXPECT_EQ(nullptr, lb->peekAnotherHost(nullptr));
+
+  // selectExistingConnection is not implemented and always returns nullopt.
+  std::vector<uint8_t> hash_key;
+  EXPECT_EQ(absl::nullopt, lb->selectExistingConnection(nullptr, *hosts[0], hash_key));
+
+  // lifetimeCallbacks is not implemented and returns empty OptRef.
+  EXPECT_FALSE(lb->lifetimeCallbacks().has_value());
+}
+
 // Works correctly with empty context
 TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
