@@ -116,7 +116,7 @@ private:
 
   // Cache of headers applicators, keyed by HttpService config hash. Protected by
   // applicator_mutex_ because the custom deleter on the shared_ptr may run on any thread.
-  mutable absl::Mutex applicator_mutex_;
+  absl::Mutex applicator_mutex_;
   absl::flat_hash_map<std::size_t, std::weak_ptr<const Http::HttpServiceHeadersApplicator>>
       applicators_ ABSL_GUARDED_BY(applicator_mutex_);
 };
