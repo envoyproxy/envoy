@@ -23,6 +23,12 @@ using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::TrailersResponse;
 
+bool isBodyCallback(DecodingProcessorState::CallbackState callback_state) {
+  return (callback_state == DecodingProcessorState::CallbackState::BufferedBodyCallback ||
+          callback_state == DecodingProcessorState::CallbackState::StreamedBodyCallback ||
+          callback_state == DecodingProcessorState::CallbackState::BufferedPartialBodyCallback);
+}
+
 void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                                           CallbackState callback_state) {
   ENVOY_STREAM_LOG(debug, "Start external processing call", *filter_callbacks_);
@@ -36,6 +42,14 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
     message_timer_->enableTimer(timeout);
     ENVOY_STREAM_LOG(debug, "Traffic direction {}: {} ms timer enabled", *filter_callbacks_,
                      trafficDirectionDebugStr(), timeout.count());
+  }
+  ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+  if (isBodyCallback(callback_state) && logging_info != nullptr) {
+    if (trafficDirection() == envoy::config::core::v3::TrafficDirection::INBOUND) {
+      logging_info->incrementRequestBodySentCount();
+    } else {
+      logging_info->incrementResponseBodySentCount();
+    }
   }
 
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
