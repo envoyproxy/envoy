@@ -969,7 +969,7 @@ TEST_F(EnvoyQuicServerStreamTest, DisallowObsTextBehavior) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
   {
     envoy::config::core::v3::Http3ProtocolOptions options;
-    options.mutable_disallow_obs_text()->set_value(true);
+    options.set_disallow_obs_text(true);
     auto stream = std::make_unique<EnvoyQuicServerStream>(
         stream_id_ + 16, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
         envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -981,7 +981,7 @@ TEST_F(EnvoyQuicServerStreamTest, DisallowObsTextBehavior) {
   }
   {
     envoy::config::core::v3::Http3ProtocolOptions options;
-    options.mutable_disallow_obs_text()->set_value(false);
+    options.set_disallow_obs_text(false);
     auto stream = std::make_unique<EnvoyQuicServerStream>(
         stream_id_ + 20, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
         envoy::config::core::v3::HttpProtocolOptions::ALLOW);

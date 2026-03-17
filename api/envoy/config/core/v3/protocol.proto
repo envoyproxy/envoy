@@ -777,7 +777,7 @@ message Http2ProtocolOptions {
 
   // Whether to disallow obsolete text in header field values.
   // If not set, it defaults to false.
-  google.protobuf.BoolValue disallow_obs_text = 20;
+  bool disallow_obs_text = 20;
 }
 
 // [#not-implemented-hide:]
@@ -834,7 +834,7 @@ message Http3ProtocolOptions {
 
   // Whether to disallow obsolete text in header field values.
   // If not set, it defaults to false for alignment with HTTP/2.
-  google.protobuf.BoolValue disallow_obs_text = 9;
+  bool disallow_obs_text = 9;
 }
 
 // A message to control transformations to the :scheme header
