@@ -480,8 +480,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
     ),
     rules_shell = dict(
-        version = "0.6.1",
-        sha256 = "e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307",
+        version = "0.7.0",
+        sha256 = "e17f72732618a6536559b3015dbe190ef592f7b9ba81969ff4bca766c451b3a5",
         strip_prefix = "rules_shell-{version}",
         urls = ["https://github.com/bazelbuild/rules_shell/releases/download/v{version}/rules_shell-v{version}.tar.gz"],
     ),
