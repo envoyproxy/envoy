@@ -578,13 +578,13 @@ protected:
   }
 };
 
-TEST_P(Http2CodecImplTest, AllowObsTextBehaviorDisallow) {
+TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorDisallow) {
   if (skipForUhv() || http2_implementation_ != Http2Impl::Oghttp2) {
     return;
   }
 
-  // With allow_obs_text = false, the request is rejected.
-  server_http2_options_.mutable_allow_obs_text()->set_value(false);
+  // With disallow_obs_text = true, the request is rejected.
+  server_http2_options_.mutable_disallow_obs_text()->set_value(true);
   initialize();
 
   InSequence s;
@@ -606,13 +606,13 @@ TEST_P(Http2CodecImplTest, AllowObsTextBehaviorDisallow) {
   server_wrapper_->buffer_.drain(server_wrapper_->buffer_.length());
 }
 
-TEST_P(Http2CodecImplTest, AllowObsTextBehaviorAllow) {
+TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorAllow) {
   if (skipForUhv() || http2_implementation_ != Http2Impl::Oghttp2) {
     return;
   }
 
-  // With allow_obs_text = true, the request is accepted.
-  server_http2_options_.mutable_allow_obs_text()->set_value(true);
+  // With disallow_obs_text = false, the request is accepted.
+  server_http2_options_.mutable_disallow_obs_text()->set_value(false);
   initialize();
 
   InSequence s;

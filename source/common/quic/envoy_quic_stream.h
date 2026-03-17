@@ -51,7 +51,7 @@ public:
     if (http3_options_.disable_connection_flow_control_for_streams()) {
       quic_stream_.DisableConnectionFlowControlForThisStream();
     }
-    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(http3_options_, allow_obs_text, true)) {
+    if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http3_options_, disallow_obs_text, false)) {
       header_validator_.SetObsTextOption(http2::adapter::ObsTextOption::kAllow);
     }
   }

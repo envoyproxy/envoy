@@ -775,9 +775,9 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value max_header_field_size_kb = 19
       [(validate.rules).uint32 = {lte: 256 gte: 64}];
 
-  // Whether to allow obsolete text in header field values.
-  // If not set, it defaults to true.
-  google.protobuf.BoolValue allow_obs_text = 20;
+  // Whether to disallow obsolete text in header field values.
+  // If not set, it defaults to false.
+  google.protobuf.BoolValue disallow_obs_text = 20;
 }
 
 // [#not-implemented-hide:]
@@ -832,9 +832,9 @@ message Http3ProtocolOptions {
   // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
   bool disable_connection_flow_control_for_streams = 8;
 
-  // Whether to allow obsolete text in header field values.
-  // If not set, it defaults to true for alignment with HTTP/2.
-  google.protobuf.BoolValue allow_obs_text = 9;
+  // Whether to disallow obsolete text in header field values.
+  // If not set, it defaults to false for alignment with HTTP/2.
+  google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
 // A message to control transformations to the :scheme header
