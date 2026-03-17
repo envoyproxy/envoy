@@ -957,6 +957,41 @@ WEAK_STUB(NetworkFilterGetConnectionState,
 WEAK_STUB(NetworkFilterReadDisable,
           envoy_dynamic_module_callback_network_filter_read_disable(nullptr, true))
 
+WEAK_STUB(UpstreamBridgeGetRequestHeader,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeadersSize,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeGetRequestBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(nullptr,
+                                                                                    nullptr,
+                                                                                    nullptr))
+WEAK_STUB(UpstreamBridgeGetResponseBuffer,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(nullptr,
+                                                                                     nullptr,
+                                                                                     nullptr))
+WEAK_STUB(UpstreamBridgeSendUpstreamData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponse,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(nullptr, 0, nullptr,
+                                                                               0, {nullptr, 0}))
+WEAK_STUB(UpstreamBridgeSendResponseHeaders,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(nullptr, 0,
+                                                                                       nullptr, 0,
+                                                                                       false))
+WEAK_STUB(UpstreamBridgeSendResponseData,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    false))
+WEAK_STUB(UpstreamBridgeSendResponseTrailers,
+          envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(nullptr,
+                                                                                        nullptr, 0))
+
 WEAK_STUB(NetworkSetDynamicMetadataBool,
           envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(nullptr, {nullptr, 0},
                                                                           {nullptr, 0}, true))

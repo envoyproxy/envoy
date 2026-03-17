@@ -15,6 +15,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod network;
 pub mod udp_listener;
+pub mod upstream_http_tcp_bridge;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
@@ -25,6 +26,7 @@ pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
 pub use udp_listener::*;
+pub use upstream_http_tcp_bridge::*;
 pub use utility::*;
 
 #[cfg(test)]
@@ -465,6 +467,8 @@ macro_rules! declare_network_filter_init_functions {
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
+/// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
+///   bridges
 ///
 /// # Examples
 ///
@@ -521,6 +525,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register cert_validator : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register upstream_http_tcp_bridge : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -1014,3 +1022,16 @@ macro_rules! declare_cert_validator_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Upstream HTTP TCP Bridge Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new upstream HTTP TCP bridge configuration.
+pub type NewUpstreamHttpTcpBridgeConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn UpstreamHttpTcpBridgeConfig>>;
+
+/// Global storage for the upstream HTTP TCP bridge config factory function.
+pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
+  NewUpstreamHttpTcpBridgeConfigFunction,
+> = OnceLock::new();
