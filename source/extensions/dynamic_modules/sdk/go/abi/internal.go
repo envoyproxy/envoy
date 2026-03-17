@@ -524,6 +524,118 @@ func (h *dymHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSource
 	return envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
 }
 
+func (h *dymHttpFilterHandle) AddMetadataListNumber(metadataNamespace, key string, value float64) bool {
+	ret := C.envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		(C.double)(value),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) AddMetadataListString(metadataNamespace, key string, value string) bool {
+	ret := C.envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		stringToModuleBuffer(value),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) AddMetadataListBool(metadataNamespace, key string, value bool) bool {
+	ret := C.envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		(C.bool)(value),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) GetMetadataListSize(source shared.MetadataSourceType, metadataNamespace, key string) (int, bool) {
+	var result C.size_t = 0
+	ret := C.envoy_dynamic_module_callback_http_get_metadata_list_size(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		&result,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	if !bool(ret) {
+		return 0, false
+	}
+	return int(result), true
+}
+
+func (h *dymHttpFilterHandle) GetMetadataListNumber(source shared.MetadataSourceType, metadataNamespace, key string, index int) (float64, bool) {
+	var value C.double = 0
+	ret := C.envoy_dynamic_module_callback_http_get_metadata_list_number(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		(C.size_t)(index),
+		&value,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	if !bool(ret) {
+		return 0, false
+	}
+	return float64(value), true
+}
+
+func (h *dymHttpFilterHandle) GetMetadataListString(source shared.MetadataSourceType, metadataNamespace, key string, index int) (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_metadata_list_string(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		(C.size_t)(index),
+		&valueView,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	// Handle the case where the value is empty string.
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetMetadataListBool(source shared.MetadataSourceType, metadataNamespace, key string, index int) (bool, bool) {
+	var value C.bool
+	ret := C.envoy_dynamic_module_callback_http_get_metadata_list_bool(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		stringToModuleBuffer(key),
+		(C.size_t)(index),
+		&value,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	if !bool(ret) {
+		return false, false
+	}
+	return bool(value), true
+}
+
 func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value any) {
 	var numValue float64 = 0
 	var isNum bool = false

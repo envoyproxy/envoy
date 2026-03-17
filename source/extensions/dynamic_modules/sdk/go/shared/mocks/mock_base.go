@@ -434,6 +434,48 @@ func (mr *MockHttpFilterHandleMockRecorder) AddCustomFlag(flag any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCustomFlag", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddCustomFlag), flag)
 }
 
+// AddMetadataListBool mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListBool(metadataNamespace, key string, value bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListBool", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListBool indicates an expected call of AddMetadataListBool.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListBool(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListBool), metadataNamespace, key, value)
+}
+
+// AddMetadataListNumber mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListNumber(metadataNamespace, key string, value float64) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListNumber", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListNumber indicates an expected call of AddMetadataListNumber.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListNumber(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListNumber", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListNumber), metadataNamespace, key, value)
+}
+
+// AddMetadataListString mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListString(metadataNamespace, key, value string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListString", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListString indicates an expected call of AddMetadataListString.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListString(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListString", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListString), metadataNamespace, key, value)
+}
+
 // BufferedRequestBody mocks base method.
 func (m *MockHttpFilterHandle) BufferedRequestBody() shared.BodyBuffer {
 	m.ctrl.T.Helper()
@@ -630,6 +672,66 @@ func (m *MockHttpFilterHandle) GetMetadataKeys(source shared.MetadataSourceType,
 func (mr *MockHttpFilterHandleMockRecorder) GetMetadataKeys(source, metadataNamespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataKeys", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataKeys), source, metadataNamespace)
+}
+
+// GetMetadataListBool mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListBool(source shared.MetadataSourceType, metadataNamespace, key string, index int) (bool, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListBool", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListBool indicates an expected call of GetMetadataListBool.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListBool(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListBool), source, metadataNamespace, key, index)
+}
+
+// GetMetadataListNumber mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListNumber(source shared.MetadataSourceType, metadataNamespace, key string, index int) (float64, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListNumber", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListNumber indicates an expected call of GetMetadataListNumber.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListNumber(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListNumber", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListNumber), source, metadataNamespace, key, index)
+}
+
+// GetMetadataListSize mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListSize(source shared.MetadataSourceType, metadataNamespace, key string) (int, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListSize", source, metadataNamespace, key)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListSize indicates an expected call of GetMetadataListSize.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListSize(source, metadataNamespace, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListSize", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListSize), source, metadataNamespace, key)
+}
+
+// GetMetadataListString mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListString(source shared.MetadataSourceType, metadataNamespace, key string, index int) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListString", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListString indicates an expected call of GetMetadataListString.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListString(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListString", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListString), source, metadataNamespace, key, index)
 }
 
 // GetMetadataNamespaces mocks base method.

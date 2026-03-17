@@ -53,10 +53,7 @@ cc_library(
         "lib/zstd.h",
         "lib/zstd_errors.h",
     ],
-    includes = ["lib"],
-    linkopts = ["-pthread"],
-    linkstatic = True,
-    local_defines = [
+    defines = [
         "XXH_NAMESPACE=ZSTD_",
         "ZSTD_MULTITHREAD",
         "ZSTD_BUILD_SHARED=OFF",
@@ -65,6 +62,9 @@ cc_library(
         "@platforms//os:windows": ["ZSTD_DISABLE_ASM"],
         "//conditions:default": [],
     }),
+    includes = ["lib"],
+    linkopts = ["-pthread"],
+    linkstatic = True,
 )
 
 cc_binary(

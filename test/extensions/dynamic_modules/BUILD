@@ -45,6 +45,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "abi_impl_test",
+    size = "large",
     srcs = ["abi_impl_test.cc"],
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
