@@ -101,31 +101,38 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
 
 void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
     const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config) {
+  // First pass: check if any rule uses extract_only_without_validation.
+  bool extract_only_used = false;
+  bool unprefixed_allowed = false;
   for (const auto& rule : config.rules()) {
-    if (!rule.has_requires()) {
-      continue;
+    if (rule.has_requires() && rule.requires().has_extract_only_without_validation()) {
+      extract_only_used = true;
+      if (rule.requires().extract_only_without_validation().allow_unprefixed_headers()) {
+        unprefixed_allowed = true;
+      }
     }
-    const auto& requirement = rule.requires();
-    if (!requirement.has_extract_only_without_validation()) {
-      continue;
-    }
-    const auto& extract_config = requirement.extract_only_without_validation();
+  }
 
-    for (const auto& [provider_name, provider] : config.providers()) {
-      if (!provider.claim_to_headers().empty()) {
+  if (!extract_only_used) {
+    return;
+  }
+
+  // Second pass: warn once per provider that has claim_to_headers.
+  for (const auto& [provider_name, provider] : config.providers()) {
+    if (!provider.claim_to_headers().empty()) {
+      ENVOY_LOG(critical,
+                "jwt_authn: SECURITY WARNING - Provider '{}' has claim_to_headers "
+                "and may be used with extract_only_without_validation. Unverified JWT "
+                "claims will be forwarded as HTTP headers with the '{}' prefix.",
+                provider_name, "x-jwt-unverified-");
+
+      if (unprefixed_allowed) {
         ENVOY_LOG(critical,
-                  "jwt_authn: SECURITY WARNING - Provider '{}' has claim_to_headers "
-                  "configured with extract_only_without_validation. Unverified JWT "
-                  "claims will be forwarded as HTTP headers with the '{}' prefix.",
-                  provider_name, "x-jwt-unverified-");
-
-        if (extract_config.allow_unprefixed_headers()) {
-          ENVOY_LOG(critical,
-                    "jwt_authn: CRITICAL SECURITY WARNING - Provider '{}' has "
-                    "allow_unprefixed_headers: true. Unverified JWT claims will be "
-                    "set as headers WITHOUT any distinguishing prefix.",
-                    provider_name);
-        }
+                  "jwt_authn: CRITICAL SECURITY WARNING - Provider '{}' has "
+                  "claim_to_headers and allow_unprefixed_headers is true for at least "
+                  "one rule. Unverified JWT claims may be set as headers WITHOUT any "
+                  "distinguishing prefix.",
+                  provider_name);
       }
     }
   }

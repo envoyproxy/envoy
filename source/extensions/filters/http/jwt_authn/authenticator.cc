@@ -534,7 +534,7 @@ const Http::LowerCaseString kJwtSignatureVerifiedHeader{"x-jwt-signature-verifie
 
 } // namespace
 
-std::string AuthenticatorImpl::getUnverifiedHeaderPrefix(
+std::string getUnverifiedHeaderPrefix(
     const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
   if (config.allow_unprefixed_headers()) {
     ENVOY_LOG(warn,
@@ -548,7 +548,7 @@ std::string AuthenticatorImpl::getUnverifiedHeaderPrefix(
   return std::string(kDefaultUnverifiedPrefix);
 }
 
-bool AuthenticatorImpl::shouldSetVerificationStatusHeader(
+bool shouldSetVerificationStatusHeader(
     const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
   if (!config.has_set_verification_status_header()) {
     return true;

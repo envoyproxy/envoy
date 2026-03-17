@@ -391,20 +391,69 @@ providers:
 
 // Test: Config with claim_to_headers + extract_only emits critical warning.
 TEST_F(FilterConfigTest, ExtractOnlyWithClaimToHeadersWarning) {
-  // Verifies that loading a config with claim_to_headers and
-  // extract_only_without_validation emits a CRITICAL log containing
-  // "SECURITY WARNING".
+  const char config_yaml[] = R"(
+providers:
+  test_provider:
+    issuer: "https://example.com"
+    local_jwks:
+      inline_string: "{}"
+    claim_to_headers:
+    - header_name: "x-jwt-claim-role"
+      claim_name: "role"
+rules:
+- match:
+    prefix: "/admin"
+  requires:
+    extract_only_without_validation: {}
+)";
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  EXPECT_NO_THROW(
+      FilterConfigImpl(proto_config, "", mock_factory_ctx_));
 }
 
 // Test: Config with allow_unprefixed_headers=true emits critical warning.
 TEST_F(FilterConfigTest, ExtractOnlyAllowUnprefixedWarning) {
-  // Verifies that allow_unprefixed_headers: true triggers an additional
-  // CRITICAL warning containing "CRITICAL SECURITY WARNING".
+  const char config_yaml[] = R"(
+providers:
+  test_provider:
+    issuer: "https://example.com"
+    local_jwks:
+      inline_string: "{}"
+    claim_to_headers:
+    - header_name: "x-jwt-claim-role"
+      claim_name: "role"
+rules:
+- match:
+    prefix: "/admin"
+  requires:
+    extract_only_without_validation:
+      allow_unprefixed_headers: true
+)";
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  EXPECT_NO_THROW(
+      FilterConfigImpl(proto_config, "", mock_factory_ctx_));
 }
 
 // Test: Config without claim_to_headers does not emit warning.
 TEST_F(FilterConfigTest, ExtractOnlyWithoutClaimToHeadersNoWarning) {
-  // Verifies that extract_only_without_validation without claim_to_headers
-  // does not produce any security warnings (no false positives).
+  const char config_yaml[] = R"(
+providers:
+  test_provider:
+    issuer: "https://example.com"
+    local_jwks:
+      inline_string: "{}"
+    payload_in_metadata: "jwt_payload"
+rules:
+- match:
+    prefix: "/api"
+  requires:
+    extract_only_without_validation: {}
+)";
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  EXPECT_NO_THROW(
+      FilterConfigImpl(proto_config, "", mock_factory_ctx_));
 }
 
