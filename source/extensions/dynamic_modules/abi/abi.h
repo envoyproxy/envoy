@@ -535,6 +535,49 @@ bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_m
 bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
                                                 void** function_ptr_out);
 
+// ----------------------------- Shared Data Registry -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_register_shared_data registers an opaque data pointer under the
+ * given key in the process-wide shared data registry. This allows modules loaded in the same
+ * process to share arbitrary state — such as runtime handles, configuration snapshots, or shared
+ * caches — without requiring direct access to each other's globals.
+ *
+ * Unlike the function registry, the shared data registry allows overwriting an existing entry.
+ * If the key already exists, the data pointer is updated and the function returns true. This
+ * supports patterns where shared state is refreshed (e.g., after a configuration reload).
+ * Callers are responsible for managing the lifetime of overwritten data pointers.
+ *
+ * Registration is typically done once during bootstrap (e.g., in on_server_initialized or
+ * on_scheduled). The data pointer must remain valid for the lifetime of the process.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name to register the data under.
+ * @param data_ptr is the data pointer to register. Must not be nullptr.
+ * @return true if registered or updated successfully, false if data_ptr is nullptr.
+ */
+bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                        void* data_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_shared_data retrieves a previously registered data pointer by
+ * key from the process-wide shared data registry. The returned pointer can be cast to the expected
+ * data type and used directly.
+ *
+ * Resolution is typically done once during configuration creation (e.g., in
+ * on_http_filter_config_new) and the result cached for per-request use.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the data to retrieve.
+ * @param data_ptr_out is a pointer to a variable where the data pointer will be stored.
+ *                     This is only written to if the function returns true.
+ * @return true if data was found under the given key, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                   void** data_ptr_out);
+
 // =============================================================================
 // ============================== HTTP Filter ==================================
 // =============================================================================
