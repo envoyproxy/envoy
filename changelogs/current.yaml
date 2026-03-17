@@ -269,6 +269,10 @@ new_features:
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
 - area: tls
   change: |
+    Added a per-connection filter state object to select a workload trust domain in the SPIFFE validator in
+    the multi-tenant deployments.
+- area: tls
+  change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
@@ -277,6 +281,10 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: http_11_proxy
+  change: |
+    Added ability to configure a default proxy address that is used when the proxy address is not
+    configured via metadata.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -532,6 +540,14 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: connection
+  change: |
+    Add support for closing connections when they stay above the buffer high watermark for a configured time.
+    This can be enabled by setting the :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_high_watermark_timeout>`
+    field on the listener and :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.cluster.v3.Cluster.per_connection_buffer_high_watermark_timeout>`
+    field on the cluster. By default, the timeout is disabled.
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
