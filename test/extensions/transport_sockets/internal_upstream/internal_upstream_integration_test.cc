@@ -342,7 +342,7 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
   // CloseAfterFlush state waiting for a Write event to drain the buffer.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024, true);
-  (void)fake_upstream_connection_->close();
+  cleanupUpstreamAndDownstream();
 
   // Verify that the connection does not leak by waiting for the active connection gauge to drop to
   // zero. If the server side of the internal connection fails to clean up the downstream connection
