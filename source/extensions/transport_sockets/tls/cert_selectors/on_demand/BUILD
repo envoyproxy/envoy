@@ -36,6 +36,5 @@ envoy_cc_extension(
         "//envoy/ssl:handshaker_interface",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/set_filter_state:config",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],
 )

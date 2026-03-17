@@ -333,6 +333,7 @@ paths:
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
+    - source/extensions/filters/http/grpc_json_transcoder/filter_config.cc
     - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
     - source/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
