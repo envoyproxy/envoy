@@ -35,12 +35,16 @@ public:
   //     std::shared_ptr<std::string> b(a.get());
   //   }
   // whereas the analogous code for RefcountPtr works fine.
+ private:
+  friend class AllocatorImpl;
+
   RefcountPtr(T* ptr) : ptr_(ptr) {
     if (ptr_ != nullptr) {
       ptr_->incRefCount();
     }
   }
 
+ public:
   RefcountPtr(const RefcountPtr& src) : RefcountPtr(src.get()) {}
 
   // Constructor for up-casting reference-counted pointers. This doesn't change
