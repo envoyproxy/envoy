@@ -125,8 +125,6 @@ public:
     peer_handle_ = nullptr;
     write_shutdown_ = true;
     if (user_file_event_) {
-      // The connection may be waiting to flush a write to the socket, so activate the Write event
-      // so that the connection can clean up.
       user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
     }
   }
@@ -138,8 +136,12 @@ public:
   bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
   bool isPeerWritable() const override {
-    return peer_handle_ != nullptr && !peer_handle_->isPeerShutDownWrite() &&
-           peer_handle_->isWritable();
+    if (peer_handle_ == nullptr) {
+      // Treat closed peer handle as writable so that the connection cleans up. (Analogously,
+      // Linux sends EPOLLOUT along with EPOLLHUP if the peer is shutdown for reads.)
+      return true;
+    }
+    return !peer_handle_->isPeerShutDownWrite() && peer_handle_->isWritable();
   }
   Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
 

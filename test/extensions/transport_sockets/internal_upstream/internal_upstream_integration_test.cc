@@ -342,13 +342,12 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
   // CloseAfterFlush state waiting for a Write event to drain the buffer.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024, true);
-  // Cast to void to satisfy [[nodiscard]] attribute.
   (void)fake_upstream_connection_->close();
 
   // Verify that the connection does not leak by waiting for the active connection gauge to drop to
   // zero. If the server side of the internal connection fails to clean up the downstream connection
   // then this wait will time out because the connection is stuck in CloseAfterFlush indefinitely.
-  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0);
+  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0, std::chrono::milliseconds(30000));
 }
 
 } // namespace
