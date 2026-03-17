@@ -34,25 +34,17 @@ absl::StatusOr<int> getSessionId(const json& json_rpc) {
 
 json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, int session_id,
                                         bool is_error) {
-  json j;
-
-  j[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
-  j[McpConstants::ID_FIELD] = session_id;
-
-  json result_obj;
-  // Creates the "content" array
-  json content_array = json::array();
-  json content_item;
-  content_item[McpConstants::TYPE_FIELD] = "text";
-  content_item[McpConstants::TEXT_FIELD] = tool_call_response;
-  content_array.push_back(std::move(content_item));
-  // Adds the "content" array and "isError" to the "result" object
-  result_obj[McpConstants::CONTENT_FIELD] = content_array;
-  result_obj[McpConstants::IS_ERROR_FIELD] = is_error;
-  // Adds the "result" object to the main JSON object
-  j[McpConstants::RESULT_FIELD] = result_obj;
-
-  return j;
+  return json{
+      {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+      {McpConstants::ID_FIELD, session_id},
+      {McpConstants::RESULT_FIELD,
+       {
+           {McpConstants::CONTENT_FIELD,
+            json::array({{{McpConstants::TYPE_FIELD, "text"},
+                          {McpConstants::TEXT_FIELD, tool_call_response}}})},
+           {McpConstants::IS_ERROR_FIELD, is_error},
+       }},
+  };
 }
 
 json generateInitializeResponse(int session_id, absl::string_view server_name) {
@@ -214,7 +206,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
 }
 
 void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
-  ENVOY_STREAM_LOG(info, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
+  ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
   if (!validateJsonRpcIdAndMethod(json_rpc).ok()) {
     return;
   }
@@ -262,8 +254,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
 
 void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers) {
   const size_t total_size = response_body_.length();
-  void* linearized_data = response_body_.linearize(total_size);
-  const char* json_ptr = static_cast<const char*>(linearized_data);
+  const char* json_ptr = static_cast<const char*>(response_body_.linearize(total_size));
   ENVOY_STREAM_LOG(debug, "Encoding Json-RPC data from response body: {}", *encoder_callbacks_,
                    absl::string_view(json_ptr, total_size));
   switch (mcp_operation_) {
@@ -299,16 +290,11 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       ENVOY_STREAM_LOG(error, "Failed to parse error response.", *encoder_callbacks_);
       return;
     }
-    json ret;
-    ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
-    if (session_id_.has_value()) {
-      ret[McpConstants::ID_FIELD] = *session_id_;
-    } else {
-      // If the ID is missing in the request, the ID in the response should be null.
-      // See https://www.jsonrpc.org/specification.
-      ret[McpConstants::ID_FIELD] = nullptr;
-    }
-    ret[McpConstants::ERROR_FIELD] = error;
+    json ret = {
+        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        // If the ID is missing in the request, the ID in the response should be null.
+        {McpConstants::ID_FIELD, session_id_.has_value() ? json(*session_id_) : json(nullptr)},
+        {McpConstants::ERROR_FIELD, error}};
     response_body_str_ = ret.dump();
     break;
   }
