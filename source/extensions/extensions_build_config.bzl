@@ -393,6 +393,7 @@ EXTENSIONS = {
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
 
+    "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",

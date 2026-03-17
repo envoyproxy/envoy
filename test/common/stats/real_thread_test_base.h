@@ -20,7 +20,7 @@ public:
   StatName makeStatName(absl::string_view name);
 
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
   StatNamePool pool_;

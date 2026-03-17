@@ -264,9 +264,19 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
+    HTTP requests into raw TCP data for upstream connections and convert TCP responses back into HTTP
+    responses via explicit send callbacks. See :ref:`envoy.upstreams.http.dynamic_modules
+    <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 - area: filters
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
+- area: tls
+  change: |
+    Added a per-connection filter state object to select a workload trust domain in the SPIFFE validator in
+    the multi-tenant deployments.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
@@ -277,6 +287,10 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: http_11_proxy
+  change: |
+    Added ability to configure a default proxy address that is used when the proxy address is not
+    configured via metadata.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -301,6 +315,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension that allows implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added listener lifecycle event callbacks to the bootstrap dynamic module extension. Modules can
+    opt in via ``enable_listener_lifecycle`` to receive ``on_listener_add_or_update`` and
+    ``on_listener_removal`` notifications when listeners change in the ``ListenerManager``.
 - area: memory
   change: |
     Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
@@ -524,6 +543,14 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: connection
+  change: |
+    Add support for closing connections when they stay above the buffer high watermark for a configured time.
+    This can be enabled by setting the :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_high_watermark_timeout>`
+    field on the listener and :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.cluster.v3.Cluster.per_connection_buffer_high_watermark_timeout>`
+    field on the cluster. By default, the timeout is disabled.
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
@@ -544,6 +571,9 @@ new_features:
     functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
     can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
     cross-module interactions analogous to ``dlsym``.
+- area: dynamic_modules
+  change: |
+    Added a process-wide shared data registry to the dynamic modules ABI.
 - area: dynamic_modules
   change: |
     Added support for loading dynamic module binaries from local file paths via the new
@@ -687,5 +717,18 @@ new_features:
     Added :ref:`set() <config_http_filters_lua_stream_info_filter_state_wrapper>` to the Lua filter
     state API, allowing Lua scripts to create and store filter state objects dynamically using
     registered object factories.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: network_filter
+  change: |
+    Added support for
+    ``on_downstream_data`` (see
+    :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
+    to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
+    connection filter state to be populated after first receiving data from the downstream connection.
 
 deprecated:

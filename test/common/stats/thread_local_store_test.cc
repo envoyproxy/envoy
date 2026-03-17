@@ -107,7 +107,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -235,7 +235,7 @@ public:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatNamePool pool_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -1768,7 +1768,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl heap_alloc_;
+  Allocator heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopeSharedPtr scope_;
 };
@@ -1944,7 +1944,7 @@ protected:
   NiceMock<ThreadLocal::MockInstance> tls_;
   MockSink sink_;
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   ThreadLocalStoreImpl store_;
   Scope& scope_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -2029,7 +2029,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
-  AllocatorImpl alloc(symbol_table);
+  Allocator alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
