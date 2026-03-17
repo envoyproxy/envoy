@@ -156,7 +156,7 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_THAT(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -188,7 +188,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -219,7 +219,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -248,7 +248,7 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingIdFieldReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -277,7 +277,7 @@ TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithNonNumericStringReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -306,7 +306,7 @@ TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithFloatReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -335,7 +335,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -368,7 +368,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidProtocolVersionParamsReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -410,7 +410,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_THAT(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -482,7 +482,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolNameNotFoundReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -515,7 +515,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolNameReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -546,7 +546,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnknownToolReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -578,7 +578,7 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidToolArgumentsReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -611,7 +611,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -675,7 +675,7 @@ TEST_F(McpJsonRestBridgeFilterTest, BackendErrorReturnsToolCallError) {
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
@@ -702,7 +702,7 @@ TEST_F(McpJsonRestBridgeFilterTest, RejectInvalidUtf8BackendResponse) {
             Http::FilterDataStatus::Continue);
 
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_FALSE(response_headers_.has(Envoy::Http::Headers::get().ContentLength));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(response_body.length())));
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(

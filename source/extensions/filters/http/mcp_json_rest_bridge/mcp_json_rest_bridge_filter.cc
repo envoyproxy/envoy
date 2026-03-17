@@ -182,6 +182,11 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
     break;
   }
 
+  // TODO(guoyilin42): Handle headers-only upstream responses (e.g., 204 No Content).
+  // Currently, these cases bypass transcoding, which can cause MCP SDKs to timeout
+  // or throw exceptions because they expect a valid JSON-RPC response with a
+  // matching ID. Envoy should generate a synthetic JSON-RPC response (e.g., an
+  // empty ToolResult or a generic error) to ensure client stability.
   return end_stream ? Http::FilterHeadersStatus::Continue
                     : Http::FilterHeadersStatus::StopIteration;
 }
@@ -203,6 +208,15 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());
   data.add(response_body_str_);
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::ResponseTrailerMap&) {
+  // TODO(guoyilin42): Add support for transcoding upstream responses that include HTTP trailers.
+  // Currently, if a response contains trailers (i.e., end_stream is false when the body arrives),
+  // the encodeJsonRpcData logic will not execute and transcoding will fail. While rare for
+  // standard REST/JSON APIs, trailers are a native part of the HTTP spec and need to be
+  // handled properly.
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
@@ -303,7 +317,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
-    response_headers->removeContentLength();
+    response_headers->setContentLength(response_body_str_.size());
     response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 }

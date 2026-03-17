@@ -59,6 +59,8 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializeSuccess) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
 
   const std::string expected_response = R"({
     "jsonrpc": "2.0",
@@ -171,7 +173,8 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
   EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
-  EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
   const std::string expected_rpc_response = R"({
     "jsonrpc": "2.0",
     "id": 321,
