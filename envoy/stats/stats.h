@@ -155,7 +155,14 @@ public:
   virtual void dec() PURE;
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
-  virtual void sub(uint64_t amount) PURE;
+
+  /**
+   * Subtracts an amount from the gauge.
+   * @param amount The amount to subtract.
+   * @param protect_underflow If true, performing a subtraction that would underflow the gauge
+   *                          safely bounds the value to 0. Otherwise, triggers a debug assert.
+   */
+  virtual void sub(uint64_t amount, bool protect_underflow = false) PURE;
   // When adjusting a gauge both ways (e.g. buffer size update when simultaneously
   // streaming in and out), using this helper avoids touching the atomic twice.
   inline void adjust(uint64_t add_amount, uint64_t sub_amount) {

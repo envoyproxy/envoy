@@ -210,9 +210,19 @@ public:
     child_value_ = value;
     flags_ |= Flags::Used;
   }
-  void sub(uint64_t amount) override {
-    ASSERT(child_value_ >= amount);
-    child_value_ -= amount;
+  void sub(uint64_t amount, bool protect_underflow = false) override {
+    if (!protect_underflow) {
+      ENVOY_BUG(child_value_ >= amount, "subtracted amount is greater than current value");
+      child_value_ -= amount;
+      return;
+    }
+    uint64_t current = child_value_.load();
+    while (true) {
+      uint64_t next = (current >= amount) ? (current - amount) : 0;
+      if (child_value_.compare_exchange_weak(current, next)) {
+        break;
+      }
+    }
   }
   uint64_t value() const override { return child_value_ + parent_value_; }
 

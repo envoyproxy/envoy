@@ -44,7 +44,7 @@ public:
     auto it = inflight_gauges_.find(&gauge);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
-      gauge.sub(value);
+      gauge.sub(value, /*protect_underflow=*/true);
       if (it->second.value_ == 0) {
         inflight_gauges_.erase(it);
       }

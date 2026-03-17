@@ -84,6 +84,26 @@ TEST_F(AllocatorTest, GaugesWithSameName) {
   EXPECT_EQ(0, g2->value());
 }
 
+TEST_F(AllocatorTest, GaugeProtectUnderflow) {
+  StatName gauge_name = makeStat("gauge.protect_underflow");
+  GaugeSharedPtr gauge =
+      alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
+
+  gauge->set(5);
+
+  // Normal subtraction with protection.
+  gauge->sub(2, /*protect_underflow=*/true);
+  EXPECT_EQ(3, gauge->value());
+
+  // Over-subtraction with protection gracefully bounds to 0.
+  gauge->sub(10, /*protect_underflow=*/true);
+  EXPECT_EQ(0, gauge->value());
+
+  // Subsequent over-subtraction when already at 0.
+  gauge->sub(1, /*protect_underflow=*/true);
+  EXPECT_EQ(0, gauge->value());
+}
+
 // Test for a race-condition where we may decrement the ref-count of a stat to
 // zero at the same time as we are allocating another instance of that
 // stat. This test reproduces that race organically by having a 12 threads each
