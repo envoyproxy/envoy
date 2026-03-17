@@ -24,7 +24,7 @@ public:
   Allocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   virtual ~Allocator();
 
- private:
+private:
   // We use a private section for makeCounter, makeGauge, and makeTextReadout.
   // We do not want general filter code to be creating stats in this way, they
   // must go through the Scope interface.
@@ -65,7 +65,7 @@ public:
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags);
 
- public:
+public:
   SymbolTable& symbolTable() { return symbol_table_; }
   const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
