@@ -15,6 +15,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod network;
 pub mod udp_listener;
+pub mod upstream_http_tcp_bridge;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
@@ -25,6 +26,7 @@ pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
 pub use udp_listener::*;
+pub use upstream_http_tcp_bridge::*;
 pub use utility::*;
 
 #[cfg(test)]
@@ -153,6 +155,56 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
   let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
   let found =
     unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
+/// Register an opaque data pointer under a name in the process-wide shared data registry.
+///
+/// This allows modules loaded in the same process to share arbitrary state — such as runtime
+/// handles, configuration snapshots, or shared caches — without requiring direct access to
+/// each other's globals. For example, a bootstrap extension can register a Tokio runtime handle
+/// and HTTP filters or cluster extensions can retrieve and use it for async operations.
+///
+/// Unlike [`register_function`], the shared data registry allows overwriting an existing entry.
+/// If the key already exists, the data pointer is updated and the function returns `true`. This
+/// supports patterns where shared state is refreshed (e.g., after a configuration reload).
+/// Callers are responsible for managing the lifetime of overwritten data pointers.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized` or
+/// `on_scheduled`).
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
+/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
+/// opaque pointers.
+pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_shared_data(
+      str_to_module_buffer(key),
+      data_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered data pointer by name from the process-wide shared data
+/// registry. The returned pointer can be cast to the expected data type and used directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found = unsafe {
+    abi::envoy_dynamic_module_callback_get_shared_data(str_to_module_buffer(key), &mut ptr)
+  };
   if found {
     Some(ptr as *const std::ffi::c_void)
   } else {
@@ -465,6 +517,8 @@ macro_rules! declare_network_filter_init_functions {
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
+/// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
+///   bridges
 ///
 /// # Examples
 ///
@@ -521,6 +575,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register cert_validator : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register upstream_http_tcp_bridge : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -1014,3 +1072,16 @@ macro_rules! declare_cert_validator_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Upstream HTTP TCP Bridge Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new upstream HTTP TCP bridge configuration.
+pub type NewUpstreamHttpTcpBridgeConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn UpstreamHttpTcpBridgeConfig>>;
+
+/// Global storage for the upstream HTTP TCP bridge config factory function.
+pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
+  NewUpstreamHttpTcpBridgeConfigFunction,
+> = OnceLock::new();
