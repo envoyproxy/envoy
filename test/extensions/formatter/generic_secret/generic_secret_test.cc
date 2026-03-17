@@ -1,6 +1,5 @@
-// Unit tests for the %SECRET(name)% formatter extension.
-
 #include "envoy/extensions/formatter/generic_secret/v3/generic_secret.pb.h"
+
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/extensions/formatter/generic_secret/config.h"
