@@ -4,8 +4,6 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/server/listener_stats.h"
 
-#include "openssl/ssl.h"
-
 namespace Envoy {
 namespace Quic {
 

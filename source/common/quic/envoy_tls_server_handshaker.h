@@ -21,6 +21,11 @@ public:
 
   ~EnvoyTlsServerHandshaker() override = default;
 
+  // Disables session ticket support by setting SSL_OP_NO_TICKET on the
+  // underlying SSL connection. Called by EnvoyProofSourceHandle during
+  // certificate selection when session tickets should not be issued.
+  void disableTicketSupport() { SSL_set_options(ssl(), SSL_OP_NO_TICKET); }
+
 protected:
   std::unique_ptr<quic::ProofSourceHandle> MaybeCreateProofSourceHandle() override;
 
@@ -40,7 +45,7 @@ private:
         const std::string& hostname, const SSL_CLIENT_HELLO& client_hello, const std::string& alpn,
         absl::optional<std::string> alps, const std::vector<uint8_t>& quic_transport_params,
         const absl::optional<std::vector<uint8_t>>& early_data_context,
-        const quic::QuicSSLConfig& ssl_config) override;
+        const quic::QuicSSLConfig& ssl_config, bool disable_alps_explicit_codepoint) override;
 
     quic::QuicAsyncStatus ComputeSignature(const quic::QuicSocketAddress& server_address,
                                            const quic::QuicSocketAddress& client_address,
