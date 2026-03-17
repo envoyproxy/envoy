@@ -52,6 +52,11 @@ public:
     initializeInternal(false, true, {}, with_hostname);
   }
 
+  // Initialize the test with the proxy address provided via default proxy address.
+  void initializeWithDefaultProxy(bool with_hostname = false) {
+    initializeInternal(false, false, {}, with_hostname, true);
+  }
+
   void setAddress() {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
@@ -96,7 +101,8 @@ public:
 
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
-                          absl::optional<uint32_t> target_port, bool with_hostname = false) {
+                          absl::optional<uint32_t> target_port, bool with_hostname = false,
+                          bool use_default_proxy_addr = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
@@ -106,6 +112,7 @@ private:
     const std::string proxy_info_hostname = absl::StrCat("www.foo.com", port);
     auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     std::unique_ptr<Network::TransportSocketOptions::Http11ProxyInfo> info;
+    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> default_proxy_info;
 
     if (!no_proxy_protocol) {
       if (use_metadata_proxy_addr) {
@@ -142,6 +149,8 @@ private:
               Buffer::OwnedImpl{fmt::format("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
                                             address->asStringView(), address->asStringView())};
         }
+      } else if (use_default_proxy_addr) {
+        default_proxy_info.emplace(proxy_info_hostname, address);
       } else {
         info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
             proxy_info_hostname, address);
@@ -160,8 +169,8 @@ private:
 
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
 
-    connect_socket_ =
-        std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options_, host);
+    connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(
+        std::move(inner_socket), options_, host, default_proxy_info);
     connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
     connect_socket_->onConnected();
   }
@@ -188,6 +197,12 @@ TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointMetadata) {
 // Test injects CONNECT with host header using hostname when available.
 TEST_P(Http11ConnectTest, InjectsHeaderWithHostnameFromMetadata) {
   initializeWithMetadataProxyAddr(true);
+  injectHeaderOnceTest();
+}
+
+// Test injects CONNECT only once. Configured via default proxy address.
+TEST_P(Http11ConnectTest, InjectsHeaderWithDefaultProxyAddr) {
+  initializeWithDefaultProxy();
   injectHeaderOnceTest();
 }
 

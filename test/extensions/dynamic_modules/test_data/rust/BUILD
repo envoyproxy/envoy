@@ -9,6 +9,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -33,6 +34,8 @@ test_program(name = "bootstrap_stats_test")
 
 test_program(name = "bootstrap_function_registry_test")
 
+test_program(name = "bootstrap_shared_data_test")
+
 test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
@@ -41,10 +44,14 @@ test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
+test_program(name = "bootstrap_listener_lifecycle_test")
+
 test_program(name = "network_integration_test")
 
 test_program(name = "bootstrap_http_combined_test")
 
 test_program(name = "access_log_integration_test")
+
+test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
