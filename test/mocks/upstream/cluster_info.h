@@ -113,6 +113,7 @@ public:
   MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
   MOCK_METHOD(float, peekaheadRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return http_protocol_options_config_;
