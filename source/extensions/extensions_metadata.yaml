@@ -1820,6 +1820,13 @@ envoy.matching.inputs.query_params:
   status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.local_reply:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
 envoy.matching.inputs.cel_data_input:
   categories:
   - envoy.matching.http.input
