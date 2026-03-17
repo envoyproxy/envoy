@@ -3,8 +3,8 @@
 #include "envoy/extensions/formatter/file_content/v3/file_content.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/config/datasource.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_utility.h"
 
 namespace Envoy {
@@ -74,9 +74,8 @@ public:
     // Format: /path/to/file or /path/to/file:/path/to/watch
     const auto parts = StringUtil::splitToken(subcommand, ":", /*keep_empty_string=*/false);
     if (parts.empty() || parts.size() > 2) {
-      throw EnvoyException(
-          fmt::format("FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'",
-                      subcommand));
+      throw EnvoyException(fmt::format(
+          "FILE_CONTENT: expected format 'path' or 'path:watch_directory', got '{}'", subcommand));
     }
     source.set_filename(std::string(parts[0]));
     if (parts.size() == 2) {
