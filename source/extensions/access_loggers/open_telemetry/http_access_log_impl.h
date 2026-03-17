@@ -89,7 +89,8 @@ private:
  * Cache for HTTP access loggers. Creates one logger per unique configuration.
  */
 class HttpAccessLoggerCacheImpl : public Singleton::Instance,
-                                  public Logger::Loggable<Logger::Id::misc> {
+                                  public Logger::Loggable<Logger::Id::misc>,
+                                  public std::enable_shared_from_this<HttpAccessLoggerCacheImpl> {
 public:
   HttpAccessLoggerCacheImpl(Server::Configuration::ServerFactoryContext& server_context);
 
@@ -112,9 +113,12 @@ private:
 
   ThreadLocal::SlotPtr tls_slot_;
   Server::Configuration::ServerFactoryContext& server_context_;
-  // Main-thread-only cache of headers applicators, keyed by HttpService config hash.
-  absl::flat_hash_map<std::size_t, std::shared_ptr<const Http::HttpServiceHeadersApplicator>>
-      applicators_;
+
+  // Cache of headers applicators, keyed by HttpService config hash. Protected by
+  // applicator_mutex_ because the custom deleter on the shared_ptr may run on any thread.
+  mutable absl::Mutex applicator_mutex_;
+  absl::flat_hash_map<std::size_t, std::weak_ptr<const Http::HttpServiceHeadersApplicator>>
+      applicators_ ABSL_GUARDED_BY(applicator_mutex_);
 };
 
 using HttpAccessLoggerCacheSharedPtr = std::shared_ptr<HttpAccessLoggerCacheImpl>;

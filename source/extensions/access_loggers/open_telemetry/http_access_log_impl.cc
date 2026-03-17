@@ -175,16 +175,35 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   const std::size_t config_hash = MessageUtil::hash(http_service);
 
+  absl::MutexLock lock(&applicator_mutex_);
+
   const auto it = applicators_.find(config_hash);
   if (it != applicators_.end()) {
-    return it->second;
+    auto existing = it->second.lock();
+    if (existing) {
+      return existing;
+    }
   }
 
   absl::Status creation_status = absl::OkStatus();
-  auto applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
-      http_service, server_context, creation_status);
+  // Capture shared_from_this() in the deleter so the mutex and map remain alive.
+  std::shared_ptr<HttpAccessLoggerCacheImpl> self = shared_from_this();
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> applicator(
+      new Http::HttpServiceHeadersApplicator(http_service, server_context, creation_status),
+      [self, config_hash](const Http::HttpServiceHeadersApplicator* ptr) {
+        {
+          absl::MutexLock lock(&self->applicator_mutex_);
+          const auto it = self->applicators_.find(config_hash);
+          // Check for expired in case a new entry was added at nearly the same time because the
+          // check for an existing entry failed to `lock()`.
+          if (it != self->applicators_.end() && it->second.expired()) {
+            self->applicators_.erase(it);
+          }
+        }
+        delete ptr;
+      });
   THROW_IF_NOT_OK_REF(creation_status);
-  applicators_.emplace(config_hash, applicator);
+  applicators_.insert_or_assign(config_hash, applicator);
   return applicator;
 }
 
