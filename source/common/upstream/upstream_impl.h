@@ -245,10 +245,23 @@ public:
   }
 
   void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    lb_policy_data_ = std::move(lb_policy_data);
+    lb_policy_datas_.clear();
+    if (lb_policy_data != nullptr) {
+      lb_policy_datas_.push_back(std::move(lb_policy_data));
+    }
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override {
-    return makeOptRefFromPtr(lb_policy_data_.get());
+  void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
+    if (lb_policy_data != nullptr) {
+      lb_policy_datas_.push_back(std::move(lb_policy_data));
+    }
+  }
+  OptRef<HostLbPolicyData> lbPolicyData() const override { return lbPolicyDataAt(0); }
+  size_t lbPolicyDataCount() const override { return lb_policy_datas_.size(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    if (index >= lb_policy_datas_.size()) {
+      return {};
+    }
+    return makeOptRefFromPtr(lb_policy_datas_[index].get());
   }
 
 protected:
@@ -286,7 +299,7 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   absl::optional<MonotonicTime> last_hc_pass_time_;
-  HostLbPolicyDataPtr lb_policy_data_;
+  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
 };
 
 /**

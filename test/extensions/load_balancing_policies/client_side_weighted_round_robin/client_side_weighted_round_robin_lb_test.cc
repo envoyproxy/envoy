@@ -517,10 +517,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooRecent) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
+  host.lb_policy_datas_.push_back(
       std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Non empty since is too recent (5 > 2).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
@@ -535,10 +535,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
+  host.lb_policy_datas_.push_back(
       std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(7)));
+          /*last_update_time=*/MonotonicTime(std::chrono::seconds(7))));
   // Last update time is too stale (7 < 8).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
@@ -553,10 +553,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_Valid) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
+  host.lb_policy_datas_.push_back(
       std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Not empty since is not too recent (1 < 2) and last update time is not too
   // old (10 > 8).
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(

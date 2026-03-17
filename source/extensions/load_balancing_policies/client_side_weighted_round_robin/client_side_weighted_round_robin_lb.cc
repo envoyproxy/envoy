@@ -177,9 +177,9 @@ bool ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
 void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
     const HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (!host_ptr->lbPolicyData().has_value()) {
+    if (!host_ptr->typedLbPolicyData<ClientSideHostLbPolicyData>().has_value()) {
       ENVOY_LOG(trace, "Adding LB policy data to Host {}", getHostAddress(host_ptr.get()));
-      host_ptr->setLbPolicyData(std::make_unique<ClientSideHostLbPolicyData>(report_handler_));
+      host_ptr->addLbPolicyData(std::make_unique<ClientSideHostLbPolicyData>(report_handler_));
     }
   }
 }

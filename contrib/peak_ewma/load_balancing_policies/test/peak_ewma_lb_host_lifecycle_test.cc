@@ -34,16 +34,6 @@ protected:
           "10.0.0." + std::to_string(i + 1), 8080 + i);
       auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
       ON_CALL(*host, address()).WillByDefault(Return(address));
-      ON_CALL(*host, setLbPolicyData(_))
-          .WillByDefault(Invoke([raw = host.get()](Upstream::HostLbPolicyDataPtr data) {
-            raw->lb_policy_data_ = std::move(data);
-          }));
-      ON_CALL(*host, lbPolicyData()).WillByDefault(Invoke([raw = host.get()]() {
-        if (raw->lb_policy_data_) {
-          return OptRef<Upstream::HostLbPolicyData>(*raw->lb_policy_data_);
-        }
-        return OptRef<Upstream::HostLbPolicyData>();
-      }));
       hosts_.push_back(host);
     }
 
@@ -164,16 +154,6 @@ TEST_F(PeakEwmaHostLifecycleTest, HostAddedViaCallbackGetsPolicyData) {
   auto address = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.100", 9090);
   auto new_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   ON_CALL(*new_host, address()).WillByDefault(Return(address));
-  ON_CALL(*new_host, setLbPolicyData(_))
-      .WillByDefault(Invoke([raw = new_host.get()](Upstream::HostLbPolicyDataPtr data) {
-        raw->lb_policy_data_ = std::move(data);
-      }));
-  ON_CALL(*new_host, lbPolicyData()).WillByDefault(Invoke([raw = new_host.get()]() {
-    if (raw->lb_policy_data_) {
-      return OptRef<Upstream::HostLbPolicyData>(*raw->lb_policy_data_);
-    }
-    return OptRef<Upstream::HostLbPolicyData>();
-  }));
 
   Upstream::HostVector added_hosts = {new_host};
   host_set_->hosts_.push_back(new_host);

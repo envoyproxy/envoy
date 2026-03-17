@@ -117,7 +117,10 @@ public:
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
   MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -127,7 +130,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  HostLbPolicyDataPtr lb_policy_data_;
+  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
@@ -215,7 +218,10 @@ public:
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 
   bool disable_active_health_check_ = false;
 };
@@ -242,7 +248,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  HostLbPolicyDataPtr lb_policy_data_;
+  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
