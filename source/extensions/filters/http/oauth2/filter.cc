@@ -750,14 +750,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                                  config_->clientSecret(), config_->authType());
       if (!status.ok()) {
         // Async task failed to start - handle immediately
-        return onUnauthorized(std::string(status.message()));
+        return handleOAuthFailure(std::string(status.message()));
       }
       // pause while we await the next step from the OAuth server
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
 
     if (shouldAllowFailed(headers)) {
-      continueAsUnauthorized(fmt::format(
+      continueWithFailedOAuth(fmt::format(
           "Unauthorized, and forwarding as unauthorized because OAuth failure is allowed: {}",
           path_str));
       return Http::FilterHeadersStatus::Continue;
@@ -1295,7 +1295,7 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
   // We failed to get an access token via the refresh token. Forward the request based on the
   // matcher configuration.
   if (shouldAllowFailed(*request_headers_)) {
-    continueAsUnauthorized("Failed to refresh the access token, and forwarding as unauthorized "
+    continueWithFailedOAuth("Failed to refresh the access token, and forwarding as unauthorized "
                            "because OAuth failure is allowed");
     decoder_callbacks_->continueDecoding();
   } else if (shouldDenyRedirect(*request_headers_)) {
@@ -1306,10 +1306,10 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
   }
 }
 
-void OAuth2Filter::asyncOnUnauthorized(const std::string& reason,
+void OAuth2Filter::handleOAuthFailureAsync(const std::string& reason,
                                        const std::string& extra_details) {
   // Handle unauthorized request in async context
-  const auto status = onUnauthorized(reason, extra_details);
+  const auto status = handleOAuthFailure(reason, extra_details);
   if (status == Http::FilterHeadersStatus::Continue) {
     decoder_callbacks_->continueDecoding();
   }
@@ -1458,7 +1458,7 @@ bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) con
   return false;
 }
 
-void OAuth2Filter::continueAsUnauthorized(const std::string& reason,
+void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
                                           const std::string& extra_details) {
   removeOAuthTokenCookies(*request_headers_);
   removeOAuthFlowCookies(*request_headers_);
@@ -1471,10 +1471,10 @@ void OAuth2Filter::continueAsUnauthorized(const std::string& reason,
                    *decoder_callbacks_, log_details);
 }
 
-Http::FilterHeadersStatus OAuth2Filter::onUnauthorized(const std::string& reason,
+Http::FilterHeadersStatus OAuth2Filter::handleOAuthFailure(const std::string& reason,
                                                        const std::string& extra_details) {
   if (shouldAllowFailed(*request_headers_)) {
-    continueAsUnauthorized(reason, extra_details);
+    continueWithFailedOAuth(reason, extra_details);
     return Http::FilterHeadersStatus::Continue;
   } else {
     const std::string details =

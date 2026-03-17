@@ -29,9 +29,9 @@ using testing::Return;
 
 class MockCallbacks : public FilterCallbacks {
 public:
-  MOCK_METHOD(Http::FilterHeadersStatus, onUnauthorized,
+  MOCK_METHOD(Http::FilterHeadersStatus, handleOAuthFailure,
               (const std::string& reason, const std::string& extra_details));
-  MOCK_METHOD(void, asyncOnUnauthorized,
+  MOCK_METHOD(void, handleOAuthFailureAsync,
               (const std::string& reason, const std::string& extra_details));
   MOCK_METHOD(void, onGetAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
@@ -138,7 +138,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenMissingExpiresIn) {
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -205,7 +205,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -230,7 +230,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -261,7 +261,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -280,7 +280,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenNetworkError) {
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
   EXPECT_EQ(1, callbacks_.size());
 
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
@@ -304,7 +304,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenUnhealthyUpstream) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _));
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _));
   EXPECT_TRUE(client_->asyncGetAccessToken("a", "b", "c", "d", "e").ok());
 }
 
@@ -525,7 +525,7 @@ TEST_F(OAuth2ClientTest, NoCluster) {
   ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
   client_->setCallbacks(*mock_callbacks_);
   // Should NOT call any callback - returns error status synchronously
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _)).Times(0);
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _)).Times(0);
   const auto status = client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kUnavailable);
@@ -536,7 +536,7 @@ TEST_F(OAuth2ClientTest, NoClusterRefreshToken) {
   ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
   client_->setCallbacks(*mock_callbacks_);
   // Should NOT call any callback - returns error status synchronously
-  EXPECT_CALL(*mock_callbacks_, asyncOnUnauthorized(_, _)).Times(0);
+  EXPECT_CALL(*mock_callbacks_, handleOAuthFailureAsync(_, _)).Times(0);
   const auto status = client_->asyncRefreshAccessToken("refresh", "b", "c");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), absl::StatusCode::kUnavailable);

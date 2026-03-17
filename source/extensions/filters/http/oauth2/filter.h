@@ -357,16 +357,16 @@ public:
   void onRefreshAccessTokenFailure() override;
 
   // Handles unauthorized requests from async contexts (OAuth client callbacks).
-  // Calls onUnauthorized() and then continueDecoding() if needed.
-  void asyncOnUnauthorized(const std::string& reason,
-                           const std::string& extra_details = "") override;
+  // Calls handleOAuthFailure() and then continueDecoding() if needed.
+  void handleOAuthFailureAsync(const std::string& reason,
+                               const std::string& extra_details = "") override;
 
   // Handles unauthorized requests by checking allow_failed_matcher and either continuing
   // the request as unauthorized (if matcher matches) or sending an unauthorized response.
   // This is a catch-all function for request failures. We don't retry, as a user can simply
   // refresh the page in the case of a network blip.
-  Http::FilterHeadersStatus onUnauthorized(const std::string& reason,
-                                           const std::string& extra_details = "") override;
+  Http::FilterHeadersStatus handleOAuthFailure(const std::string& reason,
+                                               const std::string& extra_details = "") override;
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
@@ -431,7 +431,7 @@ private:
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
-  void continueAsUnauthorized(const std::string& reason, const std::string& extra_details = "");
+  void continueWithFailedOAuth(const std::string& reason, const std::string& extra_details = "");
   void sendUnauthorizedResponse(const std::string& details);
 };
 

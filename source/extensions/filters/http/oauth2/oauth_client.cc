@@ -168,9 +168,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                      message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->asyncOnUnauthorized("Failed to get access token",
-                                   fmt::format("response code: {}, response body: {}",
-                                               response_code, message->bodyAsString()));
+      parent_->handleOAuthFailureAsync("Failed to get access token",
+                                       fmt::format("response code: {}, response body: {}",
+                                                   response_code, message->bodyAsString()));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
       parent_->onRefreshAccessTokenFailure();
@@ -188,7 +188,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    parent_->asyncOnUnauthorized(
+    parent_->handleOAuthFailureAsync(
         "Failed to parse oauth response body",
         fmt::format("response body: {}, exception: {}", response_body, e.what()));
     return;
@@ -197,8 +197,8 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    parent_->asyncOnUnauthorized("No access token found in the token exchange response",
-                                 fmt::format("response body: {}", response_body));
+    parent_->handleOAuthFailureAsync("No access token found in the token exchange response",
+                                     fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -211,7 +211,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    parent_->asyncOnUnauthorized(
+    parent_->handleOAuthFailureAsync(
         "No default or explicit access token expiration found in the token exchange response",
         fmt::format("response body: {}", response_body));
     return;
@@ -238,7 +238,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
 
   switch (oldState) {
   case OAuthState::PendingAccessToken:
-    parent_->asyncOnUnauthorized("Failed to get access token due to HTTP request failure");
+    parent_->handleOAuthFailureAsync("Failed to get access token due to HTTP request failure");
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
     parent_->onRefreshAccessTokenFailure();
