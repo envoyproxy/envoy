@@ -2,7 +2,7 @@ bazel_skylib:
   project_name: "bazel-skylib"
   project_desc: "Common useful functions and rules for Bazel"
   project_url: "https://github.com/bazelbuild/bazel-skylib"
-  release_date: "2025-09-25"
+  release_date: "2025-12-16"
   use_category:
   - api
   license: "Apache-2.0"
