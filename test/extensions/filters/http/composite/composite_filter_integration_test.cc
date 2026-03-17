@@ -31,6 +31,7 @@ namespace Envoy {
 namespace {
 
 using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
+using envoy::extensions::filters::http::composite::v3::CompositePerRoute;
 using envoy::extensions::filters::http::composite::v3::ExecuteFilterAction;
 using envoy::type::matcher::v3::HttpRequestHeaderMatchInput;
 using test::integration::filters::SetResponseCodeFilterConfig;
@@ -43,6 +44,7 @@ struct CompositeFilterTestParams {
   Network::Address::IpVersion version;
   bool is_downstream;
   bool is_dual_factory;
+  bool use_inline_matcher; // NEW
 };
 
 class CompositeFilterIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
@@ -51,7 +53,8 @@ public:
   CompositeFilterIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
         downstream_filter_(GetParam().is_downstream), is_dual_factory_(GetParam().is_dual_factory),
-        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_) {}
+        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_),
+        use_inline_matcher_(GetParam().use_inline_matcher) {}
 
   ExtensionWithMatcherPerRoute createPerRouteConfig(
       std::function<void(envoy::config::core::v3::TypedExtensionConfig*)> base_action_function) {
@@ -82,23 +85,59 @@ public:
   void addPerRouteResponseCodeFilterTyped(const std::string& filter_name,
                                           const std::string& route_prefix, const int& code,
                                           bool response_prefix = false) {
-    ProtoConfig set_response_code;
-    set_response_code.set_code(code);
-    if (response_prefix) {
-      set_response_code.set_prefix("skipLocalReplyAndContinue");
+    if (use_inline_matcher_) {
+      // For inline matcher, pack CompositePerRoute instead of ExtensionWithMatcherPerRoute.
+      ProtoConfig set_response_code;
+      set_response_code.set_code(code);
+      if (response_prefix) {
+        set_response_code.set_prefix("skipLocalReplyAndContinue");
+      }
+
+      CompositePerRoute per_route;
+      auto* matcher_tree = per_route.mutable_matcher()->mutable_matcher_tree();
+      auto* matcher_input = matcher_tree->mutable_input();
+      matcher_input->set_name("request-headers");
+      HttpRequestHeaderMatchInput match_input;
+      match_input.set_header_name("match-header");
+      matcher_input->mutable_typed_config()->PackFrom(match_input);
+
+      auto* map = matcher_tree->mutable_exact_match_map()->mutable_map();
+      Matcher_OnMatch on_match;
+      auto* mutable_action = on_match.mutable_action();
+      mutable_action->set_name("composite-action");
+      ExecuteFilterAction filter_action;
+      filter_action.mutable_typed_config()->set_name("set-response-code-filter");
+      filter_action.mutable_typed_config()->mutable_typed_config()->PackFrom(set_response_code);
+      mutable_action->mutable_typed_config()->PackFrom(filter_action);
+      (*map)["match"] = on_match;
+
+      config_helper_.addConfigModifier(
+          [per_route, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
+            auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
+            auto* route = vh->mutable_routes()->Mutable(0);
+            route->mutable_match()->set_prefix(route_prefix);
+            route->mutable_route()->set_cluster("cluster_0");
+            (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route);
+          });
+    } else {
+      ProtoConfig set_response_code;
+      set_response_code.set_code(code);
+      if (response_prefix) {
+        set_response_code.set_prefix("skipLocalReplyAndContinue");
+      }
+      auto per_route_config = createPerRouteConfig([set_response_code](auto* cfg) {
+        cfg->set_name("set-response-code-filter");
+        cfg->mutable_typed_config()->PackFrom(set_response_code);
+      });
+      config_helper_.addConfigModifier(
+          [per_route_config, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
+            auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
+            auto* route = vh->mutable_routes()->Mutable(0);
+            route->mutable_match()->set_prefix(route_prefix);
+            route->mutable_route()->set_cluster("cluster_0");
+            (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config);
+          });
     }
-    auto per_route_config = createPerRouteConfig([set_response_code](auto* cfg) {
-      cfg->set_name("set-response-code-filter");
-      cfg->mutable_typed_config()->PackFrom(set_response_code);
-    });
-    config_helper_.addConfigModifier(
-        [per_route_config, filter_name, route_prefix](ConfigHelper::HttpConnectionManager& cm) {
-          auto* vh = cm.mutable_route_config()->mutable_virtual_hosts(0);
-          auto* route = vh->mutable_routes()->Mutable(0);
-          route->mutable_match()->set_prefix(route_prefix);
-          route->mutable_route()->set_cluster("cluster_0");
-          (*route->mutable_typed_per_filter_config())[filter_name].PackFrom(per_route_config);
-        });
   }
 
   void addPerRouteResponseCodeFilter(const std::string& filter_name,
@@ -146,7 +185,35 @@ public:
   }
 
   void prependCompositeFilter(const std::string& name = "composite") {
-    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      typed_config:
+                        name: set-response-code
+                        typed_config:
+                          "@type": type.googleapis.com/test.integration.filters.%s
+                          code: 403
+    )EOF",
+                                                   name, proto_type_),
+                                   downstream_filter_);
+    } else {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -174,12 +241,53 @@ public:
                           "@type": type.googleapis.com/test.integration.filters.%s
                           code: 403
     )EOF",
-                                                 name, proto_type_),
-                                 downstream_filter_);
+                                                   name, proto_type_),
+                                   downstream_filter_);
+    }
   }
 
   void prependCompositeFilterResponseMatcher(const std::string& name = "composite") {
-    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_list:
+            matchers:
+              - predicate:
+                  and_matcher:
+                    predicate:
+                      - single_predicate:
+                          input:
+                            name: request-header-match
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                              header_name: match-header
+                          value_match:
+                            exact: match
+                      - single_predicate:
+                          input:
+                            name: response-header-match
+                            typed_config:
+                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+                              header_name: match-response
+                          value_match:
+                            exact: match
+                on_match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      typed_config:
+                        name: local-reply-during-encode
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF",
+                                                   name),
+                                   downstream_filter_);
+    } else {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -219,8 +327,9 @@ public:
                         typed_config:
                           "@type": type.googleapis.com/google.protobuf.Struct
     )EOF",
-                                                 name),
-                                 downstream_filter_);
+                                                   name),
+                                   downstream_filter_);
+    }
   }
 
   void prependCompositeDynamicFilter(const std::string& name = "composite",
@@ -230,8 +339,44 @@ public:
     if (!sampling) {
       numerator = 0;
     }
-    config_helper_.prependFilter(
-        TestEnvironment::substitute(absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(
+          TestEnvironment::substitute(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        sample_percent:
+                          default_value:
+                            numerator: %d
+                            denominator: HUNDRED
+                        dynamic_config:
+                          name: set-response-code
+                          config_discovery:
+                            config_source:
+                                path_config_source:
+                                  path: "{{ test_tmpdir }}/%s"
+                            type_urls:
+                            - type.googleapis.com/test.integration.filters.%s
+  )EOF",
+                                                      name, numerator, path, proto_type_)),
+          downstream_filter_);
+    } else {
+      config_helper_.prependFilter(
+          TestEnvironment::substitute(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -266,8 +411,9 @@ public:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.%s
     )EOF",
-                                                    name, numerator, path, proto_type_)),
-        downstream_filter_);
+                                                      name, numerator, path, proto_type_)),
+          downstream_filter_);
+    }
 
     TestEnvironment::writeStringToFileForTest("set_response_code.yaml",
                                               absl::StrFormat(R"EOF(
@@ -282,7 +428,41 @@ resources:
   }
 
   void prependMissingCompositeDynamicFilter(const std::string& name = "composite") {
-    config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                        dynamic_config:
+                          name: missing-config
+                          config_discovery:
+                            config_source:
+                                api_config_source:
+                                  api_type: GRPC
+                                  grpc_services:
+                                    envoy_grpc:
+                                      cluster_name: "ecds_cluster"
+                            type_urls:
+                            - type.googleapis.com/test.integration.filters.%s
+  )EOF",
+                                                                               name, proto_type_)),
+                                   downstream_filter_);
+    } else {
+      config_helper_.prependFilter(TestEnvironment::substitute(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -316,8 +496,33 @@ resources:
                             type_urls:
                             - type.googleapis.com/test.integration.filters.%s
     )EOF",
-                                                                             name, proto_type_)),
-                                 downstream_filter_);
+                                                                               name, proto_type_)),
+                                   downstream_filter_);
+    }
+  }
+
+  void prependEmptyCompositeFilter(const std::string& name = "composite") {
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+    )EOF",
+                                                   name),
+                                   downstream_filter_);
+    } else {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+    )EOF",
+                                                   name),
+                                   downstream_filter_);
+    }
   }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
@@ -356,23 +561,27 @@ resources:
             // Skip upstream filter test for non-dual filter.
             continue;
           }
-          CompositeFilterTestParams params;
-          params.version = ip_version;
-          params.is_downstream = is_downstream;
-          params.is_dual_factory = is_dual_factory;
-          ret.push_back(params);
+          for (bool use_inline_matcher : {true, false}) {
+            CompositeFilterTestParams params;
+            params.version = ip_version;
+            params.is_downstream = is_downstream;
+            params.is_dual_factory = is_dual_factory;
+            params.use_inline_matcher = use_inline_matcher;
+            ret.push_back(params);
+          }
         }
       }
     }
     return ret;
   }
 
-  static std::string CompositeFilterTestParamsToString(
+  static std::string compositeFilterTestParamsToString(
       const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
     return absl::StrCat(
         (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
         (params.param.is_downstream ? "Downstream_" : "Upstream_"),
-        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"));
+        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"),
+        (params.param.use_inline_matcher ? "_InlineMatcher" : "_ExtensionWithMatcher"));
   }
 
   const std::string proto_type_dual_ = "SetResponseCodeFilterConfigDual";
@@ -380,12 +589,13 @@ resources:
   bool downstream_filter_{true};
   bool is_dual_factory_{false};
   std::string proto_type_;
+  bool use_inline_matcher_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, CompositeFilterIntegrationTest,
     testing::ValuesIn(CompositeFilterIntegrationTest::getValuesForCompositeFilterTest()),
-    CompositeFilterIntegrationTest::CompositeFilterTestParamsToString);
+    CompositeFilterIntegrationTest::compositeFilterTestParamsToString);
 
 // Verifies that if we don't match the match action the request is proxied as normal, while if the
 // match action is hit we apply the specified filter to the stream.
@@ -411,6 +621,12 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 }
 
 TEST_P(CompositeFilterIntegrationTest, TestResponseHeaders) {
+  // Response header matching is not supported with inline matchers: the match is evaluated in
+  // decodeHeaders before response headers are available, so the response header predicate always
+  // results in InsufficientData and the action never fires.
+  if (use_inline_matcher_) {
+    return;
+  }
   prependCompositeFilterResponseMatcher();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -576,16 +792,7 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcher) {
   if (!downstream_filter_) {
     return;
   }
-  config_helper_.prependFilter(R"EOF(
-      name: composite
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-        extension_config:
-          name: composite
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF",
-                               downstream_filter_);
+  prependEmptyCompositeFilter("composite");
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/402);
   initialize();
@@ -601,26 +808,8 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   if (!downstream_filter_) {
     return;
   }
-  config_helper_.prependFilter(R"EOF(
-      name: composite_2
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-        extension_config:
-          name: composite
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF",
-                               downstream_filter_);
-  config_helper_.prependFilter(R"EOF(
-      name: composite
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
-        extension_config:
-          name: composite
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
-    )EOF",
-                               downstream_filter_);
+  prependEmptyCompositeFilter("composite_2");
+  prependEmptyCompositeFilter("composite");
 
   addPerRouteResponseCodeFilter(/*filter_name=*/"composite", /*route_prefix=*/"/somepath",
                                 /*code=*/407, /*response_prefix=*/true);
@@ -634,11 +823,17 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
 
-class CompositeFilterSeverContextIntegrationTest : public HttpIntegrationTest,
-                                                   public Grpc::GrpcClientIntegrationParamTest {
+class CompositeFilterSeverContextIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>> {
 public:
   CompositeFilterSeverContextIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(std::get<0>(GetParam())); }
+  Grpc::ClientType clientType() const { return std::get<1>(std::get<0>(GetParam())); }
+  bool useInlineMatcher() const { return std::get<1>(GetParam()); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -664,7 +859,12 @@ public:
           *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
       // Loading filter config from YAML for cluster_0.
-      prependServerFactoryContextFilter(downstream_filter, downstream, sample_percent);
+      if (useInlineMatcher()) {
+        prependServerFactoryContextFilterInlineMatcher(downstream_filter, downstream,
+                                                       sample_percent);
+      } else {
+        prependServerFactoryContextFilter(downstream_filter, downstream, sample_percent);
+      }
       // Clusters for test gRPC servers. The HTTP filters is not needed for these clusters.
       for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
         auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -806,14 +1006,82 @@ public:
     EXPECT_EQ(response->headers().getStatusValue(), "200");
   }
 
+  void prependServerFactoryContextFilterInlineMatcher(bool downstream_filter, bool downstream,
+                                                      int sample_percent,
+                                                      const std::string& name = "composite") {
+    std::string context_filter_config = "ServerFactoryContextFilterConfig";
+    if (!downstream_filter) {
+      context_filter_config = "ServerFactoryContextFilterConfigDual";
+    }
+    std::string address_prefix = "";
+    if (ipVersion() == Network::Address::IpVersion::v6) {
+      address_prefix = "ipv6:///";
+    }
+    std::string grpc_config;
+    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+      grpc_config = absl::StrFormat(R"EOF(
+                            envoy_grpc:
+                              cluster_name: test_server_0
+
+)EOF");
+    } else {
+      grpc_config = absl::StrFormat(R"EOF(
+                            google_grpc:
+                              target_uri: %s%s
+                              stat_prefix: test_server_0
+)EOF",
+                                    address_prefix, grpc_upstreams_[0]->localAddress()->asString());
+    }
+
+    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      sample_percent:
+                        default_value:
+                          numerator: %d
+                          denominator: HUNDRED
+                      typed_config:
+                        name: server-factory-context-filter
+                        typed_config:
+                          "@type": type.googleapis.com/test.integration.filters.%s
+                          grpc_service:
+                            %s
+    )EOF",
+                                                 name, sample_percent, context_filter_config,
+                                                 grpc_config),
+                                 downstream);
+  }
+
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr connection_;
   FakeStreamPtr stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
-                         CompositeFilterSeverContextIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeferredProcessing, CompositeFilterSeverContextIntegrationTest,
+    testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
+    [](const testing::TestParamInfo<CompositeFilterSeverContextIntegrationTest::ParamType>& p) {
+      const auto& grpc_params = std::get<0>(p.param);
+      return absl::StrCat(
+          std::get<1>(grpc_params) == Grpc::ClientType::EnvoyGrpc ? "EnvoyGrpc" : "GoogleGrpc",
+          std::get<0>(grpc_params) == Network::Address::IpVersion::v4 ? "_IPv4" : "_IPv6",
+          std::get<1>(p.param) ? "_InlineMatcher" : "_ExtensionWithMatcher");
+    });
 
 TEST_P(CompositeFilterSeverContextIntegrationTest,
        BasicFlowDownstreamFilterInDownstreamAllSampled) {
@@ -855,10 +1123,44 @@ public:
   CompositeFilterChainIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
         downstream_filter_(GetParam().is_downstream), is_dual_factory_(GetParam().is_dual_factory),
-        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_) {}
+        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_),
+        use_inline_matcher_(GetParam().use_inline_matcher) {}
 
   void prependCompositeFilterChain(const std::string& name = "composite-filter-chain") {
-    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain:
+                        typed_config:
+                          - name: add-header-filter
+                            typed_config:
+                              "@type": type.googleapis.com/google.protobuf.Struct
+                          - name: set-response-code
+                            typed_config:
+                              "@type": type.googleapis.com/test.integration.filters.%s
+                              prefix: "/respond-directly"
+                              code: 418
+  )EOF",
+                                                   name, proto_type_),
+                                   downstream_filter_);
+    } else {
+      config_helper_.prependFilter(absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -891,8 +1193,9 @@ public:
                               prefix: "/respond-directly"
                               code: 418
     )EOF",
-                                                 name, proto_type_),
-                                 downstream_filter_);
+                                                   name, proto_type_),
+                                   downstream_filter_);
+    }
   }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
@@ -919,21 +1222,25 @@ public:
     std::vector<CompositeFilterTestParams> ret;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
       for (bool is_dual_factory : {true, false}) {
-        CompositeFilterTestParams params;
-        params.version = ip_version;
-        params.is_downstream = true; // Filter chains only supported for downstream.
-        params.is_dual_factory = is_dual_factory;
-        ret.push_back(params);
+        for (bool use_inline_matcher : {true, false}) {
+          CompositeFilterTestParams params;
+          params.version = ip_version;
+          params.is_downstream = true; // Filter chains only supported for downstream.
+          params.is_dual_factory = is_dual_factory;
+          params.use_inline_matcher = use_inline_matcher;
+          ret.push_back(params);
+        }
       }
     }
     return ret;
   }
 
   static std::string
-  FilterChainTestParamsToString(const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
+  filterChainTestParamsToString(const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
     return absl::StrCat(
         (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"));
+        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"),
+        (params.param.use_inline_matcher ? "_InlineMatcher" : "_ExtensionWithMatcher"));
   }
 
   const std::string proto_type_dual_ = "SetResponseCodeFilterConfigDual";
@@ -941,12 +1248,13 @@ public:
   bool downstream_filter_{true};
   bool is_dual_factory_{false};
   std::string proto_type_;
+  bool use_inline_matcher_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, CompositeFilterChainIntegrationTest,
     testing::ValuesIn(CompositeFilterChainIntegrationTest::getValuesForFilterChainTest()),
-    CompositeFilterChainIntegrationTest::FilterChainTestParamsToString);
+    CompositeFilterChainIntegrationTest::filterChainTestParamsToString);
 
 // Verifies that a filter chain executes all filters in order. When the path matches
 // /respond-directly, the second filter should respond with 418.
@@ -1008,13 +1316,50 @@ public:
   NamedFilterChainIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
         downstream_filter_(GetParam().is_downstream), is_dual_factory_(GetParam().is_dual_factory),
-        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_) {}
+        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_),
+        use_inline_matcher_(GetParam().use_inline_matcher) {}
 
   void addNamedFilterChainAndCompositeFilter(const std::string& chain_name,
                                              const std::string& composite_name = "composite") {
-    // Use YAML format with named_filter_chains in the Composite typed_config.
-    std::string filter_config =
-        absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      std::string filter_config =
+          absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        named_filter_chains:
+          %s:
+            typed_config:
+              - name: add-header-filter
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.Struct
+              - name: set-response-code
+                typed_config:
+                  "@type": type.googleapis.com/test.integration.filters.%s
+                  code: 418
+                  prefix: "/respond-directly"
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "%s"
+    )EOF",
+                          composite_name, chain_name, proto_type_, chain_name);
+      config_helper_.prependFilter(filter_config, downstream_filter_);
+    } else {
+      // Use YAML format with named_filter_chains in the Composite typed_config.
+      std::string filter_config =
+          absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -1049,13 +1394,61 @@ public:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                       filter_chain_name: "%s"
     )EOF",
-                        composite_name, chain_name, proto_type_, chain_name);
-    config_helper_.prependFilter(filter_config, downstream_filter_);
+                          composite_name, chain_name, proto_type_, chain_name);
+      config_helper_.prependFilter(filter_config, downstream_filter_);
+    }
   }
 
   void addMultipleNamedFilterChains(const std::string& composite_name = "composite") {
-    // Named filter chains are now defined in the Composite filter config itself.
-    std::string filter_config = absl::StrFormat(R"EOF(
+    if (use_inline_matcher_) {
+      std::string filter_config = absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        named_filter_chains:
+          chain-418:
+            typed_config:
+              - name: add-header-filter
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.Struct
+              - name: set-response-code
+                typed_config:
+                  "@type": type.googleapis.com/test.integration.filters.%s
+                  code: 418
+                  prefix: "/respond-directly"
+          chain-503:
+            typed_config:
+              - name: set-response-code
+                typed_config:
+                  "@type": type.googleapis.com/test.integration.filters.%s
+                  code: 503
+        matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                use-418:
+                  action:
+                    name: composite-action-418
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "chain-418"
+                use-503:
+                  action:
+                    name: composite-action-503
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "chain-503"
+    )EOF",
+                                                  composite_name, proto_type_, proto_type_);
+      config_helper_.prependFilter(filter_config, downstream_filter_);
+    } else {
+      // Named filter chains are now defined in the Composite filter config itself.
+      std::string filter_config = absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -1102,8 +1495,9 @@ public:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                       filter_chain_name: "chain-503"
     )EOF",
-                                                composite_name, proto_type_, proto_type_);
-    config_helper_.prependFilter(filter_config, downstream_filter_);
+                                                  composite_name, proto_type_, proto_type_);
+      config_helper_.prependFilter(filter_config, downstream_filter_);
+    }
   }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
@@ -1142,21 +1536,25 @@ public:
     std::vector<CompositeFilterTestParams> ret;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
       for (bool is_dual_factory : {true, false}) {
-        CompositeFilterTestParams params;
-        params.version = ip_version;
-        params.is_downstream = true; // Named filter chains only supported for downstream.
-        params.is_dual_factory = is_dual_factory;
-        ret.push_back(params);
+        for (bool use_inline_matcher : {true, false}) {
+          CompositeFilterTestParams params;
+          params.version = ip_version;
+          params.is_downstream = true; // Named filter chains only supported for downstream.
+          params.is_dual_factory = is_dual_factory;
+          params.use_inline_matcher = use_inline_matcher;
+          ret.push_back(params);
+        }
       }
     }
     return ret;
   }
 
-  static std::string NamedFilterChainTestParamsToString(
+  static std::string namedfilterChainTestParamsToString(
       const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
     return absl::StrCat(
         (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"));
+        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"),
+        (params.param.use_inline_matcher ? "_InlineMatcher" : "_ExtensionWithMatcher"));
   }
 
   const std::string proto_type_dual_ = "SetResponseCodeFilterConfigDual";
@@ -1164,12 +1562,13 @@ public:
   bool downstream_filter_{true};
   bool is_dual_factory_{false};
   std::string proto_type_;
+  bool use_inline_matcher_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, NamedFilterChainIntegrationTest,
     testing::ValuesIn(NamedFilterChainIntegrationTest::getValuesForNamedFilterChainTest()),
-    NamedFilterChainIntegrationTest::NamedFilterChainTestParamsToString);
+    NamedFilterChainIntegrationTest::namedfilterChainTestParamsToString);
 
 // Verifies that a named filter chain is executed correctly when referenced via filter_chain_name.
 TEST_P(NamedFilterChainIntegrationTest, TestNamedFilterChainRef) {
