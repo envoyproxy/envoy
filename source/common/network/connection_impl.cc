@@ -696,8 +696,6 @@ void ConnectionImpl::onReadBufferHighWatermark() {
 
 void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
-  ASSERT(write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = false;
   if (state() == State::Open) {
     maybeCancelBufferHighWatermarkTimeout();
   }
@@ -706,8 +704,6 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
 
 void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
-  ASSERT(!write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = true;
   if (state() == State::Open) {
     scheduleBufferHighWatermarkTimeout();
   }

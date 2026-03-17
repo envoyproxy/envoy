@@ -264,7 +264,6 @@ private:
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
   std::chrono::milliseconds buffer_high_watermark_timeout_{};
   Event::TimerPtr buffer_high_watermark_timer_{nullptr};
-  bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
   bool read_end_stream_raised_ : 1;
