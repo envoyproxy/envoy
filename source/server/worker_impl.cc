@@ -11,7 +11,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
