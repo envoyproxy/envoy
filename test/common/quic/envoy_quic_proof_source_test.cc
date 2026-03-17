@@ -1,3 +1,5 @@
+#include <openssl/ssl.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -346,6 +348,35 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
   proof_source_.ComputeTlsSignature(
       server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, FilterChainExDataIndex) {
+  // filterChainExDataIndex() should return a valid (non-negative) index and be stable.
+  int index = EnvoyQuicProofSource::filterChainExDataIndex();
+  EXPECT_GE(index, 0);
+  EXPECT_EQ(index, EnvoyQuicProofSource::filterChainExDataIndex());
+}
+
+// Smoke test: verify OnNewSslCtx installs the ticket key callback when the
+// runtime guard is enabled. We cannot directly inspect the callback, but we
+// verify the call completes without error.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupport) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "true"}});
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
+}
+
+// Smoke test: verify OnNewSslCtx is a no-op when the runtime guard is disabled.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_session_ticket_support", "false"}});
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  proof_source_.OnNewSslCtx(ssl_ctx.get());
 }
 
 } // namespace Quic
