@@ -132,7 +132,7 @@ public:
   }
   bool canReceiveData() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool hasReceivedEof() const override { return receive_data_end_stream_; }
-  bool canPeerReceiveData() const override {
+  bool isWritable() const override {
     return peer_handle_ != nullptr && !peer_handle_->hasReceivedEof() &&
            peer_handle_->canReceiveData();
   }

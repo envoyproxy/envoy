@@ -73,9 +73,10 @@ public:
   virtual bool canReceiveData() const PURE;
 
   /**
-   * @return true if the peer is valid and its receive buffer can accept more data.
+   * @return true if the peer is valid and its receive buffer can accept more data. This means that
+   * write() calls to this handle will not block.
    */
-  virtual bool canPeerReceiveData() const PURE;
+  virtual bool isWritable() const PURE;
 
   /**
    * Raised by the peer when its receive buffer switches from high watermark to low watermark.
@@ -83,8 +84,8 @@ public:
   virtual void onPeerBufferLowWatermark() PURE;
 
   /**
-   * @return true if the receive buffer is not empty or read_end is set. This means that the handle
-   * is readable (by the owner).
+   * @return true if the receive buffer is not empty or read_end is set. This means that read()
+   * calls to this handle will not block.
    */
   virtual bool isReadable() const PURE;
 
