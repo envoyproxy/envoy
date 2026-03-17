@@ -309,6 +309,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension that allows implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added listener lifecycle event callbacks to the bootstrap dynamic module extension. Modules can
+    opt in via ``enable_listener_lifecycle`` to receive ``on_listener_add_or_update`` and
+    ``on_listener_removal`` notifications when listeners change in the ``ListenerManager``.
 - area: memory
   change: |
     Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``

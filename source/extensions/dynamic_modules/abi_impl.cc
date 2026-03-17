@@ -363,6 +363,14 @@ envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle: "
+               "not implemented in this context");
+  return false;
+}
+
 // ---------------------- Cluster extension callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the cluster extension abi_impl.cc when the cluster extension is used.
