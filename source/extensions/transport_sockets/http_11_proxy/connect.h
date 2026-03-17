@@ -32,9 +32,11 @@ public:
   // @return a properly formatted CONNECT request string per RFC 9110 section 9.3.6.
   static std::string formatConnectRequest(absl::string_view target);
 
-  UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsConstSharedPtr options,
-                              std::shared_ptr<const Upstream::HostDescription> host);
+  UpstreamHttp11ConnectSocket(
+      Network::TransportSocketPtr&& transport_socket,
+      Network::TransportSocketOptionsConstSharedPtr options,
+      std::shared_ptr<const Upstream::HostDescription> host,
+      absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = absl::nullopt);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -44,7 +46,8 @@ private:
   void generateHeader();
   Network::IoResult writeHeader();
 
-  inline void handleProxyInfoConnect();
+  inline void
+  handleProxyInfoConnect(const Network::TransportSocketOptions::Http11ProxyInfo& proxy_info);
   inline void handleHostMetadataConnect(std::shared_ptr<const Upstream::HostDescription> host);
 
   Network::TransportSocketOptionsConstSharedPtr options_;
@@ -56,7 +59,8 @@ private:
 class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
   UpstreamHttp11ConnectSocketFactory(
-      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory);
+      Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
+      absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info = absl::nullopt);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -64,6 +68,17 @@ public:
                         std::shared_ptr<const Upstream::HostDescription> host) const override;
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
+
+  OptRef<const Network::TransportSocketOptions::Http11ProxyInfo>
+  defaultHttp11ProxyInfo() const override {
+    if (!proxy_info_.has_value()) {
+      return {};
+    }
+    return {proxy_info_.value()};
+  }
+
+private:
+  const absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info_;
 };
 
 // This is a utility class for isValidConnectResponse. It is only exposed for
