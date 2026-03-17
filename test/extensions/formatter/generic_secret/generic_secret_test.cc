@@ -1,7 +1,9 @@
 // Unit tests for the %SECRET(name)% formatter extension.
 
+#include "envoy/extensions/formatter/generic_secret/v3/generic_secret.pb.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/extensions/formatter/generic_secret/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -123,6 +125,37 @@ formatters:
   EXPECT_THROW_WITH_MESSAGE(makeFormatter(yaml), EnvoyException,
                             "envoy.formatter.generic_secret: secret 'no-such-secret' not found in "
                             "static bootstrap resources");
+}
+
+// formatValue() returns a Protobuf::Value with the secret string.
+TEST_F(GenericSecretFormatterTest, FormatValueReturnsStringValue) {
+  addStaticSecret("my-token", "s3cret");
+
+  envoy::extensions::formatter::generic_secret::v3::GenericSecret proto_config;
+  (*proto_config.mutable_secret_configs())["my-token"].set_name("my-token");
+
+  GenericSecretFormatterFactory factory;
+  auto parser = factory.createCommandParserFromProto(proto_config, context_);
+
+  auto provider = parser->parse("SECRET", "my-token", absl::nullopt);
+  ASSERT_NE(nullptr, provider);
+
+  auto value = provider->formatValue(formatter_context_, stream_info_);
+  EXPECT_EQ("s3cret", value.string_value());
+}
+
+// parse() returns nullptr for commands other than SECRET.
+TEST_F(GenericSecretFormatterTest, ParseIgnoresOtherCommands) {
+  addStaticSecret("my-token", "s3cret");
+
+  envoy::extensions::formatter::generic_secret::v3::GenericSecret proto_config;
+  (*proto_config.mutable_secret_configs())["my-token"].set_name("my-token");
+
+  GenericSecretFormatterFactory factory;
+  auto parser = factory.createCommandParserFromProto(proto_config, context_);
+
+  auto provider = parser->parse("NOT_SECRET", "my-token", absl::nullopt);
+  EXPECT_EQ(nullptr, provider);
 }
 
 } // namespace Formatter

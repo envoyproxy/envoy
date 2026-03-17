@@ -121,6 +121,31 @@ formatters:
   EXPECT_EQ("this-", formatter->format(formatter_context_, stream_info_));
 }
 
+TEST_F(FileContentFormatterTest, FormatValueReturnsStringValue) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("value_test.txt", "my-value");
+
+  FileContentFormatterFactory factory;
+  auto empty_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*empty_config, context_);
+
+  auto provider = parser->parse("FILE_CONTENT", file_path, absl::nullopt);
+  ASSERT_NE(nullptr, provider);
+
+  auto value = provider->formatValue(formatter_context_, stream_info_);
+  EXPECT_EQ("my-value", value.string_value());
+}
+
+TEST_F(FileContentFormatterTest, FormatValueMissingFileReturnsEmpty) {
+  // Create a parser but parse a command for a non-FILE_CONTENT command — should return nullptr.
+  FileContentFormatterFactory factory;
+  auto empty_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*empty_config, context_);
+
+  auto provider = parser->parse("NOT_FILE_CONTENT", "/some/path", absl::nullopt);
+  EXPECT_EQ(nullptr, provider);
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy
