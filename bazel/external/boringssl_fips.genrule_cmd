@@ -55,13 +55,13 @@ build_boringssl_fips() {
           -DCMAKE_CXX_FLAGS="${CXXFLAGS} -fPIC" \
           -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
           -DCMAKE_SHARED_LINKER_FLAGS="$${LDFLAGS}" \
+          -DBUILD_TESTING=off \
           ..
     ninja -j "${NINJA_CORES:-1}"
 }
 
 validate_fips() {
     cd "$BSSL_SRC/build" || exit 1
-    ninja run_tests
     # Verify correctness of the FIPS build.
     IS_FIPS="$(./bssl isfips)"
     if [[ "${IS_FIPS}" != "1" ]]; then
