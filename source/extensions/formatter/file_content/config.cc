@@ -21,9 +21,8 @@ constexpr absl::string_view FileContentCommand = "FILE_CONTENT";
 class FileContentFormatterProvider : public Envoy::Formatter::FormatterProvider {
 public:
   FileContentFormatterProvider(
-      Config::DataSource::DataSourceProviderSharedPtr<std::string> provider,
-      absl::optional<size_t> max_length)
-      : provider_(std::move(provider)), max_length_(max_length) {}
+      Config::DataSource::DataSourceProviderSharedPtr<std::string> provider)
+      : provider_(std::move(provider)) {}
 
   absl::optional<std::string> format(const Envoy::Formatter::Context&,
                                      const StreamInfo::StreamInfo&) const override {
@@ -31,9 +30,7 @@ public:
     if (!data) {
       return absl::nullopt;
     }
-    std::string result = *data;
-    Envoy::Formatter::SubstitutionFormatUtils::truncate(result, max_length_);
-    return result;
+    return *data;
   }
 
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
@@ -48,7 +45,6 @@ public:
 
 private:
   Config::DataSource::DataSourceProviderSharedPtr<std::string> provider_;
-  const absl::optional<size_t> max_length_;
 };
 
 /**
@@ -78,15 +74,16 @@ public:
         Config::DataSource::DataSourceProvider<std::string>::create(
             source, server_context_.mainThreadDispatcher(), server_context_.threadLocal(),
             server_context_.api(),
-            [](absl::string_view data) -> absl::StatusOr<std::shared_ptr<std::string>> {
-              return std::make_shared<std::string>(data);
+            [max_length](absl::string_view data) -> absl::StatusOr<std::shared_ptr<std::string>> {
+              auto result = std::make_shared<std::string>(data);
+              Envoy::Formatter::SubstitutionFormatUtils::truncate(*result, max_length);
+              return result;
             },
             options),
         Config::DataSource::DataSourceProviderPtr<std::string>);
 
     return std::make_unique<FileContentFormatterProvider>(
-        Config::DataSource::DataSourceProviderSharedPtr<std::string>(std::move(provider)),
-        max_length);
+        Config::DataSource::DataSourceProviderSharedPtr<std::string>(std::move(provider)));
   }
 
 private:
