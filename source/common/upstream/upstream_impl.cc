@@ -575,7 +575,8 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 
 absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
     const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    HostDescriptionConstSharedPtr host) {
+    HostDescriptionConstSharedPtr host,
+    const Network::UpstreamTransportSocketFactory& socket_factory) {
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     return transport_socket_options->http11ProxyInfo()->proxy_address;
   }
@@ -618,6 +619,11 @@ absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetP
     return resolve_status.value();
   }
 
+  // Proxy address was not found in the metadata. If a default proxy address is set, return that.
+  if (socket_factory.defaultHttp11ProxyInfo().has_value()) {
+    return socket_factory.defaultHttp11ProxyInfo()->proxy_address;
+  }
+
   return absl::nullopt;
 }
 
@@ -632,7 +638,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
   absl::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
-      maybeGetProxyRedirectAddress(transport_socket_options, host);
+      maybeGetProxyRedirectAddress(transport_socket_options, host, socket_factory);
 
   Network::ClientConnectionPtr connection;
   // If the transport socket options or endpoint/locality metadata indicate the connection should
@@ -668,6 +674,10 @@ Host::CreateConnectionData HostImplBase::createConnection(
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  const auto timeout = cluster.perConnectionBufferHighWatermarkTimeout();
+  if (timeout.count() > 0) {
+    connection->setBufferHighWatermarkTimeout(timeout);
+  }
   if (auto upstream_info = connection->streamInfo().upstreamInfo(); upstream_info) {
     upstream_info->setUpstreamHost(host);
   }
@@ -1178,6 +1188,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       shadow_policies_(http_protocol_options_->shadow_policies_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      buffer_high_watermark_timeout_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,

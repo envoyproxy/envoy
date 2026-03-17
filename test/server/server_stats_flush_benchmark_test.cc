@@ -90,7 +90,7 @@ public:
 private:
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::AllocatorImpl stats_allocator_;
+  Stats::Allocator stats_allocator_;
   Stats::ThreadLocalStoreImpl stats_store_;
   Event::SimulatedTimeSystem time_system_;
   FastMockClusterManager cm_;

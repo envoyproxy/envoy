@@ -6,9 +6,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -49,6 +51,14 @@ using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
 using OnBootstrapExtensionAdminRequestType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
+using OnBootstrapExtensionClusterAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update);
+using OnBootstrapExtensionClusterRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_removal);
+using OnBootstrapExtensionListenerAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
+using OnBootstrapExtensionListenerRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
 
 class DynamicModuleBootstrapExtension;
 
@@ -58,6 +68,8 @@ class DynamicModuleBootstrapExtension;
  */
 class DynamicModuleBootstrapExtensionConfig
     : public std::enable_shared_from_this<DynamicModuleBootstrapExtensionConfig>,
+      public Upstream::ClusterUpdateCallbacks,
+      public Server::ListenerUpdateCallbacks,
       public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
@@ -112,6 +124,48 @@ public:
    */
   void signalInitComplete();
 
+  /**
+   * Enables cluster lifecycle event notifications. When enabled, the module will receive
+   * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
+   * callbacks when clusters are added, updated, or removed.
+   *
+   * This must be called on the main thread after the server is initialized, since the
+   * ClusterManager is not available during bootstrap extension creation.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableClusterLifecycle();
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
+
+  /**
+   * Sets the listener manager reference. Must be called during onServerInitialized before
+   * the module can enable listener lifecycle events.
+   */
+  void setListenerManager(Server::ListenerManager& listener_manager) {
+    listener_manager_ = &listener_manager;
+  }
+
+  /**
+   * Enables listener lifecycle event notifications. When enabled, the module will receive
+   * on_bootstrap_extension_listener_add_or_update and on_bootstrap_extension_listener_removal
+   * callbacks when listeners are added, updated, or removed.
+   *
+   * This must be called on the main thread after the server is initialized, since the
+   * ListenerManager is not available during bootstrap extension creation.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableListenerLifecycle();
+
+  // Server::ListenerUpdateCallbacks
+  void onListenerAddOrUpdate(absl::string_view listener_name,
+                             const Network::ListenerConfig& listener_config) override;
+  void onListenerRemoval(const std::string& listener_name) override;
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -130,6 +184,12 @@ public:
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
   OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
+  OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
+      nullptr;
+  OnBootstrapExtensionClusterRemovalType on_bootstrap_extension_cluster_removal_ = nullptr;
+  OnBootstrapExtensionListenerAddOrUpdateType on_bootstrap_extension_listener_add_or_update_ =
+      nullptr;
+  OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -374,6 +434,26 @@ private:
   std::vector<ModuleGaugeVecHandle> gauge_vecs_;
   std::vector<ModuleHistogramHandle> histograms_;
   std::vector<ModuleHistogramVecHandle> histogram_vecs_;
+
+  // Cluster lifecycle callback handle. Set when the module enables cluster lifecycle events
+  // via enableClusterLifecycle(). Reset during shutdown to avoid use-after-free since the
+  // underlying TLS data is destroyed before the config.
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up cluster_update_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr cluster_lifecycle_shutdown_handle_;
+  bool cluster_lifecycle_enabled_ = false;
+
+  // Listener manager pointer. Set during onServerInitialized via setListenerManager().
+  // Not available during bootstrap extension creation.
+  Server::ListenerManager* listener_manager_ = nullptr;
+
+  // Listener lifecycle callback handle. Set when the module enables listener lifecycle events
+  // via enableListenerLifecycle(). Reset during shutdown to avoid use-after-free since the
+  // ListenerManager is destroyed before the config.
+  Server::ListenerUpdateCallbacksHandlePtr listener_update_callbacks_handle_;
+  // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
+  Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
+  bool listener_lifecycle_enabled_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
