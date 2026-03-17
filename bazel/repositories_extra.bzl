@@ -39,6 +39,12 @@ def envoy_dependencies_extra(
         ignore_root_user_error = ignore_root_user_error,
     )
 
+    python_register_toolchains(
+        name = "python_3_13",
+        python_version = "3.13.1",
+        ignore_root_user_error = ignore_root_user_error
+    )
+
     aspect_bazel_lib_dependencies()
 
     if not native.existing_rule("proto_bazel_features"):
