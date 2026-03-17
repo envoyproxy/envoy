@@ -152,6 +152,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can receive listener lifecycle events
+// (add/update and removal) via the ListenerUpdateCallbacks mechanism.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Bootstrap listener lifecycle test: server initialized"},
+                                  {"info", "Listener lifecycle enabled: true"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
+}
+
 // This test verifies that a bootstrap extension can register a function in the process-wide
 // function registry and an HTTP filter in the same module can resolve and call it during request
 // processing. The bootstrap extension asynchronously initializes a routing table and registers a
