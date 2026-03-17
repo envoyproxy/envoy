@@ -89,24 +89,24 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     if (module_config.module().has_remote()) {
       const auto& sha256 = module_config.module().remote().sha256();
 
-      // Check cache for previously fetched remote module.
-      auto cache_it = remote_module_cache_.find(sha256);
-      if (cache_it != remote_module_cache_.end()) {
-        std::filesystem::path cached_path(cache_it->second);
-        if (std::filesystem::exists(cached_path)) {
-          dynamic_module = Extensions::DynamicModules::newDynamicModule(
-              cached_path, module_config.do_not_close(), module_config.load_globally());
-          if (dynamic_module.ok()) {
-            // Cache hit — skip async fetch entirely.
-            return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
-                                              module_config, context, scope);
-          }
+      // Check if a previously fetched module with the same SHA256 already exists on disk.
+      // newDynamicModuleFromBytes writes to a deterministic path based on SHA256, so the
+      // filesystem itself acts as the cache.
+      auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
+      if (std::filesystem::exists(cached_path)) {
+        dynamic_module = Extensions::DynamicModules::newDynamicModule(
+            cached_path, module_config.do_not_close(), module_config.load_globally());
+        if (dynamic_module.ok()) {
+          return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
+                                            module_config, context, scope);
         }
-        // Cached file is invalid or missing, remove entry and fall through to re-fetch.
-        remote_module_cache_.erase(cache_it);
+        // File exists but failed to load — re-fetching the same SHA256 would produce
+        // identical bytes, so there is no point in falling through to the remote path.
+        return absl::InvalidArgumentError("Cached remote module failed to load: " +
+                                          std::string(dynamic_module.status().message()));
       }
 
-      // Cache miss — need async fetch, which requires init_manager.
+      // No cached file — need async fetch, which requires init_manager.
       if (init_manager == nullptr) {
         return absl::InvalidArgumentError("Remote module sources require an init manager");
       }
@@ -165,8 +165,8 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
       context.clusterManager(), init_manager, module_config.module().remote(),
       context.mainThreadDispatcher(), context.api().randomGenerator(),
       /*allow_empty=*/true,
-      [weak_state, proto_config_copy, module_config_copy, &context, &scope,
-       this](const std::string& data) {
+      [weak_state, proto_config_copy, module_config_copy, &context,
+       &scope](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {
           return;
@@ -186,11 +186,6 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
                               module_or_error.status().message());
           return;
         }
-
-        // Cache the module's file path for future config updates.
-        const auto& fetch_sha256 = module_config_copy.module().remote().sha256();
-        remote_module_cache_[fetch_sha256] =
-            Extensions::DynamicModules::moduleTempPath(fetch_sha256).string();
 
         auto cb_or_error =
             buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,

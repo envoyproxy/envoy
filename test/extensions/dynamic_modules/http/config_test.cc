@@ -384,9 +384,9 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
   std::filesystem::remove(temp_path);
 }
 
-// After a successful remote fetch the factory caches the file path keyed by SHA256.
-// A subsequent create with the same SHA256 should load from cache without an init manager
-// (which proves no RemoteAsyncDataProvider is created).
+// After a successful remote fetch, newDynamicModuleFromBytes writes the module to a
+// deterministic path based on SHA256. A subsequent create with the same SHA256 should
+// find the file on disk and load it without an init manager (no RemoteAsyncDataProvider).
 TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
   std::ifstream input(module_path, std::ios::binary);
@@ -431,7 +431,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
             return nullptr;
           }));
 
-  // First call: remote fetch populates the cache.
+  // First call: remote fetch writes the module to disk.
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
@@ -440,11 +440,12 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   context_.initManager().initialize(init_watcher_);
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
 
-  // Second call: use createFilterFactory directly with init_manager=nullptr.
-  // Without the cache this would fail with "Remote module sources require an init manager".
+  // Second call: the file exists on disk so it loads directly without an init manager.
+  // A different factory instance also works since the cache is filesystem-based.
+  DynamicModuleConfigFactory factory2;
   auto result2 =
-      factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
-                                  /*init_manager=*/nullptr);
+      factory2.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
+                                   /*init_manager=*/nullptr);
   EXPECT_TRUE(result2.ok()) << result2.status().message();
 
   // Verify the cache-loaded factory callback installs the filter.
@@ -459,8 +460,8 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   std::filesystem::remove(temp_path);
 }
 
-// When the cached temp file is deleted, the factory should detect the missing file,
-// remove the stale cache entry, and fall through to the remote fetch path.
+// When the cached temp file is deleted, the factory should detect the missing file
+// and fall through to the remote fetch path.
 TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
   std::ifstream input(module_path, std::ios::binary);
@@ -505,7 +506,7 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
             return nullptr;
           }));
 
-  // First call: remote fetch populates the cache.
+  // First call: remote fetch writes the module to disk.
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_TRUE(cb_or_error.ok());
@@ -513,13 +514,12 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
 
-  // Delete the cached temp file to simulate invalidation.
+  // Delete the temp file to simulate invalidation.
   std::filesystem::path temp_path = Extensions::DynamicModules::moduleTempPath(sha256);
   std::filesystem::remove(temp_path);
   ASSERT_FALSE(std::filesystem::exists(temp_path));
 
-  // Second call with init_manager=nullptr: cache entry exists but file is gone,
-  // so the factory should erase the stale entry and require an init manager.
+  // Second call with init_manager=nullptr: file is gone, so it needs an init manager.
   auto result2 =
       factory.createFilterFactory(proto_config, "", context_.server_factory_context_, stats_scope_,
                                   /*init_manager=*/nullptr);

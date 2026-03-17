@@ -559,10 +559,9 @@ new_features:
     through (fail-open).
 - area: dynamic_modules
   change: |
-    Added caching for remotely fetched dynamic modules in the HTTP filter factory. After a
-    successful remote fetch, the module's file path is cached by SHA256. Subsequent config
-    updates referencing the same SHA256 load from the cached file, avoiding redundant HTTP
-    fetches.
+    Added caching for remotely fetched dynamic modules. Since ``newDynamicModuleFromBytes``
+    writes modules to a deterministic path based on SHA256, subsequent config updates
+    referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing

@@ -7,8 +7,6 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
-#include "absl/container/flat_hash_map.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -55,12 +53,6 @@ private:
       const envoy::extensions::dynamic_modules::v3::DynamicModuleConfig& module_config,
       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
       Init::Manager& init_manager);
-
-  // Cache of successfully fetched remote modules, keyed by SHA256.
-  // Maps sha256 → absolute file path where the module .so was written.
-  // Populated after successful remote fetch, checked before starting new fetches.
-  // No mutex needed: factory methods are only called from the main thread.
-  absl::flat_hash_map<std::string, std::string> remote_module_cache_;
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 
