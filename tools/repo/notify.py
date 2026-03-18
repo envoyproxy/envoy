@@ -313,6 +313,9 @@ class RepoNotifier(runner.Runner):
                     f"*{num_issues} Untriaged Issues* (please tag and cc area experts)\n<{ISSUE_LINK}|{ISSUE_LINK}>"
                 ))
             await self.send_message(
+                channel='#envoy-maintainer-oncall',
+                text=(f"*Pending Deployments* (workflow runs that need manual approval from maintainer)\n<{"https://github.com/envoyproxy/envoy/actions/workflows/request.yml?query=is%3Aaction_required"}>"))
+            await self.send_message(
                 channel='#envoy-ci',
                 text=(
                     f"<@{oncall_handle}> please triage flakes per <{CI_TRIAGE_LINK} | instructions>\n"
@@ -335,7 +338,7 @@ class RepoNotifier(runner.Runner):
         return len(await response.json())
 
     async def run(self):
-        if not self.github_token:
+        if not self.github_token and not self.dry_run:
             self.log.error("Missing GITHUB_TOKEN: please check github workflow configuration")
             return 1
 

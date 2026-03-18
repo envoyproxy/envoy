@@ -44,10 +44,6 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
   return os;
 }
 
-absl::string_view ipVersionAsString(Network::Address::IpVersion ip_version) {
-  return ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6";
-}
-
 } // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -128,6 +124,8 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+  // Ensure that the access log is written.
+  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -146,6 +144,17 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
+void ConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(handler);
+}
+
+void ConnectionImpl::ensureAccessLogWritten() {
+  if (!access_log_written_) {
+    access_log_written_ = true;
+    filter_manager_.log(AccessLog::AccessLogType::TcpConnectionEnd);
+  }
+}
+
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
     ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
@@ -158,7 +167,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ENVOY_CONN_LOG(
         trace, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
         *this);
-    setDetectedCloseType(DetectedCloseType::LocalReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
     return;
   }
@@ -252,6 +261,42 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
                               (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
 }
 
+void ConnectionImpl::onBufferHighWatermarkTimeout() {
+  ENVOY_CONN_LOG(debug, "buffer high watermark timeout reached", *this);
+  if (!socket_->isOpen()) {
+    return;
+  }
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
+}
+
+void ConnectionImpl::scheduleBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timeout_.count() == 0) {
+    return;
+  }
+
+  if (buffer_high_watermark_timer_ == nullptr) {
+    buffer_high_watermark_timer_ =
+        dispatcher_.createTimer([this]() -> void { onBufferHighWatermarkTimeout(); });
+  }
+
+  if (!buffer_high_watermark_timer_->enabled()) {
+    ENVOY_CONN_LOG(debug, "scheduling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_->enableTimer(buffer_high_watermark_timeout_);
+  }
+}
+
+void ConnectionImpl::maybeCancelBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timer_ == nullptr || !buffer_high_watermark_timer_->enabled()) {
+    return;
+  }
+
+  if (!write_buffer_->highWatermarkTriggered() && !read_buffer_->highWatermarkTriggered()) {
+    ENVOY_CONN_LOG(debug, "cancelling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_->disableTimer();
+  }
+}
+
 Connection::State ConnectionImpl::state() const {
   if (!socket_->isOpen()) {
     return State::Closed;
@@ -283,7 +328,7 @@ bool ConnectionImpl::filterChainWantsData() {
          (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
-void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
+void ConnectionImpl::setDetectedCloseType(StreamInfo::DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
@@ -329,8 +374,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
-      detected_close_type_ == DetectedCloseType::LocalReset) {
+  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -617,10 +662,28 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
+void ConnectionImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (timeout == buffer_high_watermark_timeout_) {
+    return;
+  }
+
+  buffer_high_watermark_timeout_ = timeout;
+
+  if (buffer_high_watermark_timer_ != nullptr && buffer_high_watermark_timer_->enabled()) {
+    buffer_high_watermark_timer_->disableTimer();
+  }
+
+  if (state() == State::Open &&
+      (write_buffer_->highWatermarkTriggered() || read_buffer_->highWatermarkTriggered())) {
+    scheduleBufferHighWatermarkTimeout();
+  }
+}
+
 void ConnectionImpl::onReadBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
   if (state() == State::Open) {
     readDisable(false);
+    maybeCancelBufferHighWatermarkTimeout();
   }
 }
 
@@ -628,6 +691,7 @@ void ConnectionImpl::onReadBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
   if (state() == State::Open) {
     readDisable(true);
+    scheduleBufferHighWatermarkTimeout();
   }
 }
 
@@ -635,6 +699,9 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
   ASSERT(write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = false;
+  if (state() == State::Open) {
+    maybeCancelBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onBelowWriteBufferLowWatermark();
@@ -646,6 +713,9 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = true;
+  if (state() == State::Open) {
+    scheduleBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onAboveWriteBufferHighWatermark();
@@ -750,7 +820,7 @@ void ConnectionImpl::onReadReady() {
   if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     if (result.bytes_processed_ != 0) {
       onRead(new_buffer_size);
       // In some cases, the transport socket could read data along with an RST (Reset) flag.
@@ -845,7 +915,7 @@ void ConnectionImpl::onWriteReady() {
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     // Discard anything in the buffer.
     ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
@@ -1113,6 +1183,14 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 }
 
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // Ensure that connection is closed and the access log is written before the StreamInfo is
+  // destroyed. We need to write the access log here because the StreamInfo is owned by this class,
+  // and will be destroyed before the base class destructor runs.
+  close(ConnectionCloseType::NoFlush);
+  ensureAccessLogWritten();
+}
+
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
@@ -1138,27 +1216,9 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.log_ip_families_on_network_error")) {
-      absl::string_view remote_address_family =
-          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
-              ? ipVersionAsString(
-                    socket_->connectionInfoProvider().remoteAddress()->ip()->version())
-              : "";
-      absl::string_view local_address_family =
-          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
-              ? ipVersionAsString(socket_->connectionInfoProvider().localAddress()->ip()->version())
-              : "";
-      setFailureReason(absl::StrCat(
-          "immediate connect error: ", errorDetails(result.errno_),
-          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString(),
-          "|remote address family:", remote_address_family,
-          "|local address family:", local_address_family));
-    } else {
-      setFailureReason(absl::StrCat(
-          "immediate connect error: ", errorDetails(result.errno_),
-          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
-    }
+    setFailureReason(absl::StrCat(
+        "immediate connect error: ", errorDetails(result.errno_),
+        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

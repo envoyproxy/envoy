@@ -35,7 +35,7 @@ class ValidationServerTest : public testing::TestWithParam<std::string> {
 public:
   static void setupTestDirectory() {
     TestEnvironment::exec(
-        {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
+        {TestEnvironment::runfilesPath("test/config_test/configs_test_setup.sh")});
     directory_ = TestEnvironment::temporaryDirectory() + "/test/config_test/";
   }
 
@@ -270,12 +270,12 @@ TEST_P(ValidationServerTest, WithProcessContext) {
 // as-is. (Note, /dev/stdout as an access log file is invalid on Windows, no equivalent /dev/
 // exists.)
 
-auto testing_values =
-    ::testing::Values("front-proxy_envoy.yaml", "envoyproxy_io_proxy.yaml",
+auto testing_values = ::testing::Values(
+    "configs_front-proxy_envoy.yaml", "configs_envoyproxy_io_proxy.yaml",
 #if defined(WIN32) && defined(SO_ORIGINAL_DST)
-                      "configs_original-dst-cluster_proxy_config.yaml",
+    "configs_original-dst-cluster_proxy_config.yaml",
 #endif
-                      "grpc-bridge_server_envoy-proxy.yaml", "front-proxy_service-envoy.yaml");
+    "configs_grpc-bridge_server_envoy-proxy.yaml", "configs_front-proxy_service-envoy.yaml");
 
 INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest, testing_values);
 

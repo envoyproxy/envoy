@@ -4,6 +4,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -58,9 +59,15 @@ private:
 class GeoipFilterConfig {
 public:
   GeoipFilterConfig(const envoy::extensions::filters::network::geoip::v3::Geoip& config,
-                    const std::string& stat_prefix, Stats::Scope& scope);
+                    const std::string& stat_prefix, Stats::Scope& scope,
+                    Formatter::FormatterConstSharedPtr client_ip_formatter);
 
   void incTotal() { incCounter(stat_name_set_->getBuiltin("total", unknown_hit_)); }
+
+  /**
+   * @return the optional formatter for extracting the client IP address.
+   */
+  Formatter::FormatterConstSharedPtr clientIpFormatter() const { return client_ip_formatter_; }
 
 private:
   void incCounter(Stats::StatName name);
@@ -69,6 +76,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;
+  const Formatter::FormatterConstSharedPtr client_ip_formatter_;
 };
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;

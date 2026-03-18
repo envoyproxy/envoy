@@ -14,7 +14,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: SNI certificate mapper]
 // [#extension: envoy.tls.certificate_mappers.sni]
 
-// Uses the SNI value from the TLS client hello as the secret resource name.
+// Uses the SNI value from the TLS client hello as the secret resource name in the downstream selector.
 message SNI {
   // The value to use as the secret name when SNI is empty or absent.
   string default_value = 1 [(validate.rules).string = {min_len: 1}];

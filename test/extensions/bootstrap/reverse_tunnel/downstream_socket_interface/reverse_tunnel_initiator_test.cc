@@ -56,7 +56,7 @@ protected:
   // Helper function to set up thread local slot for tests.
   void setupThreadLocalSlot() {
     // First, call onServerInitialized to set up the extension reference properly.
-    extension_->onServerInitialized();
+    extension_->onServerInitialized(server_);
 
     // Create a thread local registry with the properly initialized extension.
     thread_local_registry_ =
@@ -92,6 +92,7 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Server::MockInstance> server_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
@@ -238,6 +239,27 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithReverseConnectionAddress) {
   // Verify it's a ReverseConnectionIOHandle (not a regular socket)
   auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
   EXPECT_NE(reverse_handle, nullptr);
+}
+
+TEST_F(ReverseTunnelInitiatorTest, SocketUsesCustomHandshakeRequestPathFromExtension) {
+  config_.mutable_http_handshake()->set_request_path("/custom/handshake");
+  extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  setupThreadLocalSlot();
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+  auto socket = socket_interface_->socket(Network::Socket::Type::Stream, reverse_address,
+                                          Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+  EXPECT_EQ(reverse_handle->requestPath(), "/custom/handshake");
 }
 
 TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketStreamIPv4) {

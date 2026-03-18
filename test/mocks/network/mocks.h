@@ -55,6 +55,7 @@ public:
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
 
 class MockDnsResolver : public DnsResolver {
@@ -513,6 +514,7 @@ public:
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, listenerFiltersTimeout, (), (const));
   MOCK_METHOD(bool, continueOnListenerFiltersTimeout, (), (const));
   MOCK_METHOD(Stats::Scope&, listenerScope, ());

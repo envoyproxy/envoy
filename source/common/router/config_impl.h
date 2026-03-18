@@ -38,6 +38,8 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -105,6 +107,7 @@ public:
                                const StreamInfo::StreamInfo&, std::string&) const override {
     return EMPTY_STRING;
   };
+  absl::string_view responseContentType() const override { return EMPTY_STRING; }
 };
 
 class CommonVirtualHostImpl;
@@ -389,7 +392,7 @@ private:
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
 
-  std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
+  absl::InlinedVector<RouteEntryImplBaseConstSharedPtr, 2> routes_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
@@ -736,6 +739,7 @@ public:
                                const Http::ResponseHeaderMap& response_headers,
                                const StreamInfo::StreamInfo& stream_info,
                                std::string& body_out) const override;
+  absl::string_view responseContentType() const override { return direct_response_content_type_; }
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
@@ -891,6 +895,8 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
+  std::vector<ConfigUtility::CookieMatcherPtr> config_cookies_;
+  absl::flat_hash_set<absl::string_view> config_cookie_names_;
 
   UpgradeMap upgrade_map_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
@@ -909,6 +915,7 @@ private:
   const RouteTracingConstPtr route_tracing_;
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
+  std::string direct_response_content_type_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;

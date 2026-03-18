@@ -362,7 +362,6 @@ type httpBuffer struct {
 	state               *processState
 	envoyBufferInstance uint64
 	length              uint64
-	value               []byte
 }
 
 var _ api.BufferInstance = (*httpBuffer)(nil)
@@ -409,8 +408,7 @@ func (b *httpBuffer) Bytes() []byte {
 	if b.length == 0 {
 		return nil
 	}
-	b.value = cAPI.HttpGetBuffer(unsafe.Pointer(b.state), b.envoyBufferInstance, b.length)
-	return b.value
+	return cAPI.HttpGetBuffer(unsafe.Pointer(b.state), b.envoyBufferInstance, b.length)
 }
 
 func (b *httpBuffer) Drain(offset int) {
@@ -440,8 +438,8 @@ func (b *httpBuffer) String() string {
 	if b.length == 0 {
 		return ""
 	}
-	b.value = cAPI.HttpGetBuffer(unsafe.Pointer(b.state), b.envoyBufferInstance, b.length)
-	return string(b.value)
+	buf := cAPI.HttpGetBuffer(unsafe.Pointer(b.state), b.envoyBufferInstance, b.length)
+	return unsafe.String(unsafe.SliceData(buf), len(buf))
 }
 
 func (b *httpBuffer) Append(data []byte) error {

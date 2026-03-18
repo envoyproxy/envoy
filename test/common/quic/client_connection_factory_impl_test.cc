@@ -37,12 +37,22 @@ protected:
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
     protocol_options->mutable_max_concurrent_streams()->set_value(43);
     protocol_options->mutable_initial_stream_window_size()->set_value(65555);
+    if (enable_connection_migration_) {
+      auto* connection_migration = protocol_options->mutable_connection_migration();
+      if (migrate_idle_sessions_) {
+        connection_migration->mutable_migrate_idle_connections()
+            ->mutable_max_idle_time_before_migration()
+            ->set_seconds(10);
+      }
+      connection_migration->mutable_max_time_on_non_default_network()->set_seconds(90);
+    }
     if (set_num_timeouts_to_trigger_port_migration_) {
       protocol_options->mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
     }
     protocol_options->set_connection_options("5RTO,ACKD");
     protocol_options->set_client_connection_options("6RTO,AKD4");
-    quic_info_ = createPersistentQuicInfoForCluster(dispatcher_, *cluster_);
+    quic_info_ =
+        createPersistentQuicInfoForCluster(dispatcher_, *cluster_, context_.server_context_);
     EXPECT_EQ(quic_info_->quic_config_.max_time_before_crypto_handshake(),
               quic::QuicTime::Delta::FromSeconds(10));
     EXPECT_EQ(quic_info_->quic_config_.GetMaxBidirectionalStreamsToSend(),
@@ -105,6 +115,8 @@ protected:
   QuicStatNames quic_stat_names_{store_.symbolTable()};
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
+  bool enable_connection_migration_{false};
+  bool migrate_idle_sessions_{false};
 };
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
@@ -123,14 +135,16 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_NE(absl::nullopt, session->lastRoundTripTime());
   EXPECT_THAT(session->GetAlpnsToOffer(), testing::ElementsAre("h3"));
+  EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
+TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigrationOfIdleSessions) {
   // This would enable port migration in the QUICHE.
   set_num_timeouts_to_trigger_port_migration_ = true;
+  enable_connection_migration_ = true;
+  migrate_idle_sessions_ = true;
   TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_migration_in_quiche", "true"}});
   initialize();
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
@@ -147,6 +161,46 @@ TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
     EXPECT_NE(session->writer(), nullptr);
     // Port migration should be configured.
     EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
+    EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(10),
+              session->GetConnectionMigrationConfig().idle_migration_period);
+    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
+              session->GetConnectionMigrationConfig().max_time_on_non_default_network);
+  } else {
+    EXPECT_EQ(session->writer(), nullptr);
+    // QUICHE migration config should have all kinds of migration disabled.
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_server_preferred_address);
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().allow_port_migration);
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+  }
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(QuicNetworkConnectionTest, QuicheHandlesMigration) {
+  // This would enable port migration in the QUICHE.
+  set_num_timeouts_to_trigger_port_migration_ = true;
+  enable_connection_migration_ = true;
+  TestScopedRuntime runtime;
+  initialize();
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
+      nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  ASSERT(session != nullptr);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche")) {
+    // Session should have a handle to the writer if quiche handles migration.
+    EXPECT_NE(session->writer(), nullptr);
+    // Port migration should be configured.
+    EXPECT_TRUE(session->GetConnectionMigrationConfig().allow_port_migration);
+    EXPECT_TRUE(session->GetConnectionMigrationConfig().migrate_session_on_network_change);
+    EXPECT_FALSE(session->GetConnectionMigrationConfig().migrate_idle_session);
+    EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(90),
+              session->GetConnectionMigrationConfig().max_time_on_non_default_network);
   } else {
     EXPECT_EQ(session->writer(), nullptr);
     // QUICHE migration config should have all kinds of migration disabled.

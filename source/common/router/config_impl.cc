@@ -54,8 +54,10 @@
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -567,6 +569,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         route.direct_response().body_format(), generic_context);
     SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
     direct_response_body_formatter_ = std::move(formatter_or_error.value());
+    // Capture the content_type from body_format, using the same defaulting logic as
+    // local_reply.cc BodyFormatter: explicit content_type > JSON format default > empty
+    // (text/plain).
+    const auto& body_format = route.direct_response().body_format();
+    if (!body_format.content_type().empty()) {
+      direct_response_content_type_ = body_format.content_type();
+    } else if (body_format.format_case() ==
+               envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat) {
+      direct_response_content_type_ = Http::Headers::get().ContentTypeValues.Json;
+    }
+    // else: leave empty; sendLocalReply will use its default "text/plain"
   }
 
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
@@ -627,6 +640,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   for (const auto& query_parameter : route.match().query_parameters()) {
     config_query_parameters_.push_back(
         std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
+  }
+
+  for (const auto& cookie_matcher : route.match().cookies()) {
+    config_cookies_.push_back(
+        std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
+  }
+  if (!config_cookies_.empty()) {
+    config_cookie_names_.reserve(config_cookies_.size());
+    for (const auto& matcher : config_cookies_) {
+      config_cookie_names_.insert(matcher->name());
+    }
   }
 
   if (!route.route().hash_policy().empty()) {
@@ -855,6 +879,16 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
         Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
+      return false;
+    }
+  }
+
+  if (!config_cookies_.empty()) {
+    const auto cookies =
+        Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
+          return config_cookie_names_.find(key) != config_cookie_names_.end();
+        });
+    if (!ConfigUtility::matchCookies(cookies, config_cookies_)) {
       return false;
     }
   }
@@ -1755,6 +1789,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       return;
     }
   } else {
+    routes_.reserve(virtual_host.routes().size());
     for (const auto& route : virtual_host.routes()) {
       auto route_or_error = RouteCreator::createAndValidateRoute(
           route, shared_virtual_host_, factory_context, validator, validate_clusters);
@@ -1828,7 +1863,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    Matcher::MatchResult match_result =
+    Matcher::ActionMatchResult match_result =
         Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match_result.isMatch()) {

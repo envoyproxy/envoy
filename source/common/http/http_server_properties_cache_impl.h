@@ -14,8 +14,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
 
+#include "absl/container/linked_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -110,7 +110,7 @@ private:
     }
   };
 
-  using ProtocolsMap = quiche::QuicheLinkedHashMap<Origin, OriginData, OriginHash>;
+  using ProtocolsMap = absl::linked_hash_map<Origin, OriginData, OriginHash>;
   // Map from origin to list of alternate protocols.
   ProtocolsMap protocols_;
 

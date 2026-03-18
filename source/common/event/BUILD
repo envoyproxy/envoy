@@ -125,7 +125,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/signal:fatal_error_handler_lib",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 

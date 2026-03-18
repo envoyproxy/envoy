@@ -12,6 +12,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
@@ -24,6 +25,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -2337,7 +2339,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
   auto cluster_added_via_api = cluster_manager_->getThreadLocalCluster("added_via_api");
 
-  Quic::EnvoyQuicNetworkObserverRegistryFactory registry_factory;
+  Quic::TestEnvoyQuicNetworkObserverRegistryFactory registry_factory;
   cluster_manager_->createNetworkObserverRegistries(registry_factory);
 
   NiceMock<MockLoadBalancerContext> lb_context;
@@ -2511,6 +2513,7 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   const std::string bootstrap = R"EOF(
   static_resources:
     clusters:
@@ -2532,12 +2535,48 @@ TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     create(parseBootstrapFromV3Yaml(bootstrap));
     FAIL() << "Invalid address was not rejected";
   } catch (const EnvoyException& e) {
     EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
   }
+}
+
+TEST_F(ClusterManagerImplTest, AllowNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  envoyInternalAddress:
+                   server_listener_name: internal_address
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "true"}});
+  create(parseBootstrapFromV3Yaml(bootstrap));
+
+  const auto& cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[0]->asString(), "127.0.0.1:11001");
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[1]->asString(), "envoy://internal_address/");
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {

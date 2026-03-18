@@ -1,36 +1,9 @@
-From 35303f765af1878ba4d7dcff861b903b7219ebcf Mon Sep 17 00:00:00 2001
-From: Rohit Agrawal <rohit.agrawal@databricks.com>
-Date: Tue, 29 Apr 2025 05:00:46 -0700
-Subject: [PATCH 1/2] Fix BUILD Files
-
----
- icu4c/source/common/BUILD.bazel             | 1218 -------------------
- icu4c/source/data/unidata/norm2/BUILD.bazel |   13 -
- icu4c/source/i18n/BUILD.bazel               |  130 --
- icu4c/source/icudefs.mk.in                  |    2 +-
- icu4c/source/tools/gennorm2/BUILD.bazel     |   39 -
- icu4c/source/tools/toolutil/BUILD.bazel     |  126 --
- tools/unicode/c/genprops/BUILD.bazel        |   50 -
- tools/unicode/c/genuca/BUILD.bazel          |   52 -
- vendor/double-conversion/upstream/BUILD     |   78 --
- vendor/double-conversion/upstream/WORKSPACE |    1 -
- 10 files changed, 1 insertion(+), 1708 deletions(-)
- delete mode 100644 icu4c/source/common/BUILD.bazel
- delete mode 100644 icu4c/source/data/unidata/norm2/BUILD.bazel
- delete mode 100644 icu4c/source/i18n/BUILD.bazel
- delete mode 100644 icu4c/source/tools/gennorm2/BUILD.bazel
- delete mode 100644 icu4c/source/tools/toolutil/BUILD.bazel
- delete mode 100644 tools/unicode/c/genprops/BUILD.bazel
- delete mode 100644 tools/unicode/c/genuca/BUILD.bazel
- delete mode 100644 vendor/double-conversion/upstream/BUILD
- delete mode 100644 vendor/double-conversion/upstream/WORKSPACE
-
-diff --git a/icu4c/source/common/BUILD.bazel b/icu4c/source/common/BUILD.bazel
+diff --git a/source/common/BUILD.bazel b/source/common/BUILD.bazel
 deleted file mode 100644
-index 3ecae30c437f..000000000000
---- a/icu4c/source/common/BUILD.bazel
+index e894ed907e6..00000000000
+--- a/source/common/BUILD.bazel
 +++ /dev/null
-@@ -1,1218 +0,0 @@
+@@ -1,1219 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
 -# License & terms of use: http://www.unicode.org/copyright.html
 -
@@ -97,6 +70,7 @@ index 3ecae30c437f..000000000000
 -        "umutex.cpp",
 -        "sharedobject.cpp",
 -        "utrace.cpp",
+-        "fixedstring.cpp",
 -    ],
 -    deps = [
 -        ":headers",
@@ -1249,10 +1223,10 @@ index 3ecae30c437f..000000000000
 -        "U_COMMON_IMPLEMENTATION",  
 -    ],
 -)
-diff --git a/icu4c/source/data/unidata/norm2/BUILD.bazel b/icu4c/source/data/unidata/norm2/BUILD.bazel
+diff --git a/source/data/unidata/norm2/BUILD.bazel b/source/data/unidata/norm2/BUILD.bazel
 deleted file mode 100644
-index 06e054ea3551..000000000000
---- a/icu4c/source/data/unidata/norm2/BUILD.bazel
+index 06e054ea355..00000000000
+--- a/source/data/unidata/norm2/BUILD.bazel
 +++ /dev/null
 @@ -1,13 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1268,10 +1242,10 @@ index 06e054ea3551..000000000000
 -exports_files([
 -    "nfc.txt", "nfkc.txt", "nfkc_cf.txt", "nfkc_scf.txt", "uts46.txt",
 -])
-diff --git a/icu4c/source/i18n/BUILD.bazel b/icu4c/source/i18n/BUILD.bazel
+diff --git a/source/i18n/BUILD.bazel b/source/i18n/BUILD.bazel
 deleted file mode 100644
-index 2d85cdb180e1..000000000000
---- a/icu4c/source/i18n/BUILD.bazel
+index 2d85cdb180e..00000000000
+--- a/source/i18n/BUILD.bazel
 +++ /dev/null
 @@ -1,130 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1404,11 +1378,28 @@ index 2d85cdb180e1..000000000000
 -        "U_I18N_IMPLEMENTATION",
 -    ],
 -)
-diff --git a/icu4c/source/icudefs.mk.in b/icu4c/source/icudefs.mk.in
-index 251e020903e5..b49c9a459032 100644
---- a/icu4c/source/icudefs.mk.in
-+++ b/icu4c/source/icudefs.mk.in
-@@ -117,7 +117,7 @@ EXEEXT = @EXEEXT@
+diff --git a/source/icudefs.mk.in b/source/icudefs.mk.in
+index c18113c892a..4a517307e5d 100644
+--- a/source/icudefs.mk.in
++++ b/source/icudefs.mk.in
+@@ -51,13 +51,13 @@ SO_TARGET_VERSION_MAJOR = @LIB_VERSION_MAJOR@
+ # The ICU data external name is usually icudata; the entry point name is
+ # the version-dependent name (for no particular reason except it was easier
+ # to change the build this way). When building in common mode, the data
+-# name is the versioned platform-dependent one. 
++# name is the versioned platform-dependent one.
+ 
+ ICUDATA_DIR = @pkgicudatadir@/$(PACKAGE)$(ICULIBSUFFIX)/$(VERSION)
+ 
+ ICUDATA_BASENAME_VERSION = $(ICUPREFIX)dt@LIB_VERSION_MAJOR@
+-# the entry point is almost like the basename, but has the lib suffix.  
+-ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@ 
++# the entry point is almost like the basename, but has the lib suffix.
++ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@
+ ICUDATA_CHAR = @ICUDATA_CHAR@
+ ICUDATA_PLATFORM_NAME = $(ICUDATA_BASENAME_VERSION)$(ICUDATA_CHAR)
+ PKGDATA_LIBSTATICNAME = -L $(STATIC_PREFIX)$(ICUPREFIX)$(DATA_STUBNAME)$(ICULIBSUFFIX)
+@@ -118,7 +118,7 @@ EXEEXT = @EXEEXT@
  CC = @CC@
  CXX = @CXX@
  AR = @AR@
@@ -1417,10 +1408,49 @@ index 251e020903e5..b49c9a459032 100644
  RANLIB = @RANLIB@
  COMPILE_LINK_ENVVAR = @COMPILE_LINK_ENVVAR@
  UCLN_NO_AUTO_CLEANUP = @UCLN_NO_AUTO_CLEANUP@
-diff --git a/icu4c/source/tools/gennorm2/BUILD.bazel b/icu4c/source/tools/gennorm2/BUILD.bazel
+@@ -211,7 +211,7 @@ LIBICU = $(LIBPREFIX)$(ICUPREFIX)
+ ifneq ($(ENABLE_SHARED),YES)
+ STATIC_PREFIX_WHEN_USED = s
+ else
+-STATIC_PREFIX_WHEN_USED = 
++STATIC_PREFIX_WHEN_USED =
+ endif
+ 
+ # Static library prefix and file extension
+diff --git a/source/stubdata/BUILD.bazel b/source/stubdata/BUILD.bazel
 deleted file mode 100644
-index c602897bafc1..000000000000
---- a/icu4c/source/tools/gennorm2/BUILD.bazel
+index 20344ef4991..00000000000
+--- a/source/stubdata/BUILD.bazel
++++ /dev/null
+@@ -1,24 +0,0 @@
+-# © 2021 and later: Unicode, Inc. and others.
+-# License & terms of use: http://www.unicode.org/copyright.html
+-
+-# This file defines Bazel targets for the ICU4C "stubdata" library header and source files.
+-
+-load("@rules_cc//cc:defs.bzl", "cc_library")
+-
+-package(
+-    default_visibility = ["//visibility:public"],
+-)
+-
+-# When compiling code in the `common` dir, the constant
+-# `U_COMMON_IMPLEMENTATION` needs to be defined. See 
+-# https://unicode-org.github.io/icu/userguide/howtouseicu#c-with-your-own-build-system .
+-
+-cc_library(
+-    name = "stubdata",
+-    srcs = ["stubdata.cpp"],
+-    hdrs = ["stubdata.h"],
+-    deps = ["//icu4c/source/common:headers"],
+-    local_defines = [
+-        "U_COMMON_IMPLEMENTATION",
+-    ],
+-)
+diff --git a/source/tools/gennorm2/BUILD.bazel b/source/tools/gennorm2/BUILD.bazel
+deleted file mode 100644
+index c602897bafc..00000000000
+--- a/source/tools/gennorm2/BUILD.bazel
 +++ /dev/null
 @@ -1,39 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1462,10 +1492,10 @@ index c602897bafc1..000000000000
 -    ],
 -    linkopts = ["-pthread"],
 -)
-diff --git a/icu4c/source/tools/toolutil/BUILD.bazel b/icu4c/source/tools/toolutil/BUILD.bazel
+diff --git a/source/tools/toolutil/BUILD.bazel b/source/tools/toolutil/BUILD.bazel
 deleted file mode 100644
-index 276c857f1246..000000000000
---- a/icu4c/source/tools/toolutil/BUILD.bazel
+index 276c857f124..00000000000
+--- a/source/tools/toolutil/BUILD.bazel
 +++ /dev/null
 @@ -1,126 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
@@ -1592,251 +1622,5 @@ index 276c857f1246..000000000000
 -    deps = [
 -        "//icu4c/source/common:platform",
 -        "//icu4c/source/i18n:headers",
--    ],
--)
-diff --git a/tools/unicode/c/genprops/BUILD.bazel b/tools/unicode/c/genprops/BUILD.bazel
-deleted file mode 100644
-index a7c3b2704993..000000000000
---- a/tools/unicode/c/genprops/BUILD.bazel
-+++ /dev/null
-@@ -1,50 +0,0 @@
--# © 2021 and later: Unicode, Inc. and others.
--# License & terms of use: http://www.unicode.org/copyright.html
--
--# This Bazel build file defines a target representing the binary executable
--# `genprops`, which is used for generating headers needed for bootstrapping
--# the ICU4C build process in a way that integrates core Unicode properties data.
--
--# Defining a binary executable (done in Bazel using `cc_binary`)
--# enables the use of the output file from executing the binary as a part of
--# other Bazel targets defined using `genrule`.
--
--load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
--
--package(
--    default_visibility = ["//visibility:public"],
--)
--
--cc_binary(
--    name = "genprops",
--    srcs = glob([
--        "*.cpp",
--        "*.h",   # cannot have hdrs section in cc_binary
--    ]),
--    deps = [
--        "//icu4c/source/common:uhash",
--        "//icu4c/source/common:umutablecptrie",
--        "//icu4c/source/common:ucptrie",
--        "//icu4c/source/common:utrie2",
--        "//icu4c/source/common:utrie2_builder",
--        "//icu4c/source/common:bytestrie",
--        "//icu4c/source/common:bytestriebuilder",
--        "//icu4c/source/common:propsvec",
--        "//icu4c/source/common:errorcode",
--        "//icu4c/source/common:ucharstriebuilder",
--        "//icu4c/source/common:uniset",
--        "//icu4c/source/common:uvector32",
--
--        "//icu4c/source/common:platform",
--        "//icu4c/source/common:headers",
--
--        "//icu4c/source/tools/toolutil:ppucd",
--        "//icu4c/source/tools/toolutil:unewdata",
--        "//icu4c/source/tools/toolutil:writesrc",
--        "//icu4c/source/tools/toolutil:uoptions",
--        "//icu4c/source/tools/toolutil:uparse",
--        "//icu4c/source/tools/toolutil:toolutil",
--        "//icu4c/source/tools/toolutil:denseranges",
--    ],
--    linkopts = ["-pthread"],
--)
-diff --git a/tools/unicode/c/genuca/BUILD.bazel b/tools/unicode/c/genuca/BUILD.bazel
-deleted file mode 100644
-index 7da631d34085..000000000000
---- a/tools/unicode/c/genuca/BUILD.bazel
-+++ /dev/null
-@@ -1,52 +0,0 @@
--# © 2021 and later: Unicode, Inc. and others.
--# License & terms of use: http://www.unicode.org/copyright.html
--
--# This Bazel build file defines a target representing the binary executable
--# `genuca`, which is used for generating ICU root collation data files.
--
--load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
--
--package(
--    default_visibility = ["//visibility:public"],
--)
--
--cc_binary(
--    name = "genuca",
--    srcs = glob([
--        "*.cpp",
--        "*.h",   # cannot have hdrs section in cc_binary
--    ]),
--    deps = [
--        "//icu4c/source/common:headers",
--        "//icu4c/source/common:platform",
--        "//icu4c/source/i18n:collation_builder",
--        "//icu4c/source/i18n:headers",
--        "//icu4c/source/tools/toolutil:collationinfo",
--        "//icu4c/source/tools/toolutil:toolutil",
--        "//icu4c/source/tools/toolutil:unewdata",
--        "//icu4c/source/tools/toolutil:uoptions",
--        "//icu4c/source/tools/toolutil:uparse",
--        "//icu4c/source/tools/toolutil:writesrc",
--    ],
--    # Markus 2021-06-16:
--    # The pthread library is not linked in automatically.
--    # See https://docs.bazel.build/versions/main/cpp-use-cases.html
--    # When pthread is absent, then we get runtime errors instead of compile/link errors.
--    # See https://stackoverflow.com/questions/51584960/stdcall-once-throws-stdsystem-error-unknown-error-1
--    #
--    # My first genuca build crashed with
--    #   terminate called after throwing an instance of 'std::system_error'
--    #   what():  Unknown error -1
--    #
--    #   Program received signal SIGABRT, Aborted.
--    #   ...
--    #   #4  0x00007ffff7e809d1 in std::terminate() () from /lib/x86_64-linux-gnu/libstdc++.so.6
--    #   #5  0x00007ffff7e80c65 in __cxa_throw () from /lib/x86_64-linux-gnu/libstdc++.so.6
--    #   #6  0x00007ffff7e78458 in std::__throw_system_error(int) () from /lib/x86_64-linux-gnu/libstdc++.so.6
--    #   #7  0x0000555555601c75 in std::call_once<void (&)()> (__once=..., __f=@0x55555560156c: {void (void)} 0x55555560156c <icu_70::umtx_init()>)
--    #       at /usr/include/c++/10/mutex:743
--    #   #8  0x00005555556017ca in icu_70::umtx_initImplPreInit (uio=...) at icu4c/source/common/umutex.cpp:146
--    #   #9  0x0000555555592236 in icu_70::umtx_initOnce (uio=..., fp=0x5555555e0716 <icu_70::initNFCSingleton(UErrorCode&)>,
--    #   errCode=@0x7fffffffd738: U_ZERO_ERROR) at icu4c/source/common/umutex.h:143
--    linkopts = ["-pthread"],
--)
-diff --git a/vendor/double-conversion/upstream/BUILD b/vendor/double-conversion/upstream/BUILD
-deleted file mode 100644
-index 8c2eee564be6..000000000000
---- a/vendor/double-conversion/upstream/BUILD
-+++ /dev/null
-@@ -1,78 +0,0 @@
--# Bazel(http://bazel.io) BUILD file
--
--load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
--
--licenses(["notice"])
--
--exports_files(["LICENSE"])
--
--cc_library(
--    name = "double-conversion",
--    srcs = [
--        "double-conversion/bignum.cc",
--        "double-conversion/bignum-dtoa.cc",
--        "double-conversion/cached-powers.cc",
--        "double-conversion/double-to-string.cc",
--        "double-conversion/fast-dtoa.cc",
--        "double-conversion/fixed-dtoa.cc",
--        "double-conversion/string-to-double.cc",
--        "double-conversion/strtod.cc",
--    ],
--    hdrs = [
--        "double-conversion/bignum.h",
--        "double-conversion/bignum-dtoa.h",
--        "double-conversion/cached-powers.h",
--        "double-conversion/diy-fp.h",
--        "double-conversion/double-conversion.h",
--        "double-conversion/double-to-string.h",
--        "double-conversion/fast-dtoa.h",
--        "double-conversion/fixed-dtoa.h",
--        "double-conversion/ieee.h",
--        "double-conversion/string-to-double.h",
--        "double-conversion/strtod.h",
--        "double-conversion/utils.h",
--    ],
--    linkopts = [
--        "-lm",
--    ],
--    visibility = ["//visibility:public"],
--)
--
--cc_test(
--    name = "cctest",
--    srcs = [
--        "test/cctest/cctest.cc",
--        "test/cctest/cctest.h",
--        "test/cctest/checks.h",
--        "test/cctest/gay-fixed.cc",
--        "test/cctest/gay-fixed.h",
--        "test/cctest/gay-precision.cc",
--        "test/cctest/gay-precision.h",
--        "test/cctest/gay-shortest.cc",
--        "test/cctest/gay-shortest.h",
--        "test/cctest/gay-shortest-single.cc",
--        "test/cctest/gay-shortest-single.h",
--        "test/cctest/test-bignum.cc",
--        "test/cctest/test-bignum-dtoa.cc",
--        "test/cctest/test-conversions.cc",
--        "test/cctest/test-diy-fp.cc",
--        "test/cctest/test-dtoa.cc",
--        "test/cctest/test-fast-dtoa.cc",
--        "test/cctest/test-fixed-dtoa.cc",
--        "test/cctest/test-ieee.cc",
--        "test/cctest/test-strtod.cc",
--    ],
--    args = [
--        "test-bignum",
--        "test-bignum-dtoa",
--        "test-conversions",
--        "test-diy-fp",
--        "test-dtoa",
--        "test-fast-dtoa",
--        "test-fixed-dtoa",
--        "test-ieee",
--        "test-strtod",
--    ],
--    visibility = ["//visibility:public"],
--    deps = [":double-conversion"],
--)
-diff --git a/vendor/double-conversion/upstream/WORKSPACE b/vendor/double-conversion/upstream/WORKSPACE
-deleted file mode 100644
-index 52106e7597b7..000000000000
---- a/vendor/double-conversion/upstream/WORKSPACE
-+++ /dev/null
-@@ -1 +0,0 @@
--# Bazel (http://bazel.io/) WORKSPACE file for double-conversion.
-
-From a6e5a43b8e6107929e8476f048c855b77f63377b Mon Sep 17 00:00:00 2001
-From: Rohit Agrawal <rohit.agrawal@databricks.com>
-Date: Sun, 4 May 2025 15:49:35 +0900
-Subject: [PATCH 2/2] More Patches
-
----
- icu4c/source/stubdata/BUILD.bazel | 24 ------------------------
- 1 file changed, 24 deletions(-)
- delete mode 100644 icu4c/source/stubdata/BUILD.bazel
-
-diff --git a/icu4c/source/stubdata/BUILD.bazel b/icu4c/source/stubdata/BUILD.bazel
-deleted file mode 100644
-index 20344ef49919..000000000000
---- a/icu4c/source/stubdata/BUILD.bazel
-+++ /dev/null
-@@ -1,24 +0,0 @@
--# © 2021 and later: Unicode, Inc. and others.
--# License & terms of use: http://www.unicode.org/copyright.html
--
--# This file defines Bazel targets for the ICU4C "stubdata" library header and source files.
--
--load("@rules_cc//cc:defs.bzl", "cc_library")
--
--package(
--    default_visibility = ["//visibility:public"],
--)
--
--# When compiling code in the `common` dir, the constant
--# `U_COMMON_IMPLEMENTATION` needs to be defined. See 
--# https://unicode-org.github.io/icu/userguide/howtouseicu#c-with-your-own-build-system .
--
--cc_library(
--    name = "stubdata",
--    srcs = ["stubdata.cpp"],
--    hdrs = ["stubdata.h"],
--    deps = ["//icu4c/source/common:headers"],
--    local_defines = [
--        "U_COMMON_IMPLEMENTATION",
 -    ],
 -)

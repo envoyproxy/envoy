@@ -359,8 +359,8 @@ public:
     absl::MutexLock lock(lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
-      if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
-          connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
+      if (connection_.detectedCloseType() == StreamInfo::DetectedCloseType::RemoteReset ||
+          connection_.detectedCloseType() == StreamInfo::DetectedCloseType::LocalReset) {
         rst_disconnected_ = true;
       }
       disconnected_ = true;
@@ -773,7 +773,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
-                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                       OptRef<Event::Dispatcher> dispatcher = absl::nullopt);
   Network::Address::InstanceConstSharedPtr localAddress() const {
     return socket_->connectionInfoProvider().localAddress();
   }
@@ -957,6 +958,9 @@ private:
     bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }

@@ -21,7 +21,7 @@ jobs:
         sudo rm -rf /usr/local/lib/android &
         sudo rm -rf /usr/share/dotnet &
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Install deps
       shell: bash
       run: |

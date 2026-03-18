@@ -7,7 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
 
@@ -24,6 +24,12 @@ public:
                              const std::vector<Matchers::StringMatcherPtr>& disallowed_headers,
                              envoy::config::core::v3::HeaderMap& proto_out);
 
+  // Convert a protobuf into a header map.
+  static absl::Status protoToHeaders(const envoy::config::core::v3::HeaderMap& headers_proto,
+                                     Http::HeaderMap& headers,
+                                     const Filters::Common::MutationRules::Checker& rule_checker,
+                                     Stats::Counter& rejected_mutations);
+
   // Modify header map based on a set of mutations from a protobuf. An error will be
   // returned if any mutations are not allowed and if the filter has been
   // configured to reject failed mutations. The "rejected_mutations" counter
@@ -33,15 +39,14 @@ public:
   // mutations fail, then effect will store value MutationsApplied if any
   // mutation was successful and None if nothing if no mutations occurred.
   // TODO(tyxia) Normalizing the headers to lower-case in ext_proc's header mutation.
-  static absl::Status
-  applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
-                       Http::HeaderMap& headers, bool replacing_message,
-                       const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations, ProcessingEffect::Effect& effect,
-                       bool remove_content_length = false);
+  static absl::Status applyHeaderMutations(
+      const envoy::service::ext_proc::v3::HeaderMutation& mutation, Http::HeaderMap& headers,
+      bool replacing_message, const Filters::Common::MutationRules::Checker& rule_checker,
+      Stats::Counter& rejected_mutations, Filters::Common::ProcessingEffect::Effect& effect,
+      bool remove_content_length = false);
 
   // Modify a buffer based on a set of mutations from a protobuf
-  static ProcessingEffect::Effect
+  static Filters::Common::ProcessingEffect::Effect
   applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
                      Buffer::Instance& buffer);
 
@@ -62,6 +67,9 @@ private:
   responseHeaderSizeCheck(const Http::HeaderMap& headers,
                           const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                           Stats::Counter& rejected_mutations);
+  static absl::Status responseHeaderSizeCheck(const Http::HeaderMap& headers, uint32_t set_size,
+                                              uint32_t remove_size,
+                                              Stats::Counter& rejected_mutations);
   // Check whether the header size after mutation is over the HCM size config.
   static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);

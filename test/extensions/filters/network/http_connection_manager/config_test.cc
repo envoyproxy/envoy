@@ -37,10 +37,12 @@
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
+using testing::ByMove;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
 using testing::NotNull;
 using testing::Pointee;
+using testing::Ref;
 using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
@@ -697,6 +699,74 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   EXPECT_GE(1200, sampled_count);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing: {}
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // By default, trace context propagation is enabled (no_context_propagation is false)
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is disabled when the flag is set to true
+  EXPECT_TRUE(config.tracingConfig()->noContextPropagation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  tracing:
+    no_context_propagation: false
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Trace context propagation is enabled when the flag is explicitly set to false
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -837,6 +907,24 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(8192, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxHeaderFieldSizeKbExceedsMaxRequestHeadersKb) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 64
+  http2_protocol_options:
+    max_header_field_size_kb: 128
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "max_header_field_size_kb must not exceed max_request_headers_kb");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRuntime) {
@@ -3308,6 +3396,144 @@ TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain)
   EXPECT_EQ(Http::ClientCertDetailsType::Chain, config.setCurrentClientCertDetails()[1]);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcher) {
+  // Test that forward_client_cert_matcher is properly parsed and can match on request headers.
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: SANITIZE
+  forward_client_cert_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: ":path"
+            value_match:
+              prefix: "/mtls"
+        on_match:
+          action:
+            name: forward_client_cert
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+              forward_client_cert_details: APPEND_FORWARD
+              set_current_client_cert_details:
+                cert: true
+                subject: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Verify the default forward_client_cert is SANITIZE.
+  EXPECT_EQ(Http::ForwardClientCertType::Sanitize, config.forwardClientCert());
+
+  // Verify the matcher is created.
+  EXPECT_NE(nullptr, config.forwardClientCertMatcher());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherWithMultipleActions) {
+  // Test matcher with multiple matchers/actions for different paths.
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: SANITIZE
+  forward_client_cert_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: ":path"
+            value_match:
+              prefix: "/internal"
+        on_match:
+          action:
+            name: forward_client_cert
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+              forward_client_cert_details: FORWARD_ONLY
+      - predicate:
+          single_predicate:
+            input:
+              name: envoy.matching.inputs.request_headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: ":path"
+            value_match:
+              prefix: "/external"
+        on_match:
+          action:
+            name: forward_client_cert
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+              forward_client_cert_details: SANITIZE_SET
+              set_current_client_cert_details:
+                cert: true
+                chain: true
+                dns: true
+                uri: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Verify the matcher is created.
+  EXPECT_NE(nullptr, config.forwardClientCertMatcher());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcherAllDetailsTypes) {
+  // Test that all forward client cert detail types are properly handled.
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: SANITIZE
+  forward_client_cert_matcher:
+    on_no_match:
+      action:
+        name: forward_client_cert
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+          forward_client_cert_details: ALWAYS_FORWARD_ONLY
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  // Verify the matcher is created.
+  EXPECT_NE(nullptr, config.forwardClientCertMatcher());
+}
+
 namespace {
 
 class TestHeaderValidatorFactoryConfig : public Http::HeaderValidatorFactoryConfig {
@@ -3700,6 +3926,137 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   ASSERT(hcm != nullptr);
   hcm->initializeReadFilterCallbacks(cb);
   EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
+}
+
+// Test valid configuration for forward_proto_config.
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigValid) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+forward_proto_config:
+  https_destination_ports: [443, 8443]
+  http_destination_ports: [80, 8080]
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  const auto& https_ports = config.httpsDestinationPorts();
+  EXPECT_EQ(2, https_ports.size());
+  EXPECT_TRUE(https_ports.contains(443));
+  EXPECT_TRUE(https_ports.contains(8443));
+
+  const auto& http_ports = config.httpDestinationPorts();
+  EXPECT_EQ(2, http_ports.size());
+  EXPECT_TRUE(http_ports.contains(80));
+  EXPECT_TRUE(http_ports.contains(8080));
+}
+
+// Test empty forward_proto_config is valid (feature disabled).
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigEmpty) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+forward_proto_config: {}
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+  EXPECT_TRUE(config.httpsDestinationPorts().empty());
+  EXPECT_TRUE(config.httpDestinationPorts().empty());
+}
+
+class MockSrdsFactory : public Router::SrdsFactory {
+public:
+  std::string name() const override { return "envoy.srds_factory.default"; }
+  std::unique_ptr<Envoy::Config::ConfigProviderManager>
+  createScopedRoutesConfigProviderManager(Server::Configuration::ServerFactoryContext&,
+                                          Router::RouteConfigProviderManager&) override {
+    return nullptr;
+  }
+  MOCK_METHOD(Envoy::Config::ConfigProviderPtr, createConfigProvider,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
+               Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager));
+  MOCK_METHOD(Router::ScopeKeyBuilderPtr, createScopeKeyBuilder,
+              (const envoy::extensions::filters::network::http_connection_manager::v3::
+                   HttpConnectionManager& config));
+};
+
+// Test that SRDS createConfigProvider and createScopeKeyBuilder receive the listener init manager.
+TEST_F(HttpConnectionManagerConfigTest, SrdsUsesListenerInitManager) {
+  MockSrdsFactory mock_srds_factory;
+  Registry::InjectFactory<Router::SrdsFactory> registration(mock_srds_factory);
+
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+scoped_routes:
+  name: scoped_routes
+  scope_key_builder:
+    fragments:
+    - header_value_extractor:
+        name: X-Route-Selector
+        element_separator: ","
+        element:
+          separator: =
+          key: vip
+  rds_config_source:
+    ads: {}
+  scoped_rds:
+    scoped_rds_config_source:
+      ads: {}
+http_filters:
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_CALL(mock_srds_factory, createConfigProvider(_, _, Ref(context_.init_manager_), _, _))
+      .WillOnce(Return(ByMove(Envoy::Config::ConfigProviderPtr())));
+  EXPECT_CALL(mock_srds_factory, createScopeKeyBuilder(_))
+      .WillOnce(Return(ByMove(Router::ScopeKeyBuilderPtr())));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
 }
 
 } // namespace

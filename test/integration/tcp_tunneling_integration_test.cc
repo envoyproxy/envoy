@@ -453,7 +453,21 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
   // TODO(yanavlasov): fix the test
   GTEST_SKIP() << "Test is too flaky for CI. "
                   "https://github.com/envoyproxy/envoy/issues/39856#issuecomment-3637976574";
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.reject_early_connect_data", "true");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        for (auto& filter : *hcm.mutable_http_filters()) {
+          if (filter.name() == "envoy.filters.http.router") {
+            envoy::extensions::filters::http::router::v3::Router router_config;
+            if (filter.has_typed_config()) {
+              filter.typed_config().UnpackTo(&router_config);
+            }
+            router_config.mutable_reject_connect_request_early_data()->set_value(true);
+            filter.mutable_typed_config()->PackFrom(router_config);
+            break;
+          }
+        }
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -168,7 +168,6 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   Response response{};
   response.status = CheckStatus::Error;
-  response.status_code = Http::Code::Forbidden;
   response.grpc_status = status;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;

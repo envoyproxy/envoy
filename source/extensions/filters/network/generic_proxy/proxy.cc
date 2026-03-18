@@ -119,6 +119,11 @@ bool ActiveStream::spawnUpstreamSpan() const {
   return conn_manager_tracing_config_->spawnUpstreamSpan();
 }
 
+bool ActiveStream::noContextPropagation() const {
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->noContextPropagation();
+}
+
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
@@ -577,7 +582,9 @@ void ActiveStream::continueEncoding() {
 }
 
 bool ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
-  factory.createFilterChain(*this);
+  FilterChainFactoryCallbacksHelper callbacks(*this);
+
+  factory.createFilterChain(callbacks);
   // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
   // chain.
   std::reverse(encoder_filters_.begin(), encoder_filters_.end());

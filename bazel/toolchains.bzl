@@ -1,4 +1,4 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
@@ -14,8 +14,13 @@ def envoy_toolchains():
     llvm_toolchain(
         name = "llvm_toolchain",
         llvm_version = "18.1.8",
+        # These libs are only included for cross-compile targets
+        cxx_lib = {
+            "linux-aarch64": "@libcxx_libs_aarch64",
+            "linux-x86_64": "@libcxx_libs_x86_64",
+        },
         cxx_standard = {"": "c++20"},
-        sysroot = {
+        sysroot = {} if USE_LOCAL_SYSROOT else {
             "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
             "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
         },

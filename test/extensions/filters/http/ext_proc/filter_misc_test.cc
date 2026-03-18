@@ -33,12 +33,10 @@ using ::envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using ::envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using ::envoy::service::ext_proc::v3::ProcessingResponse;
 
-using ::Envoy::Http::FilterChainFactoryCallbacks;
 using ::Envoy::Http::FilterDataStatus;
 using ::Envoy::Http::FilterFactoryCb;
 using ::Envoy::Http::FilterHeadersStatus;
 using ::Envoy::Http::FilterTrailersStatus;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::MockStreamDecoderFilter;
 using ::Envoy::Http::MockStreamEncoderFilter;
 using ::Envoy::Http::RequestHeaderMap;
@@ -262,18 +260,13 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
 
   std::shared_ptr<MockStreamDecoderFilter> mock_filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](::Envoy::Http::FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         // Add ext_proc filter.
-        FilterFactoryCb cb = [&](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamDecoderFilter(filter_);
-        };
-        manager.applyFilterFactoryCb({}, cb);
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamDecoderFilter(filter_);
         // Add the mock-decoder filter.
-        FilterFactoryCb mock_filter_cb = [&](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamDecoderFilter(mock_filter);
-        };
-        manager.applyFilterFactoryCb({}, mock_filter_cb);
-
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamDecoderFilter(mock_filter);
         return true;
       }));
   EXPECT_CALL(*mock_filter, decodeHeaders(_, false))
@@ -382,23 +375,17 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         return FilterDataStatus::Continue;
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](::Envoy::Http::FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         // Add the mock-encoder filter.
-        FilterFactoryCb mock_encode_filter_cb = [&](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamEncoderFilter(mock_encode_filter);
-        };
-        manager.applyFilterFactoryCb({}, mock_encode_filter_cb);
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamEncoderFilter(mock_encode_filter);
 
         // Add ext_proc filter.
-        FilterFactoryCb cb = [&](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamFilter(filter_);
-        };
-        manager.applyFilterFactoryCb({}, cb);
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamFilter(filter_);
         // Add the mock-decoder filter.
-        FilterFactoryCb mock_decode_filter_cb = [&](FilterChainFactoryCallbacks& callbacks) {
-          callbacks.addStreamDecoderFilter(mock_decode_filter);
-        };
-        manager.applyFilterFactoryCb({}, mock_decode_filter_cb);
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamDecoderFilter(mock_decode_filter);
 
         return true;
       }));

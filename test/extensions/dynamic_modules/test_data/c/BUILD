@@ -3,11 +3,31 @@ load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_progra
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
+    "//test/extensions/access_loggers/dynamic_modules:__pkg__",
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
+    "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
+    "//test/extensions/dynamic_modules/listener:__pkg__",
+    "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
+    "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
+
+test_program(name = "no_op_no_optional_abi")
+
+test_program(name = "network_no_op")
+
+test_program(name = "network_config_new_fail")
+
+test_program(name = "network_filter_new_fail")
+
+test_program(name = "network_stop_iteration")
 
 test_program(name = "no_program_init")
 
@@ -48,3 +68,137 @@ test_program(name = "no_http_filter_response_trailers")
 test_program(name = "program_global")
 
 test_program(name = "program_child")
+
+test_program(name = "listener_no_op")
+
+test_program(name = "listener_config_new_fail")
+
+test_program(name = "listener_filter_new_fail")
+
+test_program(name = "listener_stop_iteration")
+
+test_program(name = "udp_no_op")
+
+test_program(name = "udp_stop_iteration")
+
+test_program(name = "udp_no_config_destroy")
+
+test_program(name = "udp_no_filter_new")
+
+test_program(name = "udp_no_on_data")
+
+test_program(name = "udp_no_filter_destroy")
+
+test_program(name = "bootstrap_no_op")
+
+test_program(name = "bootstrap_no_config_new")
+
+test_program(name = "bootstrap_no_constructor")
+
+test_program(name = "bootstrap_no_config_destroy")
+
+test_program(name = "bootstrap_no_extension_new")
+
+test_program(name = "bootstrap_no_server_initialized")
+
+test_program(name = "bootstrap_no_worker_initialized")
+
+test_program(name = "bootstrap_no_extension_destroy")
+
+test_program(name = "bootstrap_extension_new_null")
+
+test_program(name = "bootstrap_no_drain_started")
+
+test_program(name = "bootstrap_no_shutdown")
+
+test_program(name = "bootstrap_no_config_scheduled")
+
+test_program(name = "bootstrap_no_http_callout_done")
+
+test_program(name = "bootstrap_no_timer_fired")
+
+test_program(name = "bootstrap_no_admin_request")
+
+test_program(name = "bootstrap_no_cluster_add_or_update")
+
+test_program(name = "bootstrap_no_cluster_removal")
+
+test_program(name = "bootstrap_no_listener_add_or_update")
+
+test_program(name = "bootstrap_no_listener_removal")
+
+test_program(name = "access_log_no_op")
+
+test_program(name = "access_log_missing_config_new")
+
+test_program(name = "access_log_missing_config_destroy")
+
+test_program(name = "access_log_missing_logger_new")
+
+test_program(name = "access_log_missing_logger_log")
+
+test_program(name = "access_log_missing_logger_destroy")
+
+test_program(name = "access_log_config_new_fail")
+
+test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_config_new_fail")
+
+test_program(name = "cluster_new_fail")
+
+test_program(name = "lb_round_robin")
+
+test_program(name = "lb_config_new_fail")
+
+test_program(name = "lb_callbacks_test")
+
+test_program(name = "lb_new_fail")
+
+test_program(name = "lb_no_choose_host")
+
+test_program(name = "lb_invalid_host_index")
+
+test_program(name = "lb_invalid_priority")
+
+test_program(name = "matcher_no_op")
+
+test_program(name = "matcher_config_new_fail")
+
+test_program(name = "matcher_missing_config_new")
+
+test_program(name = "matcher_missing_match")
+
+test_program(name = "matcher_missing_config_destroy")
+
+test_program(name = "matcher_check_headers")
+
+test_program(name = "cert_validator_no_op")
+
+test_program(name = "cert_validator_fail")
+
+test_program(name = "cert_validator_config_new_fail")
+
+test_program(name = "cert_validator_no_client_cert")
+
+test_program(name = "cert_validator_not_validated")
+
+test_program(name = "cert_validator_empty_digest")
+
+test_program(name = "cert_validator_filter_state")
+
+test_program(name = "upstream_bridge_no_op")
+
+test_program(name = "upstream_bridge_config_new_fail")
+
+test_program(name = "upstream_bridge_new_fail")
+
+test_program(name = "upstream_bridge_stop_and_buffer")
+
+test_program(name = "upstream_bridge_end_stream")
+
+test_program(name = "upstream_bridge_abi_edge_cases")
+
+test_program(name = "upstream_bridge_headers_end_stream")
+
+test_program(name = "upstream_bridge_headers_end_stream_no_body")

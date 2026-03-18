@@ -8244,6 +8244,73 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
+// Test that responseContentType() returns the correct content type based on body_format config.
+TEST_F(RouteConfigurationV2, DirectResponseBodyFormatContentType) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/html" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+            content_type: "text/html"
+      - match: { prefix: "/json" }
+        direct_response:
+          status: 200
+          body_format:
+            json_format:
+              key: "value"
+      - match: { prefix: "/text" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+      - match: { prefix: "/nobody" }
+        direct_response:
+          status: 200
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // Explicit content_type in body_format should be returned.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/html", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("text/html", direct_response->responseContentType());
+  }
+
+  // json_format without explicit content_type should return "application/json".
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/json", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("application/json", direct_response->responseContentType());
+  }
+
+  // text_format without explicit content_type should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/text", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+
+  // No body_format at all should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/nobody", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+}
+
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -9506,6 +9573,106 @@ virtual_hosts:
     headers.addCopy("cookies", "");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST_F(RouteMatcherTest, CookieMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: foo
+            - name: build
+              string_match:
+                prefix: "1"
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=123");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=999");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=bar; build=123");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST_F(RouteMatcherTest, CookieMatchInvert) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie-invert
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: blocked
+              string_match:
+                exact: nope
+              invert_match: true
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=nope");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=maybe");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 

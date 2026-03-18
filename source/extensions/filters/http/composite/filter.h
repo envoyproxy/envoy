@@ -52,12 +52,49 @@ private:
   absl::flat_hash_map<std::string, std::string> actions_;
 };
 
+// A wrapper that chains multiple filters together and delegates calls to each in sequence.
+// For decoding, filters are called in order from first to last.
+// For encoding, filters are called in reverse order from last to first.
+class DelegatedFilterChain : public Http::StreamFilter {
+public:
+  explicit DelegatedFilterChain(std::vector<Http::StreamFilterSharedPtr> filters)
+      : filters_(std::move(filters)) {}
+
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  void decodeComplete() override;
+
+  // Http::StreamEncoderFilter
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
+  void encodeComplete() override;
+
+  // Http::StreamFilterBase
+  void onDestroy() override;
+  void onStreamComplete() override;
+
+private:
+  std::vector<Http::StreamFilterSharedPtr> filters_;
+};
+
 class Filter : public Http::StreamFilter,
                public AccessLog::Instance,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream)
-      : dispatcher_(dispatcher), stats_(stats), is_upstream_(is_upstream) {}
+  Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream,
+         NamedFilterChainFactoryMapSharedPtr named_filter_chains = nullptr)
+      : dispatcher_(dispatcher), stats_(stats), is_upstream_(is_upstream),
+        named_filter_chains_(std::move(named_filter_chains)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -162,6 +199,8 @@ private:
   FilterStats& stats_;
   // Filter in the upstream filter chain.
   bool is_upstream_;
+  // Named filter chains compiled at config time.
+  NamedFilterChainFactoryMapSharedPtr named_filter_chains_;
 };
 
 } // namespace Composite

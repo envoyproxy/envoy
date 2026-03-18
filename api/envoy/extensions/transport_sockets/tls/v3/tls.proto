@@ -77,11 +77,12 @@ message UpstreamTlsContext {
   // the ``keyUsage`` is incompatible with TLS usage.
   //
   // .. note::
-  //   The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future release.
+  //   The default value is ``true`` (i.e., enforcement on).
   //
   // The ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` metric will be incremented
   // for configurations that would fail if this option were enabled.
-  google.protobuf.BoolValue enforce_rsa_key_usage = 5;
+  google.protobuf.BoolValue enforce_rsa_key_usage = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // [#next-free-field: 12]
@@ -297,10 +298,13 @@ message CommonTlsContext {
 
   // Custom TLS certificate selector.
   //
-  // Select TLS certificate based on TLS client hello.
-  // If empty, defaults to native TLS certificate selection behavior:
-  // DNS SANs or Subject Common Name in TLS certificates is extracted as server name pattern to match SNI.
-  // [#extension-category: envoy.tls.certificate_selectors]
+  // For the downstream TLS socket, select a TLS certificate based on TLS client hello. If empty,
+  // defaults to native TLS certificate selection behavior: DNS SANs or Subject Common Name in TLS
+  // certificates is extracted as server name pattern to match SNI.
+  //
+  // For the upstream TLS socket, select a TLS certificate based on TLS server hello and the
+  // transport socket options.
+  // [#extension-category: envoy.tls.certificate_selectors,envoy.tls.upstream_certificate_selectors]
   config.core.v3.TypedExtensionConfig custom_tls_certificate_selector = 16;
 
   // Certificate provider for fetching TLS certificates.

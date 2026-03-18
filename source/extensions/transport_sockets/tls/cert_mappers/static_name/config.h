@@ -15,6 +15,9 @@ namespace StaticName {
 
 using StaticNameConfigProto =
     envoy::extensions::transport_sockets::tls::cert_mappers::static_name::v3::StaticName;
+
+constexpr absl::string_view StaticNameExtension = "envoy.tls.certificate_mappers.static_name";
+
 class StaticNameMapperFactory : public Ssl::TlsCertificateMapperConfigFactory {
 public:
   absl::StatusOr<Ssl::TlsCertificateMapperFactory> createTlsCertificateMapperFactory(
@@ -25,10 +28,25 @@ public:
     return std::make_unique<StaticNameConfigProto>();
   }
 
-  std::string name() const override { return "envoy.tls.certificate_mappers.static_name"; }
+  std::string name() const override { return std::string(StaticNameExtension); }
 };
 
 DECLARE_FACTORY(StaticNameMapperFactory);
+
+class UpstreamStaticNameMapperFactory : public Ssl::UpstreamTlsCertificateMapperConfigFactory {
+public:
+  absl::StatusOr<Ssl::UpstreamTlsCertificateMapperFactory> createTlsCertificateMapperFactory(
+      const Protobuf::Message& proto_config,
+      Server::Configuration::GenericFactoryContext& factory_context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<StaticNameConfigProto>();
+  }
+
+  std::string name() const override { return std::string(StaticNameExtension); }
+};
+
+DECLARE_FACTORY(UpstreamStaticNameMapperFactory);
 
 } // namespace StaticName
 } // namespace CertificateMappers

@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/open_telemetry:config",
+        "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
@@ -36,6 +37,18 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "open_telemetry_http_impl_test",
+    srcs = ["open_telemetry_http_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

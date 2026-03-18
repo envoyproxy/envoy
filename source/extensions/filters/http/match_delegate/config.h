@@ -101,6 +101,52 @@ private:
   Envoy::Http::StreamFilterBase* base_filter_{};
 };
 
+struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallbacks {
+  DelegatingFactoryCallbacks(Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks,
+                             Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
+      : delegated_callbacks_(delegated_callbacks), match_tree_(match_tree) {}
+
+  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
+  void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
+    auto delegating_filter =
+        std::make_shared<DelegatingStreamFilter>(match_tree_, std::move(filter), nullptr);
+    delegated_callbacks_.addStreamDecoderFilter(std::move(delegating_filter));
+  }
+  void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter) override {
+    auto delegating_filter =
+        std::make_shared<DelegatingStreamFilter>(match_tree_, nullptr, std::move(filter));
+    delegated_callbacks_.addStreamEncoderFilter(std::move(delegating_filter));
+  }
+  void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter) override {
+    auto delegating_filter = std::make_shared<DelegatingStreamFilter>(match_tree_, filter, filter);
+    delegated_callbacks_.addStreamFilter(std::move(delegating_filter));
+  }
+
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
+    delegated_callbacks_.addAccessLogHandler(std::move(handler));
+  }
+
+  absl::string_view filterConfigName() const override {
+    return delegated_callbacks_.filterConfigName();
+  }
+  void setFilterConfigName(absl::string_view name) override {
+    return delegated_callbacks_.setFilterConfigName(name);
+  }
+  OptRef<const Router::Route> route() const override { return delegated_callbacks_.route(); }
+  absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+    return delegated_callbacks_.filterDisabled(config_name);
+  }
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return delegated_callbacks_.streamInfo();
+  }
+  Envoy::Http::RequestHeaderMapOptRef requestHeaders() const override {
+    return delegated_callbacks_.requestHeaders();
+  }
+
+  Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
+};
+
 class MatchDelegateConfig
     : public Extensions::HttpFilters::Common::CommonFactoryBase<
           envoy::extensions::common::matching::v3::ExtensionWithMatcher,

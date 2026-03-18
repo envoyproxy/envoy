@@ -7,14 +7,14 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger_clients.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
-
-const char GRPC_LOG_STATS_PREFIX[] = "access_logs.open_telemetry_access_log.";
 
 namespace Envoy {
 namespace Extensions {
@@ -24,15 +24,6 @@ namespace OpenTelemetry {
 namespace {
 using opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
 using opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse;
-
-opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,
-                                                             const std::string& value) {
-  opentelemetry::proto::common::v1::KeyValue keyValue;
-  keyValue.set_key(key);
-  keyValue.mutable_value()->set_string_value(value);
-  return keyValue;
-}
-
 } // namespace
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
@@ -48,9 +39,9 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                   "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
               GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
-      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(GRPC_LOG_STATS_PREFIX, config.stat_prefix())))}) {
-  initMessageRoot(config, local_info);
+      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(
+          scope, absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
+  root_ = initOtlpMessageRoot(message_, config, local_info);
 }
 
 std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks&()>
@@ -68,26 +59,6 @@ GrpcAccessLoggerImpl::genOTelCallbacksFactory() {
     return *ptr;
   };
 }
-// See comment about the structure of repeated fields in the header file.
-void GrpcAccessLoggerImpl::initMessageRoot(
-    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
-        config,
-    const LocalInfo::LocalInfo& local_info) {
-  auto* resource_logs = message_.add_resource_logs();
-  root_ = resource_logs->add_scope_logs();
-  auto* resource = resource_logs->mutable_resource();
-  if (!config.disable_builtin_labels()) {
-    *resource->add_attributes() = getStringKeyValue("log_name", config.common_config().log_name());
-    *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
-    *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
-    *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
-  }
-
-  for (const auto& pair : config.resource_attributes().values()) {
-    *resource->add_attributes() = pair;
-  }
-}
-
 void GrpcAccessLoggerImpl::addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) {
   batched_log_entries_++;
   root_->mutable_log_records()->Add(std::move(entry));
@@ -114,8 +85,8 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
   // the main thread if necessary to ensure it does not throw here.
-  auto factory_or_error = async_client_manager_.factoryForGrpcService(
-      config.common_config().grpc_service(), scope_, true);
+  auto factory_or_error =
+      async_client_manager_.factoryForGrpcService(getGrpcService(config), scope_, true);
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto client = THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
                                       Grpc::RawAsyncClientPtr);

@@ -50,7 +50,7 @@ private:
         int32_t new_trace_cnt,
         const envoy::data::tap::v3::SocketStreamedTraceSegment& src_streamed_trace,
         bool is_read_event, size_t copy_offset, size_t copy_total_bytes,
-        envoy::config::tap::v3::OutputSink::Format format);
+        envoy::config::tap::v3::OutputSink::Format format, int64_t& seq_num);
     void handleSocketStreamedTrace(TapCommon::TraceWrapperPtr&& trace,
                                    envoy::config::tap::v3::OutputSink::Format format);
     size_t getEventBodysize(const envoy::data::tap::v3::SocketEvent& event,

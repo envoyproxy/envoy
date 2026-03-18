@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/http/async_client.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,6 +39,7 @@ public:
                                        AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
+  virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
@@ -71,6 +73,9 @@ public:
                                const std::string& secret, AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
@@ -83,6 +88,7 @@ private:
   friend class OAuth2ClientTest;
 
   FilterCallbacks* parent_{nullptr};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 
   Upstream::ClusterManager& cm_;
   const HttpUri uri_;

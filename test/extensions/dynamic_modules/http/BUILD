@@ -9,6 +9,31 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/http/dynamic_modules:factory_lib",
+        "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -27,6 +52,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_trailers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_stream_complete",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
     rbe_pool = "6gig",
@@ -42,14 +68,27 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:http",
+        "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
+    env = {
+        "GODEBUG": "cgocheck=0",
+    },
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//envoy/registry",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -64,15 +103,28 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+    ],
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
 )
 
@@ -80,11 +132,27 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/go:http",
+        "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
+    env = {
+        "GODEBUG": "cgocheck=0",
+    },
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
+        "//test/extensions/dynamic_modules:util",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test_static",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],

@@ -439,6 +439,7 @@ TEST_F(EdsTest, DualStackEndpoint) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
@@ -459,12 +460,46 @@ TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
   initialize();
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     (void)eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
     FAIL() << "Invalid address was not rejected";
   } catch (const EnvoyException& e) {
     EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
   }
+}
+
+TEST_F(EdsTest, AllowNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  // Add dual stack endpoint
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("::1");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()
+      ->mutable_additional_addresses()
+      ->Add()
+      ->mutable_address()
+      ->mutable_envoy_internal_address()
+      ->set_server_listener_name("internal_address");
+
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+
+  initialize();
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "true"}});
+  (void)eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+
+  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[0]->asString(), "[::1]:80");
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[1]->asString(), "envoy://internal_address/");
 }
 
 // Verify that failure to initialize the base class results in an error not a crash.
@@ -2957,15 +2992,69 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
+class EdsWithLedsTest : public EdsTest {
+public:
+  EdsWithLedsTest() {
+    ON_CALL(server_context_.cluster_manager_.subscription_factory_,
+            collectionSubscriptionFromUrl(_, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](const xds::core::v3::ResourceLocator&,
+                   const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Envoy::Config::SubscriptionCallbacks& callbacks,
+                   Envoy::Config::OpaqueResourceDecoderSharedPtr) -> Config::SubscriptionPtr {
+              auto ret = std::make_unique<NiceMock<Config::MockSubscription>>();
+              leds_callbacks_ = &callbacks;
+              return ret;
+            }));
+  }
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  makeLedsClusterLoadAssignment(const std::string& cluster_name) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(cluster_name);
+    auto* endpoints = cla.add_endpoints();
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region("us-east-1");
+    locality->set_zone("us-east-1a");
+    auto* leds_conf = endpoints->mutable_leds_cluster_locality_config();
+    leds_conf->set_leds_collection_name(
+        "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/*");
+    auto* leds_config_source = leds_conf->mutable_leds_config()->mutable_api_config_source();
+    leds_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    leds_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+    return cla;
+  }
+
+  Config::SubscriptionCallbacks* leds_callbacks_{};
+};
+
+// Regression test: a LEDS callback firing after a subsequent EDS update must
+// not dereference the stale cluster_load_assignment_ pointer.
+TEST_F(EdsWithLedsTest, LedsCallbackAfterSubsequentEdsUpdateNoCrash) {
+  initialize();
+
+  auto cla = makeLedsClusterLoadAssignment("fare");
+
+  // First EDS update creates the LEDS subscription (not yet updated).
+  doOnConfigUpdateVerifyNoThrow(cla);
+  ASSERT_NE(nullptr, leds_callbacks_);
+
+  // Second EDS update destroys the old cluster_load_assignment_ but keeps
+  // the existing LEDS subscription.
+  doOnConfigUpdateVerifyNoThrow(cla);
+
+  // LEDS failure triggers the callback; would segfault on the dangling pointer
+  // without the fix.
+  leds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                        nullptr);
+
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
 class EdsCachedAssignmentTest : public testing::Test {
 public:
-  EdsCachedAssignmentTest() {
-    // TODO(adisuissa): setting the runtime guard is done because the runtime
-    // guard is false by default. The runtime environment should be removed
-    // once this guard is removed.
-    runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "true"}});
-    resetCluster();
-  }
+  EdsCachedAssignmentTest() { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -3165,53 +3254,6 @@ TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailure) {
   }
   // Removing the cluster on test d'tor will trigger removeCallback.
   EXPECT_CALL(eds_resources_cache_, removeCallback("fare", _));
-}
-
-// Validates that no cached assignments are used if no EDS update for a cluster arrives.
-// This test should be deleted once the enable_eds_cache runtime flag is removed.
-TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailureNoCache) {
-  // TODO(adisuissa): this test should be removed once the runtime guard is deprecated.
-  runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "false"}});
-  // Set an initial assignment.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-  auto* endpoints = cluster_load_assignment.add_endpoints();
-  auto* endpoint = endpoints->add_lb_endpoints();
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
-  endpoint->mutable_load_balancing_weight()->set_value(10);
-
-  // Store in the cache an assignment with a different weight.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cached_cluster_load_assignment;
-  cached_cluster_load_assignment.CopyFrom(cluster_load_assignment);
-  cached_cluster_load_assignment.mutable_endpoints(0)
-      ->mutable_lb_endpoints(0)
-      ->mutable_load_balancing_weight()
-      ->set_value(22);
-
-  initialize();
-  // No call to the cache to fetch the assignment, as it is being delivered as expected.
-  EXPECT_CALL(eds_resources_cache_, getResource("fare", _)).Times(0);
-  EXPECT_CALL(*interval_timer_pre_, enabled());
-  doOnConfigUpdateVerifyNoThrowPre(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-  {
-    const auto& hosts = cluster_pre_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 1);
-    EXPECT_EQ(hosts[0]->weight(), 10);
-  }
-
-  // Update the cluster and emulate a warming failure, and validate
-  // that the resource is not fetched from the cache because caching is disabled.
-  updateCluster();
-  {
-    EnvoyException dummy_ex("dummy exception");
-    EXPECT_CALL(eds_resources_cache_, getResource("fare", _)).Times(0);
-    eds_callbacks_post_->onConfigUpdateFailed(
-        Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, &dummy_ex);
-    const auto& hosts = cluster_post_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 0);
-  }
 }
 
 // Validates that after using a cached assignment, and receiving an update for it, the

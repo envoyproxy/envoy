@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/lua/lua.h"
@@ -317,26 +318,30 @@ private:
 
 /**
  * Lua wrapper for Network::Connection.
+ *
+ * TODO(dio): Remove the ssl() method once the deprecation period has passed.
+ * Users should migrate to streamInfo():downstreamSslConnection() instead.
  */
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
-  ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  ConnectionWrapper(const StreamInfo::StreamInfo& stream_info) : stream_info_{stream_info} {}
 
-  // TODO(dio): Remove this in favor of StreamInfo::downstreamSslConnection wrapper since ssl() in
-  // envoy/network/connection.h is subject to removal.
   static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
 
 private:
   /**
-   * Get the Ssl::Connection wrapper
+   * Get the Ssl::Connection wrapper.
    * @return object if secured and nil if not.
+   *
+   * @note DEPRECATED: Use streamInfo():downstreamSslConnection() instead.
+   *       This method will be removed in a future release.
    */
   DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSsl);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { ssl_connection_wrapper_.reset(); }
 
-  const Network::Connection* connection_;
+  const StreamInfo::StreamInfo& stream_info_;
   LuaDeathRef<SslConnectionWrapper> ssl_connection_wrapper_;
 };
 

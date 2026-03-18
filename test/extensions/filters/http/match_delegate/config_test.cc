@@ -785,6 +785,32 @@ TEST(DelegatingFilterTest, MatchTreeFilterActionEncodingTrailers) {
   delegating_filter->decodeComplete();
 }
 
+TEST(DelegatingFactoryCallbacks, DelegatingFactoryCallbacksTest) {
+  NiceMock<Envoy::Http::MockFilterChainFactoryCallbacks> factory_callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(factory_callbacks, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  ON_CALL(factory_callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
+
+  auto decoder_filter = std::make_shared<Envoy::Http::MockStreamDecoderFilter>();
+  auto encoder_filter = std::make_shared<Envoy::Http::MockStreamEncoderFilter>();
+  auto filter = std::make_shared<Envoy::Http::MockStreamFilter>();
+
+  DelegatingFactoryCallbacks delegating_factory_callbacks(factory_callbacks, nullptr);
+
+  delegating_factory_callbacks.dispatcher();
+  delegating_factory_callbacks.addStreamDecoderFilter(decoder_filter);
+  delegating_factory_callbacks.addStreamEncoderFilter(encoder_filter);
+  delegating_factory_callbacks.addStreamFilter(filter);
+  delegating_factory_callbacks.addAccessLogHandler(nullptr);
+
+  delegating_factory_callbacks.filterConfigName();
+  delegating_factory_callbacks.setFilterConfigName("test");
+  delegating_factory_callbacks.streamInfo();
+  delegating_factory_callbacks.requestHeaders();
+  delegating_factory_callbacks.route();
+}
+
 } // namespace
 } // namespace MatchDelegate
 } // namespace Http

@@ -7,6 +7,7 @@
 #include "test/extensions/compression/gzip/compressor_fuzz_input.pb.h"
 #include "test/extensions/compression/gzip/compressor_fuzz_input.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,6 +23,13 @@ namespace Fuzz {
 // whatever the compressor emits, as it exists only as a test utility today.
 DEFINE_PROTO_FUZZER(
     const envoy::extensions::compression::gzip::compressor::fuzz::CompressorFuzzInput& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
+
   ZlibCompressorImpl compressor;
   Stats::IsolatedStoreImpl stats_store;
   Decompressor::ZlibDecompressorImpl decompressor{*stats_store.rootScope(), "test", 4096, 100};

@@ -113,6 +113,7 @@ public:
   MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
   MOCK_METHOD(float, peekaheadRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return http_protocol_options_config_;
@@ -159,13 +160,12 @@ public:
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
 
-  MOCK_METHOD(bool, createFilterChain,
-              (Http::FilterChainManager & manager, const Http::FilterChainOptions& options),
+  MOCK_METHOD(bool, createFilterChain, (Http::FilterChainFactoryCallbacks & callbacks),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
+               Http::FilterChainFactoryCallbacks& callbacks),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
   MOCK_METHOD(

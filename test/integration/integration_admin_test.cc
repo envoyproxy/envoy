@@ -17,6 +17,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
+#include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -461,6 +462,39 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("OK\n", response->body());
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
+// Test Prometheus protobuf format with content negotiation via Accept header, and
+// correct response content type.
+TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("admin"));
+
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":method", "GET"},
+      {":path", "/stats/prometheus"},
+      {":authority", "admin"},
+      {":scheme", "http"},
+      {"accept",
+       "application/"
+       "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.6"},
+  };
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ("application/vnd.google.protobuf; "
+            "proto=io.prometheus.client.MetricFamily; encoding=delimited",
+            response->headers().getContentTypeValue());
+
+  // Validate that it is well-formed protobuf output.
+  auto families = parsePrometheusProtobuf(response->body());
+  EXPECT_GT(families.size(), 0);
+
+  codec_client_->close();
 }
 
 // Validates that the "inboundonly" drains inbound listeners.

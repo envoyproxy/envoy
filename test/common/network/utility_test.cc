@@ -4,8 +4,8 @@
 #include <net/if.h>
 
 #else
-#include <winsock2.h>
 #include <iphlpapi.h>
+#include <winsock2.h>
 #endif
 
 #include <cstdint>
@@ -250,6 +250,49 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[1::1]:65535",
             Utility::parseInternetAddressAndPortNoThrow("[1::1]:65535")->asString());
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPortNoThrow("[::1]:0")->asString());
+}
+
+TEST(NetworkUtility, GetAddressWithPort) {
+  // Test basic IPv4.
+  auto addr_v4 = std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80);
+  auto addr_v4_new_port = Utility::getAddressWithPort(*addr_v4, 8080);
+  EXPECT_EQ("1.2.3.4:8080", addr_v4_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v4, addr_v4_new_port->ip()->version());
+
+  // Test basic IPv6.
+  auto addr_v6 = std::make_shared<Address::Ipv6Instance>("::1", 80);
+  auto addr_v6_new_port = Utility::getAddressWithPort(*addr_v6, 8080);
+  EXPECT_EQ("[::1]:8080", addr_v6_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v6, addr_v6_new_port->ip()->version());
+
+  // Test IPv6 with scope ID.
+  sockaddr_in6 scoped_addr;
+  memset(&scoped_addr, 0, sizeof(scoped_addr));
+  scoped_addr.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "fe80::1", &scoped_addr.sin6_addr));
+  scoped_addr.sin6_port = htons(80);
+  scoped_addr.sin6_scope_id = 5;
+
+  auto addr_v6_scoped = std::make_shared<Address::Ipv6Instance>(scoped_addr);
+  EXPECT_EQ("[fe80::1%5]:80", addr_v6_scoped->asString());
+  EXPECT_EQ(5u, addr_v6_scoped->ip()->ipv6()->scopeId());
+
+  auto addr_v6_scoped_new_port = Utility::getAddressWithPort(*addr_v6_scoped, 8080);
+  EXPECT_EQ("[fe80::1%5]:8080", addr_v6_scoped_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v6, addr_v6_scoped_new_port->ip()->version());
+  EXPECT_EQ(5u, addr_v6_scoped_new_port->ip()->ipv6()->scopeId());
+  EXPECT_EQ(8080u, addr_v6_scoped_new_port->ip()->port());
+
+  // Verify v6only is preserved.
+  sockaddr_in6 v6only_addr;
+  memset(&v6only_addr, 0, sizeof(v6only_addr));
+  v6only_addr.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "::1", &v6only_addr.sin6_addr));
+  v6only_addr.sin6_port = htons(80);
+  auto addr_v6only_false = std::make_shared<Address::Ipv6Instance>(v6only_addr, false);
+  EXPECT_FALSE(addr_v6only_false->ip()->ipv6()->v6only());
+  auto addr_v6only_false_new_port = Utility::getAddressWithPort(*addr_v6only_false, 8080);
+  EXPECT_FALSE(addr_v6only_false_new_port->ip()->ipv6()->v6only());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
@@ -558,6 +601,15 @@ TEST(NetworkUtility, ParseProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
+    proto_address.mutable_socket_address()->set_address("::1");
+    proto_address.mutable_socket_address()->set_port_value(1234);
+    proto_address.mutable_socket_address()->set_network_namespace_filepath("/proc/test-ns/ns/net");
+    EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
+    EXPECT_EQ("/proc/test-ns/ns/net",
+              Utility::protobufAddressToAddressNoThrow(proto_address)->networkNamespace().value());
+  }
+  {
+    envoy::config::core::v3::Address proto_address;
     proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
     EXPECT_EQ("/tmp/unix-socket",
               Utility::protobufAddressToAddressNoThrow(proto_address)->asString());
@@ -602,6 +654,15 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
     EXPECT_TRUE(proto_address.has_envoy_internal_address());
     EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
     EXPECT_EQ("endpoint_id", proto_address.envoy_internal_address().endpoint_id());
+  }
+  {
+    envoy::config::core::v3::Address proto_address;
+    Address::Ipv6Instance address("::1", 1234, nullptr, true, "/proc/1234/ns/net");
+    Utility::addressToProtobufAddress(address, proto_address);
+    EXPECT_TRUE(proto_address.has_socket_address());
+    EXPECT_EQ("::1", proto_address.socket_address().address());
+    EXPECT_EQ(1234, proto_address.socket_address().port_value());
+    EXPECT_EQ("/proc/1234/ns/net", proto_address.socket_address().network_namespace_filepath());
   }
 }
 
@@ -688,7 +749,7 @@ TEST(ResolvedUdpSocketConfig, Warning) {
       ResolvedUdpSocketConfig resolved_config(envoy::config::core::v3::UdpSocketConfig(), true));
 }
 
-#ifndef WIN32
+#if defined(__linux__)
 TEST(PacketLoss, LossTest) {
   class ZeroTimeSource : public TimeSource {
   public:

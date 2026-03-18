@@ -57,7 +57,7 @@ done
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
 sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
 
-retry ./bazelw version
+retry bazel version
 
 # Unset default variables so we don't have to install Android SDK/NDK.
 unset ANDROID_HOME

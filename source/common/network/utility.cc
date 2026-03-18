@@ -316,10 +316,18 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {
-  case Address::IpVersion::v4:
-    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
-  case Address::IpVersion::v6:
-    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+  case Address::IpVersion::v4: {
+    // Copy the sockaddr and update the port to preserve all address properties.
+    sockaddr_in addr = *reinterpret_cast<const sockaddr_in*>(address.sockAddr());
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv4Instance>(&addr);
+  }
+  case Address::IpVersion::v6: {
+    // Copy the sockaddr and update the port to preserve all address properties including scope ID.
+    sockaddr_in6 addr = *reinterpret_cast<const sockaddr_in6*>(address.sockAddr());
+    addr.sin6_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv6Instance>(addr, address.ip()->ipv6()->v6only());
+  }
   }
   PANIC("not handled");
 }
@@ -409,9 +417,10 @@ Address::InstanceConstSharedPtr
 Utility::protobufAddressToAddressNoThrow(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
-    return Utility::parseInternetAddressNoThrow(proto_address.socket_address().address(),
-                                                proto_address.socket_address().port_value(),
-                                                !proto_address.socket_address().ipv4_compat());
+    return Utility::parseInternetAddressNoThrow(
+        proto_address.socket_address().address(), proto_address.socket_address().port_value(),
+        !proto_address.socket_address().ipv4_compat(),
+        proto_address.socket_address().network_namespace_filepath());
   case envoy::config::core::v3::Address::AddressCase::kPipe: {
     auto ret_or_error =
         Address::PipeInstance::create(proto_address.pipe().path(), proto_address.pipe().mode());
@@ -438,6 +447,9 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+    if (address.networkNamespace().has_value()) {
+      socket_address->set_network_namespace_filepath(address.networkNamespace().value());
+    }
   } else {
     ASSERT(address.type() == Address::Type::EnvoyInternal);
     auto* internal_address = proto_address.mutable_envoy_internal_address();

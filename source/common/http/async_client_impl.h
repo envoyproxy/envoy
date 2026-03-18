@@ -245,10 +245,10 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
 
-  void setDecoderBufferLimit(uint64_t) override {
+  void setBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
-  uint64_t decoderBufferLimit() override {
+  uint64_t bufferLimit() override {
     if (new_async_client_retry_logic_) {
       return buffer_limit_.value_or(kDefaultDecoderBufferLimit);
     } else {
@@ -412,7 +412,7 @@ private:
     // and do not need to buffer again.
   }
   const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
-  uint64_t decoderBufferLimit() override {
+  uint64_t bufferLimit() override {
     if (new_async_client_retry_logic_) {
       // 0 means no limit because the whole body is already buffered in request message.
       return 0;

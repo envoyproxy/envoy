@@ -26,9 +26,15 @@ envoy_cc_test(
     srcs = ["logical_host_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/clusters/common:logical_host_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
     ],
 )
 

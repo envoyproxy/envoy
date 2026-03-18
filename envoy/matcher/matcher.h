@@ -4,13 +4,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "source/common/common/non_copyable.h"
+
 #include "absl/container/flat_hash_set.h"
+#include "absl/functional/overload.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
@@ -32,9 +36,6 @@ class CustomMatchData {
 public:
   virtual ~CustomMatchData() = default;
 };
-
-using MatchingDataType =
-    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
 
 inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
@@ -67,6 +68,32 @@ template <class DataType> class MatchTree;
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 template <class DataType> using MatchTreePtr = std::unique_ptr<MatchTree<DataType>>;
 template <class DataType> using MatchTreeFactoryCb = std::function<MatchTreePtr<DataType>()>;
+
+/**
+ * The result of a match.
+ */
+enum class MatchResult {
+  // The match comparison was completed, and there was no match.
+  NoMatch,
+  // The match comparison was completed, and there was a match.
+  Matched,
+  // The match could not be completed, e.g. due to the required data
+  // not being available.
+  InsufficientData,
+};
+
+// Prints a human-readable string representing the MatchResult.
+inline static std::string MatchResultToString(MatchResult match_result) {
+  switch (match_result) {
+  case MatchResult::Matched:
+    return "match";
+  case MatchResult::NoMatch:
+    return "no match";
+  case MatchResult::InsufficientData:
+    return "insufficient data";
+  }
+  return "invalid enum value";
+}
 
 /**
  * Action provides the interface for actions to perform when a match occurs. It provides no
@@ -124,16 +151,21 @@ public:
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
-// The result of a match. There are three possible results:
+// The result of a match. Use of ActionMatchResult over MatchResult indicates there is a configured
+// action associated with the match. This is used to inject configuration into the matcher. In cases
+// where there is no associated configuration (such as sub-matchers configured as part of a match
+// tree), use MatchResult to convey the result without an associated action.
+//
+// There are three possible results:
 // - The match could not be completed due to lack of data (isInsufficientData() will return true.)
 // - The match was completed, no match found (isNoMatch() will return true.)
 // - The match was completed, match found (isMatch() will return true, action() will return the
 //   ActionConstSharedPtr.)
-struct MatchResult {
+struct ActionMatchResult {
 public:
-  MatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
-  static MatchResult noMatch() { return MatchResult(NoMatch{}); }
-  static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
+  ActionMatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
+  static ActionMatchResult noMatch() { return ActionMatchResult(NoMatch{}); }
+  static ActionMatchResult insufficientData() { return ActionMatchResult(InsufficientData{}); }
   bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
   bool isComplete() const { return !isInsufficientData(); }
   bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
@@ -142,7 +174,7 @@ public:
     ASSERT(isMatch());
     return absl::get<ActionConstSharedPtr>(result_);
   }
-  // Returns the action by move. The caller must ensure that the MatchResult is not used after
+  // Returns the action by move. The caller must ensure that the ActionMatchResult is not used after
   // this call.
   ActionConstSharedPtr actionByMove() {
     ASSERT(isMatch());
@@ -154,8 +186,8 @@ private:
   struct NoMatch {};
   using Result = absl::variant<ActionConstSharedPtr, NoMatch, InsufficientData>;
   Result result_;
-  MatchResult(NoMatch) : result_(NoMatch{}) {}
-  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
+  ActionMatchResult(NoMatch) : result_(NoMatch{}) {}
+  ActionMatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
 
 // Callback to execute against skipped matches' actions.
@@ -170,33 +202,33 @@ public:
 
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements).
-  // If the match couldn't be completed, MatchResult::insufficientData() will be returned.
+  // If the match couldn't be completed, ActionMatchResult::insufficientData() will be returned.
   // If a match result was determined, an action callback factory will be returned.
-  // If it was determined to be no match, MatchResult::noMatch() will be returned.
+  // If it was determined to be no match, ActionMatchResult::noMatch() will be returned.
   //
   // Implementors should call handleRecursionAndSkips() to transform OnMatch values
-  // into MatchResult values, and handle noMatch and insufficientData results as appropriate
+  // into ActionMatchResult values, and handle noMatch and insufficientData results as appropriate
   // for the specific matcher type.
-  virtual MatchResult match(const DataType& matching_data,
-                            SkippedMatchCb skipped_match_cb = nullptr) PURE;
+  virtual ActionMatchResult match(const DataType& matching_data,
+                                  SkippedMatchCb skipped_match_cb = nullptr) PURE;
 
 protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
-  static inline MatchResult
+  static inline ActionMatchResult
   handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
                           SkippedMatchCb skipped_match_cb) {
     if (!on_match.has_value()) {
-      return MatchResult::noMatch();
+      return ActionMatchResult::noMatch();
     }
     if (on_match->matcher_) {
-      MatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
+      ActionMatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
       // Parent result's keep_matching skips the nested result.
       if (on_match->keep_matching_ && nested_result.isMatch()) {
         if (skipped_match_cb) {
           skipped_match_cb(nested_result.action());
         }
-        return MatchResult::noMatch();
+        return ActionMatchResult::noMatch();
       }
       return nested_result;
     }
@@ -204,13 +236,15 @@ protected:
       if (skipped_match_cb) {
         skipped_match_cb(on_match->action_);
       }
-      return MatchResult::noMatch();
+      return ActionMatchResult::noMatch();
     }
-    return MatchResult{on_match->action_};
+    return ActionMatchResult{on_match->action_};
   }
 };
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+
+class DataInputGetResult;
 
 // InputMatcher provides the interface for determining whether an input value matches.
 class InputMatcher {
@@ -219,10 +253,10 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
+   * @param input is the input result. Will be absl::monostate() if the
    * lookup failed.
    */
-  virtual bool match(const Matcher::MatchingDataType& input) PURE;
+  virtual MatchResult match(const DataInputGetResult& input) PURE;
 
   /**
    * A set of data input types supported by InputMatcher.
@@ -232,8 +266,8 @@ public:
    *
    * Override this function to provide matcher specific supported data input types.
    */
-  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
-    return absl::flat_hash_set<std::string>{std::string(DefaultMatchingDataType)};
+  virtual bool supportsDataInputType(absl::string_view data_type) const {
+    return data_type == DefaultMatchingDataType;
   }
 };
 
@@ -252,6 +286,15 @@ public:
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
 
+enum class DataAvailability {
+  // The data is not yet available.
+  NotAvailable,
+  // Some data is available, but more might arrive.
+  MoreDataMightBeAvailable,
+  // All the data is available.
+  AllDataAvailable
+};
+
 // The result of retrieving data from a DataInput. As the data is generally made available
 // over time (e.g. as more of the stream reaches the proxy), data might become increasingly
 // available. This return type allows the DataInput to indicate this, as this might influence
@@ -260,39 +303,98 @@ public:
 // Conceptually the data availability should start at being NotAvailable, transition to
 // MoreDataMightBeAvailable (optional, this doesn't make sense for all data) and finally
 // AllDataAvailable as the data becomes available.
-struct DataInputGetResult {
-  enum class DataAvailability {
-    // The data is not yet available.
-    NotAvailable,
-    // Some data is available, but more might arrive.
-    MoreDataMightBeAvailable,
-    // All the data is available.
-    AllDataAvailable
-  };
+//
+// This is non-copyable because its lifetime has a definite upper bound by the backing
+// string data and by the matching procedure.
+class DataInputGetResult : public NonCopyable {
+public:
+  DataAvailability availability() const { return data_availability_; }
 
+  /**
+   * @return the default "string" data or nil. Life time must be bound by "this".
+   */
+  absl::optional<absl::string_view> stringData() const {
+    return absl::visit(
+        absl::Overload{
+            [](const std::string& arg) { return absl::make_optional<absl::string_view>(arg); },
+            [](const absl::string_view& arg) {
+              return absl::make_optional<absl::string_view>(arg);
+            },
+            [](const auto&) { return absl::optional<absl::string_view>(); }},
+        data_);
+  }
+
+  /**
+   * @return the default custom data of the expected type or nil. Life time must be bound by "this".
+   */
+  template <class T> OptRef<const T> customData() const {
+    return absl::visit(absl::Overload{[](const std::shared_ptr<CustomMatchData>& arg) {
+                                        const T* data = dynamic_cast<const T*>(arg.get());
+                                        return makeOptRefFromPtr<const T>(data);
+                                      },
+                                      [](const auto&) { return OptRef<const T>(); }},
+                       data_);
+  }
+
+  static DataInputGetResult
+  NoData(DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(absl::monostate(), data_availability);
+  }
+
+  /**
+   * Returns a string view match result. The input must ensure the backing data stays alive for the
+   *duration of matching. Use CreateString when a string must be constructed.
+   **/
+  static DataInputGetResult
+  CreateStringView(absl::string_view data,
+                   DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(data, data_availability);
+  }
+
+  static DataInputGetResult
+  CreateString(std::string&& data,
+               DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(std::move(data), data_availability);
+  }
+
+  static DataInputGetResult
+  CreateCustom(std::shared_ptr<CustomMatchData>&& data,
+               DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(std::move(data), data_availability);
+  }
+
+private:
   DataAvailability data_availability_;
   // The resulting data. This will be absl::monostate() if we don't have sufficient data available
   // (as per data_availability_) or because no value was extracted. For example, consider a
   // DataInput which attempts to look a key up in the map: if we don't have access to the map yet,
   // we return absl::monostate() with NotAvailable. If we have the entire map, but the key doesn't
   // exist in the map, we return absl::monostate() with AllDataAvailable.
+  using MatchingDataType = absl::variant<absl::monostate, std::string, absl::string_view,
+                                         std::shared_ptr<CustomMatchData>>;
   MatchingDataType data_;
 
+  DataInputGetResult(MatchingDataType&& data, DataAvailability data_availability)
+      : data_availability_(data_availability), data_(std::move(data)) {}
+
+public:
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: "
-        << (absl::holds_alternative<std::string>(result.data_)
-                ? absl::get<std::string>(result.data_)
-                : "n/a");
+    out << "data input: ";
+    absl::visit(absl::Overload{[&](const std::string& arg) { out << arg; },
+                               [&](const absl::string_view& arg) { out << arg; },
+                               [&](const std::shared_ptr<CustomMatchData>&) { out << "(custom)"; },
+                               [&](const auto&) { out << "n/a"; }},
+                result.data_);
 
     switch (result.data_availability_) {
-    case DataInputGetResult::DataAvailability::NotAvailable:
+    case DataAvailability::NotAvailable:
       out << " (not available)";
       break;
-    case DataInputGetResult::DataAvailability::MoreDataMightBeAvailable:
+    case DataAvailability::MoreDataMightBeAvailable:
       out << " (more data available)";
       break;
-    case DataInputGetResult::DataAvailability::AllDataAvailable:;
+    case DataAvailability::AllDataAvailable:;
     }
     return out;
   }
@@ -353,7 +455,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual MatchingDataType get() PURE;
+  virtual DataInputGetResult get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;

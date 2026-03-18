@@ -10,15 +10,18 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,6 +32,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -90,14 +94,17 @@ protected:
 
   // Helper to create a ReverseConnectionIOHandle with specified configuration.
   std::unique_ptr<ReverseConnectionIOHandle>
-  createTestIOHandle(const ReverseConnectionSocketConfig& config) {
+  createTestIOHandle(const ReverseConnectionSocketConfig& config,
+                     ReverseTunnelInitiatorExtension* extension_override = nullptr) {
     // Create a test socket file descriptor.
     int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
     EXPECT_GE(test_fd, 0);
 
     // Create the IO handle.
+    ReverseTunnelInitiatorExtension* extension_ptr =
+        extension_override != nullptr ? extension_override : extension_.get();
     return std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
-                                                       extension_.get(), *stats_scope_);
+                                                       extension_ptr, *stats_scope_);
   }
 
   // Helper to create a default test configuration.
@@ -364,6 +371,20 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
 
   // Verify the IO handle has a valid file descriptor.
   EXPECT_GE(io_handle_->fdDoNotUse(), 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
+  auto default_config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(default_config);
+  ASSERT_NE(io_handle_, nullptr);
+  EXPECT_EQ(io_handle_->requestPath(),
+            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  custom_config.request_path = "/custom/handshake";
+  auto custom_handle = createTestIOHandle(custom_config);
+  ASSERT_NE(custom_handle, nullptr);
+  EXPECT_EQ(custom_handle->requestPath(), "/custom/handshake");
 }
 
 // listen() is a no-op for the initiator
@@ -2265,6 +2286,69 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
 }
 
+TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  // Create trigger pipe BEFORE initiating connection to ensure it's ready.
+  createTriggerPipe();
+  EXPECT_TRUE(isTriggerPipeReady());
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts.
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host.
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).Times(0);
+
+  // Create HostConnectionInfo entry.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Simulate a upstream connection in connecting state.
+  io_handle_->updateConnectionState("192.168.1.1", "test-cluster", "fake_pending_key",
+                                    ReverseConnectionState::Connecting);
+
+  RemoteClusterConnectionConfig cluster_config("test-cluster", 1);
+  maintainClusterConnections("test-cluster", cluster_config);
+
+  EXPECT_EQ(getConnectionWrappers().size(), 0);
+}
+
+// Bind to address must be no-op for reverse connection io handle.
+TEST_F(ReverseConnectionIOHandleTest, ReverseConnectionIoHandleBindMustBeNoOp) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  auto address = io_handle_->localAddress();
+  EXPECT_EQ(address.ok(), true);
+
+  // Set up the api mocks any call here fails the test.
+  StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+
+  auto result = io_handle_->bind(address.value());
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
+}
+
 // Test ReverseConnectionIOHandle::close() method without trigger pipe.
 TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
   auto config = createDefaultTestConfig();
@@ -2386,6 +2470,36 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupClosesEstablishedConnections) {
   EXPECT_GT(getEstablishedConnectionsSize(), 0);
   cleanup();
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// Test that cleanup() resets file events before closing trigger pipe FDs to prevent busy loop.
+TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  int callback_call_count = 0;
+  Event::FileReadyCb mock_callback = [&callback_call_count](uint32_t) -> absl::Status {
+    callback_call_count++;
+    return absl::OkStatus();
+  };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  EXPECT_TRUE(isTriggerPipeReady());
+  EXPECT_GE(getTriggerPipeReadFd(), 0);
+  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
+
+  cleanup();
+
+  EXPECT_FALSE(isTriggerPipeReady());
+  EXPECT_EQ(getTriggerPipeReadFd(), -1);
+  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
+
+  // Verify the file event callback is not triggered after cleanup (no busy loop).
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(callback_call_count, 0);
 }
 
 // Test initializeFileEvent early-return path when already started.

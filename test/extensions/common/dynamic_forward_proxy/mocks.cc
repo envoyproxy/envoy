@@ -30,7 +30,7 @@ MockDnsCacheManager::~MockDnsCacheManager() = default;
 
 MockDnsHostInfo::MockDnsHostInfo() {
   ON_CALL(*this, address()).WillByDefault(ReturnPointee(&address_));
-  ON_CALL(*this, addressList(_)).WillByDefault(ReturnPointee(&address_list_));
+  ON_CALL(*this, addressList()).WillByDefault(ReturnPointee(&address_list_));
   ON_CALL(*this, resolvedHost()).WillByDefault(ReturnRef(resolved_host_));
 }
 MockDnsHostInfo::~MockDnsHostInfo() = default;

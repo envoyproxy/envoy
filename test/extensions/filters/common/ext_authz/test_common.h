@@ -122,6 +122,10 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
+  // Compare headers_to_set (used by ext_authz filter for denied local reply).
+  if (!TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set)) {
+    return false;
+  }
   // Compare headers_to_add.
   return TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add);
 }

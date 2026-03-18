@@ -1,7 +1,13 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/http/filter.h"
 #include "envoy/server/factory_context.h"
+
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Http {
