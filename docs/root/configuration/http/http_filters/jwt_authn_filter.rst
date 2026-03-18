@@ -235,3 +235,60 @@ comes from the owning HTTP connection manager.
   jwks_fetch_failed, Counter, Total failed JWKS remote fetch attempts
   jwt_cache_hit, Counter, Total JWT cache hits where a previously validated token was reused
   jwt_cache_miss, Counter, Total JWT cache misses requiring full token validation
+
+
+.. _config_jwt_authn_extract_only_security:
+
+Extract-Only Mode Security Considerations
+------------------------------------------
+
+.. warning::
+
+   **SECURITY WARNING**: The ``extract_only_without_validation``
+   requirement type does **NOT** verify JWT signatures. Any party can craft
+   a JWT with arbitrary claims, and those claims will be extracted and
+   forwarded as HTTP headers.
+
+   **Verification status header (default on):**
+
+   When this mode is active, Envoy sets a verification status header on
+   every request:
+
+   .. code-block:: text
+
+      x-jwt-signature-verified: false
+
+   **RBAC integration:**
+
+   If RBAC policies match on JWT-derived claim headers (e.g.,
+   ``x-jwt-claim-role``), add a corresponding principal check for the
+   verification status header. Example RBAC policy that only allows
+   verified admin claims:
+
+   .. code-block:: yaml
+
+      policies:
+        admin_verified_only:
+          permissions:
+          - any: true
+          principals:
+          - and_ids:
+              ids:
+              - header:
+                  name: "x-jwt-claim-role"
+                  string_match:
+                    exact: "admin"
+              - not_id:
+                  header:
+                    name: "x-jwt-signature-verified"
+                    string_match:
+                      exact: "false"
+
+   **Configuration:**
+
+   The header name is configurable via ``verification_status_header`` in
+   ``ExtractOnlyWithoutValidation``. Set to ``-`` to disable (not recommended).
+
+   **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
+   or ``local_jwks`` for full signature verification.
+
