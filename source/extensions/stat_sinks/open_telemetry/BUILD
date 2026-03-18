@@ -50,6 +50,7 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
