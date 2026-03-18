@@ -406,8 +406,8 @@ public:
     return textReadoutFromStatName(storage.statName());
   }
 
-  StatName prefix() const override { return prefix_.statName(); }
-  Store& store() override { return store_; }
+  IsolatedStoreImpl& store() override { return store_; }
+  const IsolatedStoreImpl& constStore() const override { return store_; }
   const Store& constStore() const override { return store_; }
 
 protected:
