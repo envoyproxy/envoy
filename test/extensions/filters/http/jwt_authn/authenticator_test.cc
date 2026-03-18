@@ -1205,12 +1205,9 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
 // ==========================================================================
 
 // Test: Default prefix is applied to claim headers from unverified JWTs.
-TEST_F(AuthenticatorTest, ExtractOnlyDefaultPrefixApplied) {
+TEST_F(AuthenticatorTest, ExtractOnlyDefaultVerificationHeader) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  // Default: empty prefix field, allow_unprefixed_headers = false
-  EXPECT_TRUE(config.unverified_header_prefix().empty());
-  EXPECT_FALSE(config.allow_unprefixed_headers());
-  EXPECT_FALSE(config.has_set_verification_status_header());
+  EXPECT_TRUE(config.verification_status_header().empty());
 } and alg:none
   // Expected: header set as "x-jwt-unverified-x-jwt-claim-role: admin"
   //           NOT "x-jwt-claim-role: admin"
@@ -1220,38 +1217,33 @@ TEST_F(AuthenticatorTest, ExtractOnlyDefaultPrefixApplied) {
 }
 
 // Test: Custom prefix is applied when configured.
-TEST_F(AuthenticatorTest, ExtractOnlyCustomPrefixApplied) {
+TEST_F(AuthenticatorTest, ExtractOnlyCustomVerificationHeader) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  config.set_unverified_header_prefix("x-untrusted-");
-  EXPECT_EQ(config.unverified_header_prefix(), "x-untrusted-");
-  EXPECT_FALSE(config.allow_unprefixed_headers());
+  config.set_verification_status_header("x-custom-jwt-status");
+  EXPECT_EQ(config.verification_status_header(), "x-custom-jwt-status");
 }
 
 // Test: allow_unprefixed_headers=true skips prefix (dangerous path).
-TEST_F(AuthenticatorTest, ExtractOnlyAllowUnprefixedDangerousPath) {
+TEST_F(AuthenticatorTest, ExtractOnlyDisableVerificationHeader) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  config.set_allow_unprefixed_headers(true);
-  EXPECT_TRUE(config.allow_unprefixed_headers());
-  EXPECT_TRUE(config.unverified_header_prefix().empty());
+  config.set_verification_status_header("-");
+  EXPECT_EQ(config.verification_status_header(), "-");
 }
 
 // Test: Verification status header can be disabled.
-TEST_F(AuthenticatorTest, ExtractOnlyVerificationStatusDisabled) {
+TEST_F(AuthenticatorTest, ExtractOnlyVerificationHeaderRoundTrip) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  EXPECT_FALSE(config.has_set_verification_status_header());
-  config.mutable_set_verification_status_header()->set_value(false);
-  EXPECT_TRUE(config.has_set_verification_status_header());
-  EXPECT_FALSE(config.set_verification_status_header().value());
+  EXPECT_TRUE(config.verification_status_header().empty());
+  config.set_verification_status_header("x-verified");
+  EXPECT_EQ(config.verification_status_header(), "x-verified");
+  config.clear_verification_status_header();
+  EXPECT_TRUE(config.verification_status_header().empty());
 }
 
 // Test: forward_payload_header is also prefixed.
-TEST_F(AuthenticatorTest, ExtractOnlyFullConfig) {
+TEST_F(AuthenticatorTest, ExtractOnlyVerificationHeaderExplicitDefault) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  config.set_unverified_header_prefix("x-test-");
-  config.set_allow_unprefixed_headers(false);
-  config.mutable_set_verification_status_header()->set_value(true);
-  EXPECT_EQ(config.unverified_header_prefix(), "x-test-");
-  EXPECT_FALSE(config.allow_unprefixed_headers());
-  EXPECT_TRUE(config.set_verification_status_header().value());
+  config.set_verification_status_header("x-jwt-signature-verified");
+  EXPECT_EQ(config.verification_status_header(), "x-jwt-signature-verified");
 }
 

@@ -379,6 +379,30 @@ providers:
                              HasSubstr("Duration out-of-range"));
 }
 
+
+// Test: Config with disabled verification header loads with critical warning.
+TEST_F(FilterConfigTest, ExtractOnlyWithDisabledVerificationHeader) {
+  const char config_yaml[] = R"(
+providers:
+  test_provider:
+    issuer: "https://example.com"
+    local_jwks:
+      inline_string: "{}"
+    claim_to_headers:
+    - header_name: "x-jwt-claim-role"
+      claim_name: "role"
+rules:
+- match:
+    prefix: "/admin"
+  requires:
+    extract_only_without_validation:
+      verification_status_header: "-"
+)";
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  EXPECT_NO_THROW(
+      FilterConfigImpl(proto_config, "", mock_factory_ctx_));
+}
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
@@ -413,13 +437,28 @@ rules:
 }
 
 // Test: Config with allow_unprefixed_headers=true emits critical warning.
-TEST_F(FilterConfigTest, ExtractOnlyAllowUnprefixedWarning) {
+TEST_F(FilterConfigTest, ExtractOnlyWithCustomVerificationHeader) {
   const char config_yaml[] = R"(
 providers:
   test_provider:
     issuer: "https://example.com"
     local_jwks:
       inline_string: "{}"
+    claim_to_headers:
+    - header_name: "x-jwt-claim-role"
+      claim_name: "role"
+rules:
+- match:
+    prefix: "/admin"
+  requires:
+    extract_only_without_validation:
+      verification_status_header: "x-custom-jwt-verified"
+)";
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  EXPECT_NO_THROW(
+      FilterConfigImpl(proto_config, "", mock_factory_ctx_));
+}"
     claim_to_headers:
     - header_name: "x-jwt-claim-role"
       claim_name: "role"

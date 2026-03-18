@@ -619,34 +619,26 @@ message JwtRequirement {
 
 // Configuration for extract-only mode without JWT signature validation.
 //
-// .. warning::
-//
-//    See security warnings on the ``extract_only_without_validation`` field
-//    in ``JwtRequirement``. Misconfiguration can lead to complete
-//    authentication and authorization bypass.
+// When this mode is active, a verification status header is set on the request
+// to signal to downstream filters (RBAC, ext_authz) that the JWT claims were
+// NOT cryptographically verified. This header is set by default and requires
+// no configuration.
 //
 message ExtractOnlyWithoutValidation {
-  // Prefix prepended to all header names set from unverified JWT claims
-  // via ``claim_to_headers``. This ensures downstream consumers can
-  // distinguish unverified claims from cryptographically validated ones.
+  // Name of the HTTP header set to "false" on requests where JWT claims
+  // were extracted without signature verification.
   //
-  // If empty, defaults to "x-jwt-unverified-". Set to a non-empty custom
-  // prefix if needed.
-  string unverified_header_prefix = 1;
-
-  // If true, allows claim_to_headers to set headers WITHOUT the
-  // unverified prefix. This is DANGEROUS and should only be used
-  // when the operator has verified that no downstream filter or
-  // backend trusts these headers for authorization decisions.
+  // Downstream filters (RBAC, ext_authz) SHOULD check this header before
+  // trusting any JWT-derived claim headers for authorization decisions.
   //
-  // Default: false
-  bool allow_unprefixed_headers = 2;
-
-  // If true, sets ``x-jwt-signature-verified: false`` header on requests
-  // processed by this mode.
+  // Default (unset or empty): "x-jwt-signature-verified"
+  // Custom value: uses the specified header name
+  // Set to "-" to disable the header entirely (NOT RECOMMENDED)
   //
-  // Default: true
-  google.protobuf.BoolValue set_verification_status_header = 3;
+  // Example: with the default, all requests processed by this mode will have:
+  //   x-jwt-signature-verified: false
+  //
+  string verification_status_header = 1;
 }
 
 // This message specifies a list of RequiredProvider.

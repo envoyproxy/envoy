@@ -38,15 +38,12 @@ behavior_changes:
 minor_behavior_changes:
 - area: jwt_authn
   change: |
-    added ``x-jwt-signature-verified: false`` header and configurable ``unverified_header_prefix``
-    to ``extract_only_without_validation`` JWT requirement type. When claims are extracted without
-    signature verification, headers are now prefixed with ``x-jwt-unverified-`` by default to
-    distinguish them from cryptographically validated claims. This prevents confused deputy
-    vulnerabilities where RBAC policies or ext_authz services inadvertently trust unverified
-    claim headers. The previous behavior can be restored by setting
-    ``allow_unprefixed_headers: true`` or runtime guard
-    ``envoy.reloadable_features.jwt_authn_prefix_unverified_claims`` to ``false``.
-# *Changes that may cause incompatibilities for some users, but should not for most*
+    added configurable ``verification_status_header`` to ``extract_only_without_validation``
+    JWT requirement type. When claims are extracted without signature verification, Envoy
+    now sets ``x-jwt-signature-verified: false`` by default so downstream filters (RBAC,
+    ext_authz) can distinguish unverified claims. Enhanced config validation warns per
+    claim header with specific RBAC guidance. Set header to ``-`` to disable (not recommended).
+
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native

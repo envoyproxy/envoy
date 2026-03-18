@@ -526,35 +526,26 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
 
 namespace {
 
-// Default prefix for headers set from unverified JWT claims.
-constexpr absl::string_view kDefaultUnverifiedPrefix = "x-jwt-unverified-";
-
 // Header indicating whether the JWT signature was verified.
-const Http::LowerCaseString kJwtSignatureVerifiedHeader{"x-jwt-signature-verified"};
+// Verification status header name resolved by getVerificationStatusHeaderName().
 
 } // namespace
 
-std::string getUnverifiedHeaderPrefix(
+std::string getVerificationStatusHeaderName(
     const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
-  if (config.allow_unprefixed_headers()) {
-    ENVOY_LOG(warn,
-              "jwt_authn: SECURITY WARNING - allow_unprefixed_headers is true. "
-              "Unverified JWT claims will be set as headers WITHOUT prefix.");
+  const auto& configured = config.verification_status_header();
+  if (configured == "-") {
+    ENVOY_LOG(warn, "jwt_authn: verification_status_header disabled. "
+              "Downstream filters cannot distinguish unverified claims.");
     return "";
   }
-  if (!config.unverified_header_prefix().empty()) {
-    return config.unverified_header_prefix();
+  if (!configured.empty()) {
+    return configured;
   }
-  return std::string(kDefaultUnverifiedPrefix);
+  return "x-jwt-signature-verified";
 }
 
-bool shouldSetVerificationStatusHeader(
-    const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
-  if (!config.has_set_verification_status_header()) {
-    return true;
-  }
-  return config.set_verification_status_header().value();
-}
+
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

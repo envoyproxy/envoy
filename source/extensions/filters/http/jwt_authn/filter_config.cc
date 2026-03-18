@@ -101,15 +101,23 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
 
 void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
     const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config) {
-  // First pass: check if any rule uses extract_only_without_validation.
+  // Resolve verification status header and detect extract_only usage.
+  std::string verification_header = "x-jwt-signature-verified";
   bool extract_only_used = false;
-  bool unprefixed_allowed = false;
+  bool verification_disabled = false;
+
   for (const auto& rule : config.rules()) {
     if (rule.has_requires() && rule.requires().has_extract_only_without_validation()) {
       extract_only_used = true;
-      if (rule.requires().extract_only_without_validation().allow_unprefixed_headers()) {
-        unprefixed_allowed = true;
+      const auto& econfig = rule.requires().extract_only_without_validation();
+      if (!econfig.verification_status_header().empty()) {
+        if (econfig.verification_status_header() == "-") {
+          verification_disabled = true;
+        } else {
+          verification_header = econfig.verification_status_header();
+        }
       }
+      break;
     }
   }
 
@@ -117,23 +125,39 @@ void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
     return;
   }
 
-  // Second pass: warn once per provider that has claim_to_headers.
-  for (const auto& [provider_name, provider] : config.providers()) {
-    if (!provider.claim_to_headers().empty()) {
-      ENVOY_LOG(critical,
-                "jwt_authn: SECURITY WARNING - Provider '{}' has claim_to_headers "
-                "and may be used with extract_only_without_validation. Unverified JWT "
-                "claims will be forwarded as HTTP headers with the '{}' prefix.",
-                provider_name, "x-jwt-unverified-");
+  if (verification_disabled) {
+    ENVOY_LOG(critical,
+              "jwt_authn: SECURITY WARNING - extract_only_without_validation is in use "
+              "with verification_status_header DISABLED. Downstream filters have NO way "
+              "to distinguish forged JWT claims from verified ones.");
+  }
 
-      if (unprefixed_allowed) {
+  // Warn per claim header with specific RBAC guidance.
+  for (const auto& [provider_name, provider] : config.providers()) {
+    for (const auto& claim_to_header : provider.claim_to_headers()) {
+      if (verification_disabled) {
         ENVOY_LOG(critical,
-                  "jwt_authn: CRITICAL SECURITY WARNING - Provider '{}' has "
-                  "claim_to_headers and allow_unprefixed_headers is true for at least "
-                  "one rule. Unverified JWT claims may be set as headers WITHOUT any "
-                  "distinguishing prefix.",
-                  provider_name);
+                  "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' "
+                  "will be set WITHOUT signature verification and WITHOUT a verification "
+                  "status header. Any RBAC or ext_authz policy matching on '{}' can be "
+                  "bypassed with a forged JWT.",
+                  claim_to_header.header_name(), claim_to_header.claim_name(),
+                  provider_name, claim_to_header.header_name());
+      } else {
+        ENVOY_LOG(warn,
+                  "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' will "
+                  "be set WITHOUT signature verification. Ensure RBAC policies check "
+                  "'{}' before trusting '{}' for authorization.",
+                  claim_to_header.header_name(), claim_to_header.claim_name(),
+                  provider_name, verification_header, claim_to_header.header_name());
       }
+    }
+
+    if (!provider.forward_payload_header().empty()) {
+      ENVOY_LOG(warn,
+                "jwt_authn: Payload header '{}' from provider '{}' will contain an "
+                "UNVERIFIED JWT payload. Check '{}' before trusting it.",
+                provider.forward_payload_header(), provider_name, verification_header);
     }
   }
 }
