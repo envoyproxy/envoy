@@ -1132,16 +1132,16 @@ void ThreadLocalStoreImpl::evictUnused() {
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
           return [&unused_metrics](const auto& kv) {
             const auto& [name, metric] = kv;
-            if (metric->used()) {
-              metric->markUnused();
-              return false;
-            }
             // We assume the gauge is used as an updown counter here and if the value is 0, it is
             // unused.
             if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
               if (metric->value() != 0) {
                 return false;
               }
+            }
+            if (metric->used()) {
+              metric->markUnused();
+              return false;
             }
             unused_metrics.try_emplace(name, metric);
             return true;

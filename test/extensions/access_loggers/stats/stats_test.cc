@@ -626,7 +626,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   // We don't expect it to actually be added to inflight_gauges_.
   EXPECT_CALL(store_, gauge(_, _)).WillRepeatedly(testing::ReturnRef(*gauge_));
 
-  // EXPECT_CALL(*gauge_, add(0));  // Removed because addInflightGauge skips if value == 0
+  EXPECT_CALL(*gauge_, add(0)).Times(0); // addInflightGauge skips if value == 0
   logger_->log(formatter_context_, stream_info_);
 
   // Trigger SUBTRACT

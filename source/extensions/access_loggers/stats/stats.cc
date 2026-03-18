@@ -17,8 +17,6 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
-// WARNING: Do not copy this object or share it with upstream. It is not guaranteed
-// that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   AccessLogState(Stats::ScopeSharedPtr scope, std::shared_ptr<Stats::StatNamePool> stat_name_pool)

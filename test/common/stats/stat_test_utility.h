@@ -146,8 +146,8 @@ public:
   Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
                                            StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-  Store& store() override { return store_; }
-  const Store& constStore() const override { return store_; }
+  IsolatedStoreImpl& store() override { return store_; }
+  const IsolatedStoreImpl& constStore() const override { return store_; }
 
 private:
   std::string statNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags);
