@@ -5,6 +5,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -70,10 +71,13 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       collector_->endpoint_ = path;
     }
 
-    // Parse headers from HttpService
-    for (const auto& header_option : http_service.request_headers_to_add()) {
-      const auto& header_value = header_option.header();
-      collector_->request_headers_.emplace_back(header_value.key(), header_value.value());
+    // Create headers applicator using the common helper for substitution formatter support
+    absl::Status creation_status;
+    collector_->headers_applicator_ = std::make_unique<Http::HttpServiceHeadersApplicator>(
+        http_service, context, creation_status);
+    if (!creation_status.ok()) {
+      throw EnvoyException(fmt::format("Failed to create HttpServiceHeadersApplicator: {}",
+                                       creation_status.message()));
     }
   } else {
     if (zipkin_config.collector_cluster().empty() || zipkin_config.collector_endpoint().empty()) {
@@ -210,10 +214,14 @@ void ReporterImpl::flushSpans() {
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 
-    // Add custom headers from collector configuration
-    for (const auto& header : collector_->request_headers_) {
-      // Replace any existing header with the configured value
-      message->headers().setCopy(header.first, header.second);
+    // Apply custom headers from collector configuration using common helper
+    if (collector_->headers_applicator_) {
+      collector_->headers_applicator_->apply(message->headers());
+    } else {
+      // Legacy header application for backward compatibility
+      for (const auto& header : collector_->request_headers_) {
+        message->headers().setCopy(header.first, header.second);
+      }
     }
 
     message->body().add(request_body);
