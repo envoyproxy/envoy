@@ -21,30 +21,44 @@ using Extensions::Matching::Actions::TransformStat::ActionContext;
 // that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState() = default;
+  AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
 
   ~AccessLogState() override {
     while (!inflight_gauges_.empty()) {
-      auto& gauge = *inflight_gauges_.begin()->first;
-      removeInflightGauge(gauge, inflight_gauges_.begin()->second.value_);
+      auto it = inflight_gauges_.begin();
+      Stats::StatNameDynamicStorage storage(it->first, scope_->symbolTable());
+      scope_->gaugeFromStatName(storage.statName(), it->second.import_mode_)
+          .sub(it->second.value_, /*protect_underflow=*/true);
+      inflight_gauges_.erase(it);
     }
   }
 
-  void addInflightGauge(Stats::Gauge& gauge, uint64_t value) {
+  void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
+                        Stats::Gauge::ImportMode import_mode, uint64_t value) {
     if (value == 0) {
       return;
     }
-    auto [it, inserted] =
-        inflight_gauges_.try_emplace(&gauge, InflightGauge{Stats::GaugeSharedPtr(&gauge), 0});
+    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    std::string gauge_name = gauge_stat.name();
+
+    auto it = inflight_gauges_.find(gauge_name);
+    if (it == inflight_gauges_.end()) {
+      auto [new_it, inserted] = inflight_gauges_.emplace(gauge_name, InflightGauge{import_mode, 0});
+      it = new_it;
+    }
     it->second.value_ += value;
-    gauge.add(value);
+    gauge_stat.add(value);
   }
 
-  void removeInflightGauge(Stats::Gauge& gauge, uint64_t value) {
-    auto it = inflight_gauges_.find(&gauge);
+  void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode import_mode, uint64_t value) {
+    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    std::string gauge_name = gauge_stat.name();
+
+    auto it = inflight_gauges_.find(gauge_name);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
-      gauge.sub(value, /*protect_underflow=*/true);
+      gauge_stat.sub(value, /*protect_underflow=*/true);
       if (it->second.value_ == 0) {
         inflight_gauges_.erase(it);
       }
@@ -54,17 +68,19 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
+  Stats::ScopeSharedPtr scope_;
+
   // InflightGauge holds the state of a gauge that is currently in-flight (incremented but not
   // yet decremented).
   struct InflightGauge {
-
-    Stats::GaugeSharedPtr gauge_ref_;
+    Stats::Gauge::ImportMode import_mode_;
     uint64_t value_;
   };
 
-  // The map key holds a raw pointer to the gauge to enable fast O(1) lookups during
-  // PAIRED_SUBTRACT. The InflightGauge value ensures the gauge object survives eviction.
-  absl::flat_hash_map<Stats::Gauge*, InflightGauge> inflight_gauges_;
+  // The map key holds a std::string generated from the instantiated gauge to correctly
+  // ensure that we match PAIRED_ADD and PAIRED_SUBTRACT entries without being subject to
+  // subtle StatName encoding mismatches between Managed and Dynamic SymbolTable allocations.
+  absl::flat_hash_map<std::string, InflightGauge> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -405,27 +421,25 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
-  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
+  if (op == Gauge::OperationType::SET) {
+    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    gauge_stat.set(value);
+  } else if (op == Gauge::OperationType::PAIRED_ADD ||
+             op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
                            StreamInfo::FilterState::StateType::Mutable,
                            StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(gauge_stat, value);
+      state->addInflightGauge(gauge.stat_.name_, tags, import_mode, value);
     } else {
-      state->removeInflightGauge(gauge_stat, value);
+      state->removeInflightGauge(gauge.stat_.name_, tags, import_mode, value);
     }
-    return;
-  }
-
-  if (op == Gauge::OperationType::SET) {
-    gauge_stat.set(value);
   }
 }
 

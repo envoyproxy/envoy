@@ -575,16 +575,16 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
 
   // Case 2: AccessLogType matches subtract_at but no prior add -> no change
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(_)).Times(0);
-  EXPECT_CALL(*gauge_, sub(_)).Times(0);
+  EXPECT_CALL(*gauge_, sub(_, _)).Times(0);
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 3: AccessLogType matches add_at -> add
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(1));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
@@ -592,16 +592,16 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
 
   // Case 4: AccessLogType matches subtract_at after add -> subtract
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(*gauge_, sub(1));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
+  EXPECT_CALL(*gauge_, sub(1, _));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
   // Case 5: AccessLogType matches subtract_at again -> no change (already removed from inflight)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(*gauge_, sub(1)).Times(0);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
+  EXPECT_CALL(*gauge_, sub(1, _)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -631,7 +631,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   // Trigger SUBTRACT
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   // We expect no `sub(0)` interaction here because it wasn't added to inflight_gauges_.
-  EXPECT_CALL(*gauge_, sub(_)).Times(0);
+  EXPECT_CALL(*gauge_, sub(_, _)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -650,14 +650,14 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
 
   // Trigger ADD with value 10
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, stream_info_);
 
   // Trigger SUBTRACT. Should still subtract 10.
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(*gauge_, sub(10));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
+  EXPECT_CALL(*gauge_, sub(10, _));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -680,12 +680,12 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
   NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
 
   // Called once on log().
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
   // Expect subtraction on destruction
-  EXPECT_CALL(*gauge_, sub(10));
+  EXPECT_CALL(*gauge_, sub(10, _));
 
   // Destroy logger before stream_info to simulate logger config deletion while stream is active
   logger_.reset();
@@ -745,9 +745,9 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
 
-  // The destructor of AccessLogState should call sub(10) directly on the saved gauge
+  // The destructor of AccessLogState should call sub(10, _) directly on the saved gauge
   // This will trigger a second lookup using gaugeFromString (tags == absl::nullopt).
-  EXPECT_CALL(*gauge_, sub(10));
+  EXPECT_CALL(*gauge_, sub(10, _));
 
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.
 }
@@ -773,14 +773,14 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
 
   // Trigger ADD for the first definition (DownstreamStart)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, stream_info_);
 
   // Trigger ADD for the second definition (TcpUpstreamConnected)
   formatter_context_.setAccessLogType(
       envoy::data::accesslog::v3::AccessLogType::TcpUpstreamConnected);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   // The second gauge is added on TcpUpstreamConnected
   EXPECT_CALL(*gauge_, add(20));
   logger_->log(formatter_context_, stream_info_);
@@ -788,8 +788,8 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
   // Trigger SUBTRACT for both (DownstreamEnd)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
-  EXPECT_CALL(*gauge_, sub(10));
-  EXPECT_CALL(*gauge_, sub(20));
+  EXPECT_CALL(*gauge_, sub(10, _));
+  EXPECT_CALL(*gauge_, sub(20, _));
   logger_->log(formatter_context_, stream_info_);
 }
 
