@@ -991,6 +991,10 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
     (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+    (*json_format->mutable_fields())["field_header_bytes_sent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:header_bytes_sent)%");
+    (*json_format->mutable_fields())["field_header_bytes_received"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:header_bytes_received)%");
     (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
     (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
