@@ -1,6 +1,7 @@
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
+load("@envoy_toolshed//v8:v8_libs.bzl", "setup_v8_prebuilt")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -204,12 +205,7 @@ def envoy_dependencies(skip_targets = []):
     _abseil_cpp()
     _googletest()
     _com_google_protobuf()
-    _v8()
-    _fast_float()
-    _highway()
-    _dragonbox()
-    _fp16()
-    _simdutf()
+    _v8_prebuilt()
     _quiche()
     _googleurl()
     _hyperscan()
@@ -718,97 +714,10 @@ def _com_google_protobuf():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _v8():
-    external_http_archive(
-        name = "v8",
-        patches = [
-            "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_atomic_ref.patch",
-            "@envoy//bazel:v8_novtune.patch",
-            "@envoy//bazel:v8_ppc64le.patch",
-            # https://issues.chromium.org/issues/423403090
-            "@envoy//bazel:v8_python.patch",
-        ],
-        patch_args = ["-p1"],
-        patch_cmds = [
-            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
-            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
-            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
-            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
-            # TODO(jwendell): Remove the atomic_ref polyfill injection once the LLVM toolchain is
-            # bumped to a version whose libc++ provides std::atomic_ref (LLVM 19+).
-            "grep -rl 'std::atomic_ref' src/ include/ --include='*.h' --include='*.cc' | grep -v atomic_ref_polyfill | while IFS= read -r f; do { echo '#include \"src/base/atomic_ref_polyfill.h\"'; cat \"$f\"; } > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; done",
-            # TODO(jwendell): Remove consteval->constexpr workaround once the LLVM toolchain is
-            # bumped. Clang 18 has bugs with consteval in template contexts (fixed in clang 19+).
-            "find ./src -type f \\( -name '*.h' -o -name '*.cc' \\) -exec sed -i.bak 's/consteval/constexpr/g' {} \\;",
-            "find ./src -type f -name '*.bak' -delete",
-        ],
-    )
-
-def _fast_float():
-    external_http_archive(
-        name = "fast_float",
-    )
-
-def _highway():
-    external_http_archive(
-        name = "highway",
-        patches = [
-            "@envoy//bazel:highway-ppc64le.patch",
-        ],
-        patch_args = ["-p1"],
-    )
-
-def _dragonbox():
-    external_http_archive(
-        name = "dragonbox",
-        build_file = "@envoy//bazel/external:dragonbox.BUILD",
-    )
-
-def _fp16():
-    external_http_archive(
-        name = "fp16",
-        build_file = "@envoy//bazel/external:fp16.BUILD",
-    )
-
-def _simdutf():
-    external_http_archive(
-        name = "simdutf",
-        build_file = "@envoy//bazel/external:simdutf.BUILD",
-        patch_cmds = [
-            # TODO(jwendell): Remove this polyfill once the LLVM toolchain is bumped to a
-            # version whose libc++ provides std::atomic_ref (LLVM 19+).
-            # LLVM 18's libc++ lacks std::atomic_ref; without it SIMDUTF_ATOMIC_REF is 0
-            # and the atomic_base64/atomic_binary functions are excluded from compilation.
-            """cat > atomic_ref_polyfill.h << 'EOF'
-#ifndef ATOMIC_REF_POLYFILL_H_
-#define ATOMIC_REF_POLYFILL_H_
-#include <atomic>
-#include <type_traits>
-#if !defined(__cpp_lib_atomic_ref)
-#define __cpp_lib_atomic_ref 201806L
-namespace std {
-template <typename T> struct atomic_ref {
-  static_assert(std::is_trivially_copyable_v<T>);
-  static constexpr std::size_t required_alignment = alignof(T);
-  explicit atomic_ref(T& obj) : ptr_(&obj) {}
-  atomic_ref(const atomic_ref&) = default;
-  T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
-    return reinterpret_cast<const std::atomic<T>*>(ptr_)->load(order);
-  }
-  void store(T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
-    reinterpret_cast<std::atomic<T>*>(ptr_)->store(desired, order);
-  }
-private:
-  T* ptr_;
-};
-template <typename T> atomic_ref(T&) -> atomic_ref<T>;
-}  // namespace std
-#endif
-#endif
-EOF""",
-            "{ echo '#include \"atomic_ref_polyfill.h\"'; cat simdutf.cpp; } > simdutf.cpp.tmp && mv simdutf.cpp.tmp simdutf.cpp",
-        ],
+def _v8_prebuilt():
+    setup_v8_prebuilt(
+        version = REPOSITORY_LOCATIONS_SPEC["v8"]["version"],
+        sha256 = REPOSITORY_LOCATIONS_SPEC["v8"]["sha256"],
     )
 
 def _quiche():

@@ -761,18 +761,6 @@ confluentinc_librdkafka:
   license: "librdkafka"
   license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
 
-dragonbox:
-  project_name: "Dragonbox"
-  project_desc: |
-    Reference implementation of dragonbox, a float-to-string conversion algorithm based on a beautiful algorithm Schubfach,
-    developed by Raffaello Giulietti in 2017-2018. Dragonbox is further inspired by Grisu and Grisu-Exact.
-  project_url: "https://github.com/jk-jeon/dragonbox"
-  release_date: "2024-10-28"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
-
 emsdk:
   project_name: "Emscripten SDK"
   project_desc: "Emscripten SDK (use by Wasm)"
@@ -799,18 +787,6 @@ envoy_toolshed:
   - msan_libs
   license: "Apache-2.0"
   license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
-
-fast_float:
-  project_name: "fast_float number parsing library"
-  project_desc: |
-    Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
-    part of GCC 12, Chromium, Redis and WebKit/Safari
-  project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 
 fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
@@ -877,16 +853,6 @@ fips_ninja:
   license: "Apache-2.0"
   license_url: "https://github.com/ninja-build/ninja/blob/v{version}/COPYING"
 
-fp16:
-  project_name: "Conversion to/from half-precision floating point formats"
-  project_desc: "Header-only library for conversion to/from half-precision floating point formats."
-  project_url: "https://github.com/Maratyszcza/FP16"
-  release_date: "2025-08-16"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
-
 googleurl:
   project_name: "Chrome URL parsing library"
   project_desc: "Chrome URL parsing library"
@@ -926,16 +892,6 @@ grpc_httpjson_transcoding:
   - envoy.filters.http.mcp
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE"
-
-highway:
-  project_name: "Efficient and performance-portable vector software"
-  project_desc: "Performance-portable, length-agnostic SIMD with runtime dispatch"
-  project_url: "https://github.com/google/highway"
-  release_date: "2024-05-31"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
 
 dlb:
   project_name: "Intel Dlb"
@@ -1304,19 +1260,6 @@ rules_shell:
   license: "Apache-2.0"
   license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
 
-simdutf:
-  project_name: "Unicode validation and transcoding at billions of characters per second"
-  project_desc: |
-    Unicode routines (UTF8, UTF16, UTF32) and Base64: billions of characters per second using SSE2, AVX2, NEON,
-    AVX-512, RISC-V Vector Extension, LoongArch64, POWER. Part of Node.js, WebKit/Safari, Ladybird, Chromium,
-    Cloudflare Workers and Bun.
-  project_url: "https://github.com/simdutf/simdutf"
-  release_date: "2026-03-07"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
-
 skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
@@ -1367,8 +1310,11 @@ uadk:
   license_url: "https://github.com/Linaro/uadk/blob/v{version}/LICENSE"
 
 v8:
-  project_name: "V8"
-  project_desc: "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++"
+  project_name: "V8 (pre-built)"
+  project_desc: |
+    Google’s open source high-performance JavaScript and WebAssembly engine, written in C++.
+    Pre-built as a static library (libwee8.a) in envoy_toolshed. Includes V8-specific
+    sub-dependencies: dragonbox, fast_float, fp16, simdutf, and highway.
   project_url: "https://v8.dev"
   release_date: "2026-03-04"
   use_category:
