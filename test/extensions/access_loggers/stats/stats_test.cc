@@ -577,7 +577,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
   EXPECT_CALL(*gauge_, add(_)).Times(0);
-  EXPECT_CALL(*gauge_, sub(_, _)).Times(0);
+  EXPECT_CALL(*gauge_, sub(_, /*protect_underflow=*/true)).Times(0);
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
@@ -593,7 +593,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   // Case 4: AccessLogType matches subtract_at after add -> subtract
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
-  EXPECT_CALL(*gauge_, sub(1, _));
+  EXPECT_CALL(*gauge_, sub(1, /*protect_underflow=*/true));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
@@ -601,7 +601,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   // Case 5: AccessLogType matches subtract_at again -> no change (already removed from inflight)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
-  EXPECT_CALL(*gauge_, sub(1, _)).Times(0);
+  EXPECT_CALL(*gauge_, sub(1, /*protect_underflow=*/true)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -631,7 +631,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   // Trigger SUBTRACT
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   // We expect no `sub(0)` interaction here because it wasn't added to inflight_gauges_.
-  EXPECT_CALL(*gauge_, sub(_, _)).Times(0);
+  EXPECT_CALL(*gauge_, sub(_, /*protect_underflow=*/true)).Times(0);
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -657,7 +657,7 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   // Trigger SUBTRACT. Should still subtract 10.
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AnyNumber());
-  EXPECT_CALL(*gauge_, sub(10, _));
+  EXPECT_CALL(*gauge_, sub(10, /*protect_underflow=*/true));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -685,7 +685,7 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
   logger_->log(formatter_context_, local_stream_info);
 
   // Expect subtraction on destruction
-  EXPECT_CALL(*gauge_, sub(10, _));
+  EXPECT_CALL(*gauge_, sub(10, /*protect_underflow=*/true));
 
   // Destroy logger before stream_info to simulate logger config deletion while stream is active
   logger_.reset();
@@ -747,7 +747,7 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
 
   // The destructor of AccessLogState should call sub(10, _) directly on the saved gauge
   // This will trigger a second lookup using gaugeFromString (tags == absl::nullopt).
-  EXPECT_CALL(*gauge_, sub(10, _));
+  EXPECT_CALL(*gauge_, sub(10, /*protect_underflow=*/true));
 
   // local_stream_info goes out of scope here, triggering AccessLogState destructor.
 }
@@ -788,8 +788,8 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
   // Trigger SUBTRACT for both (DownstreamEnd)
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(2);
-  EXPECT_CALL(*gauge_, sub(10, _));
-  EXPECT_CALL(*gauge_, sub(20, _));
+  EXPECT_CALL(*gauge_, sub(10, /*protect_underflow=*/true));
+  EXPECT_CALL(*gauge_, sub(20, /*protect_underflow=*/true));
   logger_->log(formatter_context_, stream_info_);
 }
 

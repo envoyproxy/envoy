@@ -80,7 +80,7 @@ TEST(GaugeHelperTest, AdjustAddsWhenAddIsBigger) {
 
 TEST(GaugeHelperTest, AdjustSubtractsWhenSubIsBigger) {
   MockGauge gauge;
-  EXPECT_CALL(gauge, sub(3));
+  EXPECT_CALL(gauge, sub(3, /*protect_underflow=*/false));
   gauge.adjust(2, 5);
 }
 

@@ -88,10 +88,10 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   EXPECT_EQ(5UL, previous_total);
 
   EXPECT_CALL(counter, add(1));
-  EXPECT_CALL(gauge, sub(1));
+  EXPECT_CALL(gauge, sub(1, /*protect_underflow=*/false));
   ConnectionImplUtility::updateBufferStats(1, 4, previous_total, counter, gauge);
 
-  EXPECT_CALL(gauge, sub(4));
+  EXPECT_CALL(gauge, sub(4, /*protect_underflow=*/false));
   ConnectionImplUtility::updateBufferStats(0, 0, previous_total, counter, gauge);
 
   EXPECT_CALL(counter, add(3));
@@ -866,7 +866,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   Sequence s2;
   EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
   EXPECT_CALL(server_connection_stats.rx_current_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_connection_stats.rx_current_, sub(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, sub(4, /*protect_underflow=*/false)).InSequence(s2);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter_, onNewConnection());
