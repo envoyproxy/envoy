@@ -7,9 +7,9 @@
 ///    the connection for network filters, etc.
 ///
 /// Subsequent callbacks on a poisoned wrapper behave differently depending on type:
-/// - Status-returning callbacks abort the process. This indicates the fail-closed mechanism did not
+/// - Status-returning callbacks panic immediately. This indicates the fail-closed mechanism did not
 ///   terminate the stream as expected.
-/// - Void cleanup/event callbacks are silently skipped.
+/// - Late async, event, and cleanup callbacks are silently skipped.
 ///
 /// # Usage
 ///
@@ -36,7 +36,7 @@ impl<F> CatchUnwind<F> {
 
   /// Run `f` on the inner filter, catching any panic.
   ///
-  /// If the filter was already poisoned by a prior panic, aborts the process — a
+  /// If the filter was already poisoned by a prior panic, panics immediately — a
   /// status-returning callback on a poisoned filter means the fail-closed mechanism
   /// didn't terminate the stream as expected.
   fn catch<R>(&mut self, name: &str, f: impl FnOnce(&mut F) -> R) -> Result<R, ()> {
@@ -64,7 +64,16 @@ impl<F> CatchUnwind<F> {
   }
 
   /// Like [`catch`](Self::catch), but skips if the filter is already poisoned.
-  /// Use for callbacks that Envoy may still invoke after a prior fail-closed.
+  ///
+  /// This is intended for async, event, and cleanup callbacks that Envoy may still
+  /// invoke after a prior fail-closed.
+  ///
+  /// Returns:
+  /// - `Ok(R)` if the callback completed successfully.
+  /// - `Err(CatchError::Panicked)` if this invocation panicked and the caller should apply its
+  ///   fail-closed action.
+  /// - `Err(CatchError::Poisoned)` if the wrapper was already poisoned and the callback was
+  ///   skipped.
   fn catch_or_skip<R>(&mut self, name: &str, f: impl FnOnce(&mut F) -> R) -> Result<R, CatchError> {
     let Some(mut filter) = self.filter.take() else {
       return Err(CatchError::Poisoned);
