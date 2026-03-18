@@ -211,7 +211,8 @@ public:
     flags_ |= Flags::Used;
   }
   void sub(uint64_t amount, bool protect_underflow = false) override {
-    ENVOY_BUG(used(), "sub() called on unused gauge");
+    // Mark as used to prevent the stat from being evicted before flush.
+    flags_ |= Flags::Used;
     if (!protect_underflow) {
       ENVOY_BUG(child_value_ >= amount, "subtracted amount is greater than current value");
       child_value_ -= amount;

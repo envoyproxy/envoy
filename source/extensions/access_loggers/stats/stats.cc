@@ -27,6 +27,9 @@ public:
   // GaugeKey serves as a lock-free map key composed of exactly the configuration
   // properties that define a fully resolved gauge metric.
   //
+  // It preserves the raw components (base name + tags) allowing us to safely
+  // re-create the gauge from the scope if it gets evicted while the request is in-flight.
+  //
   // To avoid heap-allocating a new std::vector on every map lookup (which happens
   // on every single gauge increment/decrement), this key acts as a lightweight
   // zero-allocation "view" using `borrowed_tags_` during map lookups.
@@ -88,9 +91,7 @@ public:
     for (const auto& [key, info] : inflight_gauges_) {
       auto& gauge_stat =
           scope_->gaugeFromStatNameWithTags(key.stat_name_, key.tags(), key.import_mode_);
-      if (gauge_stat.used()) {
-        gauge_stat.sub(info.value_, /*protect_underflow=*/true);
-      }
+      gauge_stat.sub(info.value_, /*protect_underflow=*/true);
     }
   }
 
@@ -144,8 +145,6 @@ private:
   Stats::ScopeSharedPtr scope_;
   std::shared_ptr<Stats::StatNamePool> stat_name_pool_;
 
-  // InflightGauge holds the state of a gauge that is currently in-flight (incremented but not
-  // yet decremented).
   struct InflightGauge {
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
     uint64_t value_;
