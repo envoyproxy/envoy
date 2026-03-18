@@ -95,7 +95,7 @@ private:
                        const StreamInfo::StreamInfo& stream_info) const;
 
   const Stats::ScopeSharedPtr scope_;
-  Stats::StatNamePool stat_name_pool_;
+  std::shared_ptr<Stats::StatNamePool> stat_name_pool_;
 
   const std::vector<Histogram> histograms_;
   const std::vector<Counter> counters_;

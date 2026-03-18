@@ -21,44 +21,117 @@ using Extensions::Matching::Actions::TransformStat::ActionContext;
 // that objects are deleted with streams.
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
+  AccessLogState(Stats::ScopeSharedPtr scope, std::shared_ptr<Stats::StatNamePool> stat_name_pool)
+      : scope_(std::move(scope)), stat_name_pool_(std::move(stat_name_pool)) {}
+
+  // GaugeKey serves as a lock-free map key composed of exactly the configuration
+  // properties that define a fully resolved gauge metric.
+  //
+  // To avoid heap-allocating a new std::vector on every map lookup (which happens
+  // on every single gauge increment/decrement), this key acts as a lightweight
+  // zero-allocation "view" using `borrowed_tags_` during map lookups.
+  // When the key actually needs to be safely persisted into the map, `makeOwned()`
+  // is explicitly called to allocate and copy the tags into `owned_tags_`.
+  struct GaugeKey {
+    Stats::StatName stat_name_;
+    Stats::Gauge::ImportMode import_mode_;
+    absl::optional<Stats::StatNameTagVector> owned_tags_;
+    Stats::StatNameTagVectorOptConstRef borrowed_tags_{
+        absl::nullopt}; // Only valid if owned_tags_ is nullopt
+
+    // Constructor for fast lookup (no initial vector allocation)
+    GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
+             Stats::StatNameTagVectorOptConstRef borrowed_tags)
+        : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
+
+    // Convert to owned strings to be held safely within the map
+    void makeOwned() {
+      if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
+        owned_tags_ = borrowed_tags_.value().get();
+        borrowed_tags_ = absl::nullopt;
+      }
+    }
+
+    Stats::StatNameTagVectorOptConstRef tags() const {
+      if (owned_tags_.has_value()) {
+        return std::cref(owned_tags_.value());
+      }
+      return borrowed_tags_;
+    }
+
+    bool operator==(const GaugeKey& rhs) const {
+      auto lhs_tags = tags();
+      auto rhs_tags = rhs.tags();
+      if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_)
+        return false;
+      if (lhs_tags.has_value() != rhs_tags.has_value())
+        return false;
+      if (!lhs_tags.has_value())
+        return true;
+      return lhs_tags.value().get() == rhs_tags.value().get();
+    }
+
+    template <typename H> friend H AbslHashValue(H h, const GaugeKey& key) {
+      auto tags = key.tags();
+      if (tags.has_value()) {
+        h = H::combine(std::move(h), key.stat_name_, key.import_mode_, true);
+        for (const auto& tag : tags.value().get()) {
+          h = H::combine(std::move(h), tag.first, tag.second);
+        }
+        return h;
+      }
+      return H::combine(std::move(h), key.stat_name_, key.import_mode_, false);
+    }
+  };
 
   ~AccessLogState() override {
-    while (!inflight_gauges_.empty()) {
-      auto it = inflight_gauges_.begin();
-      Stats::StatNameDynamicStorage storage(it->first, scope_->symbolTable());
-      scope_->gaugeFromStatName(storage.statName(), it->second.import_mode_)
-          .sub(it->second.value_, /*protect_underflow=*/true);
-      inflight_gauges_.erase(it);
+    for (const auto& [key, info] : inflight_gauges_) {
+      auto& gauge_stat =
+          scope_->gaugeFromStatNameWithTags(key.stat_name_, key.tags(), key.import_mode_);
+      if (gauge_stat.used()) {
+        gauge_stat.sub(info.value_, /*protect_underflow=*/true);
+      }
     }
   }
 
   void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                        Stats::Gauge::ImportMode import_mode, uint64_t value) {
+                        Stats::Gauge::ImportMode import_mode, uint64_t value,
+                        std::vector<Stats::StatNameDynamicStorage> tags_storage) {
     if (value == 0) {
       return;
     }
-    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
-    std::string gauge_name = gauge_stat.name();
 
-    auto it = inflight_gauges_.find(gauge_name);
+    GaugeKey key{stat_name, import_mode, tags};
+
+    auto it = inflight_gauges_.find(key);
     if (it == inflight_gauges_.end()) {
-      auto [new_it, inserted] = inflight_gauges_.emplace(gauge_name, InflightGauge{import_mode, 0});
+      key.makeOwned();
+      auto [new_it, inserted] =
+          inflight_gauges_.emplace(std::move(key), InflightGauge{std::move(tags_storage), 0});
       it = new_it;
     }
     it->second.value_ += value;
-    gauge_stat.add(value);
+    scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
   }
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode import_mode, uint64_t value) {
-    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
-    std::string gauge_name = gauge_stat.name();
+    if (value == 0) {
+      return;
+    }
 
-    auto it = inflight_gauges_.find(gauge_name);
+    GaugeKey key{stat_name, import_mode, tags};
+
+    // Create the gauge so it gets registered in the stat store (expected by some tests and stats
+    // logic)
+    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+
+    auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
-      gauge_stat.sub(value, /*protect_underflow=*/true);
+      if (gauge_stat.used()) {
+        gauge_stat.sub(value, /*protect_underflow=*/true);
+      }
       if (it->second.value_ == 0) {
         inflight_gauges_.erase(it);
       }
@@ -69,18 +142,16 @@ public:
 
 private:
   Stats::ScopeSharedPtr scope_;
+  std::shared_ptr<Stats::StatNamePool> stat_name_pool_;
 
   // InflightGauge holds the state of a gauge that is currently in-flight (incremented but not
   // yet decremented).
   struct InflightGauge {
-    Stats::Gauge::ImportMode import_mode_;
+    std::vector<Stats::StatNameDynamicStorage> tags_storage_;
     uint64_t value_;
   };
 
-  // The map key holds a std::string generated from the instantiated gauge to correctly
-  // ensure that we match PAIRED_ADD and PAIRED_SUBTRACT entries without being subject to
-  // subtle StatName encoding mismatches between Managed and Dynamic SymbolTable allocations.
-  absl::flat_hash_map<std::string, InflightGauge> inflight_gauges_;
+  absl::flat_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -148,10 +219,11 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
       scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
+      stat_name_pool_(std::make_shared<Stats::StatNamePool>(scope_->symbolTable())),
+      histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
-          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),
+          histograms.emplace_back(NameAndTags(hist_cfg.stat(), *stat_name_pool_, commands, context),
                                   convertUnitEnum(hist_cfg.unit()),
                                   parseValueFormat(hist_cfg.value_format(), commands));
         }
@@ -161,7 +233,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         std::vector<Counter> counters;
         for (const auto& counter_cfg : config.counters()) {
           Counter& inserted = counters.emplace_back(
-              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands, context), nullptr, 0);
+              NameAndTags(counter_cfg.stat(), *stat_name_pool_, commands, context), nullptr, 0);
           if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
             throw EnvoyException(
                 "Stats logger cannot have both `value_format` and `value_fixed` configured.");
@@ -220,9 +292,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             operations.emplace_back(gauge_cfg.set().log_type(), Gauge::OperationType::SET);
           }
 
-          Gauge& inserted =
-              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands, context),
-                                  nullptr, 0, std::move(operations));
+          Gauge& inserted = gauges.emplace_back(
+              NameAndTags(gauge_cfg.stat(), *stat_name_pool_, commands, context), nullptr, 0,
+              std::move(operations));
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
@@ -429,14 +501,14 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
              op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
-                           StreamInfo::FilterState::StateType::Mutable,
-                           StreamInfo::FilterState::LifeSpan::Request);
+      filter_state.setData(
+          AccessLogState::key(), std::make_shared<AccessLogState>(scope_, stat_name_pool_),
+          StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(gauge.stat_.name_, tags, import_mode, value);
+      state->addInflightGauge(gauge.stat_.name_, tags, import_mode, value, std::move(storage));
     } else {
       state->removeInflightGauge(gauge.stat_.name_, tags, import_mode, value);
     }

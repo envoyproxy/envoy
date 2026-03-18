@@ -105,6 +105,7 @@ public:
     auto* gauge = new NiceMock<MockGaugeWithTags>();
     gauge_ = gauge;
     ON_CALL(*gauge_, value()).WillByDefault(testing::Return(10));
+    ON_CALL(*gauge_, used()).WillByDefault(testing::Return(true));
     gauge_ptr_ = Stats::GaugeSharedPtr(gauge_);
     gauge_->name_ = "gauge";
     gauge_->setTagExtractedName("gauge");
