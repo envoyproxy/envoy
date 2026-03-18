@@ -11,6 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/http/async_client_utility.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/tracer.h"
@@ -63,6 +64,9 @@ struct CollectorInfo {
   // Only available when using HttpService configuration via request_headers_to_add.
   // Legacy configuration does not support custom headers.
   std::vector<std::pair<Http::LowerCaseString, std::string>> request_headers_;
+
+  // Headers applicator for substitution formatter support when using HttpService configuration
+  std::unique_ptr<Http::HttpServiceHeadersApplicator> headers_applicator_;
 };
 
 using CollectorInfoConstSharedPtr = std::shared_ptr<const CollectorInfo>;
