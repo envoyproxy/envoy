@@ -1546,6 +1546,14 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%SPAN_ID%``
+  HTTP
+    The span ID of the active (downstream) span for the request. If the request does not have a span ID,
+    this will be an empty string. Note that span ID availability depends on the tracing provider; not all
+    providers implement span ID retrieval.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%QUERY_PARAM(X):Z%``
   HTTP
     The value of the query parameter ``X``. If the query parameter ``X`` is not present, ``"-"`` symbol will be used.
