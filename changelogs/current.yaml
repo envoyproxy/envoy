@@ -731,8 +731,8 @@ new_features:
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
 - area: http
-   change: |
-     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
-     which will close idle HTTP connections when the overload manager enters the active state.
+  change: |
+    Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
+    which will close idle HTTP connections when the overload manager enters the active state.
 
 deprecated:
