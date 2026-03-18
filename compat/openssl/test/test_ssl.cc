@@ -2108,3 +2108,119 @@ INSTANTIATE_TEST_SUITE_P(SSLTestWithSSLFunc, SSLTestWithSSLFunc,
       }
     }
 ));
+
+// A custom BIO backed by a raw fd. This mimics Envoy's io_handle_bio pattern.
+// The read callback returns 0 on EOF without setting any OpenSSL-specific EOF
+// flags.
+namespace custom_bio {
+
+static int bread(BIO* b, char* out, int outl) {
+  if (out == nullptr) {
+    return 0;
+  }
+  int fd = static_cast<int>(reinterpret_cast<intptr_t>(BIO_get_data(b)));
+  BIO_clear_retry_flags(b);
+  int ret = ::read(fd, out, outl);
+  if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
+    BIO_set_retry_read(b);
+    return -1;
+  }
+  return ret; // Returns 0 on EOF — no special flag handling, just like BoringSSL.
+}
+
+static int bwrite(BIO* b, const char* in, int inl) {
+  int fd = static_cast<int>(reinterpret_cast<intptr_t>(BIO_get_data(b)));
+  BIO_clear_retry_flags(b);
+  int ret = ::write(fd, in, inl);
+  if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
+    BIO_set_retry_write(b);
+    return -1;
+  }
+  return ret;
+}
+
+static long ctrl(BIO*, int cmd, long, void*) {
+  switch (cmd) {
+  case BIO_CTRL_FLUSH:
+    return 1;
+  default:
+    return 0;
+  }
+}
+
+static const BIO_METHOD* custom_method() {
+  static BIO_METHOD* m = [] {
+    BIO_METHOD* ret = BIO_meth_new(BIO_TYPE_SOCKET, "custom_bio");
+    BIO_meth_set_read(ret, bread);
+    BIO_meth_set_write(ret, bwrite);
+    BIO_meth_set_ctrl(ret, ctrl);
+    return ret;
+  }();
+  return m;
+}
+
+static BIO* new_custom_bio(int fd) {
+  BIO* b = BIO_new(custom_method());
+  BIO_set_data(b, reinterpret_cast<void*>(static_cast<intptr_t>(fd)));
+  BIO_set_init(b, 1);
+  return b;
+}
+
+} // namespace custom_bio
+
+// Verify that SSL_read through a custom BIO correctly reports EOF (not a fatal
+// error) when the peer closes the connection without SSL_shutdown.
+TEST(SSLTest, test_custom_bio_eof) {
+  TempFile root_ca_cert_pem{root_ca_cert_pem_str};
+  TempFile server_2_key_pem{server_2_key_pem_str};
+  TempFile server_2_cert_chain_pem{server_2_cert_chain_pem_str};
+
+  int sockets[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets));
+  SocketCloser close_client{sockets[1]};
+
+  // Server setup — use SSL_set_fd (standard BIO) for simplicity.
+  bssl::UniquePtr<SSL_CTX> server_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_TRUE(SSL_CTX_use_certificate_chain_file(server_ctx.get(), server_2_cert_chain_pem.path()));
+  ASSERT_TRUE(
+      SSL_CTX_use_PrivateKey_file(server_ctx.get(), server_2_key_pem.path(), SSL_FILETYPE_PEM));
+  bssl::UniquePtr<SSL> server_ssl(SSL_new(server_ctx.get()));
+  ASSERT_TRUE(SSL_set_fd(server_ssl.get(), sockets[0]));
+  SSL_set_accept_state(server_ssl.get());
+
+  // Client setup — use the custom BIO (no EOF flag handling, pure BoringSSL style).
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_TRUE(SSL_CTX_load_verify_locations(client_ctx.get(), root_ca_cert_pem.path(), nullptr));
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  BIO* client_bio = custom_bio::new_custom_bio(sockets[1]);
+  SSL_set_bio(client_ssl.get(), client_bio, client_bio);
+  SSL_set_connect_state(client_ssl.get());
+
+  ASSERT_TRUE(CompleteHandshakes(client_ssl.get(), server_ssl.get()));
+
+  // Server: close abruptly (no SSL_shutdown), simulating EOF on the transport.
+  server_ssl.reset();
+  ::close(sockets[0]);
+
+  // Client: SSL_read should report EOF, not a fatal SSL error.
+  char buf[128];
+  int ret = SSL_read(client_ssl.get(), buf, sizeof(buf));
+  int err = SSL_get_error(client_ssl.get(), ret);
+
+  // SSL_read should not have succeeded.
+  EXPECT_LE(ret, 0);
+
+  // Must not be a fatal protocol error. On OpenSSL without EOF flag handling,
+  // this would be SSL_ERROR_SSL because the record layer treats the 0-return
+  // as a fatal error rather than EOF.
+  EXPECT_NE(SSL_ERROR_SSL, err) << ERR_error_string(ERR_get_error(), nullptr);
+
+  // The error should be either SYSCALL (BoringSSL's typical EOF indication,
+  // with errno 0) or ZERO_RETURN (clean shutdown).
+  EXPECT_TRUE((err == SSL_ERROR_SYSCALL) || (err == SSL_ERROR_ZERO_RETURN))
+                    << "SSL_get_error returned " << err;
+
+  // The error stack must be empty — a transport EOF is not a protocol error.
+  // SSL_ERROR_SSL would push errors onto the stack; EOF should not.
+  EXPECT_EQ(0u, ERR_peek_error());
+}

@@ -16,6 +16,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_read \
   --uncomment-func-decl BIO_write \
   --uncomment-func-decl BIO_puts \
+  --uncomment-func-decl BIO_flush \
   --uncomment-func-decl BIO_pending \
   --uncomment-func-decl BIO_reset \
   --uncomment-func-decl BIO_should_read \
@@ -44,8 +45,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_meth_set_read \
   --uncomment-func-decl BIO_meth_set_write \
   --uncomment-func-decl BIO_meth_set_ctrl \
-  --uncomment-func-decl BIO_meth_set_create \
-  --uncomment-func-decl BIO_meth_set_destroy \
   --uncomment-func-decl BIO_set_data \
   --uncomment-func-decl BIO_get_data \
   --uncomment-func-decl BIO_set_init \

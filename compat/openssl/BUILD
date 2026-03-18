@@ -378,6 +378,7 @@ mapping_func_filegroup(
         "BIO_pending",
         "BIO_printf",
         "BIO_puts",
+        "BIO_flush",
         "BIO_read_asn1",
         "BIO_read_filename",
         "BIO_read",
@@ -898,6 +899,8 @@ cc_library(
         "source/override.cc",
         "source/override.h",
         "source/stack.c",
+        "source/custom_bio.h",
+        "source/custom_bio.cc",
     ],
 
     # Add the OpenSSL shared libraries as a *data* dependency, so they get

@@ -67,10 +67,6 @@
 #include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
-#ifdef ENVOY_SSL_OPENSSL
-#include <ossl/openssl/provider.h>
-#endif
-
 using testing::_;
 using testing::ContainsRegex;
 using testing::DoAll;
