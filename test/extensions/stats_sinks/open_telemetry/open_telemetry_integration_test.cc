@@ -192,7 +192,6 @@ public:
     }
   }
 
-private:
   TransportDriver makeGrpcDriver(Grpc::ClientType client_type) {
     return {[this](auto& config, auto addr) {
               setGrpcService(*config.mutable_grpc_service(), "otlp_collector", addr);
@@ -221,32 +220,44 @@ private:
             }};
   }
 
-  TransportDriver makeHttpDriver() {
-    return {[this](auto& config, auto addr) {
-              auto* http = config.mutable_http_service();
-              http->mutable_http_uri()->set_uri(fmt::format(
-                  "http://{}:{}/v1/metrics",
-                  Network::Test::getLoopbackAddressUrlString(ipVersion()), addr->ip()->port()));
-              http->mutable_http_uri()->set_cluster("otlp_collector");
-              http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
-            },
-            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
-              VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
-              EXPECT_EQ("POST", stream->headers().getMethodValue());
-              EXPECT_EQ("/v1/metrics", stream->headers().getPathValue());
-              EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
-              EXPECT_TRUE(absl::StartsWith(stream->headers().getUserAgentValue(),
-                                           "OTel-OTLP-Exporter-Envoy/"));
-              EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
-              return AssertionSuccess();
-            },
-            [](auto& stream) {
-              stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-            },
-            // HTTP uses standard cluster request tracking.
-            [](IntegrationTestServer& server) {
-              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
-            }};
+  TransportDriver makeHttpDriver(bool add_formatter_header = false) {
+    return {
+        [this, add_formatter_header](auto& config, auto addr) {
+          auto* http = config.mutable_http_service();
+          http->mutable_http_uri()->set_uri(fmt::format(
+              "http://{}:{}/v1/metrics", Network::Test::getLoopbackAddressUrlString(ipVersion()),
+              addr->ip()->port()));
+          http->mutable_http_uri()->set_cluster("otlp_collector");
+          http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+          if (add_formatter_header) {
+            auto* header = http->add_request_headers_to_add();
+            header->mutable_header()->set_key("x-custom-formatter");
+            header->mutable_header()->set_value("%HOSTNAME%");
+          }
+        },
+        [add_formatter_header](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+          VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
+          EXPECT_EQ("POST", stream->headers().getMethodValue());
+          EXPECT_EQ("/v1/metrics", stream->headers().getPathValue());
+          EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
+          EXPECT_TRUE(
+              absl::StartsWith(stream->headers().getUserAgentValue(), "OTel-OTLP-Exporter-Envoy/"));
+          if (add_formatter_header) {
+            auto values = stream->headers().get(Http::LowerCaseString("x-custom-formatter"));
+            EXPECT_FALSE(values.empty());
+            EXPECT_FALSE(values[0]->value().empty());
+            EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+          }
+          EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
+          return AssertionSuccess();
+        },
+        [](auto& stream) {
+          stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+        },
+        // HTTP uses standard cluster request tracking.
+        [](IntegrationTestServer& server) {
+          server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+        }};
   }
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
@@ -469,5 +480,41 @@ TEST_P(OpenTelemetryIntegrationTestCustomConversion, CustomConversionWithAggrega
   driver_.expectUpstreamRequestFinished(*test_server_);
   cleanup();
 }
+
+class OpenTelemetryFormatterHeaderTest : public OpenTelemetryIntegrationTest {
+public:
+  OpenTelemetryFormatterHeaderTest() { driver_ = makeHttpDriver(/*add_formatter_header=*/true); }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeHttpOnly, OpenTelemetryFormatterHeaderTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(ExporterType::HTTP)),
+    [](const auto& info) {
+      return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                         std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                                 : "EnvoyGrpc",
+                         std::get<2>(info.param) == ExporterType::GRPC ? "gRPC" : "HTTP");
+    });
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(OpenTelemetryFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(
+      waitForMetricsRequest([this](const auto& metrics, auto& counter, auto& gauge, auto& hist) {
+        checkBasicMetrics(metrics, counter, gauge, hist);
+      }));
+
+  driver_.expectUpstreamRequestFinished(*test_server_);
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

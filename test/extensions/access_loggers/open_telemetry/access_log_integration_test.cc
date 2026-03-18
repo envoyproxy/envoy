@@ -66,6 +66,7 @@ class AccessLogIntegrationTest
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, ExporterType>>,
       public HttpIntegrationTest {
+protected:
   TransportDriver driver_;
 
 public:
@@ -152,7 +153,6 @@ public:
     }
   }
 
-private:
   TransportDriver makeGrpcDriver() {
     return {[this](auto& config, auto addr) {
               setGrpcService(*config.mutable_grpc_service(), "accesslog", addr);
@@ -173,28 +173,40 @@ private:
             }};
   }
 
-  TransportDriver makeHttpDriver() {
-    return {[this](auto& config, auto addr) {
-              auto* http = config.mutable_http_service();
-              http->mutable_http_uri()->set_uri(fmt::format(
-                  "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(ipVersion()),
-                  addr->ip()->port()));
-              http->mutable_http_uri()->set_cluster("accesslog");
-              http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
-            },
-            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
-              VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
-              EXPECT_EQ("POST", stream->headers().getMethodValue());
-              EXPECT_EQ("/v1/logs", stream->headers().getPathValue());
-              EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
-              EXPECT_TRUE(absl::StartsWith(stream->headers().getUserAgentValue(),
-                                           "OTel-OTLP-Exporter-Envoy/"));
-              EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
-              return AssertionSuccess();
-            },
-            [](auto& stream) {
-              stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-            }};
+  TransportDriver makeHttpDriver(bool add_formatter_header = false) {
+    return {
+        [this, add_formatter_header](auto& config, auto addr) {
+          auto* http = config.mutable_http_service();
+          http->mutable_http_uri()->set_uri(fmt::format(
+              "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(ipVersion()),
+              addr->ip()->port()));
+          http->mutable_http_uri()->set_cluster("accesslog");
+          http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+          if (add_formatter_header) {
+            auto* header = http->add_request_headers_to_add();
+            header->mutable_header()->set_key("x-custom-formatter");
+            header->mutable_header()->set_value("%HOSTNAME%");
+          }
+        },
+        [add_formatter_header](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+          VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
+          EXPECT_EQ("POST", stream->headers().getMethodValue());
+          EXPECT_EQ("/v1/logs", stream->headers().getPathValue());
+          EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
+          EXPECT_TRUE(
+              absl::StartsWith(stream->headers().getUserAgentValue(), "OTel-OTLP-Exporter-Envoy/"));
+          if (add_formatter_header) {
+            auto values = stream->headers().get(Http::LowerCaseString("x-custom-formatter"));
+            EXPECT_FALSE(values.empty());
+            EXPECT_FALSE(values[0]->value().empty());
+            EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+          }
+          EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
+          return AssertionSuccess();
+        },
+        [](auto& stream) {
+          stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+        }};
   }
 
   FakeHttpConnectionPtr fake_access_log_connection_;
@@ -291,6 +303,35 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
   cleanup();
 
   test_server_->waitForCounterEq("access_logs.open_telemetry_access_log.logs_written", 2);
+}
+
+class AccessLogFormatterHeaderTest : public AccessLogIntegrationTest {
+public:
+  AccessLogFormatterHeaderTest() {
+    // Override the driver to include a formatter-based custom header.
+    driver_ = makeHttpDriver(/*add_formatter_header=*/true);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeHttpOnly, AccessLogFormatterHeaderTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(ExporterType::HTTP)),
+    [](const auto& info) {
+      return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                         std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                                 : "EnvoyGrpc",
+                         std::get<2>(info.param) == ExporterType::GRPC ? "gRPC" : "HTTP");
+    });
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(AccessLogFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  testRouterNotFound();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
+  cleanup();
 }
 
 } // namespace
