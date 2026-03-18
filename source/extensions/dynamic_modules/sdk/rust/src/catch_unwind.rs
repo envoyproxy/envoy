@@ -235,9 +235,11 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     end_stream: bool,
   ) {
-    self.catch_or_skip("on_http_stream_headers", |f| {
-      f.on_http_stream_headers(envoy_filter, stream_handle, response_headers, end_stream)
-    });
+    self
+      .catch("on_http_stream_headers", |f| {
+        f.on_http_stream_headers(envoy_filter, stream_handle, response_headers, end_stream)
+      })
+      .unwrap_or_else(|_| reset_stream(envoy_filter));
   }
 
   fn on_http_stream_data(
@@ -247,9 +249,11 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_data: &[EnvoyBuffer],
     end_stream: bool,
   ) {
-    self.catch_or_skip("on_http_stream_data", |f| {
-      f.on_http_stream_data(envoy_filter, stream_handle, response_data, end_stream)
-    });
+    self
+      .catch("on_http_stream_data", |f| {
+        f.on_http_stream_data(envoy_filter, stream_handle, response_data, end_stream)
+      })
+      .unwrap_or_else(|_| reset_stream(envoy_filter));
   }
 
   fn on_http_stream_trailers(
@@ -258,9 +262,11 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     stream_handle: u64,
     response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
   ) {
-    self.catch_or_skip("on_http_stream_trailers", |f| {
-      f.on_http_stream_trailers(envoy_filter, stream_handle, response_trailers)
-    });
+    self
+      .catch("on_http_stream_trailers", |f| {
+        f.on_http_stream_trailers(envoy_filter, stream_handle, response_trailers)
+      })
+      .unwrap_or_else(|_| reset_stream(envoy_filter));
   }
 
   fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
