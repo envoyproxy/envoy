@@ -236,3 +236,132 @@ pub trait CertValidatorConfig: Send + Sync {
   /// lifetime of the config.
   fn update_digest(&self) -> &[u8];
 }
+
+// =============================================================================
+// FFI trampolines
+// =============================================================================
+
+use crate::{drop_wrapped_c_void_ptr, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CONFIG_FUNCTION};
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let new_config_fn = NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_ptr, CertValidatorConfig);
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  certs: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  certs_count: usize,
+  host_name: abi::envoy_dynamic_module_type_envoy_buffer,
+  is_server: bool,
+) -> abi::envoy_dynamic_module_type_cert_validator_validation_result {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+    &**raw
+  };
+
+  let envoy_cert_validator = EnvoyCertValidator::new(config_envoy_ptr);
+
+  let cert_buffers = std::slice::from_raw_parts(certs, certs_count);
+  let cert_slices: Vec<&[u8]> = cert_buffers
+    .iter()
+    .map(|buf| std::slice::from_raw_parts(buf.ptr as *const u8, buf.length))
+    .collect();
+
+  let host_name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    host_name.ptr as *const _,
+    host_name.length,
+  ));
+
+  let result = config.do_verify_cert_chain(
+    &envoy_cert_validator,
+    &cert_slices,
+    host_name_str,
+    is_server,
+  );
+
+  // If the module provided error details, pass them to Envoy via the callback.
+  // Envoy copies the buffer immediately, so the string only needs to live until the call returns.
+  if let Some(ref error) = result.error_details {
+    let error_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: error.as_ptr() as *const _,
+      length: error.len(),
+    };
+    abi::envoy_dynamic_module_callback_cert_validator_set_error_details(
+      config_envoy_ptr,
+      error_buf,
+    );
+  }
+
+  abi::envoy_dynamic_module_type_cert_validator_validation_result::from(&result)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  handshaker_provides_certificates: bool,
+) -> std::os::raw::c_int {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+    &**raw
+  };
+  config.get_ssl_verify_mode(handshaker_provides_certificates)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_update_digest(
+  config_module_ptr: abi::envoy_dynamic_module_type_cert_validator_config_module_ptr,
+  out_data: *mut abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let config = {
+    let raw = config_module_ptr as *const *const dyn CertValidatorConfig;
+    &**raw
+  };
+  let digest = config.update_digest();
+  (*out_data).ptr = digest.as_ptr() as *const _;
+  (*out_data).length = digest.len();
+}

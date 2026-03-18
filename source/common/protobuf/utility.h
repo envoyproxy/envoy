@@ -412,6 +412,10 @@ public:
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
+   *
+   * NOTE: prefer to use knownAnyToBytes() instead of this function, which has additional support
+   * for google.protobuf.Struct. This is kept temporarily for backward compatibility.
+   *
    * @param any source google.protobuf.Any message.
    *
    * @return std::string consists of bytes in the input message or error status.
@@ -429,6 +433,36 @@ public:
     }
     return bytesToString(any.value());
   };
+
+#ifdef ENVOY_ENABLE_YAML
+
+  /**
+   * Convert from google.protobuf.Any to bytes as std::string, with additional support for
+   * google.protobuf.Struct which is serialized to JSON.
+   * @param any source google.protobuf.Any message.
+   *
+   * @return std::string consists of bytes (StringValue/BytesValue), JSON (Struct), or raw bytes.
+   */
+  static absl::StatusOr<std::string> knownAnyToBytes(const Protobuf::Any& any) {
+    if (any.Is<Protobuf::StringValue>()) {
+      Protobuf::StringValue s;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
+      return s.value();
+    }
+    if (any.Is<Protobuf::BytesValue>()) {
+      Protobuf::BytesValue b;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
+      return bytesToString(b.value());
+    }
+    if (any.Is<Protobuf::Struct>()) {
+      Protobuf::Struct s;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
+      return getJsonStringFromMessage(s);
+    }
+    return bytesToString(any.value());
+  };
+
+#endif
 
   /**
    * Convert from google.protobuf.Any to a typed message.

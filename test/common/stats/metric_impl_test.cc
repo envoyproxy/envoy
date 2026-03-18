@@ -1,6 +1,6 @@
 #include <string>
 
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/utility.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -25,7 +25,7 @@ protected:
   }
 
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   StatNamePool pool_;
 };
 

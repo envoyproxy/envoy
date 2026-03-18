@@ -144,6 +144,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+    "envoy.matching.actions.transform_stat":            "//source/extensions/matching/actions/transform_stat:config",
     "envoy.matching.action.transport_socket.name":      "//source/extensions/matching/common_inputs/transport_socket:config",
 
     #
@@ -155,6 +156,7 @@ EXTENSIONS = {
     # HTTP filters
     #
 
+    "envoy.filters.http.a2a":                           "//source/extensions/filters/http/a2a:config",
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
     "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
     "envoy.filters.http.alternate_protocols_cache":     "//source/extensions/filters/http/alternate_protocols_cache:config",
@@ -236,6 +238,7 @@ EXTENSIONS = {
     # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
+    "envoy.filters.listener.set_filter_state":          "//source/extensions/filters/listener/set_filter_state:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
     "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
@@ -390,6 +393,7 @@ EXTENSIONS = {
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
 
+    "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",

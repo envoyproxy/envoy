@@ -88,9 +88,9 @@ Matcher::DataInputGetResult
 TransportSocketInputBase::get(const Upstream::TransportSocketMatchingData& data) const {
   auto value = getValue(data);
   if (value.has_value()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, value.value()};
+    return Matcher::DataInputGetResult::CreateString(std::move(value.value()));
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  return Matcher::DataInputGetResult::NoData();
 }
 
 absl::optional<std::string>

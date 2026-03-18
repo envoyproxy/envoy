@@ -1,5 +1,9 @@
 #include "sdk.h"
 
+#include <format>
+#include <iostream>
+#include <string_view>
+
 namespace Envoy {
 namespace DynamicModules {
 
@@ -60,10 +64,13 @@ std::string readWholeResponseBody(HttpFilterHandle& handle) {
 }
 } // namespace Utility
 
-HttpFilterConfigFactoryRegister::HttpFilterConfigFactoryRegister(absl::string_view name,
+HttpFilterConfigFactoryRegister::HttpFilterConfigFactoryRegister(std::string_view name,
                                                                  HttpFilterConfigFactoryPtr factory)
     : name_(name) {
-  auto r = HttpFilterConfigFactoryRegistry::getMutableRegistry().emplace(name_, std::move(factory));
+  // The register will have longer lifetime than the related factory entry in the registry,
+  // so it's safe to store the name as string_view in the registry.
+  auto r = HttpFilterConfigFactoryRegistry::getMutableRegistry().emplace(std::string_view(name_),
+                                                                         std::move(factory));
   if (!r.second) {
     std::string error_msg = std::format("Factory with the same name {} already registered", name_);
     std::cerr << error_msg << std::endl;
@@ -75,13 +82,13 @@ HttpFilterConfigFactoryRegister::~HttpFilterConfigFactoryRegister() {
   HttpFilterConfigFactoryRegistry::getMutableRegistry().erase(name_);
 }
 
-absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>&
+std::map<std::string_view, HttpFilterConfigFactoryPtr>&
 HttpFilterConfigFactoryRegistry::getMutableRegistry() {
-  static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr> registry;
+  static std::map<std::string_view, HttpFilterConfigFactoryPtr> registry;
   return registry;
 }
 
-const absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>&
+const std::map<std::string_view, HttpFilterConfigFactoryPtr>&
 HttpFilterConfigFactoryRegistry::getRegistry() {
   return getMutableRegistry();
 };

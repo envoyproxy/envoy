@@ -144,18 +144,6 @@ path_mappings:
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("banana")));
 }
 
-TEST_F(FileServerConfigTest, SuffixForContentTypeContainingPeriodIsError) {
-  auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
-manager_config:
-  thread_pool: {}
-content_types:
-  "txt": "text/plain"
-  ".html": "text/html"
-)"),
-                                                           "stats", mock_factory_context_);
-  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr(".html")));
-}
-
 TEST_F(FileServerConfigTest, ValidConfigPopulatesConfigObjectAppropriately) {
   std::shared_ptr<const FileServerConfig> config = captureConfigFromProto(configFromYaml(R"(
 manager_config:
@@ -170,7 +158,7 @@ content_types:
   "txt": "text/plain"
   "html": "text/html"
   "": "text/x-no-suffix"
-  "README": "text/markdown"
+  "readme": "text/markdown"
 default_content_type: "application/octet-stream"
 directory_behaviors:
   - default_file: "index.html"

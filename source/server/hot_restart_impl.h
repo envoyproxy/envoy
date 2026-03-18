@@ -12,7 +12,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
@@ -102,7 +102,8 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
-  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) override;
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                  absl::string_view network_namespace) override;
   void registerUdpForwardingListener(
       Network::Address::InstanceConstSharedPtr address,
       std::shared_ptr<Network::UdpListenerConfig> listener_config) override;

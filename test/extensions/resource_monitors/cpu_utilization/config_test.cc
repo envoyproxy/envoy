@@ -1,7 +1,9 @@
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/thread.h"
 #include "source/extensions/resource_monitors/cpu_utilization/config.h"
+#include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -44,7 +46,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
-  EXPECT_NE(factory, nullptr);
+  ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   EXPECT_EQ(config.mode(),
@@ -63,7 +65,7 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
-  EXPECT_NE(factory, nullptr);
+  ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   config.set_mode(
@@ -79,8 +81,18 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
 #if defined(__linux__)
-  auto monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+  // Skip the check if the system running the test does not support cgroup.
+  TRY_ASSERT_MAIN_THREAD {
+    auto monitor = factory->createResourceMonitor(config, context);
+    // If we did not throw, we must have a non-null monitor.
+    EXPECT_NE(monitor, nullptr);
+  }
+  END_TRY
+  CATCH(EnvoyException & e, {
+    // If we did throw it must have been because of cgroup.
+    ASSERT_THAT(std::string(e.what()), ::testing::Eq(NoSupportedCGroupMessage));
+    GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
+  });
 #else
   EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 #endif
@@ -126,15 +138,24 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
 
-  auto monitor = factory->createResourceMonitor(config, context);
-  // If cgroup files exist (Linux CI), monitor should be created and functional
-  ASSERT_NE(monitor, nullptr);
+  // Skip the check if the system running the test does not support cgroup.
+  TRY_ASSERT_MAIN_THREAD {
+    auto monitor = factory->createResourceMonitor(config, context);
+    // If cgroup files exist (Linux CI), monitor should be created and functional
+    ASSERT_NE(monitor, nullptr);
 
-  // Exercise the monitor by calling updateResourceUsage
-  TestResourcePressureCallbacks callbacks;
-  monitor->updateResourceUsage(callbacks);
-  // Either success or error is acceptable depending on system state
-  EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+    // Exercise the monitor by calling updateResourceUsage
+    TestResourcePressureCallbacks callbacks;
+    monitor->updateResourceUsage(callbacks);
+    // Either success or error is acceptable depending on system state
+    EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+  }
+  END_TRY
+  CATCH(EnvoyException & e, {
+    // If we did throw it must have been because of cgroup.
+    ASSERT_THAT(std::string(e.what()), ::testing::Eq(NoSupportedCGroupMessage));
+    GTEST_SKIP() << "Skipping test because the current machine does not support cgroup";
+  });
 }
 #endif
 
@@ -142,7 +163,7 @@ TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
-  EXPECT_NE(factory, nullptr);
+  ASSERT_NE(factory, nullptr);
 
   EXPECT_EQ(factory->name(), "envoy.resource_monitors.cpu_utilization");
 }
