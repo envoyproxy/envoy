@@ -406,9 +406,9 @@ public:
     return textReadoutFromStatName(storage.statName());
   }
 
+  StatName prefix() const override { return prefix_.statName(); }
   IsolatedStoreImpl& store() override { return store_; }
   const IsolatedStoreImpl& constStore() const override { return store_; }
-  const Store& constStore() const override { return store_; }
 
 protected:
   void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
