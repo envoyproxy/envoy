@@ -730,6 +730,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   listener_manager_ = listener_manager_factory->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
+  // Runtime is initialized before the overload manager so resource monitors can read runtime keys;
+  // that means the first runtime snapshot is published before workers register for thread-local
+  // updates. Refresh the snapshot now so worker threads receive a valid TLS snapshot.
+  if (runtime_) {
+    RETURN_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+  }
+
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
 

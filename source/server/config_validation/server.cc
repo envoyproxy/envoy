@@ -130,14 +130,26 @@ void ValidationInstance::initialize(const Options& options,
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
-                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   runtime_ = component_factory.createRuntime(*this, initial_config);
   ENVOY_BUG(runtime_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");
+  validation_context_.setRuntime(runtime());
+
+  overload_manager_ = THROW_OR_RETURN_VALUE(
+      OverloadManagerImpl::create(
+          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
+          messageValidationContext().staticValidationVisitor(), *api_, options_, *runtime_),
+      std::unique_ptr<OverloadManagerImpl>);
+  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
+
+  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
+                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
+
+  THROW_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+
   drain_manager_ = component_factory.createDrainManager(*this);
   ENVOY_BUG(drain_manager_ != nullptr,
             "Component factory should not return nullptr from createDrainManager()");
@@ -159,14 +171,6 @@ void ValidationInstance::initialize(const Options& options,
       quic_stat_names_);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
-
-  // Overload manager last so it can use runtime (e.g. for resource monitor runtime keys).
-  overload_manager_ = THROW_OR_RETURN_VALUE(
-      OverloadManagerImpl::create(
-          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
-          messageValidationContext().staticValidationVisitor(), *api_, options_, *runtime_),
-      std::unique_ptr<OverloadManagerImpl>);
-  null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
 
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }

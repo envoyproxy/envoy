@@ -542,6 +542,8 @@ absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   return absl::OkStatus();
 }
 
+absl::Status LoaderImpl::onWorkerThreadsRegistered() { return loadNewSnapshot(); }
+
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
   init_manager_.initialize(init_watcher_);
