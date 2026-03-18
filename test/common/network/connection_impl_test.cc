@@ -866,7 +866,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   Sequence s2;
   EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
   EXPECT_CALL(server_connection_stats.rx_current_, add(4)).InSequence(s2);
-  EXPECT_CALL(server_connection_stats.rx_current_, sub(4, /*protect_underflow=*/false)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_current_, sub(4, /*protect_underflow=*/false))
+      .InSequence(s2);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);
 
   EXPECT_CALL(*read_filter_, onNewConnection());
