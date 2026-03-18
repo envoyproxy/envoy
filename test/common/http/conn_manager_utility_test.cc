@@ -2258,6 +2258,38 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonMinimal) {
   EXPECT_EQ("[{}]", headers.get_("x-forwarded-client-cert"));
 }
 
+// JSON format: All detail fields requested but all data is empty — produces an empty JSON object.
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonAllDetailsEmpty) {
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>()));
+  std::string empty_sha;
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(empty_sha));
+  std::string empty_cert;
+  EXPECT_CALL(*ssl, pemEncodedPeerCertificate()).WillOnce(ReturnRef(empty_cert));
+  EXPECT_CALL(*ssl, pemEncodedPeerCertificateChain())
+      .WillOnce(Return(absl::Span<const std::string>()));
+  std::string empty_subject;
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(empty_subject));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<std::string>()));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>()));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  ON_CALL(config_, clientCertFormat()).WillByDefault(Return(Http::ClientCertFormat::Json));
+  std::vector<Http::ClientCertDetailsType> details = {
+      Http::ClientCertDetailsType::Cert, Http::ClientCertDetailsType::Chain,
+      Http::ClientCertDetailsType::Subject, Http::ClientCertDetailsType::URI,
+      Http::ClientCertDetailsType::DNS};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestRequestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  // All fields are empty — by, hash, and all details omitted — produces empty JSON object.
+  EXPECT_EQ("[{}]", headers.get_("x-forwarded-client-cert"));
+}
+
 // Sampling, global on.
 TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
   EXPECT_CALL(
