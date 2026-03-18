@@ -102,13 +102,13 @@ message ExecuteFilterAction {
   // can be set.
   // [#extension-category: envoy.filters.http]
   config.core.v3.TypedExtensionConfig typed_config = 1
-  [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // Dynamic configuration of filter obtained via extension configuration discovery service.
   // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
   // can be set.
   DynamicConfig dynamic_config = 2
-  [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // An inlined list of filter configurations. The specified filters will be executed in order.
   // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
