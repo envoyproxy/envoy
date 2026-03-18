@@ -22,6 +22,11 @@ pub struct CatchUnwind<F> {
   filter: Option<F>,
 }
 
+enum CatchError {
+  Panicked,
+  Poisoned,
+}
+
 impl<F> CatchUnwind<F> {
   pub fn new(filter: F) -> Self {
     Self {
@@ -58,17 +63,17 @@ impl<F> CatchUnwind<F> {
     }
   }
 
-  /// Like [`catch`](Self::catch), but silently skips if the filter is already poisoned.
-  /// Use for void cleanup/event callbacks (e.g. `on_destroy`, `on_stream_complete`)
-  /// that Envoy may still invoke after a prior fail-closed.
-  fn catch_or_skip(&mut self, name: &str, f: impl FnOnce(&mut F)) {
+  /// Like [`catch`](Self::catch), but skips if the filter is already poisoned.
+  /// Use for callbacks that Envoy may still invoke after a prior fail-closed.
+  fn catch_or_skip<R>(&mut self, name: &str, f: impl FnOnce(&mut F) -> R) -> Result<R, CatchError> {
     let Some(mut filter) = self.filter.take() else {
-      return;
+      return Err(CatchError::Poisoned);
     };
     // See `catch` for AssertUnwindSafe justification.
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut filter))) {
-      Ok(()) => {
+      Ok(val) => {
         self.filter = Some(filter);
+        Ok(val)
       },
       Err(panic) => {
         crate::envoy_log_error!(
@@ -76,6 +81,7 @@ impl<F> CatchUnwind<F> {
           name,
           crate::panic_payload_to_string(panic)
         );
+        Err(CatchError::Panicked)
       },
     }
   }
@@ -204,7 +210,7 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
   // Void callbacks: cleanup/event notifications that Envoy may invoke after the stream is
   // already terminated. Safe to skip on a poisoned filter.
   fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
-    self.catch_or_skip("on_stream_complete", |f| f.on_stream_complete(envoy_filter));
+    let _ = self.catch_or_skip("on_stream_complete", |f| f.on_stream_complete(envoy_filter));
   }
 
   fn on_http_callout_done(
@@ -215,8 +221,8 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
     response_body: Option<&[EnvoyBuffer]>,
   ) {
-    self
-      .catch("on_http_callout_done", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_callout_done", |f| {
         f.on_http_callout_done(
           envoy_filter,
           callout_id,
@@ -224,8 +230,11 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
           response_headers,
           response_body,
         )
-      })
-      .unwrap_or_else(|_| reset_stream(envoy_filter));
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      reset_stream(envoy_filter);
+    }
   }
 
   fn on_http_stream_headers(
@@ -235,11 +244,14 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     end_stream: bool,
   ) {
-    self
-      .catch("on_http_stream_headers", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_stream_headers", |f| {
         f.on_http_stream_headers(envoy_filter, stream_handle, response_headers, end_stream)
-      })
-      .unwrap_or_else(|_| reset_stream(envoy_filter));
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      reset_stream(envoy_filter);
+    }
   }
 
   fn on_http_stream_data(
@@ -249,11 +261,14 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_data: &[EnvoyBuffer],
     end_stream: bool,
   ) {
-    self
-      .catch("on_http_stream_data", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_stream_data", |f| {
         f.on_http_stream_data(envoy_filter, stream_handle, response_data, end_stream)
-      })
-      .unwrap_or_else(|_| reset_stream(envoy_filter));
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      reset_stream(envoy_filter);
+    }
   }
 
   fn on_http_stream_trailers(
@@ -262,15 +277,18 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     stream_handle: u64,
     response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
   ) {
-    self
-      .catch("on_http_stream_trailers", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_stream_trailers", |f| {
         f.on_http_stream_trailers(envoy_filter, stream_handle, response_trailers)
-      })
-      .unwrap_or_else(|_| reset_stream(envoy_filter));
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      reset_stream(envoy_filter);
+    }
   }
 
   fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
-    self.catch_or_skip("on_http_stream_complete", |f| {
+    let _ = self.catch_or_skip("on_http_stream_complete", |f| {
       f.on_http_stream_complete(envoy_filter, stream_handle)
     });
   }
@@ -281,25 +299,28 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     stream_handle: u64,
     reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
-    self.catch_or_skip("on_http_stream_reset", |f| {
+    let _ = self.catch_or_skip("on_http_stream_reset", |f| {
       f.on_http_stream_reset(envoy_filter, stream_handle, reset_reason)
     });
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
-    self
-      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
-      .unwrap_or_else(|_| reset_stream(envoy_filter));
+    if matches!(
+      self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id)),
+      Err(CatchError::Panicked)
+    ) {
+      reset_stream(envoy_filter);
+    }
   }
 
   fn on_downstream_above_write_buffer_high_watermark(&mut self, envoy_filter: &mut EHF) {
-    self.catch_or_skip("on_downstream_above_write_buffer_high_watermark", |f| {
+    let _ = self.catch_or_skip("on_downstream_above_write_buffer_high_watermark", |f| {
       f.on_downstream_above_write_buffer_high_watermark(envoy_filter)
     });
   }
 
   fn on_downstream_below_write_buffer_low_watermark(&mut self, envoy_filter: &mut EHF) {
-    self.catch_or_skip("on_downstream_below_write_buffer_low_watermark", |f| {
+    let _ = self.catch_or_skip("on_downstream_below_write_buffer_low_watermark", |f| {
       f.on_downstream_below_write_buffer_low_watermark(envoy_filter)
     });
   }
@@ -313,26 +334,13 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     details: EnvoyBuffer,
     reset_imminent: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_local_reply_status {
-    // Cannot use `catch` here: send_500 triggers sendLocalReply which synchronously
-    // invokes on_local_reply on the same (now poisoned) filter instance.
-    let Some(mut filter) = self.filter.take() else {
-      return abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue;
-    };
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-      filter.on_local_reply(envoy_filter, response_code, details, reset_imminent)
-    })) {
-      Ok(val) => {
-        self.filter = Some(filter);
-        val
-      },
-      Err(panic) => {
-        crate::envoy_log_error!(
-          "on_local_reply: caught panic: {}",
-          crate::panic_payload_to_string(panic)
-        );
-        abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue
-      },
-    }
+    // send_500 triggers sendLocalReply synchronously, so this may be invoked while the
+    // filter is already poisoned.
+    self
+      .catch_or_skip("on_local_reply", |f| {
+        f.on_local_reply(envoy_filter, response_code, details, reset_imminent)
+      })
+      .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue)
   }
 }
 
@@ -398,7 +406,7 @@ impl<ENF: EnvoyNetworkFilter, F: NetworkFilter<ENF>> NetworkFilter<ENF> for Catc
     envoy_filter: &mut ENF,
     event: abi::envoy_dynamic_module_type_network_connection_event,
   ) {
-    self.catch_or_skip("on_event", |f| f.on_event(envoy_filter, event));
+    let _ = self.catch_or_skip("on_event", |f| f.on_event(envoy_filter, event));
   }
 
   fn on_http_callout_done(
@@ -409,37 +417,37 @@ impl<ENF: EnvoyNetworkFilter, F: NetworkFilter<ENF>> NetworkFilter<ENF> for Catc
     headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
     body_chunks: Vec<EnvoyBuffer>,
   ) {
-    self
-      .catch("on_http_callout_done", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_callout_done", |f| {
         f.on_http_callout_done(envoy_filter, callout_id, result, headers, body_chunks)
-      })
-      .unwrap_or_else(|_| {
-        envoy_filter
-          .close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
-      });
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      envoy_filter.close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
+    }
   }
 
   fn on_destroy(&mut self, envoy_filter: &mut ENF) {
-    self.catch_or_skip("on_destroy", |f| f.on_destroy(envoy_filter));
+    let _ = self.catch_or_skip("on_destroy", |f| f.on_destroy(envoy_filter));
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut ENF, event_id: u64) {
-    self
-      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
-      .unwrap_or_else(|_| {
-        envoy_filter
-          .close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
-      });
+    if matches!(
+      self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id)),
+      Err(CatchError::Panicked)
+    ) {
+      envoy_filter.close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
+    }
   }
 
   fn on_above_write_buffer_high_watermark(&mut self, envoy_filter: &mut ENF) {
-    self.catch_or_skip("on_above_write_buffer_high_watermark", |f| {
+    let _ = self.catch_or_skip("on_above_write_buffer_high_watermark", |f| {
       f.on_above_write_buffer_high_watermark(envoy_filter)
     });
   }
 
   fn on_below_write_buffer_low_watermark(&mut self, envoy_filter: &mut ENF) {
-    self.catch_or_skip("on_below_write_buffer_low_watermark", |f| {
+    let _ = self.catch_or_skip("on_below_write_buffer_low_watermark", |f| {
       f.on_below_write_buffer_low_watermark(envoy_filter)
     });
   }
@@ -479,7 +487,7 @@ impl<ELF: EnvoyListenerFilter, F: ListenerFilter<ELF>> ListenerFilter<ELF> for C
 
   // Void callbacks: cleanup after the socket is already closed.
   fn on_close(&mut self, envoy_filter: &mut ELF) {
-    self.catch_or_skip("on_close", |f| f.on_close(envoy_filter));
+    let _ = self.catch_or_skip("on_close", |f| f.on_close(envoy_filter));
   }
 
   fn on_http_callout_done(
@@ -490,8 +498,8 @@ impl<ELF: EnvoyListenerFilter, F: ListenerFilter<ELF>> ListenerFilter<ELF> for C
     response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
     response_body: Vec<EnvoyBuffer>,
   ) {
-    self
-      .catch("on_http_callout_done", |f| {
+    if matches!(
+      self.catch_or_skip("on_http_callout_done", |f| {
         f.on_http_callout_done(
           envoy_filter,
           callout_id,
@@ -499,13 +507,19 @@ impl<ELF: EnvoyListenerFilter, F: ListenerFilter<ELF>> ListenerFilter<ELF> for C
           response_headers,
           response_body,
         )
-      })
-      .unwrap_or_else(|_| envoy_filter.close_socket(Some("filter panic")));
+      }),
+      Err(CatchError::Panicked)
+    ) {
+      envoy_filter.close_socket(Some("filter panic"));
+    }
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut ELF, event_id: u64) {
-    self
-      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
-      .unwrap_or_else(|_| envoy_filter.close_socket(Some("filter panic")));
+    if matches!(
+      self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id)),
+      Err(CatchError::Panicked)
+    ) {
+      envoy_filter.close_socket(Some("filter panic"));
+    }
   }
 }

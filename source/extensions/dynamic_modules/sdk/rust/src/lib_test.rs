@@ -3731,6 +3731,79 @@ fn test_catch_unwind_listener_on_data_panic() {
   assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[test]
+fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_http_callout_done(
+      &mut wrapper,
+      &mut envoy_filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      None,
+      None,
+    );
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_http_callout_done should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+#[test]
+fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_scheduled should be skipped after CatchUnwind is poisoned",
+  );
+}
+
 // =============================================================================
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
