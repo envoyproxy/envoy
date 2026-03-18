@@ -1713,7 +1713,16 @@ ProtobufTypes::MessagePtr
 ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
-  for (const auto& active_cluster_pair : active_clusters_) {
+  // Sort `active_clusters` before dumping.
+  using ClusterDataElement = std::pair<std::string, ClusterData*>;
+  auto de_unique = [](const ClusterMap::value_type& input) {
+    return ClusterDataElement{input.first, input.second.get()};
+  };
+  std::vector<ClusterDataElement> active_clusters(active_clusters_.size());
+  std::transform(active_clusters_.begin(), active_clusters_.end(), active_clusters.begin(), de_unique);
+  std::sort(active_clusters.begin(), active_clusters.end());
+
+  for (const auto& active_cluster_pair : active_clusters) {
     const auto& cluster = *active_cluster_pair.second;
     if (!name_matcher.match(cluster.cluster_config_.name())) {
       continue;
@@ -1732,7 +1741,12 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     }
   }
 
-  for (const auto& warming_cluster_pair : warming_clusters_) {
+  // Sort `warming_clusters` before dumping.
+  std::vector<ClusterDataElement> warming_clusters(warming_clusters_.size());
+  std::transform(warming_clusters_.begin(), warming_clusters_.end(), warming_clusters.begin(), de_unique);
+  std::sort(warming_clusters.begin(), warming_clusters.end());
+
+  for (const auto& warming_cluster_pair : warming_clusters) {
     const auto& cluster = *warming_cluster_pair.second;
     if (!name_matcher.match(cluster.cluster_config_.name())) {
       continue;

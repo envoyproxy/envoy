@@ -42,7 +42,7 @@
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 
-#include "absl/container/btree_map.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -547,7 +547,7 @@ private:
     struct TcpConnPoolsContainer {
       TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
-      using ConnPools = absl::btree_map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
+      using ConnPools = absl::flat_hash_map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
@@ -821,8 +821,7 @@ private:
   };
 
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
-  // This map is ordered so that config dumping is consistent.
-  using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
+  using ClusterMap = absl::flat_hash_map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
