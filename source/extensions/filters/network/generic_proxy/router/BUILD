@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:well_known_names",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:tracer_lib",
