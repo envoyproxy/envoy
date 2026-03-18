@@ -219,6 +219,17 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This must be called on the main thread.
   fn remove_admin_handler(&self, path_prefix: &str) -> bool;
+
+  /// Enable cluster lifecycle event notifications. When enabled, the module will receive
+  /// [`BootstrapExtensionConfig::on_cluster_add_or_update`] and
+  /// [`BootstrapExtensionConfig::on_cluster_removal`] callbacks when clusters are added, updated,
+  /// or removed from the ClusterManager.
+  ///
+  /// This must be called on the main thread, typically during or after `on_server_initialized`,
+  /// since the ClusterManager is not available until that point.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  fn enable_cluster_lifecycle(&self) -> bool;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -332,6 +343,36 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) -> (u32, String) {
     (404, String::new())
   }
+
+  /// This is called when a cluster is added to or updated in the ClusterManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `cluster_name` is the name of the cluster that was added or updated.
+  fn on_cluster_add_or_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _cluster_name: &str,
+  ) {
+  }
+
+  /// This is called when a cluster is removed from the ClusterManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `cluster_name` is the name of the cluster that was removed.
+  fn on_cluster_removal(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _cluster_name: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -349,6 +390,13 @@ unsafe impl Send for CompletionCallback {}
 unsafe impl Sync for CompletionCallback {}
 
 impl CompletionCallback {
+  pub(crate) fn new(
+    callback: abi::envoy_dynamic_module_type_event_cb,
+    context: *mut std::os::raw::c_void,
+  ) -> Self {
+    Self { callback, context }
+  }
+
   /// Signal that the asynchronous operation is complete. This must be called exactly once.
   pub fn done(self) {
     unsafe {
@@ -1019,6 +1067,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       )
     }
   }
+
+  fn enable_cluster_lifecycle(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(self.raw)
+    }
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
@@ -1278,10 +1332,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
 ) {
   let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
   let extension = unsafe { &mut *extension };
-  let completion = CompletionCallback {
-    callback: completion_callback,
-    context: completion_context,
-  };
+  let completion = CompletionCallback::new(completion_callback, completion_context);
   extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
 }
 
@@ -1428,4 +1479,60 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
   }
 
   status_code
+}
+
+/// Event hook called by Envoy when a cluster is added to or updated in the ClusterManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let cluster_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+  };
+
+  extension_config.on_cluster_add_or_update(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    cluster_name_str,
+  );
+}
+
+/// Event hook called by Envoy when a cluster is removed from the ClusterManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let cluster_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+  };
+
+  extension_config.on_cluster_removal(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    cluster_name_str,
+  );
 }

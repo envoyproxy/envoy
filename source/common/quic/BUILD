@@ -122,7 +122,6 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
-        "//source/common/quic:cert_compression_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
@@ -504,6 +503,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/tls:cert_compression_lib",
         "@quiche//:quic_core_config_lib",
         "@quiche//:quic_core_http_header_list_lib",
         "@quiche//:quic_platform",
@@ -525,12 +525,12 @@ envoy_cc_library(
     ]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_lib",
+        ":envoy_quic_utils_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
-        "//source/common/quic:cert_compression_lib",
         "//source/common/tls:client_ssl_socket_lib",
         "//source/common/tls:context_config_lib",
         "@quiche//:quic_core_crypto_crypto_handshake_lib",
@@ -728,18 +728,5 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "@quiche//:quic_core_http_spdy_session_lib",
         "@quiche//:quic_core_types_lib",
-    ]),
-)
-
-envoy_cc_library(
-    name = "cert_compression_lib",
-    srcs = envoy_select_enable_http3(["cert_compression.cc"]),
-    hdrs = envoy_select_enable_http3(["cert_compression.h"]),
-    external_deps = ["ssl"],
-    deps = envoy_select_enable_http3([
-        "//bazel:zlib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/runtime:runtime_lib",
     ]),
 )

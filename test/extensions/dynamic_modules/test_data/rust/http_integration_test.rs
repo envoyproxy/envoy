@@ -135,6 +135,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       }
       Some(Box::new(ConfigStreamConfig { stream_done }))
     },
+    "list_metadata_callbacks" => Some(Box::new(ListMetadataCallbacksFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -1842,5 +1843,89 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   ) {
     assert_eq!(stream_handle, self.stream_handle);
     envoy_filter.send_response(200, &[("x-reset", b"true")], Some(b"upstream_reset"), None);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+struct ListMetadataCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ListMetadataCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ListMetadataCallbacksFilter {})
+  }
+}
+
+struct ListMetadataCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Build a number list: [10.0, 20.0, 30.0]
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns", "numbers", 10.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns", "numbers", 20.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns", "numbers", 30.0));
+    // Build a string list: ["hello", "world"]
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns", "strings", "hello"));
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns", "strings", "world"));
+    // Build a bool list: [true, false]
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns", "bools", true));
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns", "bools", false));
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let source = abi::envoy_dynamic_module_type_metadata_source::Dynamic;
+
+    // Verify and expose number list via response headers.
+    let num_size = envoy_filter
+      .get_metadata_list_size(source, "ns", "numbers")
+      .unwrap();
+    envoy_filter.set_response_header("x-list-num-size", num_size.to_string().as_bytes());
+    for i in 0 .. num_size {
+      let val = envoy_filter
+        .get_metadata_list_number(source, "ns", "numbers", i)
+        .unwrap();
+      let header_name = format!("x-list-num-{}", i);
+      envoy_filter.set_response_header(&header_name, (val as i64).to_string().as_bytes());
+    }
+
+    // Verify and expose string list via response headers.
+    let str_size = envoy_filter
+      .get_metadata_list_size(source, "ns", "strings")
+      .unwrap();
+    envoy_filter.set_response_header("x-list-str-size", str_size.to_string().as_bytes());
+    for i in 0 .. str_size {
+      let val = envoy_filter
+        .get_metadata_list_string(source, "ns", "strings", i)
+        .unwrap();
+      let val_bytes = val.as_slice().to_vec();
+      let header_name = format!("x-list-str-{}", i);
+      envoy_filter.set_response_header(&header_name, &val_bytes);
+    }
+
+    // Verify and expose bool list via response headers.
+    let bool_size = envoy_filter
+      .get_metadata_list_size(source, "ns", "bools")
+      .unwrap();
+    envoy_filter.set_response_header("x-list-bool-size", bool_size.to_string().as_bytes());
+    for i in 0 .. bool_size {
+      let val = envoy_filter
+        .get_metadata_list_bool(source, "ns", "bools", i)
+        .unwrap();
+      let header_name = format!("x-list-bool-{}", i);
+      envoy_filter.set_response_header(&header_name, val.to_string().as_bytes());
+    }
+
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

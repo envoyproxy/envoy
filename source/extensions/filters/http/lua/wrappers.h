@@ -266,7 +266,9 @@ private:
 class FilterStateWrapper : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
 public:
   FilterStateWrapper(StreamInfoWrapper& parent) : parent_(parent) {}
-  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet}, {"set", static_luaSet}};
+  }
 
 private:
   /**
@@ -276,6 +278,15 @@ private:
    * @return filter state value as string, or nil if not found.
    */
   DECLARE_LUA_FUNCTION(FilterStateWrapper, luaGet);
+
+  /**
+   * Set a filter state object by name using a registered factory.
+   * @param 1 (string): object key (the name under which the object is stored).
+   * @param 2 (string): factory key (the registered ObjectFactory name).
+   * @param 3 (string): bytes payload to pass to the factory's createFromBytes.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(FilterStateWrapper, luaSet);
 
   StreamInfo::StreamInfo& streamInfo();
 
