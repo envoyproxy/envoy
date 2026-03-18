@@ -303,18 +303,23 @@ macro_rules! envoy_log {
   ($level:expr, $($arg:tt)*) => {
     {
       #[cfg(not(test))]
-      unsafe {
-        // Avoid allocating the message if the log level is not enabled.
-        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+      {
+        let level = $level;
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and envoy_dynamic_module_callback_log
+        // are FFI calls provided by the Envoy host.
+        let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
+        if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
-          $crate::abi::envoy_dynamic_module_callback_log(
-            $level,
-            $crate::abi::envoy_dynamic_module_type_module_buffer {
-              ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-              length: message_bytes.len(),
-            },
-          );
+          unsafe {
+            $crate::abi::envoy_dynamic_module_callback_log(
+              level,
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: message_bytes.len(),
+              },
+            );
+          }
         }
       }
       // In unit tests, just print to stderr since the Envoy symbols are not available.
