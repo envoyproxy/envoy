@@ -12,8 +12,6 @@ namespace Network {
 MockConnectionCallbacks::MockConnectionCallbacks() = default;
 MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
-uint64_t MockConnectionBase::next_id_;
-
 void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
@@ -94,7 +92,7 @@ template <class T> static void initializeMockConnection(T& connection) {
         connection.local_close_reason_ = std::string(details);
         connection.raiseEvent(Network::ConnectionEvent::LocalClose);
       }));
-  ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
+  ON_CALL(connection, id()).WillByDefault(Return(connection.id_));
   connection.stream_info_.downstream_connection_info_provider_->setConnectionID(connection.id_);
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));
 
