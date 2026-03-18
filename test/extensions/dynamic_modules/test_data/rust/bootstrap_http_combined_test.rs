@@ -206,7 +206,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for CombinedHttpFilter {
         envoy_log_error!("get_route_endpoint not found in function registry");
         envoy_filter.send_response(
           503,
-          vec![("x-error-reason", b"function_not_registered")],
+          &[("x-error-reason", b"function_not_registered")],
           Some(b"routing function not registered"),
           Some("function_not_registered"),
         );
@@ -241,7 +241,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for CombinedHttpFilter {
         } else {
           envoy_filter.send_response(
             503,
-            vec![("x-error-reason", b"service_not_onboarded")],
+            &[("x-error-reason", b"service_not_onboarded")],
             Some(format!("service '{}' is not onboarded", svc).as_bytes()),
             Some("service_not_onboarded"),
           );

@@ -5,7 +5,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 
 namespace Envoy {
 namespace Server {

@@ -1013,6 +1013,51 @@ TEST(HeaderMatcher, MultipleHeaderValues) {
   checkMatcher(matcher5, true, Envoy::Network::MockConnection(), headers);
 }
 
+TEST(HeaderMatcher, TreatMissingAsEmpty) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::route::v3::HeaderMatcher config;
+  config.set_name("optional-header");
+  config.set_treat_missing_header_as_empty(true);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  Envoy::Http::LowerCaseString header_name("optional-header");
+
+  // Missing header with exact empty string match should succeed
+  config.mutable_string_match()->set_exact("");
+  RBAC::HeaderMatcher matcher1(config, factory_context);
+  checkMatcher(matcher1, true, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with non-empty exact match should fail
+  config.mutable_string_match()->set_exact("some-value");
+  RBAC::HeaderMatcher matcher2(config, factory_context);
+  checkMatcher(matcher2, false, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with prefix match on empty prefix should succeed
+  config.mutable_string_match()->set_prefix("");
+  RBAC::HeaderMatcher matcher3(config, factory_context);
+  checkMatcher(matcher3, true, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with non-empty prefix should fail
+  config.mutable_string_match()->set_prefix("pre");
+  RBAC::HeaderMatcher matcher4(config, factory_context);
+  checkMatcher(matcher4, false, Envoy::Network::MockConnection(), headers);
+
+  // Header present with matching value should still work
+  headers.setReference(header_name, "some-value");
+  config.mutable_string_match()->set_exact("some-value");
+  RBAC::HeaderMatcher matcher5(config, factory_context);
+  checkMatcher(matcher5, true, Envoy::Network::MockConnection(), headers);
+
+  // With invert_match=true, missing header treated as empty should match
+  // when the pattern doesn't match empty string
+  headers.remove(header_name);
+  config.set_invert_match(true);
+  config.mutable_string_match()->set_exact("non-empty-value");
+  RBAC::HeaderMatcher matcher6(config, factory_context);
+  // Empty string doesn't match "non-empty-value", and invert_match=true, so should return true
+  checkMatcher(matcher6, true, Envoy::Network::MockConnection(), headers);
+}
+
 TEST(AuthenticatedMatcher, EmptyCertificateFields) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();

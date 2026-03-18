@@ -13,8 +13,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "allocator_impl_test",
-    srcs = ["allocator_impl_test.cc"],
+    name = "allocator_test",
+    srcs = ["allocator_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:allocator_lib",
@@ -38,6 +38,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 

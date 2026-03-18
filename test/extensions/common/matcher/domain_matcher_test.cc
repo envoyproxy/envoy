@@ -431,13 +431,11 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(Envoy::Matcher::DataAvailability::NotAvailable);
     validateUnableToMatch();
   }
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(Envoy::Matcher::DataAvailability::AllDataAvailable);
     validateNoMatch();
   }
 }

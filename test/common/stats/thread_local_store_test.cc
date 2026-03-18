@@ -107,7 +107,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -235,7 +235,7 @@ public:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatNamePool pool_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -1444,6 +1444,146 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
   EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
 }
 
+// Helper: build a StatsMatcherSharedPtr that rejects the given prefix.
+static StatsMatcherSharedPtr
+makePrefixMatcher(absl::string_view prefix, SymbolTable& symbol_table,
+                  Server::Configuration::MockServerFactoryContext& ctx) {
+  envoy::config::metrics::v3::StatsConfig cfg;
+  cfg.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      std::string(prefix));
+  return std::make_shared<StatsMatcherImpl>(cfg, symbol_table, ctx);
+}
+
+// Tests per-scope StatsMatcher: scope matcher replaces (not supplements) the
+// global store-level matcher for all stats created within that scope.
+// Note: the scope matcher operates on the FULL stat name (scope prefix + stat name).
+TEST_F(StatsMatcherTLSTest, ScopeMatcherReplacesGlobal) {
+  // Global matcher rejects prefix "global_rejected.".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "global_rejected.");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // Confirm global rejection works on root scope.
+  Counter& global_rejected = scope_.counterFromString("global_rejected.foo");
+  EXPECT_EQ(global_rejected.name(), ""); // rejected → null counter
+
+  // Create a scope "scope" with its own matcher that rejects full names starting with
+  // "scope.scope_rejected." (i.e. stat "scope_rejected.foo" inside "scope").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.scope_rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Within the scope, "scope_rejected.foo" has full name "scope.scope_rejected.foo" → rejected.
+  Counter& scope_rejected = my_scope->counterFromString("scope_rejected.foo");
+  EXPECT_EQ(scope_rejected.name(), ""); // rejected by scope matcher
+
+  // Within the scope, "global_rejected.foo" has full name "scope.global_rejected.foo".
+  // The scope matcher does NOT reject this (scope replaces global, not supplements it).
+  Counter& global_not_rejected = my_scope->counterFromString("global_rejected.foo");
+  EXPECT_NE(global_not_rejected.name(), ""); // accepted by scope matcher
+
+  // Counters outside the scope still use the global matcher.
+  Counter& out_global_rejected = scope_.counterFromString("global_rejected.bar");
+  EXPECT_EQ(out_global_rejected.name(), ""); // rejected by global matcher
+}
+
+// Tests that setStatsMatcher on the store does not remove stats from scopes
+// that have their own scope-level matcher.
+TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
+  // Create a scope with its own matcher (rejects "scope.rejected").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.rejected", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Create a counter that is accepted by the scope matcher.
+  Counter& c = my_scope->counterFromString("accepted.foo");
+  EXPECT_NE(c.name(), "");
+  c.inc();
+  EXPECT_EQ(c.value(), 1);
+
+  // Now apply a global matcher that would reject "scope.accepted.foo".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "scope");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // The counter should still exist and be usable (scope matcher shields it from global changes).
+  EXPECT_EQ(c.value(), 1);
+  c.inc();
+  EXPECT_EQ(c.value(), 2);
+}
+
+// Tests that the scope matcher rejects all stat types (Counter, Gauge, Histogram, TextReadout),
+// that HiddenAccumulate gauges bypass the scope matcher, and that child scopes inherit the matcher.
+TEST_F(StatsMatcherTLSTest, ScopeMatcherRejectsAllStatTypesAndInheritsToChildren) {
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Gauge: rejected stat returns null gauge (empty name, NeverImport).
+  Gauge& rejected_gauge = my_scope->gaugeFromString("rejected.g", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("", rejected_gauge.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, rejected_gauge.importMode());
+
+  // Gauge: accepted stat is real.
+  Gauge& accepted_gauge = my_scope->gaugeFromString("accepted.g", Gauge::ImportMode::Accumulate);
+  EXPECT_NE("", accepted_gauge.name());
+  accepted_gauge.set(5);
+  EXPECT_EQ(5, accepted_gauge.value());
+
+  // HiddenAccumulate gauge is never rejected even if name matches.
+  Gauge& hidden_gauge =
+      my_scope->gaugeFromString("rejected.hidden", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ("scope.rejected.hidden", hidden_gauge.name());
+
+  // Histogram: rejected stat returns null histogram (empty name, Unit::Null).
+  Histogram& rejected_histogram =
+      my_scope->histogramFromString("rejected.h", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", rejected_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Null, rejected_histogram.unit());
+
+  // Histogram: accepted stat is real.
+  Histogram& accepted_histogram =
+      my_scope->histogramFromString("accepted.h", Histogram::Unit::Milliseconds);
+  EXPECT_NE("", accepted_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, accepted_histogram.unit());
+
+  // TextReadout: rejected stat returns null text readout (empty name, value always "").
+  TextReadout& rejected_tr = my_scope->textReadoutFromString("rejected.tr");
+  EXPECT_EQ("", rejected_tr.name());
+  rejected_tr.set("hello");
+  EXPECT_EQ("", rejected_tr.value());
+
+  // TextReadout: accepted stat is real.
+  TextReadout& accepted_tr = my_scope->textReadoutFromString("accepted.tr");
+  EXPECT_NE("", accepted_tr.name());
+  accepted_tr.set("world");
+  EXPECT_EQ("world", accepted_tr.value());
+
+  // Counter: rejected stat returns null counter (empty name, value always 0).
+  Counter& rejected_counter = my_scope->counterFromString("rejected.c");
+  EXPECT_EQ("", rejected_counter.name());
+  rejected_counter.inc();
+  EXPECT_EQ(0, rejected_counter.value());
+
+  // Counter: accepted stat is real.
+  Counter& accepted_counter = my_scope->counterFromString("accepted.c");
+  EXPECT_NE("", accepted_counter.name());
+  accepted_counter.inc();
+  EXPECT_EQ(1, accepted_counter.value());
+
+  // Child scope "rejected" has prefix — all its stats are rejected.
+  ScopeSharedPtr child_scope = my_scope->createScope("rejected");
+  Counter& child_counter = child_scope->counterFromString("c");
+  EXPECT_EQ("", child_counter.name());
+
+  // Grandchild also inherits the matcher.
+  ScopeSharedPtr grandchild_scope = child_scope->createScope("grandchild");
+  Counter& grandchild_counter = grandchild_scope->counterFromString("c");
+  EXPECT_EQ("", grandchild_counter.name());
+}
+
 // Tests the logic for caching the stats-matcher results, and in particular the
 // private impl method checkAndRememberRejection(). That method behaves
 // differently depending on whether TLS is enabled or not, so we parameterize
@@ -1569,7 +1709,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl heap_alloc_;
+  Allocator heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopeSharedPtr scope_;
 };
@@ -1745,7 +1885,7 @@ protected:
   NiceMock<ThreadLocal::MockInstance> tls_;
   MockSink sink_;
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   ThreadLocalStoreImpl store_;
   Scope& scope_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -1830,7 +1970,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
-  AllocatorImpl alloc(symbol_table);
+  Allocator alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
