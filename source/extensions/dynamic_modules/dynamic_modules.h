@@ -127,6 +127,14 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
                                                            const bool do_not_close,
                                                            const bool load_globally = false);
 
+/**
+ * Returns the canonical temporary file path for a remote module identified by its SHA256 hash.
+ * This is the path where newDynamicModuleFromBytes writes the module and where the cache looks
+ * it up.
+ * @param sha256 the hex-encoded SHA256 hash of the module bytes.
+ */
+std::filesystem::path moduleTempPath(absl::string_view sha256);
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy
