@@ -117,13 +117,15 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
-    ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+    ON_CALL(*cds_cluster, initializePhase())
+        .WillByDefault(Return(Cluster::InitializePhase::Primary));
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster2, nullptr)));
-    ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+    ON_CALL(*cluster2, initializePhase())
+        .WillByDefault(Return(Cluster::InitializePhase::Secondary));
     EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
     EXPECT_CALL(*cds, setInitializedCb(_));
   }

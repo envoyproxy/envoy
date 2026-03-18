@@ -1719,7 +1719,8 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
     return ClusterDataElement{input.first, input.second.get()};
   };
   std::vector<ClusterDataElement> active_clusters(active_clusters_.size());
-  std::transform(active_clusters_.begin(), active_clusters_.end(), active_clusters.begin(), de_unique);
+  std::transform(active_clusters_.begin(), active_clusters_.end(), active_clusters.begin(),
+                 de_unique);
   std::sort(active_clusters.begin(), active_clusters.end());
 
   for (const auto& active_cluster_pair : active_clusters) {
@@ -1743,7 +1744,8 @@ ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_match
 
   // Sort `warming_clusters` before dumping.
   std::vector<ClusterDataElement> warming_clusters(warming_clusters_.size());
-  std::transform(warming_clusters_.begin(), warming_clusters_.end(), warming_clusters.begin(), de_unique);
+  std::transform(warming_clusters_.begin(), warming_clusters_.end(), warming_clusters.begin(),
+                 de_unique);
   std::sort(warming_clusters.begin(), warming_clusters.end());
 
   for (const auto& warming_cluster_pair : warming_clusters) {
