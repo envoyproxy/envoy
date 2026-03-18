@@ -215,13 +215,11 @@ text format are available as JSON object fields, but with the following structur
 
 * ``by``, ``uri``, ``dns``, and ``chain`` are JSON arrays of strings (since they can have multiple values).
   For ``chain``, each string is the PEM-encoded representation of a single certificate
-  in the peer certificate chain.
+  in the peer certificate chain. This is the peer provided chain, not the validated chain.
 * ``hash``, ``cert``, and ``subject`` are JSON strings.
 * Unlike the text format, ``cert`` and ``chain`` PEM values are not URL-encoded; instead,
   special characters (such as newlines in PEM data) are escaped using standard JSON escaping rules.
-* Only fields with non-empty values are included in the JSON object. The exception is ``uri``,
-  which is included as an empty array when URI details are configured but the certificate has no
-  URI SANs.
+* Only fields with non-empty values are included in the JSON object.
 * Values are escaped according to JSON rules (e.g. ``"`` becomes ``\"``, ``\`` becomes ``\\``).
 
 An example of the XFCC header in JSON format:

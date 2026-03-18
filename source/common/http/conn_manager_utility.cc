@@ -493,10 +493,14 @@ void appendXfccJsonObject(
         }
         break;
       }
-      case ClientCertDetailsType::Subject:
-        root->addKey("subject");
-        root->addString(connection.ssl()->subjectPeerCertificate());
+      case ClientCertDetailsType::Subject: {
+        const std::string& subject = connection.ssl()->subjectPeerCertificate();
+        if (!subject.empty()) {
+          root->addKey("subject");
+          root->addString(subject);
+        }
         break;
+      }
       case ClientCertDetailsType::URI: {
         const auto uri_sans = connection.ssl()->uriSanPeerCertificate();
         if (!uri_sans.empty()) {
