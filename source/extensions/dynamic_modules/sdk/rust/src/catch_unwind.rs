@@ -95,7 +95,6 @@ fn send_500<EHF: EnvoyHttpFilter>(envoy: &mut EHF) {
     &[("content-type", b"text/plain")],
     Some(b"Internal Server Error: filter panic"),
     None,
-    None,
   );
 }
 
@@ -216,15 +215,17 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
     response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
     response_body: Option<&[EnvoyBuffer]>,
   ) {
-    self.catch_or_skip("on_http_callout_done", |f| {
-      f.on_http_callout_done(
-        envoy_filter,
-        callout_id,
-        result,
-        response_headers,
-        response_body,
-      )
-    });
+    self
+      .catch("on_http_callout_done", |f| {
+        f.on_http_callout_done(
+          envoy_filter,
+          callout_id,
+          result,
+          response_headers,
+          response_body,
+        )
+      })
+      .unwrap_or_else(|_| reset_stream(envoy_filter));
   }
 
   fn on_http_stream_headers(
@@ -280,7 +281,9 @@ impl<EHF: EnvoyHttpFilter, F: HttpFilter<EHF>> HttpFilter<EHF> for CatchUnwind<F
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
-    self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id));
+    self
+      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
+      .unwrap_or_else(|_| reset_stream(envoy_filter));
   }
 
   fn on_downstream_above_write_buffer_high_watermark(&mut self, envoy_filter: &mut EHF) {
@@ -400,9 +403,14 @@ impl<ENF: EnvoyNetworkFilter, F: NetworkFilter<ENF>> NetworkFilter<ENF> for Catc
     headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
     body_chunks: Vec<EnvoyBuffer>,
   ) {
-    self.catch_or_skip("on_http_callout_done", |f| {
-      f.on_http_callout_done(envoy_filter, callout_id, result, headers, body_chunks)
-    });
+    self
+      .catch("on_http_callout_done", |f| {
+        f.on_http_callout_done(envoy_filter, callout_id, result, headers, body_chunks)
+      })
+      .unwrap_or_else(|_| {
+        envoy_filter
+          .close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
+      });
   }
 
   fn on_destroy(&mut self, envoy_filter: &mut ENF) {
@@ -410,7 +418,12 @@ impl<ENF: EnvoyNetworkFilter, F: NetworkFilter<ENF>> NetworkFilter<ENF> for Catc
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut ENF, event_id: u64) {
-    self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id));
+    self
+      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
+      .unwrap_or_else(|_| {
+        envoy_filter
+          .close(abi::envoy_dynamic_module_type_network_connection_close_type::FlushWrite);
+      });
   }
 
   fn on_above_write_buffer_high_watermark(&mut self, envoy_filter: &mut ENF) {
@@ -471,18 +484,22 @@ impl<ELF: EnvoyListenerFilter, F: ListenerFilter<ELF>> ListenerFilter<ELF> for C
     response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
     response_body: Vec<EnvoyBuffer>,
   ) {
-    self.catch_or_skip("on_http_callout_done", |f| {
-      f.on_http_callout_done(
-        envoy_filter,
-        callout_id,
-        result,
-        response_headers,
-        response_body,
-      )
-    });
+    self
+      .catch("on_http_callout_done", |f| {
+        f.on_http_callout_done(
+          envoy_filter,
+          callout_id,
+          result,
+          response_headers,
+          response_body,
+        )
+      })
+      .unwrap_or_else(|_| envoy_filter.close_socket(Some("filter panic")));
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut ELF, event_id: u64) {
-    self.catch_or_skip("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id));
+    self
+      .catch("on_scheduled", |f| f.on_scheduled(envoy_filter, event_id))
+      .unwrap_or_else(|_| envoy_filter.close_socket(Some("filter panic")));
   }
 }
