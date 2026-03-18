@@ -95,6 +95,7 @@ fn send_500<EHF: EnvoyHttpFilter>(envoy: &mut EHF) {
     &[("content-type", b"text/plain")],
     Some(b"Internal Server Error: filter panic"),
     None,
+    None,
   );
 }
 
