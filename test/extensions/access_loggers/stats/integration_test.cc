@@ -383,41 +383,48 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
                       sub_log_type: DownstreamEnd
 )";
 
-  init(config_yaml, /*autonomous_upstream=*/false,
-       /*flush_access_log_on_new_request=*/true);
-
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},  {":authority", "envoyproxy.io"},     {":path", "/"},
       {":scheme", "http"}, {"tag-value", "my-evict-crash-tag"},
   };
 
-  // Start request.
-  auto codec_client1 = makeHttpConnection(lookupPort("http"));
-  auto response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest();
-  test_server_->waitForGaugeEq(
-      "test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag", 1);
-
-  // Force gauge value to 0 so it can be evicted while FilterState is holding it.
-  test_server_->gauge("test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag")
-      ->set(0);
-
-  // Simulate eviction from the store.
-  absl::Notification evict_done;
-  test_server_->server().dispatcher().post([this, &evict_done]() {
-    test_server_->statStore().evictUnused();
-    test_server_->statStore().evictUnused();
-    evict_done.Notify();
-  });
-  evict_done.WaitForNotification();
-
-  // The stat is now evicted from the scope, but FilterState is still holding it.
-  // Finish the request to verify it doesn't crash when FilterState cleans up.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response1->waitForEndStream());
 
-  codec_client1->close();
+  // When the gauge is evicted after ADD but before SUB, the access logger can successfully recreate
+  // it when the request ends. A newly recreated gauge starts at 0, so subtracting from it causes a
+  // subtraction underflow warning which is expected to trigger ENVOY_BUG.
+  EXPECT_ENVOY_BUG(
+      {
+        init(config_yaml, /*autonomous_upstream=*/false,
+             /*flush_access_log_on_new_request=*/true);
+
+        // Start request.
+        auto codec_client1 = makeHttpConnection(lookupPort("http"));
+        auto response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
+        waitForNextUpstreamRequest();
+        test_server_->waitForGaugeEq(
+            "test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag", 1);
+
+        // Force gauge value to 0 so it can be evicted while FilterState is holding it.
+        test_server_
+            ->gauge("test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag")
+            ->set(0);
+
+        // Simulate eviction from the store.
+        absl::Notification evict_done;
+        test_server_->server().dispatcher().post([this, &evict_done]() {
+          test_server_->statStore().evictUnused();
+          test_server_->statStore().evictUnused();
+          evict_done.Notify();
+        });
+        evict_done.WaitForNotification();
+
+        upstream_request_->encodeHeaders(response_headers, true);
+        ASSERT_TRUE(response1->waitForEndStream());
+
+        codec_client1->close();
+      },
+      "greater than current value");
 }
 
 } // namespace

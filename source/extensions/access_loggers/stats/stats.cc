@@ -91,7 +91,7 @@ public:
     for (const auto& [key, info] : inflight_gauges_) {
       auto& gauge_stat =
           scope_->gaugeFromStatNameWithTags(key.stat_name_, key.tags(), key.import_mode_);
-      gauge_stat.sub(info.value_, /*protect_underflow=*/true);
+      gauge_stat.sub(info.value_);
     }
   }
 
@@ -130,9 +130,7 @@ public:
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
-      if (gauge_stat.used()) {
-        gauge_stat.sub(value, /*protect_underflow=*/true);
-      }
+      gauge_stat.sub(value);
       if (it->second.value_ == 0) {
         inflight_gauges_.erase(it);
       }

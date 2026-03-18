@@ -17,6 +17,7 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -210,21 +211,13 @@ public:
     child_value_ = value;
     flags_ |= Flags::Used;
   }
-  void sub(uint64_t amount, bool protect_underflow = false) override {
+  void sub(uint64_t amount) override {
     // Mark as used to prevent the stat from being evicted before flush.
     flags_ |= Flags::Used;
-    if (!protect_underflow) {
-      ENVOY_BUG(child_value_ >= amount, "subtracted amount is greater than current value");
-      child_value_ -= amount;
-      return;
-    }
-    uint64_t current = child_value_.load();
-    while (true) {
-      uint64_t next = (current >= amount) ? (current - amount) : 0;
-      if (child_value_.compare_exchange_weak(current, next)) {
-        break;
-      }
-    }
+    ENVOY_BUG(child_value_ >= amount,
+              absl::StrCat("subtracted amount ", amount, " is greater than current value ",
+                           static_cast<uint64_t>(child_value_)));
+    child_value_ -= amount;
   }
   uint64_t value() const override { return child_value_ + parent_value_; }
 
