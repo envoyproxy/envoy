@@ -117,5 +117,5 @@ py_wheel(
     ],
     version = "0.5.0",
     visibility = ["//visibility:public"],
-    deps = [ ":envoy_mobile_package" ],
+    deps = [":envoy_mobile_package"],
 )
