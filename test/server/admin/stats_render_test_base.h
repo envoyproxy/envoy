@@ -30,7 +30,7 @@ protected:
                                             const std::vector<uint64_t>& vals);
 
   Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   testing::NiceMock<Stats::MockSink> sink_;
   testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;

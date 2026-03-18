@@ -105,6 +105,20 @@ public:
               (override));
   MOCK_METHOD(void, setMetadata, (std::string_view ns, std::string_view key, bool value),
               (override));
+  MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, double value),
+              (override));
+  MOCK_METHOD(bool, addMetadataList,
+              (std::string_view ns, std::string_view key, std::string_view value), (override));
+  MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, bool value),
+              (override));
+  MOCK_METHOD(std::optional<size_t>, getMetadataListSize,
+              (std::string_view ns, std::string_view key), (override));
+  MOCK_METHOD(std::optional<double>, getMetadataListNumber,
+              (std::string_view ns, std::string_view key, size_t index), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getMetadataListString,
+              (std::string_view ns, std::string_view key, size_t index), (override));
+  MOCK_METHOD(std::optional<bool>, getMetadataListBool,
+              (std::string_view ns, std::string_view key, size_t index), (override));
   MOCK_METHOD(std::optional<std::string_view>, getAttributeString, (AttributeID id), (override));
   MOCK_METHOD(std::optional<uint64_t>, getAttributeNumber, (AttributeID id), (override));
   MOCK_METHOD(std::optional<bool>, getAttributeBool, (AttributeID id), (override));

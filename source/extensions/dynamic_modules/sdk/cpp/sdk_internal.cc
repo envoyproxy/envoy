@@ -329,6 +329,77 @@ public:
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
+  bool addMetadataList(std::string_view ns, std::string_view key, double value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
+  }
+
+  bool addMetadataList(std::string_view ns, std::string_view key, std::string_view value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  bool addMetadataList(std::string_view ns, std::string_view key, bool value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
+  }
+
+  std::optional<size_t> getMetadataListSize(std::string_view ns, std::string_view key) override {
+    size_t result = 0;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_size(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, &result);
+    if (!ret) {
+      return {};
+    }
+    return result;
+  }
+
+  std::optional<double> getMetadataListNumber(std::string_view ns, std::string_view key,
+                                              size_t index) override {
+    double value = 0.0;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_number(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index, &value);
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
+  std::optional<std::string_view> getMetadataListString(std::string_view ns, std::string_view key,
+                                                        size_t index) override {
+    BufferView value{nullptr, 0};
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_string(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index,
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!ret || value.data() == nullptr) {
+      return {};
+    }
+    return value.toStringView();
+  }
+
+  std::optional<bool> getMetadataListBool(std::string_view ns, std::string_view key,
+                                          size_t index) override {
+    bool value = false;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index, &value);
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
   std::optional<std::string_view> getFilterState(std::string_view key) override {
     BufferView value{nullptr, 0};
 

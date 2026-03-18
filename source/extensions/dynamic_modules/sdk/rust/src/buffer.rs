@@ -53,6 +53,9 @@ impl EnvoyBuffer<'_> {
   }
 
   pub fn as_slice(&self) -> &[u8] {
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 }
@@ -80,6 +83,7 @@ impl EnvoyMutBuffer<'_> {
   /// static mut BUF: [u8; 1024] = [0; 1024];
   /// let _buffer = unsafe { envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer::new(&raw mut BUF) };
   /// ```
+  #[allow(unknown_lints, dangerous_implicit_autorefs)]
   pub unsafe fn new(static_buf: *mut [u8]) -> Self {
     Self {
       raw_ptr: static_buf as *mut u8,
@@ -102,13 +106,19 @@ impl EnvoyMutBuffer<'_> {
     }
   }
 
-  /// This returns a immutable slice to the underlying memory region managed by Envoy.
+  /// This returns an immutable slice to the underlying memory region managed by Envoy.
   pub fn as_slice(&self) -> &[u8] {
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 
   /// This returns a mutable slice to the underlying memory region managed by Envoy.
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
+    if self.raw_ptr.is_null() {
+      return &mut [];
+    }
     unsafe { std::slice::from_raw_parts_mut(self.raw_ptr, self.length) }
   }
 }

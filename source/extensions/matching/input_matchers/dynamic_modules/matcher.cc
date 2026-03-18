@@ -22,15 +22,8 @@ DynamicModuleInputMatcher::~DynamicModuleInputMatcher() {
   }
 }
 
-MatchResult DynamicModuleInputMatcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
-  if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
-      ptr != nullptr) {
-    auto* dynamic_module_data = dynamic_cast<DynamicModuleMatchData*>((*ptr).get());
-    if (dynamic_module_data == nullptr) {
-      ENVOY_LOG(debug, "dynamic module matcher received non-DynamicModuleMatchData input");
-      return MatchResult::NoMatch;
-    }
-
+MatchResult DynamicModuleInputMatcher::match(const ::Envoy::Matcher::DataInputGetResult& input) {
+  if (auto dynamic_module_data = input.customData<DynamicModuleMatchData>(); dynamic_module_data) {
     // Build the match context with header pointers from the matching data.
     MatchContext context;
     context.request_headers = dynamic_module_data->request_headers_;
