@@ -1,6 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_http_impl.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -14,12 +15,16 @@ namespace OpenTelemetry {
 
 OpenTelemetryHttpMetricsExporter::OpenTelemetryHttpMetricsExporter(
     Upstream::ClusterManager& cluster_manager,
-    const envoy::config::core::v3::HttpService& http_service)
+    const envoy::config::core::v3::HttpService& http_service,
+    Server::Configuration::ServerFactoryContext& server_context)
     : cluster_manager_(cluster_manager), http_service_(http_service) {
-  // Parse headers at construction time to avoid copies per request.
-  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
-    parsed_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                      header_value_option.header().value()});
+  // Create headers applicator to handle substitution formatters.
+  absl::Status creation_status;
+  headers_applicator_ = std::make_unique<Http::HttpServiceHeadersApplicator>(
+      http_service_, server_context, creation_status);
+  if (!creation_status.ok()) {
+    throw EnvoyException(fmt::format("Failed to create HttpServiceHeadersApplicator: {}",
+                                     creation_status.message()));
   }
 }
 
@@ -49,10 +54,8 @@ void OpenTelemetryHttpMetricsExporter::send(MetricsExportRequestPtr&& metrics) {
   // User-Agent header follows the OTLP specification.
   message->headers().setReferenceUserAgent(AccessLoggers::OpenTelemetry::getOtlpUserAgentHeader());
 
-  // Add custom headers from config.
-  for (const auto& header_pair : parsed_headers_to_add_) {
-    message->headers().setReference(header_pair.first, header_pair.second);
-  }
+  // Apply custom headers from config using the common helper.
+  headers_applicator_->apply(message->headers());
   message->body().add(request_body);
 
   const auto options =
