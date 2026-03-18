@@ -73,11 +73,11 @@ json generateErrorJsonResponse(int error_code, absl::string_view error_message) 
 
 int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
   if (!response_headers.has_value()) {
-    return 500;
+    return static_cast<int>(Http::Code::InternalServerError);
   }
   int status_code;
   if (!absl::SimpleAtoi(response_headers->getStatusValue(), &status_code)) {
-    return 500;
+    return static_cast<int>(Http::Code::InternalServerError);
   }
   return status_code;
 }
@@ -157,7 +157,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   }
 
   handleMcpMethod(request_body_json);
-  data.add(request_body_str_);
+  data.add(std::move(request_body_str_));
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
@@ -206,7 +206,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   }
 
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());
-  data.add(response_body_str_);
+  data.add(std::move(response_body_str_));
   return Http::FilterDataStatus::Continue;
 }
 
@@ -290,7 +290,8 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
     } else {
       response_body_str_ =
           translateJsonRestResponseToJsonRpc(absl::string_view(json_ptr, total_size), *session_id_,
-                                             getResponseCode(response_headers) >= 400)
+                                             getResponseCode(response_headers) >=
+                                                 static_cast<int>(Http::Code::BadRequest))
               .dump();
     }
     break;
@@ -317,6 +318,10 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
+    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
+    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
+    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
+    // 2. If Content-Length is present, update it with the new value.
     response_headers->setContentLength(response_body_str_.size());
     response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   }
@@ -383,6 +388,10 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   if (request_headers.has_value()) {
     request_headers->setPath(http_request->url);
     request_headers->setMethod(http_request->method);
+    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
+    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
+    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
+    // 2. If Content-Length is present, update it with the new value.
     request_headers->setContentLength(request_body_str_.size());
     request_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
