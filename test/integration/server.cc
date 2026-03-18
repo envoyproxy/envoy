@@ -297,7 +297,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
       server_gone_.WaitForNotification();
     }
   } else {
-    if (server_) {
+    if (!server_gone_.HasBeenNotified()) {
       server_->dispatcher().post([this]() { server_->shutdown(); });
       server_gone_.WaitForNotification();
     }
