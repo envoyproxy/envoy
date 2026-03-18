@@ -24,6 +24,8 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 namespace {
+constexpr absl::string_view WwwFormUrlEncodedReservedCharacters = ":/=&?+";
+
 constexpr const char* UrlBodyTemplateWithCredentialsForAuthCode =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}&code_"
     "verifier={4}";
@@ -52,15 +54,19 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 
-  const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?+");
+  const auto encoded_cb_url =
+      Http::Utility::PercentEncoding::encode(cb_url, WwwFormUrlEncodedReservedCharacters);
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
 
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
     body = fmt::format(UrlBodyTemplateWithCredentialsForAuthCode, auth_code,
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?+"),
-                       Http::Utility::PercentEncoding::encode(secret, ":/=&?+"), encoded_cb_url,
+                       Http::Utility::PercentEncoding::encode(
+                           client_id, WwwFormUrlEncodedReservedCharacters),
+                       Http::Utility::PercentEncoding::encode(
+                           secret, WwwFormUrlEncodedReservedCharacters),
+                       encoded_cb_url,
                        code_verifier);
     break;
   case AuthType::BasicAuth: {
@@ -77,7 +83,9 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?+"), encoded_cb_url,
+                       Http::Utility::PercentEncoding::encode(
+                           client_id, WwwFormUrlEncodedReservedCharacters),
+                       encoded_cb_url,
                        code_verifier);
     break;
   }
@@ -100,9 +108,12 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   switch (auth_type) {
   case AuthType::UrlEncodedBody:
     body = fmt::format(UrlBodyTemplateWithCredentialsForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?+"),
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?+"),
-                       Http::Utility::PercentEncoding::encode(secret, ":/=&?+"));
+                       Http::Utility::PercentEncoding::encode(
+                           refresh_token, WwwFormUrlEncodedReservedCharacters),
+                       Http::Utility::PercentEncoding::encode(
+                           client_id, WwwFormUrlEncodedReservedCharacters),
+                       Http::Utility::PercentEncoding::encode(
+                           secret, WwwFormUrlEncodedReservedCharacters));
     break;
   case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
@@ -118,8 +129,10 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutSecretForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?+"),
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?+"));
+                       Http::Utility::PercentEncoding::encode(
+                           refresh_token, WwwFormUrlEncodedReservedCharacters),
+                       Http::Utility::PercentEncoding::encode(
+                           client_id, WwwFormUrlEncodedReservedCharacters));
     break;
   }
 
