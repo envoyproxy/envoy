@@ -23,6 +23,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/oauth2/client_assertion.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -177,6 +178,9 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_TLS_CLIENT_AUTH:
     return AuthType::TlsClientAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_PRIVATE_KEY_JWT:
+    return AuthType::PrivateKeyJwt;
   case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
       OAuth2Config_AuthType_URL_ENCODED_BODY:
   default:
@@ -479,6 +483,15 @@ FilterConfig::FilterConfig(
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
       disable_token_encryption_(proto_config.disable_token_encryption()),
+      jwt_signing_algorithm_(proto_config.has_private_key_jwt() &&
+                                     !proto_config.private_key_jwt().signing_algorithm().empty()
+                                 ? proto_config.private_key_jwt().signing_algorithm()
+                                 : "RS256"),
+      jwt_assertion_lifetime_(
+          std::chrono::seconds(proto_config.has_private_key_jwt()
+                                   ? PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config.private_key_jwt(),
+                                                                     assertion_lifetime, 60)
+                                   : 60)),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -739,8 +752,22 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                        *decoder_callbacks_);
 
       // try to update access token by refresh token
+      std::string client_credential;
+      if (config_->authType() == AuthType::PrivateKeyJwt) {
+        auto assertion_result = ClientAssertion::create(
+            config_->clientId(), config_->tokenEndpointUrl(), config_->clientSecret(),
+            config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_);
+        if (!assertion_result.ok()) {
+          sendUnauthorizedResponse(fmt::format("Failed to create client assertion: {}",
+                                               assertion_result.status().message()));
+          return Http::FilterHeadersStatus::StopIteration;
+        }
+        client_credential = std::move(assertion_result.value());
+      } else {
+        client_credential = config_->clientSecret();
+      }
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                             config_->clientSecret(), config_->authType());
+                                             client_credential, config_->authType());
       // pause while we await the next step from the OAuth server
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
@@ -788,7 +815,21 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
   std::string code_verifier = decrypt_result.plaintext;
 
-  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+  std::string client_credential;
+  if (config_->authType() == AuthType::PrivateKeyJwt) {
+    auto assertion_result = ClientAssertion::create(
+        config_->clientId(), config_->tokenEndpointUrl(), config_->clientSecret(),
+        config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_);
+    if (!assertion_result.ok()) {
+      sendUnauthorizedResponse(fmt::format("Failed to create client assertion: {}",
+                                           assertion_result.status().message()));
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    client_credential = std::move(assertion_result.value());
+  } else {
+    client_credential = config_->clientSecret();
+  }
+  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), client_credential,
                                      redirect_uri, code_verifier, config_->authType());
 
   // pause while we await the next step from the OAuth server

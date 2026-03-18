@@ -41,10 +41,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_assertion_lib",
+    srcs = ["client_assertion.cc"],
+    hdrs = ["client_assertion.h"],
+    deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/json:json_sanitizer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "oauth_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":client_assertion_lib",
         ":oauth_client",
         "//envoy/server:filter_config_interface",
         "//source/common/common:assert_lib",

@@ -12,6 +12,21 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "client_assertion_test",
+    srcs = ["client_assertion_test.cc"],
+    extension_names = ["envoy.filters.http.oauth2"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/extensions/filters/http/oauth2:client_assertion_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],

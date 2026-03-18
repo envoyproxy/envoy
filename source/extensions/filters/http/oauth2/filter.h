@@ -207,6 +207,9 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
+  const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
+  std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
+  const std::string& tokenEndpointUrl() const { return oauth_token_endpoint_.uri(); }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -242,6 +245,8 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
+  const std::string jwt_signing_algorithm_;
+  const std::chrono::seconds jwt_assertion_lifetime_;
   Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;

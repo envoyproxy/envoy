@@ -264,6 +264,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: oauth2
+  change: |
+    Added ``PRIVATE_KEY_JWT`` client authentication to the OAuth2 filter (`RFC 7523 <https://datatracker.ietf.org/doc/html/rfc7523>`_).
+    The client authenticates using a signed JWT assertion sent as ``client_assertion`` in the token request.
+    The PEM-encoded private key is provided via the existing ``token_secret`` SDS configuration.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform

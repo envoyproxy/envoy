@@ -36,7 +36,7 @@ public:
 /**
  * Describes the authentication type used by the client when communicating with the auth server.
  */
-enum class AuthType { UrlEncodedBody, BasicAuth, TlsClientAuth };
+enum class AuthType { UrlEncodedBody, BasicAuth, TlsClientAuth, PrivateKeyJwt };
 
 } // namespace Oauth2
 } // namespace HttpFilters

@@ -492,6 +492,55 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
   client_->asyncRefreshAccessToken("a", "b", "c");
 }
 
+TEST_F(OAuth2ClientTest, RequestAccessTokenPrivateKeyJwtHasClientAssertion) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_NE(std::string::npos,
+                      body.find("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
+                                "assertion-type%3Ajwt-bearer"));
+            EXPECT_NE(std::string::npos, body.find("client_assertion=test_jwt_assertion"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  // For PrivateKeyJwt, the "secret" parameter holds the pre-built JWT assertion.
+  client_->asyncGetAccessToken("auth_code", "client_id", "test_jwt_assertion", "cb", "verifier",
+                               AuthType::PrivateKeyJwt);
+  EXPECT_EQ(1, callbacks_.size());
+}
+
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenPrivateKeyJwtHasClientAssertion) {
+  EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_NE(std::string::npos,
+                      body.find("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
+                                "assertion-type%3Ajwt-bearer"));
+            EXPECT_NE(std::string::npos, body.find("client_assertion=test_jwt_assertion"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncRefreshAccessToken("refresh", "client_id", "test_jwt_assertion",
+                                   AuthType::PrivateKeyJwt);
+  EXPECT_EQ(1, callbacks_.size());
+}
+
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkErrorDoubleCallStateInvalid) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(

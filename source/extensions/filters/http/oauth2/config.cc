@@ -84,6 +84,20 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
     return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }
 
+  if (auth_type ==
+      envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_PRIVATE_KEY_JWT) {
+    if (proto_config.has_private_key_jwt() &&
+        !proto_config.private_key_jwt().signing_algorithm().empty()) {
+      const std::string alg = proto_config.private_key_jwt().signing_algorithm();
+      if (alg != "RS256" && alg != "RS384" && alg != "RS512" && alg != "ES256" && alg != "ES384" &&
+          alg != "ES512") {
+        return absl::InvalidArgumentError(
+            absl::StrCat("unsupported private_key_jwt signing algorithm: ", alg,
+                         ". Supported: RS256, RS384, RS512, ES256, ES384, ES512"));
+      }
+    }
+  }
+
   if (proto_config.preserve_authorization_header() && proto_config.forward_bearer_token()) {
     return absl::InvalidArgumentError(
         "invalid combination of forward_bearer_token and preserve_authorization_header "

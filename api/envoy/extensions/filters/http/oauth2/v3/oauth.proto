@@ -129,6 +129,8 @@ message OAuth2Credentials {
   // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
   // This field is required unless :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``TLS_CLIENT_AUTH``, in which case authentication is done via the client certificate.
+  // When ``auth_type`` is ``PRIVATE_KEY_JWT``, this field must contain the PEM-encoded private key
+  // used to sign the JWT client assertion.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
@@ -149,9 +151,21 @@ message OAuth2Credentials {
       [(validate.rules).string = {pattern: "^$|^[^\\x00-\\x1f\\x7f \",;<>\\\\]+$"}];
 }
 
+// Configuration for ``PRIVATE_KEY_JWT`` client authentication (RFC 7523).
+message PrivateKeyJwtConfig {
+  // The signing algorithm to use for the JWT assertion.
+  // Supported values: ``RS256``, ``RS384``, ``RS512``, ``ES256``, ``ES384``, ``ES512``.
+  // Default: ``RS256``.
+  string signing_algorithm = 1;
+
+  // The lifetime of the JWT assertion. After this duration, the assertion expires.
+  // Default: ``60s``.
+  google.protobuf.Duration assertion_lifetime = 2;
+}
+
 // OAuth config
 //
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -168,6 +182,12 @@ message OAuth2Config {
     // transport socket configuration.
     // This implements OAuth 2.0 Mutual-TLS Client Authentication as defined in RFC 8705.
     TLS_CLIENT_AUTH = 2;
+
+    // The client authenticates using a signed JWT assertion (RFC 7523).
+    // The ``token_secret`` in credentials must contain the PEM-encoded private key used to sign the assertion.
+    // The JWT assertion is sent as ``client_assertion`` in the token request body along with
+    // ``client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer``.
+    PRIVATE_KEY_JWT = 3;
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
@@ -292,6 +312,11 @@ message OAuth2Config {
   // This option should only be used in secure environments where token encryption is not required.
   // Default is false (tokens are encrypted).
   bool disable_token_encryption = 26;
+
+  // Configuration for ``PRIVATE_KEY_JWT`` client authentication.
+  // Only used when :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
+  // is set to ``PRIVATE_KEY_JWT``.
+  PrivateKeyJwtConfig private_key_jwt = 27;
 }
 
 // Filter config.
