@@ -51,19 +51,18 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
     Upstream::ClusterLbStats& /*stats*/, Runtime::Loader& runtime, Random::RandomGenerator& random,
     uint32_t /* healthy_panic_threshold */, const Upstream::ClusterInfo& cluster_info,
     TimeSource& time_source,
-    const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config,
-    Event::Dispatcher& main_dispatcher)
+    const envoy::extensions::load_balancing_policies::peak_ewma::v3alpha::PeakEwma& config)
     : LoadBalancerBase(priority_set, cluster_info.lbStats(), runtime, random,
                        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                            cluster_info.lbConfig(), healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set), config_proto_(config), random_(random),
       time_source_(time_source), stats_scope_(cluster_info.statsScope()),
       cost_(config.has_penalty_value() ? config.penalty_value().value() : 1000000.0),
-      main_dispatcher_(main_dispatcher),
       aggregation_interval_(config_proto_.has_aggregation_interval()
                                 ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
                                       config_proto_.aggregation_interval()))
                                 : std::chrono::milliseconds(100)),
+      last_aggregation_time_(time_source_.monotonicTime()),
       tau_nanos_(config_proto_.has_decay_time()
                      ? DurationUtil::durationToMilliseconds(config_proto_.decay_time()) * 1000000LL
                      : kDefaultDecayTimeSeconds * 1000000000LL),
@@ -76,41 +75,16 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
     addPeakEwmaLbPolicyDataToHosts(host_set->hosts());
   }
 
-  // Setup callback to add data to new hosts.
-  priority_update_cb_ =
-      priority_set_.addPriorityUpdateCb([this](uint32_t, const Upstream::HostVector& hosts_added,
-                                               const Upstream::HostVector&) -> absl::Status {
+  // Setup callback to add data to new hosts and clean up removed hosts.
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this](uint32_t, const Upstream::HostVector& hosts_added,
+             const Upstream::HostVector& hosts_removed) -> absl::Status {
         addPeakEwmaLbPolicyDataToHosts(hosts_added);
+        for (const auto& host : hosts_removed) {
+          all_host_stats_.erase(host);
+        }
         return absl::OkStatus();
       });
-
-  // Create timer for EWMA aggregation.
-  aggregation_timer_ = main_dispatcher_.createTimer([this]() -> void { onAggregationTimer(); });
-  aggregation_timer_->enableTimer(aggregation_interval_);
-
-  // Peak EWMA load balancer initialized successfully.
-}
-
-PeakEwmaLoadBalancer::~PeakEwmaLoadBalancer() {
-  // Post timer cancellation to main thread to avoid cross-thread timer operations.
-  // Timer must be disabled from the same thread that created it (main_dispatcher_).
-  if (aggregation_timer_) {
-    main_dispatcher_.post([timer = std::move(aggregation_timer_)]() mutable {
-      if (timer) {
-        timer->disableTimer();
-        timer.reset();
-      }
-    });
-  }
-
-  // EWMA snapshot cleanup is automatic via shared_ptr destructor.
-
-  // Clean up host data.
-  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
-    for (const auto& host : host_set->hosts()) {
-      host->setLbPolicyData(nullptr);
-    }
-  }
 }
 
 // Host management.
@@ -130,12 +104,12 @@ PeakEwmaHostLbPolicyData* PeakEwmaLoadBalancer::getPeakEwmaData(Upstream::HostCo
   return dynamic_cast<PeakEwmaHostLbPolicyData*>(lb_data.ptr());
 }
 
-void PeakEwmaLoadBalancer::onAggregationTimer() {
-  // Timer callback - aggregate EWMA data from all hosts.
-  aggregateWorkerData();
-
-  // Reschedule timer for next cycle.
-  aggregation_timer_->enableTimer(aggregation_interval_);
+void PeakEwmaLoadBalancer::maybeAggregate() {
+  const auto now = time_source_.monotonicTime();
+  if (now - last_aggregation_time_ >= aggregation_interval_) {
+    aggregateWorkerData();
+    last_aggregation_time_ = now;
+  }
 }
 
 double PeakEwmaLoadBalancer::calculateHostCost(Upstream::HostConstSharedPtr host) {
@@ -192,6 +166,9 @@ PeakEwmaLoadBalancer::selectFromTwoCandidates(const Upstream::HostVector& hosts,
 
 Upstream::HostSelectionResponse
 PeakEwmaLoadBalancer::chooseHost(Upstream::LoadBalancerContext* /* context */) {
+  // Lazily aggregate EWMA data if the interval has elapsed.
+  maybeAggregate();
+
   // Power of Two Choices selection using host-attached EWMA data.
   const auto& host_sets = priority_set_.hostSetsPerPriority();
 
@@ -268,23 +245,9 @@ void PeakEwmaLoadBalancer::aggregateWorkerData() {
   // Aggregation cycle complete.
 }
 
-size_t PeakEwmaLoadBalancer::calculateNewSampleCount(size_t last_processed, size_t current_write,
-                                                     size_t max_samples) {
-  if (last_processed == current_write) {
-    return 0;
-  }
-
-  if (current_write >= last_processed) {
-    return current_write - last_processed;
-  } else {
-    // Write index wrapped around.
-    return (max_samples - last_processed) + current_write;
-  }
-}
-
-double PeakEwmaLoadBalancer::calculateTimeBasedAlpha(uint64_t current_time_ns,
-                                                     uint64_t sample_time_ns) {
-  int64_t time_delta_ns = static_cast<int64_t>(current_time_ns - sample_time_ns);
+double PeakEwmaLoadBalancer::calculateTimeBasedAlpha(uint64_t later_time_ns,
+                                                     uint64_t earlier_time_ns) {
+  int64_t time_delta_ns = static_cast<int64_t>(later_time_ns - earlier_time_ns);
   if (time_delta_ns <= 0) {
     return 1.0; // Use full weight for future/concurrent samples.
   }
@@ -316,17 +279,20 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
 
   // Get the range of new samples to process (atomic ring buffer).
   auto [last_processed, current_write] = data->getNewSampleRange();
-
-  size_t num_new_samples =
-      calculateNewSampleCount(last_processed, current_write, data->max_samples_);
-  if (num_new_samples == 0)
+  if (last_processed == current_write)
     return;
+
+  // If ring buffer was fully overwritten, skip to oldest valid slot.
+  // Uses unsigned arithmetic (always correct since write_index_ only increments).
+  if (current_write - last_processed > data->max_samples_) {
+    last_processed = current_write - data->max_samples_;
+  }
+
+  size_t num_new_samples = current_write - last_processed;
 
   // Get current EWMA state.
   double current_ewma = data->getEwmaRtt();
-  uint64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 time_source_.monotonicTime().time_since_epoch())
-                                 .count();
+  uint64_t reference_time = data->last_update_timestamp_.load();
 
   // Process all new samples in chronological order.
   size_t processed_index = last_processed;
@@ -342,13 +308,14 @@ void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* ho
       continue;
     }
 
-    double alpha = calculateTimeBasedAlpha(current_time_ns, timestamp_ns);
+    double alpha = calculateTimeBasedAlpha(timestamp_ns, reference_time);
     current_ewma = updateEwmaWithSample(current_ewma, rtt_ms, alpha);
+    reference_time = timestamp_ns;
     processed_index++;
   }
 
   // Update atomic EWMA in host data.
-  data->updateEwma(current_ewma, current_time_ns);
+  data->updateEwma(current_ewma, reference_time);
   data->markSamplesProcessed(current_write);
 }
 

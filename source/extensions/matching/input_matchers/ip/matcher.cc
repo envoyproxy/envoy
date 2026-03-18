@@ -28,18 +28,18 @@ Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
       // store any associated data.
       trie_({{true, ranges}}), stats_(generateStats(stat_prefix, stat_scope)) {}
 
-MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
-  if (absl::holds_alternative<absl::monostate>(input)) {
+MatchResult Matcher::match(const Envoy::Matcher::DataInputGetResult& input) {
+  auto data = input.stringData();
+  if (!data) {
     return MatchResult::NoMatch;
   }
-  const std::string& ip_str = absl::get<std::string>(input);
-  if (ip_str.empty()) {
+  if (data->empty()) {
     return MatchResult::NoMatch;
   }
-  const auto ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
+  const auto ip = Network::Utility::parseInternetAddressNoThrow(std::string(*data));
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
-    ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
+    ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", *data);
     return MatchResult::NoMatch;
   }
   if (!trie_.getData(ip).empty()) {

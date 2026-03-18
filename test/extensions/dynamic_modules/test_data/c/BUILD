@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
@@ -13,9 +14,12 @@ package(default_visibility = [
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
+    "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
+
+test_program(name = "no_op_no_optional_abi")
 
 test_program(name = "network_no_op")
 
@@ -115,6 +119,14 @@ test_program(name = "bootstrap_no_timer_fired")
 
 test_program(name = "bootstrap_no_admin_request")
 
+test_program(name = "bootstrap_no_cluster_add_or_update")
+
+test_program(name = "bootstrap_no_cluster_removal")
+
+test_program(name = "bootstrap_no_listener_add_or_update")
+
+test_program(name = "bootstrap_no_listener_removal")
+
 test_program(name = "access_log_no_op")
 
 test_program(name = "access_log_missing_config_new")
@@ -129,6 +141,12 @@ test_program(name = "access_log_missing_logger_destroy")
 
 test_program(name = "access_log_config_new_fail")
 
+test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_config_new_fail")
+
+test_program(name = "cluster_new_fail")
+
 test_program(name = "lb_round_robin")
 
 test_program(name = "lb_config_new_fail")
@@ -140,6 +158,8 @@ test_program(name = "lb_new_fail")
 test_program(name = "lb_no_choose_host")
 
 test_program(name = "lb_invalid_host_index")
+
+test_program(name = "lb_invalid_priority")
 
 test_program(name = "matcher_no_op")
 
@@ -166,3 +186,19 @@ test_program(name = "cert_validator_not_validated")
 test_program(name = "cert_validator_empty_digest")
 
 test_program(name = "cert_validator_filter_state")
+
+test_program(name = "upstream_bridge_no_op")
+
+test_program(name = "upstream_bridge_config_new_fail")
+
+test_program(name = "upstream_bridge_new_fail")
+
+test_program(name = "upstream_bridge_stop_and_buffer")
+
+test_program(name = "upstream_bridge_end_stream")
+
+test_program(name = "upstream_bridge_abi_edge_cases")
+
+test_program(name = "upstream_bridge_headers_end_stream")
+
+test_program(name = "upstream_bridge_headers_end_stream_no_body")

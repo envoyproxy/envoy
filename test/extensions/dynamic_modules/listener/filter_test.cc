@@ -317,7 +317,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_config_define_counter(
                 static_cast<void*>(filter_config_.get()), name, &counter_id));
-  EXPECT_EQ(0, counter_id);
+  EXPECT_EQ(1, counter_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
@@ -340,7 +340,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsGaugeDefineAndManipulate) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_config_define_gauge(
                 static_cast<void*>(filter_config_.get()), name, &gauge_id));
-  EXPECT_EQ(0, gauge_id);
+  EXPECT_EQ(1, gauge_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
@@ -371,7 +371,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsHistogramDefineAndRecord) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_config_define_histogram(
                 static_cast<void*>(filter_config_.get()), name, &histogram_id));
-  EXPECT_EQ(0, histogram_id);
+  EXPECT_EQ(1, histogram_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);

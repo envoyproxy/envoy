@@ -11,6 +11,7 @@
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -19,62 +20,6 @@ using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
-
-class OsSysCallsWithMockedDns : public Api::OsSysCallsImpl {
-public:
-  static addrinfo* makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
-    addrinfo* ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
-    memset(ai, 0, sizeof(addrinfo));
-    ai->ai_protocol = IPPROTO_TCP;
-    ai->ai_socktype = SOCK_STREAM;
-    if (addr->ip()->ipv4() != nullptr) {
-      ai->ai_family = AF_INET;
-    } else {
-      ai->ai_family = AF_INET6;
-    }
-    sockaddr_storage* storage =
-        reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
-    ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
-    memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
-    ai->ai_addrlen = addr->sockAddrLen();
-    ai->ai_next = nullptr;
-    return ai;
-  }
-
-  Api::SysCallIntResult getaddrinfo(const char* node, const char* /*service*/,
-                                    const addrinfo* /*hints*/, addrinfo** res) override {
-    *res = nullptr;
-    if (absl::string_view{"localhost"} == node || absl::string_view{"127.0.0.1"} == node ||
-        absl::string_view{"::1"} == node) {
-      if (ip_version_ == Network::Address::IpVersion::v6) {
-        *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
-      } else {
-        *res = makeAddrInfo(Network::Utility::getCanonicalIpv4LoopbackAddress());
-      }
-      return {0, 0};
-    }
-    if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
-      return {EAI_NONAME, 0};
-    }
-    std::cerr << "Mock DNS does not have entry for: " << node << std::endl;
-    return {-1, 128};
-  }
-  void freeaddrinfo(addrinfo* ai) override {
-    while (ai != nullptr) {
-      addrinfo* p = ai;
-      ai = ai->ai_next;
-      free(p->ai_addr);
-      free(p);
-    }
-  }
-
-  void setIpVersion(Network::Address::IpVersion version) { ip_version_ = version; }
-
-  Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
-
-  absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
-                                                                   "itdoesnotexist"};
-};
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {

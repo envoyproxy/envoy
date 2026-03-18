@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -228,6 +229,42 @@ TEST_F(ReverseConnectionUtilityTest, PingMessageHandlerGetPingCount) {
 
   handler->processPingMessage("RPING", *connection);
   EXPECT_EQ(handler->getPingCount(), 1);
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithDelimiter) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_TRUE(result.hasTenant());
+  EXPECT_EQ(result.tenant, "tenant-alpha");
+  EXPECT_EQ(result.identifier, "node-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithoutDelimiter) {
+  const absl::string_view composite = "node-plain";
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_EQ(result.identifier, "node-plain");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierEmptyValue) {
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier("");
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_TRUE(result.identifier.empty());
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
+  EXPECT_EQ(composite, absl::StrCat("tenant-alpha",
+                                    ReverseConnectionUtility::TENANT_SCOPE_DELIMITER, "node-1"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
+  const std::string composite = ReverseConnectionUtility::buildTenantScopedIdentifier("", "node-1");
+  EXPECT_EQ(composite, "node-1");
 }
 
 } // namespace ReverseConnection

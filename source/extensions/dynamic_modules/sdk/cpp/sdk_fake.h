@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <map>
+#include <string_view>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
 #include "sdk.h"
 
 namespace Envoy {
@@ -13,9 +14,9 @@ class FakeHeaderMap : public HeaderMap {
 public:
   FakeHeaderMap() = default;
 
-  std::vector<absl::string_view> get(absl::string_view key) const override {
-    std::vector<absl::string_view> result;
-    auto it = headers_.find(key);
+  std::vector<std::string_view> get(std::string_view key) const override {
+    std::vector<std::string_view> result;
+    auto it = headers_.find(std::string(key));
     if (it == headers_.end()) {
       return {};
     }
@@ -23,13 +24,13 @@ public:
       return {};
     }
     for (const auto& value : it->second) {
-      result.emplace_back(absl::string_view(value));
+      result.emplace_back(std::string_view(value));
     }
     return result;
   }
 
-  absl::string_view getOne(absl::string_view key) const override {
-    auto it = headers_.find(key);
+  std::string_view getOne(std::string_view key) const override {
+    auto it = headers_.find(std::string(key));
     if (it == headers_.end()) {
       return {};
     }
@@ -58,36 +59,38 @@ public:
     return count;
   }
 
-  void set(absl::string_view key, absl::string_view value) override {
-    headers_[key] = {std::string(value)};
+  void set(std::string_view key, std::string_view value) override {
+    headers_[std::string(key)] = {std::string(value)};
   }
 
-  void add(absl::string_view key, absl::string_view value) override {
-    headers_[key].emplace_back(value);
+  void add(std::string_view key, std::string_view value) override {
+    headers_[std::string(key)].emplace_back(std::string(value));
   }
 
-  void remove(absl::string_view key) override { headers_.erase(key); }
+  void remove(std::string_view key) override { headers_.erase(std::string(key)); }
 
   void clear() { headers_.clear(); }
 
 private:
-  absl::flat_hash_map<std::string, std::vector<std::string>> headers_;
+  std::map<std::string, std::vector<std::string>> headers_;
 };
 
 class FakeBodyBuffer : public BodyBuffer {
 public:
   FakeBodyBuffer() = default;
 
-  std::vector<BufferView> getChunks() override { return {BufferView(data_.data(), data_.size())}; }
+  std::vector<BufferView> getChunks() const override {
+    return {BufferView(data_.data(), data_.size())};
+  }
 
-  size_t getSize() override { return data_.size(); }
+  size_t getSize() const override { return data_.size(); }
 
   void drain(size_t num_bytes) override {
     const size_t to_drain = std::min(num_bytes, getSize());
     data_ = data_.substr(to_drain);
   }
 
-  void append(absl::string_view data) override { data_.append(data); }
+  void append(std::string_view data) override { data_.append(data); }
 
   void clear() { data_.clear(); }
 

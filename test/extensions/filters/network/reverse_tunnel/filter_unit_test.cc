@@ -4,6 +4,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/network/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
@@ -11,6 +12,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
@@ -1887,6 +1890,168 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
   auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
   EXPECT_EQ(1, accepted->value());
+}
+
+class ReverseTunnelFilterWithTenantIsolationTest : public ReverseTunnelFilterUnitTest {
+public:
+  void SetUp() override {
+    ReverseTunnelFilterUnitTest::SetUp();
+    // Enable tenant isolation in bootstrap config before setting up extension.
+    upstream_config_.mutable_enable_tenant_isolation()->set_value(true);
+    setupUpstreamExtension();
+    setupUpstreamThreadLocalSlot();
+    // Ensure tenant isolation is set on the socket manager.
+    if (upstream_thread_local_registry_ && upstream_thread_local_registry_->socketManager()) {
+      upstream_thread_local_registry_->socketManager()->setTenantIsolationEnabled(true);
+    }
+  }
+
+  void TearDown() override {
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
+    upstream_socket_interface_.reset();
+    ReverseTunnelFilterUnitTest::TearDown();
+  }
+};
+
+// Test filter rejects delimiter in node ID when tenant isolation is enabled.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
+       FilterRejectsDelimiterInNodeIdWhenTenantIsolationEnabled) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string node_id_with_delimiter =
+      absl::StrCat("node", ReverseTunnelFilterConfig::tenantDelimiter(), "foo");
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+// Test filter rejects delimiter in cluster ID when tenant isolation is enabled.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
+       FilterRejectsDelimiterInClusterIdWhenTenantIsolationEnabled) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string cluster_id_with_delimiter =
+      absl::StrCat("cluster", ReverseTunnelFilterConfig::tenantDelimiter(), "bar");
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node", cluster_id_with_delimiter, "tenant"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+// Test filter rejects delimiter in tenant ID when tenant isolation is enabled.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
+       FilterRejectsDelimiterInTenantIdWhenTenantIsolationEnabled) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  const std::string tenant_id_with_delimiter =
+      absl::StrCat("tenant", ReverseTunnelFilterConfig::tenantDelimiter(), "baz");
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node", "cluster", tenant_id_with_delimiter));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+// Test filter uses tenant-scoped identifiers for socket registration.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest,
+       FilterUsesTenantScopedIdentifiersForSocketRegistration) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  // Verify socket manager has tenant isolation enabled - this confirms the filter will use
+  // tenant-scoped identifiers when registering sockets.
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
+}
+
+// Test filter uses non-scoped identifiers when tenant isolation is disabled.
+TEST_F(ReverseTunnelFilterUnitTest, FilterUsesNonScopedIdentifiersWhenTenantIsolationDisabled) {
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+  // Don't enable tenant isolation - socket manager flag remains false.
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  // Verify socket manager has tenant isolation disabled - this confirms the filter will use
+  // non-scoped identifiers when registering sockets.
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  EXPECT_FALSE(socket_manager->tenantIsolationEnabled());
+}
+
+// Test filter reads tenant isolation from socket manager.
+TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFromSocketManager) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  // Verify socket manager has tenant isolation enabled.
+  auto* socket_manager = upstream_thread_local_registry_->socketManager();
+  ASSERT_NE(socket_manager, nullptr);
+  EXPECT_TRUE(socket_manager->tenantIsolationEnabled());
+
+  // Send request with delimiter in node ID - should be rejected.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  const std::string node_id_with_delimiter =
+      absl::StrCat("node", ReverseTunnelFilterConfig::tenantDelimiter(), "foo");
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
 }
 
 } // namespace

@@ -239,6 +239,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     let worker_index = envoy_filter.get_worker_index();
     assert_eq!(worker_index, 0);
 
+    // ConnectionMtls is a bool attribute; without TLS it should return None.
+    let mtls =
+      envoy_filter.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+    assert!(mtls.is_none());
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -436,7 +441,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.send_response(
       200,
-      vec![
+      &[
         ("header1", "value1".as_bytes()),
         ("header2", "value2".as_bytes()),
       ],
@@ -601,6 +606,170 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "key",
     );
     assert!(ns_res_body.is_none());
+
+    // Test bool metadata.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", true);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(true));
+    // Set false.
+    envoy_filter.set_dynamic_metadata_bool("ns_res_body_bool", "bool_key", false);
+    let bool_val = envoy_filter.get_metadata_bool(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert_eq!(bool_val, Some(false));
+    // Try getting bool as string (should fail).
+    let bool_as_string = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_string.is_none());
+    // Try getting bool as number (should fail).
+    let bool_as_number = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body_bool",
+      "bool_key",
+    );
+    assert!(bool_as_number.is_none());
+
+    // Test get_metadata_keys.
+    envoy_filter.set_dynamic_metadata_string("ns_keys_test", "k1", "v1");
+    envoy_filter.set_dynamic_metadata_number("ns_keys_test", "k2", 2.0);
+    envoy_filter.set_dynamic_metadata_bool("ns_keys_test", "k3", true);
+    let keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_keys_test",
+    );
+    assert!(keys.is_some());
+    let keys = keys.unwrap();
+    assert_eq!(keys.len(), 3);
+    let key_strs: Vec<&str> = keys
+      .iter()
+      .map(|k| std::str::from_utf8(k.as_slice()).unwrap())
+      .collect();
+    assert!(key_strs.contains(&"k1"));
+    assert!(key_strs.contains(&"k2"));
+    assert!(key_strs.contains(&"k3"));
+
+    // Non-existing namespace returns None.
+    let no_keys = envoy_filter.get_metadata_keys(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "non_existing_ns",
+    );
+    assert!(no_keys.is_none());
+
+    // Test get_metadata_namespaces.
+    let namespaces =
+      envoy_filter.get_metadata_namespaces(abi::envoy_dynamic_module_type_metadata_source::Dynamic);
+    assert!(namespaces.is_some());
+    let namespaces = namespaces.unwrap();
+    assert!(!namespaces.is_empty());
+    let ns_strs: Vec<&str> = namespaces
+      .iter()
+      .map(|ns| std::str::from_utf8(ns.as_slice()).unwrap())
+      .collect();
+    assert!(ns_strs.contains(&"ns_keys_test"));
+    assert!(ns_strs.contains(&"ns_res_body_bool"));
+
+    // Test list metadata: add numbers, strings, and bools to a list.
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 1.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 2.0));
+    assert!(envoy_filter.add_dynamic_metadata_list_number("ns_list", "list_key", 3.0));
+    let size = envoy_filter.get_metadata_list_size(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "list_key",
+    );
+    assert_eq!(size, Some(3));
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        0,
+      ),
+      Some(1.0)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        2,
+      ),
+      Some(3.0)
+    );
+    // Out of range index returns None.
+    assert!(envoy_filter
+      .get_metadata_list_number(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "list_key",
+        3,
+      )
+      .is_none());
+
+    // Test string list.
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "hello"));
+    assert!(envoy_filter.add_dynamic_metadata_list_string("ns_list", "str_list_key", "world"));
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      0,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"hello");
+    let str_val = envoy_filter.get_metadata_list_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_list",
+      "str_list_key",
+      1,
+    );
+    assert!(str_val.is_some());
+    assert_eq!(str_val.unwrap().as_slice(), b"world");
+
+    // Test bool list.
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", true));
+    assert!(envoy_filter.add_dynamic_metadata_list_bool("ns_list", "bool_list_key", false));
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        0,
+      ),
+      Some(true)
+    );
+    assert_eq!(
+      envoy_filter.get_metadata_list_bool(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "bool_list_key",
+        1,
+      ),
+      Some(false)
+    );
+
+    // Adding to an existing non-list key returns false.
+    envoy_filter.set_dynamic_metadata_number("ns_list", "not_a_list", 42.0);
+    assert!(!envoy_filter.add_dynamic_metadata_list_number("ns_list", "not_a_list", 1.0));
+
+    // Getting list size for a non-list key returns None.
+    assert!(envoy_filter
+      .get_metadata_list_size(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_list",
+        "not_a_list",
+      )
+      .is_none());
+
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }
