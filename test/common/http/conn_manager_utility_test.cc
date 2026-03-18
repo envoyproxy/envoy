@@ -2112,9 +2112,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonCertEscaping) 
             headers.get_("x-forwarded-client-cert"));
 }
 
-// JSON format: Verify that JSON escaping roundtrips correctly by parsing the output and comparing
-// parsed values byte-for-byte with the original inputs. Uses AppendForward with an existing JSON
-// header to also verify that the append produces valid JSON.
+// JSON format: Verify that JSON escaping makes a roundtrip correctly by parsing the output and
+// comparing parsed values byte-for-byte with the original inputs. Uses AppendForward with an
+// existing JSON header to also verify that the append produces valid JSON.
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonRoundtrip) {
   auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
