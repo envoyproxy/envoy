@@ -329,13 +329,13 @@ public:
    * Used by HDS to report richer health state to the control plane.
    * 0 means no response has been recorded yet.
    */
-  virtual void setLastHealthCheckHttpStatus(uint32_t) {}
+  virtual void setLastHealthCheckHttpStatus(uint32_t) PURE;
 
   /**
    * @return the HTTP status code from the last active health check response, or
    * 0 if no response has been recorded.
    */
-  virtual uint32_t lastHealthCheckHttpStatus() const { return 0; }
+  virtual absl::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

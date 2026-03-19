@@ -379,7 +379,9 @@ public:
   void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
 
   void setLastHealthCheckHttpStatus(uint32_t status) override { last_hc_http_status_ = status; }
-  uint32_t lastHealthCheckHttpStatus() const override { return last_hc_http_status_; }
+  absl::optional<uint64_t> lastHealthCheckHttpStatus() const override {
+    return last_hc_http_status_;
+  }
 
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.
@@ -469,7 +471,7 @@ private:
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
   std::atomic<Host::HealthStatus> eds_health_status_{};
-  std::atomic<uint32_t> last_hc_http_status_{0};
+  absl::optional<std::atomic<uint64_t>> last_hc_http_status_ = absl::nullopt;
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {
