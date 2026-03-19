@@ -1,7 +1,3 @@
-// © 2026 Nokia
-// Licensed under the Apache License 2.0
-// SPDX-License-Identifier: Apache-2.0
-
 // LDAP message decoder - looks for StartTLS requests and protocol violations.
 // Intentionally limited in scope. We only parse enough to detect StartTLS.
 

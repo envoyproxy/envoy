@@ -1,7 +1,3 @@
-// © 2026 Nokia
-// Licensed under the Apache License 2.0
-// SPDX-License-Identifier: Apache-2.0
-
 // LDAP proxy filter - handles StartTLS upgrades transparently.
 //
 // Two modes:

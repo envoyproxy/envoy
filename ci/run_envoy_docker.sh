@@ -61,6 +61,5 @@ export ENVOY_BUILD_IMAGE
 exec docker compose \
     -f "${SCRIPT_DIR}/docker-compose.yml" \
     ${ENVOY_DOCKER_PLATFORM:+-p "$ENVOY_DOCKER_PLATFORM"} \
-    run \
-    --rm \
+    up -d \
     "${COMPOSE_SERVICE}"

@@ -1,7 +1,3 @@
-// © 2026 Nokia
-// Licensed under the Apache License 2.0
-// SPDX-License-Identifier: Apache-2.0
-
 // Pre-baked LDAP response templates.
 // We use static byte arrays instead of building ASN.1 dynamically.
 

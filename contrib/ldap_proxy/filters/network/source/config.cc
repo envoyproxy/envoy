@@ -1,7 +1,3 @@
-// © 2026 Nokia
-// Licensed under the Apache License 2.0
-// SPDX-License-Identifier: Apache-2.0
-
 #include "contrib/ldap_proxy/filters/network/source/config.h"
 
 #include "fmt/format.h"

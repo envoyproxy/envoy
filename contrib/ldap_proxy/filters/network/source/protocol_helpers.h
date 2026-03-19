@@ -1,7 +1,3 @@
-// © 2026 Nokia
-// Licensed under the Apache License 2.0
-// SPDX-License-Identifier: Apache-2.0
-
 // Minimal BER helpers for LDAP message inspection.
 // Only what we need for StartTLS detection - no generic ASN.1 stuff.
 
