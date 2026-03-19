@@ -176,6 +176,68 @@ node:
   TestEnvironment::removePath(config_root);
 }
 
+TEST(BootstrapConfigDirectoryTest, IncludeDirectoryLoadsSymlinkedYamlFiles) {
+  Api::ApiPtr api = Api::createApiForTest();
+
+  const std::string config_root =
+      TestEnvironment::temporaryPath("bootstrap_config_include_symlinked_files");
+  const std::string data_dir = absl::StrCat(config_root, "/data");
+  const std::string include_dir = absl::StrCat(config_root, "/conf.d");
+  TestEnvironment::removePath(config_root);
+  TestEnvironment::createPath(data_dir);
+  TestEnvironment::createPath(include_dir);
+
+  const std::string target_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(data_dir, "/cluster.yaml"),
+                                                R"EOF(
+static_resources:
+  clusters:
+  - name: symlinked-cluster
+    type: STATIC
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: symlinked-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
+)EOF",
+                                                /*fully_qualified_path=*/true);
+  TestEnvironment::createSymlink(target_path, absl::StrCat(include_dir, "/10-cluster.yaml"));
+
+  const std::string root_config_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/bootstrap.yaml"),
+                                                R"EOF(
+include: conf.d
+node:
+  id: root-id
+  cluster: root-cluster
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                                                /*fully_qualified_path=*/true);
+
+  OptionsImplBase options;
+  options.setConfigPath(root_config_path);
+  options.setLocalAddressIpVersion(Network::Address::IpVersion::v4);
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  const absl::Status status = InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+  ASSERT_TRUE(status.ok()) << status;
+  ASSERT_EQ(1, bootstrap.static_resources().clusters_size());
+  EXPECT_EQ("symlinked-cluster", bootstrap.static_resources().clusters(0).name());
+
+  TestEnvironment::removePath(config_root);
+}
+
 TEST(BootstrapConfigDirectoryTest, IncludeCycleIsRejected) {
   Api::ApiPtr api = Api::createApiForTest();
 
