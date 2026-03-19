@@ -267,7 +267,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
     } else {
-      // If tools_list_http_rule is not configured, pass through the request.
+      // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
+      // be addressed later when the JSON parser is updated.
       mcp_operation_ = McpOperation::Unspecified;
       request_body_str_ = json_rpc.dump();
     }
