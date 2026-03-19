@@ -283,7 +283,7 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   codec_client_->close();
 }
 
-TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUnprotected) {
+TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   const std::string config_yaml = R"(
               name: envoy.access_loggers.stats
               typed_config:
@@ -365,6 +365,10 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictionResetsValueIfUn
   codec_client2->close();
 }
 
+// This test verifies that if the gauge is evicted while the request is in-flight,
+// the access logger can successfully recreate it when the request ends.
+// In reality, it shouldn't happen because the gauge is protected from eviction while
+// in-flight(value > 0).
 TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
   const std::string config_yaml = R"(
               name: envoy.access_loggers.stats
@@ -393,6 +397,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
   // When the gauge is evicted after ADD but before SUB, the access logger can successfully recreate
   // it when the request ends. A newly recreated gauge starts at 0, so subtracting from it causes a
   // subtraction underflow warning which is expected to trigger EXPECT_DEBUG_DEATH.
+  // Note: `EXPECT_DEBUG_DEATH` forks a subprocess. Forked processes do not inherit background
+  // threads. Since Envoy integration tests rely on background server threads (started by `init`),
+  // the setup must happen *inside* the block so that the threads are created within the subprocess.
   EXPECT_DEBUG_DEATH(
       {
         init(config_yaml, /*autonomous_upstream=*/false,
@@ -424,7 +431,61 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
 
         codec_client1->close();
       },
+      // This text check ensures the crash is from the underflow assert, not due to
+      // crashing because of bad stat access in the StatsAccessLog. This text check is the entire
+      // point of the test.
       "child_value_ >= amount");
+}
+
+TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
+  const std::string config_yaml = R"(
+              name: envoy.access_loggers.stats
+              filter:
+                log_type_filter:
+                  types: [DownstreamStart]
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    add_subtract:
+                      add_log_type: DownstreamStart
+                      sub_log_type: DownstreamEnd
+)";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"},       {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-evict-cleanup-tag"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  auto codec_client = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // DownstreamStart logged, gauge should be 1.
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", 1);
+
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  codec_client->close();
+
+  // Since DownstreamEnd is filtered out, the explicit SUB op is skipped.
+  // When the request dies, AccessLogState destructor should run and subtract the gauge.
+  // The gauge should go back to 0.
+  test_server_->waitForGaugeEq(
+      "test_stat_prefix.active_requests.request_header_tag.my-evict-cleanup-tag", 0);
 }
 
 } // namespace
