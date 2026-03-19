@@ -38,7 +38,12 @@ std::shared_ptr<Tenant> Factory::getTenant(absl::string_view tenant_name, uint64
     auto it = active_tenants_.find(tenant_name);
     if (it == active_tenants_.end() || (tenant = it->second.lock()) == nullptr) {
       tenant = std::make_shared<Tenant>(tenant_name, shared_from_this(), 1);
-      active_tenants_.insert_or_assign(tenant->name_, tenant);
+      if (it != active_tenants_.end()) {
+        // Replace the entry rather than update in-place so the key always points
+        // to the current live Tenant::name_.
+        active_tenants_.erase(it);
+      }
+      active_tenants_.emplace(tenant->name_, tenant);
     }
   }
   {
@@ -192,8 +197,7 @@ void Tenant::addToQueue(std::shared_ptr<Request> weak_request) {
   waiting_requests_.push_back(std::move(weak_request));
 }
 
-uint64_t Request::consume(uint64_t want_tokens, bool allow_partial) {
-  ENVOY_BUG(allow_partial, "not implemented with allow_partial=false, because not used");
+uint64_t Request::consume(uint64_t want_tokens) {
   Thread::LockGuard lock(tenant_->parent_->mutex_);
   tenant_->parent_->synchronizer_.syncPoint(Factory::ConsumeSyncPoint);
   tenant_->parent_->spill();
@@ -230,33 +234,17 @@ uint64_t Request::consume(uint64_t want_tokens, bool allow_partial) {
   return got;
 }
 
-uint64_t Request::consume(uint64_t, bool, std::chrono::milliseconds&) {
-  IS_ENVOY_BUG("consume with time_to_next_token not implemented, because not used");
-  return 0;
-};
-
-std::chrono::milliseconds Request::nextTokenAvailable() {
-  IS_ENVOY_BUG("nextTokenAvailable not implemented, because not used");
-  return std::chrono::milliseconds{0};
-};
-
 void Request::cancel() {
-  ASSERT(tenant_ != nullptr, "cancel should not be called twice");
   Thread::LockGuard lock(tenant_->parent_->mutex_);
   if (queued_tokens_) {
-    std::cerr << "request queued_tokens_=" << queued_tokens_ << " for tenant=" << tenant_->name_
-              << std::endl;
     tenant_->removeFromQueue(shared_from_this());
   }
   tenant_.reset();
 }
 
-Request::~Request() { ASSERT(tenant_ == nullptr, "cancel must be called before destructor"); }
-
 void Tenant::removeFromQueue(std::shared_ptr<Request> req) {
   // This is a linear search, but deletions of requests that are waiting on
   // data *and* are being bandwidth-limited should be very rare.
-  std::cerr << "waiting_requests_.size()=" << waiting_requests_.size() << std::endl;
   auto it = std::find_if(waiting_requests_.begin(), waiting_requests_.end(),
                          [&](std::shared_ptr<Request>& p) { return req.get() == p.get(); });
   // removeRequest should not be called if the request is not waiting,
@@ -276,6 +264,29 @@ void Factory::removeFromQueue(std::shared_ptr<Tenant> tenant) {
   // so it should always be found.
   ASSERT(it != waiting_tenants_.end());
   waiting_tenants_.erase(it);
+}
+
+Client::Client(Factory& factory, absl::string_view tenant_name, uint64_t weight)
+    : request_(factory.getTenant(tenant_name, weight)->makeRequest()) {}
+
+Client::~Client() { request_->cancel(); }
+
+uint64_t Client::consume(uint64_t tokens, bool allow_partial) {
+  if (allow_partial == false) {
+    IS_ENVOY_BUG("consume with allow_partial=false is not expected to be called");
+    return 0;
+  }
+  return request_->consume(tokens);
+}
+
+uint64_t Client::consume(uint64_t, bool, std::chrono::milliseconds&) {
+  IS_ENVOY_BUG("consume with time_to_next_token is not expected to be called");
+  return 0;
+}
+
+std::chrono::milliseconds Client::nextTokenAvailable() {
+  IS_ENVOY_BUG("nextTokenAvailable is not expected to be called");
+  return {};
 }
 
 } // namespace FairTokenBucket

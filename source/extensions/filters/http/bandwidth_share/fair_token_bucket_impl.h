@@ -43,6 +43,11 @@ namespace FairTokenBucket {
  *                          |         |      |
  *                     Request    Request   Request
  *
+ * The interface for actual use is `Client` which wraps a Request and provides
+ * [the relevant part of] the TokenBucket interface. This wrapper allows
+ * RAII to cancel requests for tokens and perform appropriate structural
+ * deletion while the relevant locks are held, dodging the pitfalls of
+ * std::weak_ptrs being invalidated before destructors run, normally.
  */
 
 class Request;
@@ -125,30 +130,39 @@ private:
   friend class SpillHandler;
 };
 
-class Request : public TokenBucket, public std::enable_shared_from_this<Request> {
+class Request : public std::enable_shared_from_this<Request> {
 public:
   Request(const Request&) = delete;
   Request(Request&&) = delete;
-  uint64_t consume(uint64_t tokens, bool allow_partial) override;
-  uint64_t consume(uint64_t tokens, bool allow_partial,
-                   std::chrono::milliseconds& time_to_next_token) override;
-  std::chrono::milliseconds nextTokenAvailable() override;
-  uint64_t queuedTokens() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(&Factory::mutex_) {
-    return queued_tokens_;
-  }
-  // Actual bucket belongs to the factory and is reset at create-time,
-  // so maybeReset is a no-op.
-  void maybeReset(uint64_t) override{};
-  void cancel();
-  ~Request() override;
 
 private:
+  uint64_t consume(uint64_t tokens);
+  void cancel();
   explicit Request(std::shared_ptr<Tenant> tenant) : tenant_(std::move(tenant)) {}
   uint64_t held_tokens_ ABSL_GUARDED_BY(&Factory::mutex_){0};
   uint64_t queued_tokens_ ABSL_GUARDED_BY(&Factory::mutex_){0};
   std::shared_ptr<Tenant> tenant_;
+  friend class Client;
   friend class Tenant;
   friend class SpillHandler;
+};
+
+class Client : public TokenBucket {
+public:
+  Client(Factory& factory, absl::string_view tenant_name, uint64_t weight);
+  Client(const Client&) = delete;
+  Client(Client&&) = delete;
+  ~Client() override;
+  uint64_t consume(uint64_t tokens, bool allow_partial = true) override;
+  uint64_t consume(uint64_t tokens, bool allow_partial,
+                   std::chrono::milliseconds& time_to_next_token) override;
+  std::chrono::milliseconds nextTokenAvailable() override;
+  // Actual bucket belongs to the factory and is reset at create-time,
+  // so maybeReset is a no-op.
+  void maybeReset(uint64_t) override{};
+
+private:
+  std::shared_ptr<Request> request_;
 };
 
 } // namespace FairTokenBucket
