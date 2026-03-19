@@ -151,12 +151,15 @@ void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   return dlsym(handle_, std::string(symbol_ref).c_str());
 }
 
+std::filesystem::path moduleTempPath(const absl::string_view sha256) {
+  return std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+}
+
 absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
                                                            const absl::string_view sha256,
                                                            const bool do_not_close,
                                                            const bool load_globally) {
-  std::filesystem::path temp_file_path =
-      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::path temp_file_path = moduleTempPath(sha256);
 
   // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
   // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check

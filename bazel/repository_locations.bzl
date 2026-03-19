@@ -74,9 +74,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     aspect_bazel_lib = dict(
         version = "2.21.2",
-        sha256 = "079e47b2fd357396a376dec6ad7907a51028cb2b98233b45e5269cd5ce2fea51",
+        sha256 = "53cadea9109e646a93ed4dc90c9bbcaa8073c7c3df745b92f6a5000daf7aa3da",
         strip_prefix = "bazel-lib-{version}",
-        urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/aspect-build/bazel-lib/releases/download/v{version}/bazel-lib-v{version}.tar.gz"],
     ),
     abseil_cpp = dict(
         version = "20260107.0",
