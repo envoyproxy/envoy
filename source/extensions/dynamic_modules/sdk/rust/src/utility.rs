@@ -136,6 +136,7 @@ impl<'a> From<&[(&'a str, &'a [u8])]> for HeaderPairSlice {
 }
 
 #[cfg(test)]
+#[allow(static_mut_refs)]
 mod tests {
   use super::*;
   use crate::{EnvoyMutBuffer, MockEnvoyHttpFilter};
@@ -157,7 +158,7 @@ mod tests {
     mock
       .expect_get_buffered_request_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
     // get_received_request_body_size and get_received_request_body should NOT be called.
 
     assert_eq!(read_whole_request_body(&mut mock), b"hello world");
@@ -184,11 +185,11 @@ mod tests {
     mock
       .expect_get_buffered_request_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFERED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFERED) }]));
     mock
       .expect_get_received_request_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut RECEIVED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_request_body(&mut mock), b"hello world");
   }
@@ -217,7 +218,7 @@ mod tests {
     mock
       .expect_get_received_request_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut RECEIVED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_request_body(&mut mock), b"world");
   }
@@ -238,7 +239,7 @@ mod tests {
     mock
       .expect_get_buffered_response_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
     // get_received_response_body_size and get_received_response_body should NOT be called.
 
     assert_eq!(read_whole_response_body(&mut mock), b"hello world");
@@ -266,11 +267,11 @@ mod tests {
     mock
       .expect_get_buffered_response_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFERED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFERED) }]));
     mock
       .expect_get_received_response_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut RECEIVED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_response_body(&mut mock), b"hello world");
   }
@@ -299,7 +300,7 @@ mod tests {
     mock
       .expect_get_received_response_body()
       .times(1)
-      .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut RECEIVED })]));
+      .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_response_body(&mut mock), b"world");
   }

@@ -896,7 +896,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::HeadersCallback);
+                             ProcessorState::CallbackState::HeadersCallback, false);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -1425,7 +1425,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
 void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
+                             new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -1453,7 +1453,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
       callback_state = ProcessorState::CallbackState::TrailersCallback;
     }
     state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(), callback_state);
+                               config_->messageTimeout(), callback_state, false);
     ENVOY_STREAM_LOG(debug, "Sending trailers message", *decoder_callbacks_);
   }
   encodeProtocolConfig(req);

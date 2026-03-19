@@ -117,6 +117,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
   <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
 
+``envoy.tls.cert_validator.spiffe.workload_trust_domain``
+  Specifies per-connection workload trust domain to be used in the :ref:`SPIFFE certificate validator
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`.
+
 Filter state object factories
 -----------------------------
 
