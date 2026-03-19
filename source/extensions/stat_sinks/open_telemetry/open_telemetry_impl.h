@@ -48,7 +48,7 @@ using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig
  * - Histogram metrics: We aggregate the counts and sums if bounds are compatible.
  *
  * Data points are also split into multiple OTLP requests if the number of
- * data points exceeds `max_datapoints_per_request_`. A new request is spawned
+ * data points exceeds `max_data_points_per_request_`. A new request is spawned
  * when the limit is reached.
  */
 class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
@@ -243,7 +243,7 @@ public:
   }
   bool enableMetricAggregation() const { return enable_metric_aggregation_; }
 
-  uint32_t maxDatapointsPerRequest() const { return max_datapoints_per_request_; }
+  uint32_t maxDataPointsPerRequest() const { return max_data_points_per_request_; }
 
 private:
   const bool report_counters_as_deltas_;
@@ -254,7 +254,7 @@ private:
   bool enable_metric_aggregation_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
   const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
-  const uint32_t max_datapoints_per_request_;
+  const uint32_t max_data_points_per_request_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;

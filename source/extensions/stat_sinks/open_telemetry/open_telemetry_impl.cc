@@ -343,7 +343,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
       resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
-      max_datapoints_per_request_(sink_config.max_datapoints_per_request()) {}
+      max_data_points_per_request_(sink_config.max_data_points_per_request()) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -518,7 +518,7 @@ void OtlpMetricsFlusherImpl::flush(
   }
 
   auto metrics = aggregator.releaseResult();
-  RequestBuilder builder(config_->enableMetricAggregation(), config_->maxDatapointsPerRequest(),
+  RequestBuilder builder(config_->enableMetricAggregation(), config_->maxDataPointsPerRequest(),
                          config_->resource_attributes(), std::move(send_callback));
   builder.buildRequests(metrics);
 }

@@ -259,8 +259,8 @@ removed_config_or_runtime:
 new_features:
 - area: stat_sinks
   change: |
-    Added :ref:`max_datapoints_per_request
-    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_datapoints_per_request>`
+    Added :ref:`max_data_points_per_request
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_data_points_per_request>`
     configuration to the OpenTelemetry stat sink to chunk metric export requests.
 - area: filters
   change: |

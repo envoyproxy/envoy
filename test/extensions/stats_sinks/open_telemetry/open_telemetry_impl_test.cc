@@ -670,7 +670,7 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 
 TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-  sink_config.set_max_datapoints_per_request(0);
+  sink_config.set_max_data_points_per_request(0);
   Tracers::OpenTelemetry::Resource resource;
   auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   OtlpMetricsFlusherImpl flusher(options);
@@ -690,7 +690,7 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
 
 TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestEmptyMetrics) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-  sink_config.set_max_datapoints_per_request(10);
+  sink_config.set_max_data_points_per_request(10);
   Tracers::OpenTelemetry::Resource resource;
   auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   OtlpMetricsFlusherImpl flusher(options);

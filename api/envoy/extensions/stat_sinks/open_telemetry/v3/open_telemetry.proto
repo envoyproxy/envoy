@@ -95,8 +95,7 @@ message SinkConfig {
   // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 
-  // Maximum number of data points per request. If this is 0 or unassigned, there is no limit.
-  // When the maximum number of data points is reached, the remaining data points will be split
-  // into a new request.
-  uint32 max_datapoints_per_request = 10;
+  // Maximum number of data points per request. If explicitly set to 0, there is no limit. If unset, it currently defaults to no limit.
+  // When the maximum number of data points is reached, the remaining data points will be sent in subsequent requests.
+  uint32 max_data_points_per_request = 10;
 }
