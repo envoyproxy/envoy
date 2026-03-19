@@ -15,75 +15,13 @@ namespace StatsAccessLog {
 
 namespace {
 
+using GaugeKey = StatsAccessLog::StatsAccessLog::GaugeKey;
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   AccessLogState(Stats::ScopeSharedPtr scope, std::shared_ptr<Stats::StatNamePool> stat_name_pool)
       : scope_(std::move(scope)), stat_name_pool_(std::move(stat_name_pool)) {}
-
-  // GaugeKey serves as a lock-free map key composed of exactly the configuration
-  // properties that define a fully resolved gauge metric.
-  //
-  // It preserves the raw components (base name + tags) allowing us to safely
-  // re-create the gauge from the scope if it gets evicted while the request is in-flight.
-  //
-  // To avoid heap-allocating a new std::vector on every map lookup (which happens
-  // on every single gauge increment/decrement), this key acts as a lightweight
-  // zero-allocation "view" using `borrowed_tags_` during map lookups.
-  // When the key actually needs to be safely persisted into the map, `makeOwned()`
-  // is explicitly called to allocate and copy the tags into `owned_tags_`.
-  struct GaugeKey {
-    Stats::StatName stat_name_;
-    Stats::Gauge::ImportMode import_mode_;
-    absl::optional<Stats::StatNameTagVector> owned_tags_;
-    Stats::StatNameTagVectorOptConstRef borrowed_tags_{
-        absl::nullopt}; // Only valid if owned_tags_ is nullopt
-
-    // Constructor for fast lookup (no initial vector allocation)
-    GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
-             Stats::StatNameTagVectorOptConstRef borrowed_tags)
-        : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
-
-    // Convert to owned strings to be held safely within the map
-    void makeOwned() {
-      if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
-        owned_tags_ = borrowed_tags_.value().get();
-        borrowed_tags_ = absl::nullopt;
-      }
-    }
-
-    Stats::StatNameTagVectorOptConstRef tags() const {
-      if (owned_tags_.has_value()) {
-        return std::cref(owned_tags_.value());
-      }
-      return borrowed_tags_;
-    }
-
-    bool operator==(const GaugeKey& rhs) const {
-      auto lhs_tags = tags();
-      auto rhs_tags = rhs.tags();
-      if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_)
-        return false;
-      if (lhs_tags.has_value() != rhs_tags.has_value())
-        return false;
-      if (!lhs_tags.has_value())
-        return true;
-      return lhs_tags.value().get() == rhs_tags.value().get();
-    }
-
-    template <typename H> friend H AbslHashValue(H h, const GaugeKey& key) {
-      auto tags = key.tags();
-      if (tags.has_value()) {
-        h = H::combine(std::move(h), key.stat_name_, key.import_mode_, true);
-        for (const auto& tag : tags.value().get()) {
-          h = H::combine(std::move(h), tag.first, tag.second);
-        }
-        return h;
-      }
-      return H::combine(std::move(h), key.stat_name_, key.import_mode_, false);
-    }
-  };
 
   ~AccessLogState() override {
     for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
@@ -207,6 +145,36 @@ public:
 };
 
 } // namespace
+
+StatsAccessLog::GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
+                                   Stats::StatNameTagVectorOptConstRef borrowed_tags)
+    : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
+
+void StatsAccessLog::GaugeKey::makeOwned() {
+  if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
+    owned_tags_ = borrowed_tags_.value().get();
+    borrowed_tags_ = absl::nullopt;
+  }
+}
+
+Stats::StatNameTagVectorOptConstRef StatsAccessLog::GaugeKey::tags() const {
+  if (owned_tags_.has_value()) {
+    return std::cref(owned_tags_.value());
+  }
+  return borrowed_tags_;
+}
+
+bool StatsAccessLog::GaugeKey::operator==(const GaugeKey& rhs) const {
+  auto lhs_tags = tags();
+  auto rhs_tags = rhs.tags();
+  if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_)
+    return false;
+  if (lhs_tags.has_value() != rhs_tags.has_value())
+    return false;
+  if (!lhs_tags.has_value())
+    return true;
+  return lhs_tags.value().get() == rhs_tags.value().get();
+}
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
                                Server::Configuration::GenericFactoryContext& context,
