@@ -10762,6 +10762,425 @@ void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_traile
     envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size);
 
+// =============================================================================
+// ================================== Tracer ===================================
+// =============================================================================
+//
+// This extension enables custom distributed tracing via dynamic modules.
+// It implements the Tracing::Driver and Tracing::Span interfaces, allowing
+// modules to create spans, propagate trace context, set tags, log events,
+// and report traces to arbitrary backends.
+//
+// The module receives trace context (headers) from incoming requests during
+// span creation and can inject trace context into outgoing requests for
+// propagation. The module controls all span lifecycle operations.
+
+// =============================================================================
+// Tracer Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_tracer_config_envoy_ptr is a pointer to the
+ * DynamicModuleTracerConfig object in Envoy. This is passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_tracer_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_config_module_ptr is a pointer to the
+ * in-module tracer configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tracer_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_span_envoy_ptr is a pointer to the
+ * DynamicModuleSpan object in Envoy. This is used as context for trace context
+ * access callbacks during startSpan and injectContext.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_tracer_span_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_span_module_ptr is a pointer to the
+ * in-module span instance created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tracer_span_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_trace_reason corresponds to Envoy's Tracing::Reason enum.
+ */
+typedef enum envoy_dynamic_module_type_trace_reason {
+  envoy_dynamic_module_type_trace_reason_NotTraceable,
+  envoy_dynamic_module_type_trace_reason_HealthCheck,
+  envoy_dynamic_module_type_trace_reason_Sampling,
+  envoy_dynamic_module_type_trace_reason_ServiceForced,
+  envoy_dynamic_module_type_trace_reason_ClientForced,
+} envoy_dynamic_module_type_trace_reason;
+
+// =============================================================================
+// Tracer Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_tracer_config_new is called by the main thread when the tracer
+ * configuration is loaded. The function returns a module-side config pointer for the given name
+ * and config.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the tracer name owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_tracer_config_module_ptr is the pointer to the in-module
+ * tracer configuration. Returning nullptr indicates a failure to initialize the module.
+ * When it fails, the tracer configuration will be rejected.
+ */
+envoy_dynamic_module_type_tracer_config_module_ptr envoy_dynamic_module_on_tracer_config_new(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_tracer_config_destroy is called when the tracer configuration is
+ * destroyed in Envoy. The module should release any resources associated with the corresponding
+ * in-module tracer configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module tracer configuration whose corresponding
+ * Envoy tracer configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_tracer_config_destroy(
+    envoy_dynamic_module_type_tracer_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_start_span is called when a new span needs to be started
+ * for an incoming request. During this call, the module can use trace context callbacks
+ * (get/set/remove) on span_envoy_ptr to read incoming propagation headers.
+ *
+ * @param config_module_ptr is the pointer to the in-module tracer configuration.
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object in Envoy. This is used
+ * as context for trace context callbacks.
+ * @param operation_name is the operation name for this span.
+ * @param traced is true if this request should be traced based on Envoy's sampling decision.
+ * @param reason is the reason for the tracing decision.
+ * @return envoy_dynamic_module_type_tracer_span_module_ptr is the pointer to the in-module
+ * span instance. Returning nullptr results in a NullSpan being used.
+ */
+envoy_dynamic_module_type_tracer_span_module_ptr envoy_dynamic_module_on_tracer_start_span(
+    envoy_dynamic_module_type_tracer_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer operation_name, bool traced,
+    envoy_dynamic_module_type_trace_reason reason);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_operation is called to update the span's operation name.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param operation is the new operation name.
+ */
+void envoy_dynamic_module_on_tracer_span_set_operation(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer operation);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_tag is called to set a tag on the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the tag key.
+ * @param value is the tag value.
+ */
+void envoy_dynamic_module_on_tracer_span_set_tag(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param timestamp_ns is the event timestamp in nanoseconds since epoch.
+ * @param event is the event description.
+ */
+void envoy_dynamic_module_on_tracer_span_log(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, int64_t timestamp_ns,
+    envoy_dynamic_module_type_envoy_buffer event);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_finish is called to finish the span and report it.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ */
+void envoy_dynamic_module_on_tracer_span_finish(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_inject_context is called when Envoy needs to propagate
+ * trace context to an upstream request. During this call, the module can use trace context
+ * callbacks (get/set/remove) on span_envoy_ptr to write propagation headers.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object with the outgoing
+ * trace context set. The module should use set/remove callbacks on this pointer.
+ */
+void envoy_dynamic_module_on_tracer_span_inject_context(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_spawn_child is called to create a child span from the
+ * current span.
+ *
+ * @param span_module_ptr is the pointer to the parent in-module span instance.
+ * @param name is the operation name for the child span.
+ * @param start_time_ns is the start time in nanoseconds since epoch.
+ * @return envoy_dynamic_module_type_tracer_span_module_ptr is the pointer to the child in-module
+ * span instance. Returning nullptr results in a NullSpan being used for the child.
+ */
+envoy_dynamic_module_type_tracer_span_module_ptr envoy_dynamic_module_on_tracer_span_spawn_child(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, int64_t start_time_ns);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_sampled is called to override the sampling decision.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param sampled is true if the span should be sampled/reported.
+ */
+void envoy_dynamic_module_on_tracer_span_set_sampled(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, bool sampled);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_use_local_decision is called to query whether the span
+ * uses Envoy's local sampling decision or its own.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @return true if Envoy's sampling decision is used, false if the module has its own.
+ */
+bool envoy_dynamic_module_on_tracer_span_use_local_decision(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_baggage is called to retrieve a baggage value by key.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the baggage key.
+ * @param value_out is the output buffer where the baggage value will be stored.
+ * @return true if the baggage key was found, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_baggage(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_baggage is called to set a baggage key/value pair.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the baggage key.
+ * @param value is the baggage value.
+ */
+void envoy_dynamic_module_on_tracer_span_set_baggage(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_trace_id is called to retrieve the trace ID.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param value_out is the output buffer where the trace ID will be stored. The module must
+ * ensure the underlying memory remains valid until the span is destroyed.
+ * @return true if a trace ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_trace_id(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_span_id is called to retrieve the span ID.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param value_out is the output buffer where the span ID will be stored. The module must
+ * ensure the underlying memory remains valid until the span is destroyed.
+ * @return true if a span ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_span_id(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_destroy is called when the span is being destroyed.
+ * The module should release any resources associated with the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ */
+void envoy_dynamic_module_on_tracer_span_destroy(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+// =============================================================================
+// Tracer Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_value is called by the module to get
+ * a trace context header value by key. This operates on the currently active trace context
+ * (incoming during startSpan, outgoing during injectContext).
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to look up.
+ * @param value_out is the buffer where the header value will be stored.
+ * @return true if the header was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_set_trace_context_value is called by the module to set
+ * a trace context header. This is typically used during injectContext to write propagation headers.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to set.
+ * @param value is the header value to set.
+ */
+void envoy_dynamic_module_callback_tracer_set_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_remove_trace_context_value is called by the module to
+ * remove a trace context header.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to remove.
+ */
+void envoy_dynamic_module_callback_tracer_remove_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_protocol is called by the module to
+ * get the protocol of the traceable stream (e.g., "HTTP/1.1", "HTTP/2").
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the protocol string will be stored.
+ * @return true if the protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_protocol(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_host is called by the module to get
+ * the host of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the host string will be stored.
+ * @return true if the host is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_host(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_path is called by the module to get
+ * the path of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the path string will be stored.
+ * @return true if the path is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_path(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_method is called by the module to get
+ * the method of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the method string will be stored.
+ * @return true if the method is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_method(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_counter is called by the module to define a counter
+ * metric during config creation. Returns a 1-based ID for the counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the counter name.
+ * @return the 1-based ID for the counter. 0 indicates failure.
+ */
+size_t envoy_dynamic_module_callback_tracer_define_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_gauge is called by the module to define a gauge
+ * metric during config creation. Returns a 1-based ID for the gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the gauge name.
+ * @return the 1-based ID for the gauge. 0 indicates failure.
+ */
+size_t envoy_dynamic_module_callback_tracer_define_gauge(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_histogram is called by the module to define a
+ * histogram metric during config creation. Returns a 1-based ID for the histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the histogram name.
+ * @return the 1-based ID for the histogram. 0 indicates failure.
+ */
+size_t envoy_dynamic_module_callback_tracer_define_histogram(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_tracer_increment_counter is called by the module to increment
+ * a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param counter_id is the 1-based ID returned by define_counter.
+ * @param value is the amount to increment.
+ * @return envoy_dynamic_module_type_metrics_result indicating success or failure.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_increment_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t counter_id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_record_histogram_value is called by the module to
+ * record a value for a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param histogram_id is the 1-based ID returned by define_histogram.
+ * @param value is the value to record.
+ * @return envoy_dynamic_module_type_metrics_result indicating success or failure.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_record_histogram_value(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t histogram_id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_set_gauge is called by the module to set the value of
+ * a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param gauge_id is the 1-based ID returned by define_gauge.
+ * @param value is the value to set.
+ * @return envoy_dynamic_module_type_metrics_result indicating success or failure.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_set_gauge(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t gauge_id,
+    uint64_t value);
+
 #ifdef __cplusplus
 }
 #endif

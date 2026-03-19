@@ -33,6 +33,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
+* As a :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`.
 
 There are a few design goals for the dynamic modules:
 
