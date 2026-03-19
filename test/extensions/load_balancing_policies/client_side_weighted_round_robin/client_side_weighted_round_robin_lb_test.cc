@@ -76,7 +76,7 @@ public:
             MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
             /*last_update_time=*/
             MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
-    host->setLbPolicyData(std::move(client_side_data));
+    host->addLbPolicyData(std::move(client_side_data));
   }
 
   ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandlerSharedPtr orcaLoadReportHandler() {
@@ -288,7 +288,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report, mock_stream_info),
+    EXPECT_EQ(host->lbPolicyDataAt(0)->onOrcaLoadReport(orca_load_report, mock_stream_info),
               absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }

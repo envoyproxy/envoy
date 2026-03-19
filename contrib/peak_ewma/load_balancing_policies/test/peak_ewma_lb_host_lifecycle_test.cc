@@ -87,7 +87,7 @@ TEST_F(PeakEwmaHostLifecycleTest, DestructorPreservesHostPolicyData) {
   createLoadBalancer();
 
   for (const auto& host : hosts_) {
-    EXPECT_TRUE(host->lbPolicyData().has_value())
+    EXPECT_TRUE(host->typedLbPolicyData<PeakEwmaHostLbPolicyData>().has_value())
         << "Host should have lbPolicyData after LB creation";
   }
 
@@ -95,7 +95,7 @@ TEST_F(PeakEwmaHostLifecycleTest, DestructorPreservesHostPolicyData) {
 
   // After fix: host data must still be present (not cleared by destructor).
   for (const auto& host : hosts_) {
-    EXPECT_TRUE(host->lbPolicyData().has_value())
+    EXPECT_TRUE(host->typedLbPolicyData<PeakEwmaHostLbPolicyData>().has_value())
         << "Host lbPolicyData should persist after LB destruction";
   }
 }
@@ -160,7 +160,8 @@ TEST_F(PeakEwmaHostLifecycleTest, HostAddedViaCallbackGetsPolicyData) {
   host_set_->healthy_hosts_.push_back(new_host);
   host_set_->runCallbacks(added_hosts, {});
 
-  EXPECT_TRUE(new_host->lbPolicyData().has_value()) << "Newly added host should have lbPolicyData";
+  EXPECT_TRUE(new_host->typedLbPolicyData<PeakEwmaHostLbPolicyData>().has_value())
+      << "Newly added host should have lbPolicyData";
 }
 
 // Coverage: chooseHost works after removing a host.
@@ -191,7 +192,7 @@ TEST_F(PeakEwmaHostLifecycleTest, RingBufferOverflowSkipsOverwrittenSamples) {
   config_.mutable_decay_time()->set_seconds(1);
   createLoadBalancer();
 
-  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  auto* data = hosts_[0]->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
   ASSERT_NE(data, nullptr);
 
   // Write 15 samples (overflow by 5). First 5 slots get overwritten.
@@ -226,7 +227,7 @@ TEST_F(PeakEwmaHostLifecycleTest, RingBufferOverflowExactlyOnePastMax) {
   config_.mutable_decay_time()->set_seconds(1);
   createLoadBalancer();
 
-  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  auto* data = hosts_[0]->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
   ASSERT_NE(data, nullptr);
 
   uint64_t base_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -256,7 +257,7 @@ TEST_F(PeakEwmaHostLifecycleTest, NewerSamplesHaveMoreInfluenceOnEwma) {
   config_.mutable_decay_time()->set_seconds(1); // tau = 1s
   createLoadBalancer();
 
-  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  auto* data = hosts_[0]->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
   ASSERT_NE(data, nullptr);
 
   // Record old sample: RTT=500ms at T=2s.
@@ -296,7 +297,7 @@ TEST_F(PeakEwmaHostLifecycleTest, AlphaUsesLastUpdateTimestampNotAggregationTime
   config_.mutable_decay_time()->set_seconds(1); // tau = 1s
   createLoadBalancer();
 
-  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  auto* data = hosts_[0]->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
   ASSERT_NE(data, nullptr);
 
   // LB was created at T=1000s (SetUp default). Use times after that.
@@ -338,7 +339,7 @@ TEST_F(PeakEwmaHostLifecycleTest, AggregationHappensInlineOnChooseHost) {
   createLoadBalancer();
 
   // Record an RTT sample on host 0.
-  auto* data = dynamic_cast<PeakEwmaHostLbPolicyData*>(hosts_[0]->lbPolicyData().ptr());
+  auto* data = hosts_[0]->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
   ASSERT_NE(data, nullptr);
   uint64_t sample_time_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(

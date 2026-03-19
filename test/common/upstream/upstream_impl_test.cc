@@ -1871,7 +1871,6 @@ TEST_F(HostImplTest, Weight) {
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
-  EXPECT_TRUE(!host->lbPolicyData().has_value());
   EXPECT_EQ(0, host->lbPolicyDataCount());
 
   class TestLbPolicyData : public Upstream::HostLbPolicyData {
@@ -1883,8 +1882,7 @@ TEST_F(HostImplTest, HostLbPolicyData) {
     int bar = 7;
   };
 
-  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
-  EXPECT_TRUE(host->lbPolicyData().has_value());
+  host->addLbPolicyData(std::make_unique<TestLbPolicyData>());
   EXPECT_EQ(1, host->lbPolicyDataCount());
   auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
   EXPECT_TRUE(test_policy_data.has_value());

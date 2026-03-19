@@ -104,7 +104,7 @@ public:
   /**
    * @return true if this host data wants router ORCA callbacks.
    */
-  virtual bool receivesOrcaLoadReport() const { return false; }
+  virtual bool receivesOrcaLoadReport() const { return true; }
 
   /**
    * Invoked when a new orca report is received for this upstream host to
@@ -299,25 +299,11 @@ public:
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options = nullptr) const PURE;
 
   /**
-   * Set load balancing policy related data to the host.
-   * NOTE: this method should only be called at main thread before the host is used
-   * across worker threads.
-   */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /**
    * Add load balancing policy related data to the host.
    * NOTE: this method should only be called at main thread before the host is used
    * across worker threads.
    */
   virtual void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /**
-   * Get the first load balancing policy related data of the host.
-   * This singular accessor exists for compatibility with legacy single-owner callers.
-   * New code should prefer typedLbPolicyData() or lbPolicyDataAt().
-   */
-  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
 
   /**
    * @return the number of load balancing policy data entries on the host.

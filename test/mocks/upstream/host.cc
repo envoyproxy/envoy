@@ -46,22 +46,10 @@ MockHostDescription::MockHostDescription()
       .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> bool {
         return cluster().resourceManager(pri).connections().canCreate();
       }));
-  ON_CALL(*this, setLbPolicyData(_)).WillByDefault(Invoke([this](HostLbPolicyDataPtr data) {
-    lb_policy_datas_.clear();
-    if (data != nullptr) {
-      lb_policy_datas_.push_back(std::move(data));
-    }
-  }));
   ON_CALL(*this, addLbPolicyData(_)).WillByDefault(Invoke([this](HostLbPolicyDataPtr data) {
     if (data != nullptr) {
       lb_policy_datas_.push_back(std::move(data));
     }
-  }));
-  ON_CALL(*this, lbPolicyData()).WillByDefault(Invoke([this]() -> OptRef<HostLbPolicyData> {
-    if (lb_policy_datas_.empty()) {
-      return {};
-    }
-    return OptRef<HostLbPolicyData>(*lb_policy_datas_.front());
   }));
   ON_CALL(*this, lbPolicyDataCount()).WillByDefault(Invoke([this]() -> size_t {
     return lb_policy_datas_.size();
@@ -87,22 +75,10 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
   ON_CALL(*this, loadMetricStats()).WillByDefault(ReturnRef(load_metric_stats_));
   ON_CALL(*this, warmed()).WillByDefault(Return(true));
   ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
-  ON_CALL(*this, setLbPolicyData(_)).WillByDefault(Invoke([this](HostLbPolicyDataPtr data) {
-    lb_policy_datas_.clear();
-    if (data != nullptr) {
-      lb_policy_datas_.push_back(std::move(data));
-    }
-  }));
   ON_CALL(*this, addLbPolicyData(_)).WillByDefault(Invoke([this](HostLbPolicyDataPtr data) {
     if (data != nullptr) {
       lb_policy_datas_.push_back(std::move(data));
     }
-  }));
-  ON_CALL(*this, lbPolicyData()).WillByDefault(Invoke([this]() -> OptRef<HostLbPolicyData> {
-    if (lb_policy_datas_.empty()) {
-      return {};
-    }
-    return OptRef<HostLbPolicyData>(*lb_policy_datas_.front());
   }));
   ON_CALL(*this, lbPolicyDataCount()).WillByDefault(Invoke([this]() -> size_t {
     return lb_policy_datas_.size();

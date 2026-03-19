@@ -57,9 +57,6 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
       .WillOnce(ReturnRef(socket_factory));
   description_.resolveTransportSocketFactory(address_, &metadata, nullptr);
 
-  EXPECT_CALL(*mock_host_, lbPolicyData());
-  description_.lbPolicyData();
-
   EXPECT_CALL(*mock_host_, lbPolicyDataCount());
   description_.lbPolicyDataCount();
 
@@ -70,7 +67,6 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.priority(0);
   description_.metadata(nullptr);
   description_.setLastHcPassTime(MonotonicTime());
-  description_.setLbPolicyData(nullptr);
   description_.addLbPolicyData(nullptr);
 
   Upstream::HealthCheckHostMonitorPtr heath_check_monitor;

@@ -116,9 +116,7 @@ public:
                const envoy::config::core::v3::Metadata* metadata,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 
@@ -217,9 +215,7 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
 

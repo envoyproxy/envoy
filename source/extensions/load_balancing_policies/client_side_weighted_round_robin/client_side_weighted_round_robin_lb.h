@@ -67,7 +67,6 @@ public:
         : report_handler_(std::move(handler)), weight_(weight), non_empty_since_(non_empty_since),
           last_update_time_(last_update_time) {}
 
-    bool receivesOrcaLoadReport() const override { return true; }
     absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
                                   const StreamInfo::StreamInfo& stream_info) override;
 

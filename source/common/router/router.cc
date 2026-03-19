@@ -2432,14 +2432,14 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
   if (has_orca_lb_policy_data) {
+    ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
+                     upstream_host->address()->asString(), orca_load_report->DebugString());
     for (size_t i = 0; i < upstream_host->lbPolicyDataCount(); ++i) {
       auto host_lb_policy_data = upstream_host->lbPolicyDataAt(i);
       if (!host_lb_policy_data.has_value() || !host_lb_policy_data->receivesOrcaLoadReport()) {
         continue;
       }
 
-      ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
-                       upstream_host->address()->asString(), orca_load_report->DebugString());
       const absl::Status status =
           host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
       if (!status.ok()) {

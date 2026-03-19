@@ -7918,7 +7918,6 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 
 class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
-  bool receivesOrcaLoadReport() const override { return true; }
   MOCK_METHOD(absl::Status, onOrcaLoadReport,
               (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
 };
@@ -8083,6 +8082,49 @@ TEST_F(RouterTest, OrcaLoadReportCallbacksFanOutToMultipleHostDataEntries) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_cpu_utilization(0.5);
   orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // First entry opts out of ORCA reports.
+  class NonOrcaLbData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+    MOCK_METHOD(absl::Status, onOrcaLoadReport,
+                (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
+  };
+
+  auto non_orca_data = std::make_unique<NonOrcaLbData>();
+  auto* non_orca_data_raw_ptr = non_orca_data.get();
+  auto orca_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto* orca_data_raw_ptr = orca_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(std::move(non_orca_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(std::move(orca_data));
+
+  // Non-ORCA entry should never be called, ORCA entry should be called.
+  EXPECT_CALL(*non_orca_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
+  EXPECT_CALL(*orca_data_raw_ptr, onOrcaLoadReport(_, _)).WillOnce(Return(absl::OkStatus()));
+
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
   std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
   std::string orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length());

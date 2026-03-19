@@ -244,18 +244,11 @@ public:
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
-  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    lb_policy_datas_.clear();
-    if (lb_policy_data != nullptr) {
-      lb_policy_datas_.push_back(std::move(lb_policy_data));
-    }
-  }
   void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
     if (lb_policy_data != nullptr) {
       lb_policy_datas_.push_back(std::move(lb_policy_data));
     }
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return lbPolicyDataAt(0); }
   size_t lbPolicyDataCount() const override { return lb_policy_datas_.size(); }
   OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
     if (index >= lb_policy_datas_.size()) {
