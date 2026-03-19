@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
-#include <chrono>
-
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 
