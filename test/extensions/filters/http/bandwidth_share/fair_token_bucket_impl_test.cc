@@ -128,7 +128,7 @@ TEST_F(FactoryTest, PoorlyDividedSplitsCanBeSubdivided) {
   // Empty the bucket for baz.
   EXPECT_EQ(1000, client0.consume(1000));
   // Queue a 1000 request for everyone else, except foo only wants to consume
-  // a little bit of "indivisable spill".
+  // a little bit of "indivisible spill".
   EXPECT_EQ(0, client1.consume(1000 / 74 + 2));
   EXPECT_EQ(0, client2.consume(1000));
   EXPECT_EQ(0, client3.consume(1000));
