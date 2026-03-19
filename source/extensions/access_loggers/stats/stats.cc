@@ -15,18 +15,17 @@ namespace StatsAccessLog {
 
 namespace {
 
-using GaugeKey = StatsAccessLog::StatsAccessLog::GaugeKey;
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState(Stats::ScopeSharedPtr scope, std::shared_ptr<Stats::StatNamePool> stat_name_pool)
-      : scope_(std::move(scope)), stat_name_pool_(std::move(stat_name_pool)) {}
+  AccessLogState(std::shared_ptr<const StatsAccessLog> parent)
+      : parent_(std::move(parent)), scope_(parent_->scope()) {}
 
   ~AccessLogState() override {
     for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
-      auto& gauge_stat = scope_->gaugeFromStatNameWithTags(p.first.stat_name_, p.first.tags(),
-                                                           p.first.import_mode_);
+      auto& gauge_stat = scope_.gaugeFromStatNameWithTags(p.first.stat_name_, p.first.tags(),
+                                                          p.first.import_mode_);
       gauge_stat.sub(p.second.value_);
     }
   }
@@ -48,7 +47,7 @@ public:
       it = new_it;
     }
     it->second.value_ += value;
-    scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+    scope_.gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
   }
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
@@ -61,7 +60,7 @@ public:
 
     // Create the gauge so it gets registered in the stat store (expected by some tests and stats
     // logic)
-    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    auto& gauge_stat = scope_.gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
@@ -76,8 +75,11 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  Stats::ScopeSharedPtr scope_;
-  std::shared_ptr<Stats::StatNamePool> stat_name_pool_;
+  // We hold a shared_ptr to the parent StatsAccessLog to reduce overhead by managing fewer
+  // shared_ptrs (passing 1 instead of 2 separate shared pointers for scope and stat_name_pool).
+  // This ensures the parent and its members exist for the lifetime of AccessLogState.
+  std::shared_ptr<const StatsAccessLog> parent_;
+  Stats::Scope& scope_;
 
   struct InflightGauge {
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
@@ -146,25 +148,25 @@ public:
 
 } // namespace
 
-StatsAccessLog::GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
-                                   Stats::StatNameTagVectorOptConstRef borrowed_tags)
+GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
+                   Stats::StatNameTagVectorOptConstRef borrowed_tags)
     : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
 
-void StatsAccessLog::GaugeKey::makeOwned() {
+void GaugeKey::makeOwned() {
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
     borrowed_tags_ = absl::nullopt;
   }
 }
 
-Stats::StatNameTagVectorOptConstRef StatsAccessLog::GaugeKey::tags() const {
+Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
   if (owned_tags_.has_value()) {
     return std::cref(owned_tags_.value());
   }
   return borrowed_tags_;
 }
 
-bool StatsAccessLog::GaugeKey::operator==(const GaugeKey& rhs) const {
+bool GaugeKey::operator==(const GaugeKey& rhs) const {
   auto lhs_tags = tags();
   auto rhs_tags = rhs.tags();
   if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_)
@@ -182,11 +184,10 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
       scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
-      stat_name_pool_(std::make_shared<Stats::StatNamePool>(scope_->symbolTable())),
-      histograms_([&]() {
+      stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
-          histograms.emplace_back(NameAndTags(hist_cfg.stat(), *stat_name_pool_, commands, context),
+          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands, context),
                                   convertUnitEnum(hist_cfg.unit()),
                                   parseValueFormat(hist_cfg.value_format(), commands));
         }
@@ -196,7 +197,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         std::vector<Counter> counters;
         for (const auto& counter_cfg : config.counters()) {
           Counter& inserted = counters.emplace_back(
-              NameAndTags(counter_cfg.stat(), *stat_name_pool_, commands, context), nullptr, 0);
+              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands, context), nullptr, 0);
           if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
             throw EnvoyException(
                 "Stats logger cannot have both `value_format` and `value_fixed` configured.");
@@ -255,9 +256,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             operations.emplace_back(gauge_cfg.set().log_type(), Gauge::OperationType::SET);
           }
 
-          Gauge& inserted = gauges.emplace_back(
-              NameAndTags(gauge_cfg.stat(), *stat_name_pool_, commands, context), nullptr, 0,
-              std::move(operations));
+          Gauge& inserted =
+              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands, context),
+                                  nullptr, 0, std::move(operations));
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
@@ -465,7 +466,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       filter_state.setData(
-          AccessLogState::key(), std::make_shared<AccessLogState>(scope_, stat_name_pool_),
+          AccessLogState::key(), std::make_shared<AccessLogState>(shared_from_this()),
           StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());

@@ -137,7 +137,7 @@ public:
           return scope_;
         }));
 
-    logger_ = std::make_unique<StatsAccessLog>(config, context_, std::move(filter_),
+    logger_ = std::make_shared<StatsAccessLog>(config, context_, std::move(filter_),
                                                std::vector<Formatter::CommandParserPtr>{});
   }
 
@@ -146,7 +146,7 @@ public:
   NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::shared_ptr<Stats::MockScope> scope_;
   std::unique_ptr<Stats::StatNameDynamicStorage> scope_name_storage_;
-  std::unique_ptr<StatsAccessLog> logger_;
+  std::shared_ptr<StatsAccessLog> logger_;
   Formatter::Context formatter_context_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Stats::GaugeSharedPtr gauge_ptr_;
@@ -1192,7 +1192,7 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::SymbolTableImpl symbol_table;
   Stats::StatNamePool pool(symbol_table);
 
-  using GaugeKey = AccessLoggers::StatsAccessLog::StatsAccessLog::GaugeKey;
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
 
   Stats::StatName name1 = pool.add("name1");
   Stats::StatName name2 = pool.add("name2");

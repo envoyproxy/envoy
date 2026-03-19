@@ -17,7 +17,6 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
