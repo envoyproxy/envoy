@@ -135,7 +135,8 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     ASSERT(e != nullptr);
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
-    ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
+    ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_,
+              e == nullptr ? "exception not provided" : e->what());
     callbacks_.onConfigUpdateFailed(reason, e);
     break;
   }

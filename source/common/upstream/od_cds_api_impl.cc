@@ -266,7 +266,7 @@ private:
                               const EnvoyException* e) override {
       ASSERT(reason != Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
       ENVOY_LOG(trace, "ODCDS-manager: error while fetching a single resource {}: {}",
-                resource_name_, e->what());
+                resource_name_, e == nullptr ? "exception not provided" : e->what());
       // If the resource wasn't previously updated, this sends a notification that it was removed,
       // so if there are any resources waiting for this one, they can proceed.
       if (!resource_was_updated_) {
