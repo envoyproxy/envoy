@@ -489,5 +489,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
 
-# OpenSSL FIXME: Maybe create another group "owners"?
-/compat/openssl/ @envoyproxy/envoy-openssl-sync
+/compat/openssl/ @tedjpoole @envoyproxy/envoy-openssl-sync

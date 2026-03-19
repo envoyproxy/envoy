@@ -10,7 +10,10 @@ filegroup(
 
 configure_make(
     name = "openssl",
-    args = ["-j"],
+    args = select({
+        "@envoy//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     configure_command = "Configure",
     configure_in_place = True,
     configure_options = ["--libdir=lib"],

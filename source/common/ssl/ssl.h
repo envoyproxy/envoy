@@ -21,5 +21,11 @@ namespace Ssl {
 #define BORINGSSL_TEST_F(test_suite, test_name) TEST_F(test_suite, test_name)
 #endif
 
+#if ENVOY_SSL_OPENSSL
+#define ENVOY_OPENSSL_CAST(cast_type, field) cast_type(field)
+#else
+#define ENVOY_OPENSSL_CAST(cast_type, field) field
+#endif
+
 } // namespace Ssl
 } // namespace Envoy

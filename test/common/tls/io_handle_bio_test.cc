@@ -1,5 +1,3 @@
-#include "envoy/common/platform.h"
-
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/tls/io_handle_bio.h"
 
@@ -7,9 +5,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "openssl/ssl.h"
 #include "openssl/bio.h"
 #include "openssl/err.h"
+#include "openssl/ssl.h"
 
 using testing::_;
 using testing::Invoke;
@@ -50,7 +48,6 @@ TEST_F(IoHandleBioTest, TestMiscApis) {
   EXPECT_EQ(ret, 1);
 }
 
-
 static Api::IoCallUint64Result makeSuccessResult(uint64_t rc) {
   return {rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
@@ -63,9 +60,7 @@ static Api::IoCallUint64Result makeErrorResult(int sys_errno) {
   return {0, Network::IoSocketError::create(sys_errno)};
 }
 
-TEST_F(IoHandleBioTest, Reset) {
-  EXPECT_EQ(0, BIO_reset(bio_));
-}
+TEST_F(IoHandleBioTest, Reset) { EXPECT_EQ(0, BIO_reset(bio_)); }
 
 TEST_F(IoHandleBioTest, BioIsInitialized) {
   // The BIO should be initialized and ready for I/O.
@@ -330,8 +325,7 @@ TEST_F(IoHandleBioTest, ReadErrorCodeIsRecoverable) {
 
 TEST_F(IoHandleBioTest, WriteErrorSetsErrno) {
   // Different errno values should be preserved.
-  EXPECT_CALL(io_handle_, writev(_, 1))
-      .WillOnce(Return(testing::ByMove(makeErrorResult(EPERM))));
+  EXPECT_CALL(io_handle_, writev(_, 1)).WillOnce(Return(testing::ByMove(makeErrorResult(EPERM))));
   EXPECT_EQ(-1, BIO_write(bio_, "x", 1));
   const int err = ERR_get_error();
   EXPECT_EQ(ERR_GET_LIB(err), ERR_LIB_SYS);

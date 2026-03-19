@@ -92,13 +92,13 @@ def envoy_contrib_package():
 def _envoy_directory_genrule_impl(ctx):
     tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
     ctx.actions.run_shell(
-        inputs = ctx.files.srcs + ctx.files.openssl_libs,
+        inputs = ctx.files.srcs + ctx.files.additional_libs,
         tools = ctx.files.tools,
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
         env = {
             "GENRULE_OUTPUT_DIR": tree.path,
-            "LD_LIBRARY_PATH": ":".join([f.dirname for f in ctx.files.openssl_libs]),
+            "LD_LIBRARY_PATH": ":".join([f.dirname for f in ctx.files.additional_libs]),
         },
         use_default_shell_env = True,
         toolchain = None,
@@ -111,7 +111,7 @@ _envoy_directory_genrule = rule(
         "srcs": attr.label_list(),
         "cmd": attr.string(),
         "tools": attr.label_list(),
-        "openssl_libs": attr.label(
+        "additional_libs": attr.label(
             allow_files = True,
         ),
     },
@@ -123,7 +123,7 @@ _envoy_directory_genrule = rule(
 def envoy_directory_genrule(name, **kwargs):
     _envoy_directory_genrule(
         name = name,
-        openssl_libs = select({
+        additional_libs = select({
             "//bazel:using_openssl": "@openssl//:libs",
             "//conditions:default": None,
         }),

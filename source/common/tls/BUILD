@@ -262,6 +262,7 @@ envoy_cc_library(
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/ssl:ssl_lib",
     ],
 )
 
