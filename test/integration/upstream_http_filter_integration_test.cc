@@ -139,6 +139,17 @@ public:
     return upstream_headers;
   }
 
+  void addStaticNoConfigFilter(const std::string& name) {
+    HttpFilterProto filter_config;
+    filter_config.set_name(name);
+    filter_config.mutable_typed_config()->PackFrom(Envoy::Protobuf::Struct());
+    if (useRouterFilters()) {
+      addStaticRouterFilter(filter_config);
+    } else {
+      addStaticClusterFilter(filter_config);
+    }
+  }
+
   bool use_router_filters_{false};
   const std::string default_header_key_ = "header-key";
   const std::string default_header_value_ = "default-value";
@@ -226,6 +237,39 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
 
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "value1,value2");
+}
+
+// Verifies that an upstream filter calling sendLocalReply() from onHostSelected()
+// (before decodeHeaders) correctly returns an error to the client without
+// corrupting the connection state. Two requests on the same HTTP/2 connection
+// (header-only + POST with body) prove the state machine handles early abort cleanly.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReply) {
+  addStaticNoConfigFilter("local-reply-during-host-selection");
+  addCodecFilter();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1: header-only GET — rejected during onHostSelected.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_EQ("403", response1->headers().getStatusValue());
+
+  // Request 2: POST with body — rejected during onHostSelected, body must be drained cleanly.
+  Http::TestRequestHeaderMapImpl post_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "https"}, {":authority", "host"}};
+  auto response2 = codec_client_->makeRequestWithBody(post_headers, "hello");
+  EXPECT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("403", response2->headers().getStatusValue());
+
+  // No upstream request was made — newStream() was never called.
+  auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+  EXPECT_TRUE(upstream_headers == nullptr);
+
+  cleanupUpstreamAndDownstream();
 }
 
 INSTANTIATE_TEST_SUITE_P(
