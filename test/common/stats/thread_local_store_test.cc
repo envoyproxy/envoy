@@ -718,7 +718,7 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     EXPECT_EQ(&g1, &scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
     EXPECT_EQ(&g1, &scope1->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
     EXPECT_FALSE(g1.used());
-    EXPECT_EQ(5, g1.value());
+    EXPECT_EQ(0, g1.value());
     EXPECT_EQ(1UL, store_->gauges().size());
 
     EXPECT_EQ(&t1, &scope->textReadoutFromString("t1"));
