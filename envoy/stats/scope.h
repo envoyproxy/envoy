@@ -84,8 +84,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
-   * that the metrics are not stored by reference. Evictable gauges are expected to be updown
-   * counters where 0 means no-value.
+   * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
@@ -102,8 +101,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
-   * that the metrics are not stored by reference. Evictable gauges are expected to be updown
-   * counters where 0 means no-value.
+   * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
    * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
