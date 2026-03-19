@@ -249,7 +249,7 @@ void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_vi
   Network::ConnectionEvent event;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst")) {
-    // Map remote-originated resets to RemoteClose so tcp_proxy can propagate RST.
+    // Map remote-originated resets to RemoteClose.
     switch (reason) {
     case Http::StreamResetReason::RemoteReset:
     case Http::StreamResetReason::RemoteRefusedStreamReset:

@@ -233,7 +233,6 @@ protected:
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
-  // Tracks whether the upstream stream was reset due to a remote-originated reason.
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
 
 private:
