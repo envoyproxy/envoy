@@ -261,10 +261,9 @@ public:
   absl::optional<std::reference_wrapper<StatType>> get() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
-      IterateFn<StatType> check_stat = [this,
-                                        &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
-        if (shared_stat->name() == name_) {
-          stat = shared_stat.get();
+      IterateFn<StatType> check_stat = [this, &stat](StatType& statref) -> bool {
+        if (statref.name() == name_) {
+          stat = &statref;
           return false; // Stop iteration.
         }
         return true;

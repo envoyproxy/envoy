@@ -26,8 +26,8 @@ enum class StoreType {
 
 class StatsUtilityTest : public testing::TestWithParam<StoreType> {
 protected:
-  template <class StatType>
-  using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
+  //template <class StatType>
+      //using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
   using MakeStatFn = std::function<void(Scope& scope, const ElementVec& elements)>;
 
   StatsUtilityTest()
@@ -62,15 +62,15 @@ protected:
   }
 
   template <class StatType> IterateFn<StatType> iterOnce() {
-    return [this](const RefcountPtr<StatType>& stat) -> bool {
-      results_.insert(stat->name());
+    return [this](StatType& stat) -> bool {
+      results_.insert(stat.name());
       return false;
     };
   }
 
   template <class StatType> IterateFn<StatType> iterAll() {
-    return [this](const RefcountPtr<StatType>& stat) -> bool {
-      results_.insert(stat->name());
+    return [this](StatType& stat) -> bool {
+      results_.insert(stat.name());
       return true;
     };
   }
@@ -121,7 +121,8 @@ protected:
 
     ASSERT_TRUE(symbolic1_ref.get());
     ASSERT_TRUE(dynamic1_ref.get());
-    EXPECT_FALSE(store_->iterate(iterOnce<StatType>()));
+    IterateFn<StatType> iter = iterOnce<StatType>();
+    EXPECT_FALSE(store_->iterate(iter));
     EXPECT_EQ(1, results_.size());
     EXPECT_TRUE(checkValue(*symbolic1_ref.get()));
     EXPECT_TRUE(checkValue(*dynamic1_ref.get()));
