@@ -34,6 +34,7 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-openssl
     - check-coverage
     - check-runtime
     - check-san
@@ -93,6 +94,11 @@ checks:
     required: true
     on-run:
     - mobile-perf
+  mobile-python:
+    name: Mobile/Python
+    required: true
+    on-run:
+    - mobile-python
   mobile-release-validation:
     name: Mobile/Release validation
     required: true
@@ -110,6 +116,7 @@ checks:
     - precheck-external
     - precheck-format
     - precheck-publish
+    - precheck-publish-config
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -174,6 +181,9 @@ run:
     - source/**/*
     - test/**/*
   check-build:
+    paths:
+    - "**/*"
+  check-build-openssl:
     paths:
     - "**/*"
   check-coverage:
@@ -315,6 +325,18 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+  mobile-python:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - .github/workflows/mobile-python.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
   mobile-release-validation:
     paths:
     - .bazelrc
@@ -358,6 +380,9 @@ run:
   precheck-publish:
     paths:
     - "**/*"
+  precheck-publish-config:
+    paths:
+    - "**/*"
   release:
     paths:
     - .bazelrc
@@ -378,6 +403,8 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/_publish_verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*

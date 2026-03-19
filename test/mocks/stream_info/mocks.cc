@@ -25,6 +25,7 @@ MockUpstreamInfo::MockUpstreamInfo()
   }));
   ON_CALL(*this, setUpstreamConnectionId(_)).WillByDefault(Invoke([this](uint64_t id) {
     upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
   }));
   ON_CALL(*this, upstreamConnectionId()).WillByDefault(ReturnPointee(&upstream_connection_id_));
   ON_CALL(*this, setUpstreamInterfaceName(_))
@@ -54,6 +55,11 @@ MockUpstreamInfo::MockUpstreamInfo()
         failure_reason_ = std::string(failure_reason);
       }));
   ON_CALL(*this, upstreamTransportFailureReason()).WillByDefault(ReturnRef(failure_reason_));
+  ON_CALL(*this, setUpstreamLocalCloseReason(_))
+      .WillByDefault(Invoke([this](absl::string_view failure_reason) {
+        local_close_reason_ = std::string(failure_reason);
+      }));
+  ON_CALL(*this, upstreamLocalCloseReason()).WillByDefault(ReturnPointee(&local_close_reason_));
   ON_CALL(*this, setUpstreamHost(_))
       .WillByDefault(Invoke([this](Upstream::HostDescriptionConstSharedPtr upstream_host) {
         upstream_host_ = upstream_host;
@@ -72,6 +78,19 @@ MockUpstreamInfo::MockUpstreamInfo()
   }));
   ON_CALL(*this, upstreamProtocol()).WillByDefault(ReturnPointee(&upstream_protocol_));
   ON_CALL(*this, upstreamRemoteAddress()).WillByDefault(ReturnRef(upstream_remote_address_));
+  ON_CALL(*this, setUpstreamDetectedCloseType(_))
+      .WillByDefault(Invoke(
+          [this](DetectedCloseType close_type) { upstream_detected_close_type_ = close_type; }));
+  ON_CALL(*this, upstreamDetectedCloseType()).WillByDefault(Invoke([this]() {
+    return upstream_detected_close_type_;
+  }));
+  ON_CALL(*this, addUpstreamHostAttempted(_))
+      .WillByDefault(Invoke([this](Upstream::HostDescriptionConstSharedPtr host) {
+        upstream_hosts_attempted_.push_back(host);
+      }));
+  ON_CALL(*this, upstreamHostsAttempted()).WillByDefault(ReturnRef(upstream_hosts_attempted_));
+  ON_CALL(*this, upstreamConnectionIdsAttempted())
+      .WillByDefault(ReturnRef(upstream_connection_ids_attempted_));
 }
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;
@@ -209,8 +228,12 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setDownstreamDetectedCloseType(_))
       .WillByDefault(Invoke(
           [this](DetectedCloseType close_type) { downstream_detected_close_type_ = close_type; }));
-  ON_CALL(*this, downstreamDetectedCloseType())
-      .WillByDefault(ReturnPointee(&downstream_detected_close_type_));
+  ON_CALL(*this, setDownstreamDetectedCloseType(_))
+      .WillByDefault(Invoke(
+          [this](DetectedCloseType close_type) { downstream_detected_close_type_ = close_type; }));
+  ON_CALL(*this, downstreamDetectedCloseType()).WillByDefault(Invoke([this]() {
+    return downstream_detected_close_type_;
+  }));
   ON_CALL(*this, setUpstreamClusterInfo(_))
       .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
         upstream_cluster_info_ = std::move(cluster_info);

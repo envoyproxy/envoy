@@ -2,4 +2,4 @@
 
 // NOLINT(namespace-envoy)
 
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"

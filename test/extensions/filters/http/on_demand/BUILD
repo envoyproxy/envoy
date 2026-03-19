@@ -12,6 +12,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_names = ["envoy.filters.http.on_demand"],
+    deps = [
+        "//source/extensions/filters/http/on_demand:config",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "on_demand_filter_test",
     srcs = ["on_demand_filter_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
@@ -24,6 +34,7 @@ envoy_extension_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -33,17 +44,16 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["on_demand_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "4core",
-    tags = [
-        "cpu:3",
-    ],
+    rbe_pool = "6gig",
+    shard_count = 4,
+    tags = ["cpu:2"],
     deps = [
         "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
-        "//test/integration:scoped_rds_lib",
+        "//test/integration:scoped_rds_test_lib",
         "//test/integration:vhds_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -68,8 +78,9 @@ envoy_extension_cc_test(
         "//test/integration:ads_xdstp_config_sources_integration_lib",
         "//test/integration:fake_upstream_lib",
         "//test/integration:http_integration_lib",
-        "//test/integration:scoped_rds_lib",
+        "//test/integration:scoped_rds_test_lib",
         "//test/integration:xdstp_config_sources_integration_lib",
+        "//test/integration/filters:add_header_filter_config_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

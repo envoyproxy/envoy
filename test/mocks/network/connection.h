@@ -54,6 +54,7 @@ public:
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));                                \
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));                                          \
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));                                  \
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));                  \
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
@@ -83,6 +84,7 @@ public:
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
+  MOCK_METHOD(void, setBufferHighWatermarkTimeout, (std::chrono::milliseconds timeout));           \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
   MOCK_METHOD(const ConnectionSocketPtr&, getSocket, (), (const));                                 \

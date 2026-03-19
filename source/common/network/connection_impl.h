@@ -61,6 +61,7 @@ public:
   void addReadFilter(ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   const ConnectionSocketPtr& getSocket() const override { return socket_; }
 
@@ -103,6 +104,7 @@ public:
   }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
@@ -167,6 +169,13 @@ public:
   StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
+  // Indicates if the access log has been written. This is used to ensure that the access log is
+  // written exactly once, even if close() is called multiple times.
+  bool access_log_written_{false};
+
+  // Write access log if it hasn't been written yet.
+  void ensureAccessLogWritten();
+
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
@@ -236,6 +245,10 @@ private:
 
   void closeInternal(ConnectionCloseType type);
 
+  void onBufferHighWatermarkTimeout();
+  void scheduleBufferHighWatermarkTimeout();
+  void maybeCancelBufferHighWatermarkTimeout();
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -249,6 +262,8 @@ private:
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
   StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
+  std::chrono::milliseconds buffer_high_watermark_timeout_{};
+  Event::TimerPtr buffer_high_watermark_timer_{nullptr};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
@@ -315,8 +330,25 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
+  ~ClientConnectionImpl() override;
+
   // Network::ClientConnection
   void connect() override;
+
+protected:
+  void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
+    ConnectionImpl::setDetectedCloseType(close_type);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
+    }
+  }
+
+  void setLocalCloseReason(absl::string_view reason) override {
+    ConnectionImpl::setLocalCloseReason(reason);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamLocalCloseReason(reason);
+    }
+  }
 
 private:
   void onConnected() override;

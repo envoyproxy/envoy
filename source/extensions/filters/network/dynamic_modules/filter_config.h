@@ -8,7 +8,7 @@
 
 #include "source/common/common/statusor.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -34,8 +34,10 @@ using OnNetworkFilterAboveWriteBufferHighWatermarkType =
 using OnNetworkFilterBelowWriteBufferLowWatermarkType =
     decltype(&envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark);
 
-// Custom namespace prefix for network filter stats.
-constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleNetworkFilterConfig;
 using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleNetworkFilterConfig>;
@@ -56,6 +58,7 @@ public:
    * Constructor for the config. Symbol resolution is done in newDynamicModuleNetworkFilterConfig().
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
    * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
@@ -63,6 +66,7 @@ public:
    */
   DynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
+                                   const absl::string_view metrics_namespace,
                                    DynamicModulePtr dynamic_module,
                                    Envoy::Upstream::ClusterManager& cluster_manager,
                                    Stats::Scope& stats_scope,
@@ -135,46 +139,49 @@ public:
     Stats::Histogram& histogram_;
   };
 
+// We use 1-based IDs for the metrics in the ABI, so we need to convert them to 0-based indices
+// for our internal storage. These helper functions do that conversion.
+#define ID_TO_INDEX(id) ((id) - 1)
+
   // Methods for adding metrics during configuration.
   size_t addCounter(ModuleCounterHandle&& counter) {
-    size_t id = counters_.size();
     counters_.push_back(std::move(counter));
-    return id;
+    return counters_.size();
   }
 
   size_t addGauge(ModuleGaugeHandle&& gauge) {
-    size_t id = gauges_.size();
     gauges_.push_back(std::move(gauge));
-    return id;
+    return gauges_.size();
   }
 
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
-    size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
-    return id;
+    return histograms_.size();
   }
 
   // Methods for getting metrics by ID.
   OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
-    if (id >= counters_.size()) {
+    if (id == 0 || id > counters_.size()) {
       return {};
     }
-    return counters_[id];
+    return counters_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
-    if (id >= gauges_.size()) {
+    if (id == 0 || id > gauges_.size()) {
       return {};
     }
-    return gauges_[id];
+    return gauges_[ID_TO_INDEX(id)];
   }
 
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
-    if (id >= histograms_.size()) {
+    if (id == 0 || id > histograms_.size()) {
       return {};
     }
-    return histograms_[id];
+    return histograms_[ID_TO_INDEX(id)];
   }
+
+#undef ID_TO_INDEX
 
   // Stats scope for metric creation.
   const Stats::ScopeSharedPtr stats_scope_;
@@ -185,6 +192,7 @@ private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleNetworkFilterConfig>>
   newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                       const absl::string_view filter_config,
+                                      const absl::string_view metrics_namespace,
                                       DynamicModulePtr dynamic_module,
                                       Envoy::Upstream::ClusterManager& cluster_manager,
                                       Stats::Scope& stats_scope,
@@ -234,6 +242,7 @@ private:
  * Creates a new DynamicModuleNetworkFilterConfig for given configuration.
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
@@ -242,6 +251,7 @@ private:
  */
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
     Event::Dispatcher& main_thread_dispatcher);

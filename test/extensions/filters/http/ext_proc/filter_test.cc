@@ -105,6 +105,8 @@ protected:
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -170,6 +172,21 @@ protected:
     response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+  }
+
+  void initializeTestFullDuplex() {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
   )EOF");
@@ -5952,6 +5969,92 @@ TEST_F(HttpFilterTest, GrpcCloseOnOpenStream) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   filter_->onDestroy();
   EXPECT_EQ(Grpc::Status::Aborted, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
+}
+
+TEST_F(HttpFilterTest, KeepContentLength) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "STREAMED"
+  allow_content_length_header: true
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Test content-length header is preserved in request in streamed mode.
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "100");
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, KeepContentLengthFullDuplex) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+  allow_content_length_header: true
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Test content-length header is preserved in request in full duplex streamed mode.
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "100");
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
+  initializeTestFullDuplex();
+
+  // Request Body
+  Buffer::OwnedImpl chunk1("chunk1");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(chunk1, false));
+
+  processRequestBody(
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        resp.mutable_response()->mutable_body_mutation()->set_body("modified");
+      },
+      false);
+
+  auto logging_info = getExtProcLoggingInfo();
+  EXPECT_EQ(logging_info->requestBodySentCount(), 1);
+
+  // Response Body
+  Buffer::OwnedImpl resp_chunk1("resp_chunk1");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk1, false));
+  Buffer::OwnedImpl resp_chunk2("resp_chunk2");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk2, false));
+
+  processResponseBody(
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        resp.mutable_response()->mutable_body_mutation()->set_body("resp_modified");
+      },
+      false);
+
+  logging_info = getExtProcLoggingInfo();
+  EXPECT_EQ(logging_info->responseBodySentCount(), 2);
+  auto& grpc_body = getGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND);
+  EXPECT_EQ(grpc_body.body_stats_->call_count_, 1);
+
+  filter_->onDestroy();
 }
 
 } // namespace

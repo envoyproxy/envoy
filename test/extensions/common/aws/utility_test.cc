@@ -7,6 +7,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 
 using testing::ElementsAre;
 using testing::NiceMock;
@@ -440,21 +441,21 @@ TEST(UtilityTest, CreateStaticClusterSuccessEvenWithMissingPort) {
 TEST(UtilityTest, GetNormalAndFipsSTSEndpoints) {
   EXPECT_EQ("sts.ap-south-1.amazonaws.com", Utility::getSTSEndpoint("ap-south-1"));
   EXPECT_EQ("sts.some-new-region.amazonaws.com", Utility::getSTSEndpoint("some-new-region"));
-#ifdef ENVOY_SSL_FIPS
-  // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
-  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
-  EXPECT_EQ("sts-fips.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
-  EXPECT_EQ("sts-fips.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
-  EXPECT_EQ("sts-fips.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
-  // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
-  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
-#else
-  EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
-  EXPECT_EQ("sts.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
-  EXPECT_EQ("sts.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
-  EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
-  EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
-#endif
+  if (FIPS_mode() == 1) {
+    // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
+    EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+    EXPECT_EQ("sts-fips.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+    EXPECT_EQ("sts-fips.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+    EXPECT_EQ("sts-fips.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+    // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
+    EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+  } else {
+    EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+    EXPECT_EQ("sts.us-east-2.amazonaws.com", Utility::getSTSEndpoint("us-east-2"));
+    EXPECT_EQ("sts.us-west-1.amazonaws.com", Utility::getSTSEndpoint("us-west-1"));
+    EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+    EXPECT_EQ("sts.ca-central-1.amazonaws.com", Utility::getSTSEndpoint("ca-central-1"));
+  }
 }
 
 // China regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region.
@@ -472,16 +473,16 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
 
 // Test edge case where a SigV4a region set is provided and also web identity provider is in use
 TEST(UtilityTest, CorrectlyConvertRegionSet) {
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*"));
-  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
-  EXPECT_EQ("sts-fips.us-east-1.amazonaws.com",
-            Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
-#else
-  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*"));
-  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
-  EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
-#endif
+  if (FIPS_mode() == 1) {
+    EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*"));
+    EXPECT_EQ("sts-fips.us-east-1.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+    EXPECT_EQ("sts-fips.us-east-1.amazonaws.com",
+              Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+  } else {
+    EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*"));
+    EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("*,ap-southeast-2"));
+    EXPECT_EQ("sts.amazonaws.com", Utility::getSTSEndpoint("ca-central-*,ap-southeast-2"));
+  }
   EXPECT_EQ("sts.ap-southeast-2.amazonaws.com",
             Utility::getSTSEndpoint("ap-southeast-2,us-east-2"));
   EXPECT_EQ("sts.ca-central-1.amazonaws.com",
@@ -566,25 +567,28 @@ TEST(UtilityTest, CheckNormalization) {
 
 TEST(UtilityTest, RolesAnywhereEndpoint) {
   std::string arn = "junkarn";
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
-#else
-  EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
-#endif
+  const bool fips_mode = FIPS_mode();
+
+  if (fips_mode) {
+    EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  } else {
+    EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  }
+
   arn = "arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/"
         "8d105284-f0a7-4939-a7e6-8df768ea535f";
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
-#else
-  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  if (fips_mode) {
+    EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  } else {
+    EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  }
 
-#endif
   arn = "arn:aws:rolesanywhere:eu-west-1:randomjunk";
-#ifdef ENVOY_SSL_FIPS
-  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
-#else
-  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
-#endif
+  if (fips_mode) {
+    EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  } else {
+    EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+  }
 }
 
 // Test that included_headers takes precedence over excluded_headers

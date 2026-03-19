@@ -244,6 +244,7 @@ public:
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
     bool flushAccessLogOnConnected() const { return flush_access_log_on_connected_; }
+    bool flushAccessLogOnStart() const { return flush_access_log_on_start_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
@@ -262,6 +263,10 @@ public:
     const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
       return proxy_protocol_tlvs_;
+    }
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+    proxyProtocolTlvMergePolicy() const {
+      return proxy_protocol_tlv_merge_policy_;
     }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
@@ -287,7 +292,8 @@ public:
     const Stats::ScopeSharedPtr stats_scope_;
 
     const TcpProxyStats stats_;
-    bool flush_access_log_on_connected_;
+    bool flush_access_log_on_connected_ : 1;
+    const bool flush_access_log_on_start_ : 1;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
     absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
@@ -297,6 +303,9 @@ public:
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
     std::vector<TlvFormatter> dynamic_tlv_formatters_;
+    envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
+        proxy_protocol_tlv_merge_policy_{
+            envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -355,6 +364,7 @@ public:
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
+  bool flushAccessLogOnStart() const { return shared_config_->flushAccessLogOnStart(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
   const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
   const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {

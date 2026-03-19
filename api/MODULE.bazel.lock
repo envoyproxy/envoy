@@ -1,5 +1,5 @@
 {
-  "lockFileVersion": 13,
+  "lockFileVersion": 26,
   "registryFileHashes": {
     "https://bcr.bazel.build/bazel_registry.json": "8a28e4aff06ee60aed2a8c281907fb8bcbf3b753c91fb5a5c57da3215d5b3497",
     "https://bcr.bazel.build/modules/abseil-cpp/20210324.2/MODULE.bazel": "7cd0312e064fde87c8d1cd79ba06c876bd23630c83466e9500321be55c96ace2",
@@ -26,7 +26,6 @@
     "https://bcr.bazel.build/modules/apple_support/1.17.1/MODULE.bazel": "655c922ab1209978a94ef6ca7d9d43e940cd97d9c172fb55f94d91ac53f8610b",
     "https://bcr.bazel.build/modules/apple_support/1.21.0/MODULE.bazel": "ac1824ed5edf17dee2fdd4927ada30c9f8c3b520be1b5fd02a5da15bc10bff3e",
     "https://bcr.bazel.build/modules/apple_support/1.21.1/MODULE.bazel": "5809fa3efab15d1f3c3c635af6974044bac8a4919c62238cce06acee8a8c11f1",
-    "https://bcr.bazel.build/modules/apple_support/1.23.1/MODULE.bazel": "53763fed456a968cf919b3240427cf3a9d5481ec5466abc9d5dc51bc70087442",
     "https://bcr.bazel.build/modules/apple_support/1.24.2/MODULE.bazel": "0e62471818affb9f0b26f128831d5c40b074d32e6dda5a0d3852847215a41ca4",
     "https://bcr.bazel.build/modules/apple_support/1.24.2/source.json": "2c22c9827093250406c5568da6c54e6fdf0ef06238def3d99c71b12feb057a8d",
     "https://bcr.bazel.build/modules/aspect_bazel_lib/1.31.2/MODULE.bazel": "7bee702b4862612f29333590f4b658a5832d433d6f8e4395f090e8f4e85d442f",
@@ -74,8 +73,8 @@
     "https://bcr.bazel.build/modules/boringssl/0.20240913.0/MODULE.bazel": "fcaa7503a5213290831a91ed1eb538551cf11ac0bc3a6ad92d0fef92c5bd25fb",
     "https://bcr.bazel.build/modules/boringssl/0.20241024.0/MODULE.bazel": "b540cff73d948cb79cb0bc108d7cef391d2098a25adabfda5043e4ef548dbc87",
     "https://bcr.bazel.build/modules/boringssl/0.20241024.0/source.json": "d843092e682b84188c043ac742965d7f96e04c846c7e338187e03238674909a9",
-    "https://bcr.bazel.build/modules/buildozer/7.1.2/MODULE.bazel": "2e8dd40ede9c454042645fd8d8d0cd1527966aa5c919de86661e62953cd73d84",
-    "https://bcr.bazel.build/modules/buildozer/7.1.2/source.json": "c9028a501d2db85793a6996205c8de120944f50a0d570438fcae0457a5f9d1f8",
+    "https://bcr.bazel.build/modules/buildozer/8.2.1/MODULE.bazel": "61e9433c574c2bd9519cad7fa66b9c1d2b8e8d5f3ae5d6528a2c2d26e68d874d",
+    "https://bcr.bazel.build/modules/buildozer/8.2.1/source.json": "7c33f6a26ee0216f85544b4bca5e9044579e0219b6898dd653f5fb449cf2e484",
     "https://bcr.bazel.build/modules/c-ares/1.15.0/MODULE.bazel": "ba0a78360fdc83f02f437a9e7df0532ad1fbaa59b722f6e715c11effebaa0166",
     "https://bcr.bazel.build/modules/c-ares/1.19.1/MODULE.bazel": "73bca21720772370ff91cc8e88bbbaf14897720c6473e87c1ddc0f848284c313",
     "https://bcr.bazel.build/modules/c-ares/1.34.5.bcr.2/MODULE.bazel": "740a10b6128069dda9f5fddcadf6df5833e02e87497a8d7b2407076197bf27c8",
@@ -101,7 +100,8 @@
     "https://bcr.bazel.build/modules/gazelle/0.37.0/MODULE.bazel": "d1327ba0907d0275ed5103bfbbb13518f6c04955b402213319d0d6c0ce9839d4",
     "https://bcr.bazel.build/modules/gazelle/0.39.1/MODULE.bazel": "1fa3fefad240e535066fd0e6950dfccd627d36dc699ee0034645e51dbde3980f",
     "https://bcr.bazel.build/modules/gazelle/0.46.0/MODULE.bazel": "3dec215dacf2427df87b524a2c99da387882a18d753f0b1b38675992bd0a99c6",
-    "https://bcr.bazel.build/modules/gazelle/0.46.0/source.json": "f255441117f6c63a3cbc0d4fd84c09c047e54a9bdaaf6aedf66e3b4218ddebd4",
+    "https://bcr.bazel.build/modules/gazelle/0.47.0/MODULE.bazel": "b61bb007c4efad134aa30ee7f4a8e2a39b22aa5685f005edaa022fbd1de43ebc",
+    "https://bcr.bazel.build/modules/gazelle/0.47.0/source.json": "aeb2e5df14b7fb298625d75d08b9c65bdb0b56014c5eb89da9e5dd0572280ae6",
     "https://bcr.bazel.build/modules/google_benchmark/1.8.2/MODULE.bazel": "a70cf1bba851000ba93b58ae2f6d76490a9feb74192e57ab8e8ff13c34ec50cb",
     "https://bcr.bazel.build/modules/google_benchmark/1.8.4/MODULE.bazel": "c6d54a11dcf64ee63545f42561eda3fd94c1b5f5ebe1357011de63ae33739d5e",
     "https://bcr.bazel.build/modules/google_benchmark/1.9.2/MODULE.bazel": "1d30f717f00d5f18e7d8e55d18573bab80651d75b40e3391af2992cd2568577a",
@@ -202,7 +202,8 @@
     "https://bcr.bazel.build/modules/protobuf/32.1/MODULE.bazel": "89cd2866a9cb07fee9ff74c41ceace11554f32e0d849de4e23ac55515cfada4d",
     "https://bcr.bazel.build/modules/protobuf/33.0/MODULE.bazel": "c5270efb4aad37a2f893536076518793f409ea7df07a06df995d848d1690f21c",
     "https://bcr.bazel.build/modules/protobuf/33.1/MODULE.bazel": "982c8a0cceab4d790076f72b7677faf836b0dfadc2b66a34aab7232116c4ae39",
-    "https://bcr.bazel.build/modules/protobuf/33.1/source.json": "992c237a40899425648213bf79b05f08c6e8dcd619f96cd944b4511b0276fbd8",
+    "https://bcr.bazel.build/modules/protobuf/33.4/MODULE.bazel": "114775b816b38b6d0ca620450d6b02550c60ceedfdc8d9a229833b34a223dc42",
+    "https://bcr.bazel.build/modules/protobuf/33.4/source.json": "555f8686b4c7d6b5ba731fbea13bf656b4bfd9a7ff629c1d9d3f6e1d6155de79",
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.0.4/MODULE.bazel": "b8913c154b16177990f6126d2d2477d187f9ddc568e95ee3e2d50fc65d2c494a",
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.2.1.bcr.2/MODULE.bazel": "3bd4b14a8e7c78dbef973280deabaa139db1fe350aa92da03730a31f59082068",
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.2.1.bcr.2/source.json": "14c28a5527fcd699f5efbf83a046666efabed3384364bd48428de89dfdc8110e",
@@ -228,7 +229,6 @@
     "https://bcr.bazel.build/modules/rules_buf/0.1.1/MODULE.bazel": "6189aec18a4f7caff599ad41b851ab7645d4f1e114aa6431acf9b0666eb92162",
     "https://bcr.bazel.build/modules/rules_cc/0.0.1/MODULE.bazel": "cb2aa0747f84c6c3a78dad4e2049c154f08ab9d166b1273835a8174940365647",
     "https://bcr.bazel.build/modules/rules_cc/0.0.10/MODULE.bazel": "ec1705118f7eaedd6e118508d3d26deba2a4e76476ada7e0e3965211be012002",
-    "https://bcr.bazel.build/modules/rules_cc/0.0.11/MODULE.bazel": "9f249c5624a4788067b96b8b896be10c7e8b4375dc46f6d8e1e51100113e0992",
     "https://bcr.bazel.build/modules/rules_cc/0.0.13/MODULE.bazel": "0e8529ed7b323dad0775ff924d2ae5af7640b23553dfcd4d34344c7e7a867191",
     "https://bcr.bazel.build/modules/rules_cc/0.0.14/MODULE.bazel": "5e343a3aac88b8d7af3b1b6d2093b55c347b8eefc2e7d1442f7a02dc8fea48ac",
     "https://bcr.bazel.build/modules/rules_cc/0.0.15/MODULE.bazel": "6704c35f7b4a72502ee81f61bf88706b54f06b3cbe5558ac17e2e14666cd5dcc",
@@ -336,7 +336,8 @@
     "https://bcr.bazel.build/modules/rules_python/1.3.0/MODULE.bazel": "8361d57eafb67c09b75bf4bbe6be360e1b8f4f18118ab48037f2bd50aa2ccb13",
     "https://bcr.bazel.build/modules/rules_python/1.4.1/MODULE.bazel": "8991ad45bdc25018301d6b7e1d3626afc3c8af8aaf4bc04f23d0b99c938b73a6",
     "https://bcr.bazel.build/modules/rules_python/1.6.0/MODULE.bazel": "7e04ad8f8d5bea40451cf80b1bd8262552aa73f841415d20db96b7241bd027d8",
-    "https://bcr.bazel.build/modules/rules_python/1.6.0/source.json": "e980f654cf66ec4928672f41fc66c4102b5ea54286acf4aecd23256c84211be6",
+    "https://bcr.bazel.build/modules/rules_python/1.7.0/MODULE.bazel": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
+    "https://bcr.bazel.build/modules/rules_python/1.7.0/source.json": "028a084b65dcf8f4dc4f82f8778dbe65df133f234b316828a82e060d81bdce32",
     "https://bcr.bazel.build/modules/rules_rust/0.51.0/MODULE.bazel": "2b6d1617ac8503bfdcc0e4520c20539d4bba3a691100bee01afe193ceb0310f9",
     "https://bcr.bazel.build/modules/rules_shell/0.2.0/MODULE.bazel": "fda8a652ab3c7d8fee214de05e7a9916d8b28082234e8d2c0094505c5268ed3c",
     "https://bcr.bazel.build/modules/rules_shell/0.3.0/MODULE.bazel": "de4402cd12f4cc8fda2354fce179fdb068c0b9ca1ec2d2b17b3e21b24c1a937b",
@@ -381,171 +382,881 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
-    "//bazel:extensions.bzl%non_module_deps": {
+    "@@rules_python+//python/extensions:config.bzl%config": {
       "general": {
-        "bzlTransitiveDigest": "7ZdM27ncoukVWcEz5RCDrmDFgcVpZKCzd8Ks24yfAlk=",
-        "usagesDigest": "0Qp+1QYlxgHDN/rLYjg6SKvEooop55N0TOHcQ+vnDrc=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
+        "bzlTransitiveDigest": "2hLgIvNVTLgxus0ZuXtleBe70intCfo0cHs8qvt6cdM=",
+        "usagesDigest": "ZVSXMAGpD+xzVNPuvF1IoLBkty7TROO0+akMapt1pAg=",
+        "recordedInputs": [
+          "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_python+,pypi__build rules_python++config+pypi__build",
+          "REPO_MAPPING:rules_python+,pypi__click rules_python++config+pypi__click",
+          "REPO_MAPPING:rules_python+,pypi__colorama rules_python++config+pypi__colorama",
+          "REPO_MAPPING:rules_python+,pypi__importlib_metadata rules_python++config+pypi__importlib_metadata",
+          "REPO_MAPPING:rules_python+,pypi__installer rules_python++config+pypi__installer",
+          "REPO_MAPPING:rules_python+,pypi__more_itertools rules_python++config+pypi__more_itertools",
+          "REPO_MAPPING:rules_python+,pypi__packaging rules_python++config+pypi__packaging",
+          "REPO_MAPPING:rules_python+,pypi__pep517 rules_python++config+pypi__pep517",
+          "REPO_MAPPING:rules_python+,pypi__pip rules_python++config+pypi__pip",
+          "REPO_MAPPING:rules_python+,pypi__pip_tools rules_python++config+pypi__pip_tools",
+          "REPO_MAPPING:rules_python+,pypi__pyproject_hooks rules_python++config+pypi__pyproject_hooks",
+          "REPO_MAPPING:rules_python+,pypi__setuptools rules_python++config+pypi__setuptools",
+          "REPO_MAPPING:rules_python+,pypi__tomli rules_python++config+pypi__tomli",
+          "REPO_MAPPING:rules_python+,pypi__wheel rules_python++config+pypi__wheel",
+          "REPO_MAPPING:rules_python+,pypi__zipp rules_python++config+pypi__zipp"
+        ],
         "generatedRepoSpecs": {
-          "prometheus_metrics_model": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
+          "rules_python_internal": {
+            "repoRuleId": "@@rules_python+//python/private:internal_config_repo.bzl%internal_config_repo",
             "attributes": {
-              "urls": [
-                "https://github.com/prometheus/client_model/archive/v0.6.2.tar.gz"
-              ],
-              "sha256": "47c5ea7949f68e7f7b344350c59b6bd31eeb921f0eec6c3a566e27cf1951470c",
-              "strip_prefix": "client_model-0.6.2",
-              "build_file_content": "\nload(\"@envoy_api//bazel:api_build_system.bzl\", \"api_cc_py_proto_library\")\nload(\"@io_bazel_rules_go//proto:def.bzl\", \"go_proto_library\")\n\napi_cc_py_proto_library(\n    name = \"client_model\",\n    srcs = [\n        \"io/prometheus/client/metrics.proto\",\n    ],\n    visibility = [\"//visibility:public\"],\n)\n\ngo_proto_library(\n    name = \"client_model_go_proto\",\n    importpath = \"github.com/prometheus/client_model/go\",\n    proto = \":client_model\",\n    visibility = [\"//visibility:public\"],\n)\n"
+              "transition_setting_generators": {},
+              "transition_settings": []
             }
           },
-          "com_github_chrusty_protoc_gen_jsonschema": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
+          "pypi__build": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "urls": [
-                "https://github.com/norbjd/protoc-gen-jsonschema/archive/7680e4998426e62b6896995ff73d4d91cc5fb13c.zip"
-              ],
-              "sha256": "ba3e313b10a1b50a6c1232d994c13f6e23d3669be4ae7fea13762f42bb3b2abc",
-              "strip_prefix": "protoc-gen-jsonschema-7680e4998426e62b6896995ff73d4d91cc5fb13c"
+              "url": "https://files.pythonhosted.org/packages/e2/03/f3c8ba0a6b6e30d7d18c40faab90807c9bb5e9a1e3b2fe2008af624a9c97/build-1.2.1-py3-none-any.whl",
+              "sha256": "75e10f767a433d9a86e50d83f418e83efc18ede923ee5ff7df93b6cb0306c5d4",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
             }
           },
-          "envoy_toolshed": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
+          "pypi__click": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "urls": [
-                "https://github.com/envoyproxy/toolshed/archive/bazel-v0.3.10.tar.gz"
-              ],
-              "sha256": "4e3ca405ab7990697f75fe75e17f42b3935389afd6fa407eb79700e73de98a11",
-              "strip_prefix": "toolshed-bazel-v0.3.10/bazel"
+              "url": "https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl",
+              "sha256": "ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__colorama": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl",
+              "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__importlib_metadata": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/2d/0a/679461c511447ffaf176567d5c496d1de27cbe34a87df6677d7171b2fbd4/importlib_metadata-7.1.0-py3-none-any.whl",
+              "sha256": "30962b96c0c223483ed6cc7280e7f0199feb01a0e40cfae4d4450fc6fab1f570",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__installer": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/e5/ca/1172b6638d52f2d6caa2dd262ec4c811ba59eee96d54a7701930726bce18/installer-0.7.0-py3-none-any.whl",
+              "sha256": "05d1933f0a5ba7d8d6296bb6d5018e7c94fa473ceb10cf198a92ccea19c27b53",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__more_itertools": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/50/e2/8e10e465ee3987bb7c9ab69efb91d867d93959095f4807db102d07995d94/more_itertools-10.2.0-py3-none-any.whl",
+              "sha256": "686b06abe565edfab151cb8fd385a05651e1fdf8f0a14191e4439283421f8684",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__packaging": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/49/df/1fceb2f8900f8639e278b056416d49134fb8d84c5942ffaa01ad34782422/packaging-24.0-py3-none-any.whl",
+              "sha256": "2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__pep517": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/25/6e/ca4a5434eb0e502210f591b97537d322546e4833dcb4d470a48c375c5540/pep517-0.13.1-py3-none-any.whl",
+              "sha256": "31b206f67165b3536dd577c5c3f1518e8fbaf38cbc57efff8369a392feff1721",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__pip": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/8a/6a/19e9fe04fca059ccf770861c7d5721ab4c2aebc539889e97c7977528a53b/pip-24.0-py3-none-any.whl",
+              "sha256": "ba0d021a166865d2265246961bec0152ff124de910c5cc39f1156ce3fa7c69dc",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__pip_tools": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/0d/dc/38f4ce065e92c66f058ea7a368a9c5de4e702272b479c0992059f7693941/pip_tools-7.4.1-py3-none-any.whl",
+              "sha256": "4c690e5fbae2f21e87843e89c26191f0d9454f362d8acdbd695716493ec8b3a9",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__pyproject_hooks": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/ae/f3/431b9d5fe7d14af7a32340792ef43b8a714e7726f1d7b69cc4e8e7a3f1d7/pyproject_hooks-1.1.0-py3-none-any.whl",
+              "sha256": "7ceeefe9aec63a1064c18d939bdc3adf2d8aa1988a510afec15151578b232aa2",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__setuptools": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/90/99/158ad0609729111163fc1f674a5a42f2605371a4cf036d0441070e2f7455/setuptools-78.1.1-py3-none-any.whl",
+              "sha256": "c3a9c4211ff4c309edb8b8c4f1cbfa7ae324c4ba9f91ff254e3d305b9fd54561",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__tomli": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/97/75/10a9ebee3fd790d20926a90a2547f0bf78f371b2f13aa822c759680ca7b9/tomli-2.0.1-py3-none-any.whl",
+              "sha256": "939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__wheel": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/7d/cd/d7460c9a869b16c3dd4e1e403cce337df165368c71d6af229a74699622ce/wheel-0.43.0-py3-none-any.whl",
+              "sha256": "55c570405f142630c6b9f72fe09d9b67cf1477fcf543ae5b8dcb1f5b7377da81",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
+            }
+          },
+          "pypi__zipp": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/da/55/a03fd7240714916507e1fcf7ae355bd9d9ed2e6db492595f1a67f61681be/zipp-3.18.2-py3-none-any.whl",
+              "sha256": "dce197b859eb796242b0622af1b8beb0a722d52aa2f57133ead08edd5bf5374e",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:py_library.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\n        # These entries include those put into user-installed dependencies by\n        # data_exclude to avoid non-determinism.\n        \"**/*.py\",\n        \"**/*.pyc\",\n        \"**/*.pyc.*\",  # During pyc creation, temp files named *.pyc.NNN are created\n        \"**/*.dist-info/RECORD\",\n        \"BUILD\",\n        \"WORKSPACE\",\n    ]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n"
             }
           }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "",
-            "envoy_api",
-            ""
-          ]
-        ]
+        }
       }
-    },
-    "@@rules_kotlin~//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {
-      "general": {
-        "bzlTransitiveDigest": "eecmTsmdIQveoA97hPtH3/Ej/kugbdCI24bhXIXaly8=",
-        "usagesDigest": "aJF6fLy82rR95Ff5CZPAqxNoFgOMLMN5ImfBS0nhnkg=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "com_github_jetbrains_kotlin_git": {
-            "bzlFile": "@@rules_kotlin~//src/main/starlark/core/repositories:compiler.bzl",
-            "ruleClassName": "kotlin_compiler_git_repository",
-            "attributes": {
-              "urls": [
-                "https://github.com/JetBrains/kotlin/releases/download/v1.9.23/kotlin-compiler-1.9.23.zip"
-              ],
-              "sha256": "93137d3aab9afa9b27cb06a824c2324195c6b6f6179d8a8653f440f5bd58be88"
-            }
-          },
-          "com_github_jetbrains_kotlin": {
-            "bzlFile": "@@rules_kotlin~//src/main/starlark/core/repositories:compiler.bzl",
-            "ruleClassName": "kotlin_capabilities_repository",
-            "attributes": {
-              "git_repository_name": "com_github_jetbrains_kotlin_git",
-              "compiler_version": "1.9.23"
-            }
-          },
-          "com_github_google_ksp": {
-            "bzlFile": "@@rules_kotlin~//src/main/starlark/core/repositories:ksp.bzl",
-            "ruleClassName": "ksp_compiler_plugin_repository",
-            "attributes": {
-              "urls": [
-                "https://github.com/google/ksp/releases/download/1.9.23-1.0.20/artifacts.zip"
-              ],
-              "sha256": "ee0618755913ef7fd6511288a232e8fad24838b9af6ea73972a76e81053c8c2d",
-              "strip_version": "1.9.23-1.0.20"
-            }
-          },
-          "com_github_pinterest_ktlint": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_file",
-            "attributes": {
-              "sha256": "01b2e0ef893383a50dbeb13970fe7fa3be36ca3e83259e01649945b09d736985",
-              "urls": [
-                "https://github.com/pinterest/ktlint/releases/download/1.3.0/ktlint"
-              ],
-              "executable": true
-            }
-          },
-          "rules_android": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "sha256": "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
-              "strip_prefix": "rules_android-0.1.1",
-              "urls": [
-                "https://github.com/bazelbuild/rules_android/archive/v0.1.1.zip"
-              ]
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_kotlin~",
-            "bazel_tools",
-            "bazel_tools"
-          ]
+    }
+  },
+  "facts": {
+    "@@rules_go+//go:extensions.bzl%go_sdk": {
+      "1.20.2": {
+        "darwin_amd64": [
+          "go1.20.2.darwin-amd64.tar.gz",
+          "c93b8ced9517d07e1cd4c362c6e2d5242cb139e29b417a328fbf19aded08764c"
+        ],
+        "darwin_arm64": [
+          "go1.20.2.darwin-arm64.tar.gz",
+          "7343c87f19e79c0063532e82e1c4d6f42175a32d99f7a4d15e658e88bf97f885"
+        ],
+        "freebsd_386": [
+          "go1.20.2.freebsd-386.tar.gz",
+          "14f9be2004e042b3a64d0facb0c020756a9084a5c7333e33b0752b393b6016ea"
+        ],
+        "freebsd_amd64": [
+          "go1.20.2.freebsd-amd64.tar.gz",
+          "b41b67b4f1b56797a7cecf6ee7f47fcf4f93960b2788a3683c07dd009d30b2a4"
+        ],
+        "linux_386": [
+          "go1.20.2.linux-386.tar.gz",
+          "ee240ed33ae57504c41f04c12236aeaa17fbeb6ea9fcd096cd9dc7a89d10d4db"
+        ],
+        "linux_amd64": [
+          "go1.20.2.linux-amd64.tar.gz",
+          "4eaea32f59cde4dc635fbc42161031d13e1c780b87097f4b4234cfce671f1768"
+        ],
+        "linux_arm64": [
+          "go1.20.2.linux-arm64.tar.gz",
+          "78d632915bb75e9a6356a47a42625fd1a785c83a64a643fedd8f61e31b1b3bef"
+        ],
+        "linux_armv6l": [
+          "go1.20.2.linux-armv6l.tar.gz",
+          "d79d56bafd6b52b8d8cbe3f8e967caaac5383a23d7a4fa9ac0e89778cd16a076"
+        ],
+        "linux_ppc64le": [
+          "go1.20.2.linux-ppc64le.tar.gz",
+          "850564ddb760cb703db63bf20182dc4407abd2ff090a95fa66d6634d172fd095"
+        ],
+        "linux_s390x": [
+          "go1.20.2.linux-s390x.tar.gz",
+          "8da24c5c4205fe8115f594237e5db7bcb1d23df67bc1fa9a999954b1976896e8"
+        ],
+        "windows_386": [
+          "go1.20.2.windows-386.zip",
+          "31838b291117495bbb93683603e98d5118bfabd2eb318b4d07540bfd524bab86"
+        ],
+        "windows_amd64": [
+          "go1.20.2.windows-amd64.zip",
+          "fe439f0e438f7555a7f5f7194ddb6f4a07b0de1fa414385d19f2aeb26d9f43db"
+        ],
+        "windows_arm64": [
+          "go1.20.2.windows-arm64.zip",
+          "ac5010c8b8b22849228a8dea698d58b9c7be2195d30c6d778cce0f709858fa64"
         ]
-      }
-    },
-    "@@rules_python~//python/uv:uv.bzl%uv": {
-      "general": {
-        "bzlTransitiveDigest": "sEFGGTSkofONc0o5QI5Gx+F/KfHEZQLIKj1B3MNlt/g=",
-        "usagesDigest": "2i8W0baJ5gflw8UyZLMTK8V524DgyUmgWq4fI+slQsk=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "uv": {
-            "bzlFile": "@@rules_python~//python/uv/private:uv_toolchains_repo.bzl",
-            "ruleClassName": "uv_toolchains_repo",
-            "attributes": {
-              "toolchain_type": "'@@rules_python~//python/uv:uv_toolchain_type'",
-              "toolchain_names": [
-                "none"
-              ],
-              "toolchain_implementations": {
-                "none": "'@@rules_python~//python:none'"
-              },
-              "toolchain_compatible_with": {
-                "none": [
-                  "@platforms//:incompatible"
-                ]
-              },
-              "toolchain_target_settings": {}
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_python~",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_python~",
-            "platforms",
-            "platforms"
-          ]
+      },
+      "1.23.0": {
+        "aix_ppc64": [
+          "go1.23.0.aix-ppc64.tar.gz",
+          "257f8560bb4001fb81a5e0ee84f32fecbe18d4450343c9556557d296786847b6"
+        ],
+        "darwin_amd64": [
+          "go1.23.0.darwin-amd64.tar.gz",
+          "ffd070acf59f054e8691b838f274d540572db0bd09654af851e4e76ab88403dc"
+        ],
+        "darwin_arm64": [
+          "go1.23.0.darwin-arm64.tar.gz",
+          "b770812aef17d7b2ea406588e2b97689e9557aac7e646fe76218b216e2c51406"
+        ],
+        "dragonfly_amd64": [
+          "go1.23.0.dragonfly-amd64.tar.gz",
+          "8fd2ab5ac8629fc97d25a056693e23f332446603dd3c2b764ccb496872004b0c"
+        ],
+        "freebsd_386": [
+          "go1.23.0.freebsd-386.tar.gz",
+          "2c9b76ead3c44f5b3e40e10b980075addb837f2dd05dafe7c0e4c611fd239753"
+        ],
+        "freebsd_amd64": [
+          "go1.23.0.freebsd-amd64.tar.gz",
+          "2c2252902b87ba605fdc0b12b4c860fe6553c0c5483c12cc471756ebdd8249fe"
+        ],
+        "freebsd_arm": [
+          "go1.23.0.freebsd-arm.tar.gz",
+          "8ec48b8d99a515644ae00e79d093ad3b7645dcaf2a19c0a9c0d97916187f4514"
+        ],
+        "freebsd_arm64": [
+          "go1.23.0.freebsd-arm64.tar.gz",
+          "f476bbe8efb0db18155671840545370bfb73903fec04ea897d510569dab16d9c"
+        ],
+        "freebsd_riscv64": [
+          "go1.23.0.freebsd-riscv64.tar.gz",
+          "b0e254b2ea5752b4f1c69934ae43a44bbabf98e0c2843af44e1b6d12390eb551"
+        ],
+        "illumos_amd64": [
+          "go1.23.0.illumos-amd64.tar.gz",
+          "09716dcc7a2e19891b3d1e2ea68a1aab22838fc664cdc5f82d5f8eef05db78cf"
+        ],
+        "linux_386": [
+          "go1.23.0.linux-386.tar.gz",
+          "0e8a7340c2632e6fb5088d60f95b52be1f8303143e04cd34e9b2314fafc24edd"
+        ],
+        "linux_amd64": [
+          "go1.23.0.linux-amd64.tar.gz",
+          "905a297f19ead44780548933e0ff1a1b86e8327bb459e92f9c0012569f76f5e3"
+        ],
+        "linux_arm64": [
+          "go1.23.0.linux-arm64.tar.gz",
+          "62788056693009bcf7020eedc778cdd1781941c6145eab7688bd087bce0f8659"
+        ],
+        "linux_armv6l": [
+          "go1.23.0.linux-armv6l.tar.gz",
+          "0efa1338e644d7f74064fa7f1016b5da7872b2df0070ea3b56e4fef63192e35b"
+        ],
+        "linux_loong64": [
+          "go1.23.0.linux-loong64.tar.gz",
+          "dc8f723ce1a236e85c8b56d1e6749e270314e99dd41b80a58355e7ffcf9ea857"
+        ],
+        "linux_mips": [
+          "go1.23.0.linux-mips.tar.gz",
+          "3332cc76c73c05b3413cdecccffc29aaa3469f87db8ed9f9b784ebb527ca5352"
+        ],
+        "linux_mips64": [
+          "go1.23.0.linux-mips64.tar.gz",
+          "0ed5cee92433d09fd0816ec5adfbf4b16d712944e833f6342bbe2df18f7826ae"
+        ],
+        "linux_mips64le": [
+          "go1.23.0.linux-mips64le.tar.gz",
+          "06a579dd6d1f9a84bc43cab063e7c759a92a6d4dd01fec3d860f22a32df93406"
+        ],
+        "linux_mipsle": [
+          "go1.23.0.linux-mipsle.tar.gz",
+          "d522770d32d6ee963f61331a695c4f8a730f2445b965d8d56db0a2e75c62af57"
+        ],
+        "linux_ppc64": [
+          "go1.23.0.linux-ppc64.tar.gz",
+          "8c884cb4f2593d897f58ec1b0f23f303acf5c78fd101e76cb48d6cb1fe5e90e7"
+        ],
+        "linux_ppc64le": [
+          "go1.23.0.linux-ppc64le.tar.gz",
+          "8b26e20d4d43a4d7641cddbdc0298d7ba3804d910a9e06cda7672970dbf2829d"
+        ],
+        "linux_riscv64": [
+          "go1.23.0.linux-riscv64.tar.gz",
+          "a87726205f1a283247f877ccae8ce147ff4e77ac802382647ac52256eb5642c7"
+        ],
+        "linux_s390x": [
+          "go1.23.0.linux-s390x.tar.gz",
+          "003722971de02d97131a4dca2496abdab5cb175a6ee0ed9c8227c5ae9b883e69"
+        ],
+        "netbsd_386": [
+          "go1.23.0.netbsd-386.tar.gz",
+          "b203fa2354874c66c40d828e96a6cce1f4e4db192414050a600d0a09b16cafd3"
+        ],
+        "netbsd_amd64": [
+          "go1.23.0.netbsd-amd64.tar.gz",
+          "1502c82c3ba663959df99c2cc3ca5e7a5e1a75a1495fd26bef697d63bf1f291c"
+        ],
+        "netbsd_arm": [
+          "go1.23.0.netbsd-arm.tar.gz",
+          "dd50c05c7f613522c8d3d74f598bfc1862c0fee9182b738225820c9b458c7be5"
+        ],
+        "netbsd_arm64": [
+          "go1.23.0.netbsd-arm64.tar.gz",
+          "728a94a648f9502cd6175adaac2b770acde6b26f5f92dcbd8c5a1a43cc44bb10"
+        ],
+        "openbsd_386": [
+          "go1.23.0.openbsd-386.tar.gz",
+          "e1ff3584778257778a4e3f0093b09044072423aebedf2015a550537853c46745"
+        ],
+        "openbsd_amd64": [
+          "go1.23.0.openbsd-amd64.tar.gz",
+          "d2e30cdb0de256360b51a43f5e551587a7369d8c248120010d5e9432f698a6e8"
+        ],
+        "openbsd_arm": [
+          "go1.23.0.openbsd-arm.tar.gz",
+          "bd5224c8a5f195f4128c866c0d418f1b61db865a1042913fd07714ed85da28db"
+        ],
+        "openbsd_arm64": [
+          "go1.23.0.openbsd-arm64.tar.gz",
+          "fc0e0af3a1b4b7168455e8492a5bb6aa96ceaf46321cef1fc04187301c058890"
+        ],
+        "openbsd_ppc64": [
+          "go1.23.0.openbsd-ppc64.tar.gz",
+          "ce7ea9343c7c2ef2700b55b80c45549ce39d164031e4d7bb98bec7ca593ed93d"
+        ],
+        "openbsd_riscv64": [
+          "go1.23.0.openbsd-riscv64.tar.gz",
+          "90b6a97285981e06752a30a638cd8d32861086848c0131fb62faddf89e2de8e1"
+        ],
+        "plan9_386": [
+          "go1.23.0.plan9-386.tar.gz",
+          "93b970a8a41f6c89113daaea12e39f2580038af155e823550d0a94a5502c5e2c"
+        ],
+        "plan9_amd64": [
+          "go1.23.0.plan9-amd64.tar.gz",
+          "6231862acbb6c1e02b1455b35446b9789b0b4b3230d249953e6957c393a53011"
+        ],
+        "plan9_arm": [
+          "go1.23.0.plan9-arm.tar.gz",
+          "632bdd3a1f84b2fe691203423dd2c3f536d4ab250bb52a48e9b05ebf327ae594"
+        ],
+        "solaris_amd64": [
+          "go1.23.0.solaris-amd64.tar.gz",
+          "16773f85003d9e610960f9af67e00bc6c02359d7914de7224079538cc9c1e93d"
+        ],
+        "windows_386": [
+          "go1.23.0.windows-386.zip",
+          "09448fedec0cdf98ad12397222e0c8bfc835b1d0894c0015ced653534b8d7427"
+        ],
+        "windows_amd64": [
+          "go1.23.0.windows-amd64.zip",
+          "d4be481ef73079ee0ad46081d278923aa3fd78db1b3cf147172592f73e14c1ac"
+        ],
+        "windows_arm": [
+          "go1.23.0.windows-arm.zip",
+          "006d93712246a672bdb57906dd5bffcab62facc36169e51a27d52340cdac661f"
+        ],
+        "windows_arm64": [
+          "go1.23.0.windows-arm64.zip",
+          "0be62073ef8f5a2d3b9adcefddf18c417dab0a7975c71488ac2694856e2ff976"
+        ]
+      },
+      "1.24.0": {
+        "aix_ppc64": [
+          "go1.24.0.aix-ppc64.tar.gz",
+          "5d04588154d5923bd8e26b76111806340ec55c41af1b05623ea744fcb3d6bc22"
+        ],
+        "darwin_amd64": [
+          "go1.24.0.darwin-amd64.tar.gz",
+          "7af054e5088b68c24b3d6e135e5ca8d91bbd5a05cb7f7f0187367b3e6e9e05ee"
+        ],
+        "darwin_arm64": [
+          "go1.24.0.darwin-arm64.tar.gz",
+          "fd9cfb5dd6c75a347cfc641a253f0db1cebaca16b0dd37965351c6184ba595e4"
+        ],
+        "dragonfly_amd64": [
+          "go1.24.0.dragonfly-amd64.tar.gz",
+          "d0dc34ad86aea746abe245994c68a9e1ad8f46ba8c4af901cd5861a4dd4c21df"
+        ],
+        "freebsd_386": [
+          "go1.24.0.freebsd-386.tar.gz",
+          "4ee02b1f3812aff4da79c79464ee4038ca61ad74b3a9619850f30435f81c2536"
+        ],
+        "freebsd_amd64": [
+          "go1.24.0.freebsd-amd64.tar.gz",
+          "838191001f9324da904dece35a586a3156d548687db87ac9461aa3d38fc88b09"
+        ],
+        "freebsd_arm": [
+          "go1.24.0.freebsd-arm.tar.gz",
+          "ce6ad4e84a40a8a1d848b7e31b0cddfd1cee8f7959e7dc358a8fa8b5566ea718"
+        ],
+        "freebsd_arm64": [
+          "go1.24.0.freebsd-arm64.tar.gz",
+          "511f7b0cac4c4ed1066d324072ce223b906ad6b2a85f2e1c5d260eb7d08b5901"
+        ],
+        "freebsd_riscv64": [
+          "go1.24.0.freebsd-riscv64.tar.gz",
+          "a1e4072630dc589a2975ef51317b52c7d8599bf6f389fc59033c01e0a0fa705a"
+        ],
+        "illumos_amd64": [
+          "go1.24.0.illumos-amd64.tar.gz",
+          "7593e9dcee9f07c3df6d099f7d259f5734a6c0dccc5f28962f18e7f501c9bb21"
+        ],
+        "linux_386": [
+          "go1.24.0.linux-386.tar.gz",
+          "90521453a59c6ce20364d2dc7c38532949b033b602ba12d782caeb90af1b0624"
+        ],
+        "linux_amd64": [
+          "go1.24.0.linux-amd64.tar.gz",
+          "dea9ca38a0b852a74e81c26134671af7c0fbe65d81b0dc1c5bfe22cf7d4c8858"
+        ],
+        "linux_arm64": [
+          "go1.24.0.linux-arm64.tar.gz",
+          "c3fa6d16ffa261091a5617145553c71d21435ce547e44cc6dfb7470865527cc7"
+        ],
+        "linux_armv6l": [
+          "go1.24.0.linux-armv6l.tar.gz",
+          "695dc54fa14cd3124fa6900d7b5ae39eeac23f7a4ecea81656070160fac2c54a"
+        ],
+        "linux_loong64": [
+          "go1.24.0.linux-loong64.tar.gz",
+          "a201e4c9b7e6d29ed64c43296ed88e81a66f82f2093ce45b766d2c526941396f"
+        ],
+        "linux_mips": [
+          "go1.24.0.linux-mips.tar.gz",
+          "f3ac039aae78ad0bfb08106406c2e62eaf763dd82ebaf0ecd539adadd1d729a6"
+        ],
+        "linux_mips64": [
+          "go1.24.0.linux-mips64.tar.gz",
+          "f2e6456d45e024831b1da8d88b1bb6392cca9500c1b00841f525d76c9e9553e0"
+        ],
+        "linux_mips64le": [
+          "go1.24.0.linux-mips64le.tar.gz",
+          "b847893ff119389c939adc2b8516b6500204b7cb49d5e19b25e1c2091d2c74c6"
+        ],
+        "linux_mipsle": [
+          "go1.24.0.linux-mipsle.tar.gz",
+          "bd4aed27d02746c237c3921e97029ac6b6fe687a67436b8f52ff1f698d330bd9"
+        ],
+        "linux_ppc64": [
+          "go1.24.0.linux-ppc64.tar.gz",
+          "007123c9b06c41729a4bb3f166f4df7196adf4e33c2d2ab0e7e990175f0ce1d4"
+        ],
+        "linux_ppc64le": [
+          "go1.24.0.linux-ppc64le.tar.gz",
+          "a871a43de7d26c91dd90cb6e0adacb214c9e35ee2188c617c91c08c017efe81a"
+        ],
+        "linux_riscv64": [
+          "go1.24.0.linux-riscv64.tar.gz",
+          "620dcf48c6297519aad6c81f8e344926dc0ab09a2a79f1e306964aece95a553d"
+        ],
+        "linux_s390x": [
+          "go1.24.0.linux-s390x.tar.gz",
+          "544d78b077c6b54bf78958c4a8285abec2d21f668fb007261c77418cd2edbb46"
+        ],
+        "netbsd_386": [
+          "go1.24.0.netbsd-386.tar.gz",
+          "8b143a7edefbaa2a0b0246c9df2df1bac9fbed909d8615a375c08da7744e697d"
+        ],
+        "netbsd_amd64": [
+          "go1.24.0.netbsd-amd64.tar.gz",
+          "67150a6dd7bdb9c4e88d77f46ee8c4dc99d5e71deca4912d8c2c85f7a16d0262"
+        ],
+        "netbsd_arm": [
+          "go1.24.0.netbsd-arm.tar.gz",
+          "446b2539f11218fd6f6f6e3dd90b20ae55a06afe129885eeb3df51eb344eb0f6"
+        ],
+        "netbsd_arm64": [
+          "go1.24.0.netbsd-arm64.tar.gz",
+          "370115b6ff7d30b29431223de348eb11ab65e3c92627532d97fd55f63f94e7a8"
+        ],
+        "openbsd_386": [
+          "go1.24.0.openbsd-386.tar.gz",
+          "cbda5f15f06ed9630f122a53542d9de13d149643633c74f1dcb45e79649b788a"
+        ],
+        "openbsd_amd64": [
+          "go1.24.0.openbsd-amd64.tar.gz",
+          "926f601d0e655ab1e8d7f357fd82542e5cf206c38c4e2f9fccf0706987d38836"
+        ],
+        "openbsd_arm": [
+          "go1.24.0.openbsd-arm.tar.gz",
+          "8a54892f8c933c541fff144a825d0fdc41bae14b0832aab703cb75eb4cb64f2c"
+        ],
+        "openbsd_arm64": [
+          "go1.24.0.openbsd-arm64.tar.gz",
+          "ef7fddcef0a22c7900c178b7687cf5aa25c2a9d46a3cc330b77a6de6e6c2396b"
+        ],
+        "openbsd_ppc64": [
+          "go1.24.0.openbsd-ppc64.tar.gz",
+          "b3b5e2e2b53489ded2c2c21900ddcbbdb7991632bb5b42f05f125d71675e0b76"
+        ],
+        "openbsd_riscv64": [
+          "go1.24.0.openbsd-riscv64.tar.gz",
+          "fbcb1dbf1269b4079dc4fd0b15f3274b9d635f1a7e319c3fc1a907b03280348e"
+        ],
+        "plan9_386": [
+          "go1.24.0.plan9-386.tar.gz",
+          "33b4221e1c174a16e3f661deab6c60838ac4ae6cb869a4da1d1115773ceed88b"
+        ],
+        "plan9_amd64": [
+          "go1.24.0.plan9-amd64.tar.gz",
+          "111a89014019cdbd69c2978de9b3e201f77e35183c8ab3606fba339d38f28549"
+        ],
+        "plan9_arm": [
+          "go1.24.0.plan9-arm.tar.gz",
+          "8da3d3997049f40ebe0cd336a9bb9e4bfa4832df3c90a32f07383371d6d74849"
+        ],
+        "solaris_amd64": [
+          "go1.24.0.solaris-amd64.tar.gz",
+          "b6069da21dc95ccdbd047675b584e5480ffc3eba35f9e7c8b0e7b317aaf01e2c"
+        ],
+        "windows_386": [
+          "go1.24.0.windows-386.zip",
+          "b53c28a4c2863ec50ab4a1dbebe818ef6177f86773b6f43475d40a5d9aa4ec9e"
+        ],
+        "windows_amd64": [
+          "go1.24.0.windows-amd64.zip",
+          "96b7280979205813759ee6947be7e3bb497da85c482711116c00522e3bb41ff1"
+        ],
+        "windows_arm64": [
+          "go1.24.0.windows-arm64.zip",
+          "53f73450fb66075d16be9f206e9177bd972b528168271918c4747903b5596c3d"
+        ]
+      },
+      "1.24.6": {
+        "aix_ppc64": [
+          "go1.24.6.aix-ppc64.tar.gz",
+          "5cafb2927af95969fc3d0884be1ad4df54f19103d86dda928d9f76494a5ae6a6"
+        ],
+        "darwin_amd64": [
+          "go1.24.6.darwin-amd64.tar.gz",
+          "4a8d7a32052f223e71faab424a69430455b27b3fff5f4e651f9d97c3e51a8746"
+        ],
+        "darwin_arm64": [
+          "go1.24.6.darwin-arm64.tar.gz",
+          "4e29202c49573b953be7cc3500e1f8d9e66ddd12faa8cf0939a4951411e09a2a"
+        ],
+        "dragonfly_amd64": [
+          "go1.24.6.dragonfly-amd64.tar.gz",
+          "c6e21bf8347f7a1c653dd4136c8c27a858515e98501d2843023a4bb3f1f7fb63"
+        ],
+        "freebsd_386": [
+          "go1.24.6.freebsd-386.tar.gz",
+          "9cd74ad74f3ad833e92529f2fd9b0d7d9ffaab46307eccadb0afcf9a1ba09553"
+        ],
+        "freebsd_amd64": [
+          "go1.24.6.freebsd-amd64.tar.gz",
+          "4983e2b10ae1f754e4eb07e1e589691c7e1d0dc428a92c16bd0e2ba03cc23ed9"
+        ],
+        "freebsd_arm": [
+          "go1.24.6.freebsd-arm.tar.gz",
+          "a8da621d8282a91ee17b257a46f2606391c019cc1a7d7be628638792ca8033ad"
+        ],
+        "freebsd_arm64": [
+          "go1.24.6.freebsd-arm64.tar.gz",
+          "76a75ad5125217c268029c0ad9c7295cc7f6042fe9cba4bebf9a89f7f42ad8af"
+        ],
+        "freebsd_riscv64": [
+          "go1.24.6.freebsd-riscv64.tar.gz",
+          "ac206417d8460662f26d46dc2ad0488b2f9e22039946069ba4b48a0cb646e8b0"
+        ],
+        "illumos_amd64": [
+          "go1.24.6.illumos-amd64.tar.gz",
+          "c54199c46ec823c857c52335f859b493593433d71fe479b9e7f95d868a144ae2"
+        ],
+        "linux_386": [
+          "go1.24.6.linux-386.tar.gz",
+          "bb5bf69d75e7edbc93339824753a1a4655a928451a2c5e13ff90959ad69e065b"
+        ],
+        "linux_amd64": [
+          "go1.24.6.linux-amd64.tar.gz",
+          "bbca37cc395c974ffa4893ee35819ad23ebb27426df87af92e93a9ec66ef8712"
+        ],
+        "linux_arm64": [
+          "go1.24.6.linux-arm64.tar.gz",
+          "124ea6033a8bf98aa9fbab53e58d134905262d45a022af3a90b73320f3c3afd5"
+        ],
+        "linux_armv6l": [
+          "go1.24.6.linux-armv6l.tar.gz",
+          "7feb4d25f5e72f94fda81c99d4adb6630dfa2c35211e0819417d53af6e71809e"
+        ],
+        "linux_loong64": [
+          "go1.24.6.linux-loong64.tar.gz",
+          "8424d9c52b254255d2720769366af73802747e4eaf339c6e86bb52e5a1809fcb"
+        ],
+        "linux_mips": [
+          "go1.24.6.linux-mips.tar.gz",
+          "791964a6ce65f604a2099b7e61f71128cc7a3a4fcee858218d2ce99033fc2b09"
+        ],
+        "linux_mips64": [
+          "go1.24.6.linux-mips64.tar.gz",
+          "2f5282fdf2eaca44515728d518caec888b0dc4948effecb8e7f2ddff1ff9aa9e"
+        ],
+        "linux_mips64le": [
+          "go1.24.6.linux-mips64le.tar.gz",
+          "64ddc6b28907b4ab997f2d81c226be403511a59a6100536560af26ccfb10b4a4"
+        ],
+        "linux_mipsle": [
+          "go1.24.6.linux-mipsle.tar.gz",
+          "5ca12d2d4939dea977100e76885f4e08cd3ef3b73823853527b58ecac4598fd3"
+        ],
+        "linux_ppc64": [
+          "go1.24.6.linux-ppc64.tar.gz",
+          "9a4a61ffbba7a58b3ef97a6d3b2b394168f613f9ca6092016981a88c78a57f86"
+        ],
+        "linux_ppc64le": [
+          "go1.24.6.linux-ppc64le.tar.gz",
+          "63fc9559a3d6dfd63aa902f714375b879bbc848466181c035c122489b9646e27"
+        ],
+        "linux_riscv64": [
+          "go1.24.6.linux-riscv64.tar.gz",
+          "e92c19ff15a9004fe43e1f62d433555250ef9fe3fabee3dc29ebd4802c2b8021"
+        ],
+        "linux_s390x": [
+          "go1.24.6.linux-s390x.tar.gz",
+          "4cde28d9ffb6eef86bf8dac6852a45db335009f67e60bee3e477dd0ba0ff9704"
+        ],
+        "netbsd_386": [
+          "go1.24.6.netbsd-386.tar.gz",
+          "d238045676104d2aaad9da53c4ba3f489cf81b26d3315d2caad2b6e240664423"
+        ],
+        "netbsd_amd64": [
+          "go1.24.6.netbsd-amd64.tar.gz",
+          "9f8a9245cf146f1ebdac6785f71646c3dd0edf07dcdb8e5a8df85ec6447e5308"
+        ],
+        "netbsd_arm": [
+          "go1.24.6.netbsd-arm.tar.gz",
+          "2359c8af6b2d6979910060478a57fd216824682e0908ea1a4412ea8dc4a55db7"
+        ],
+        "netbsd_arm64": [
+          "go1.24.6.netbsd-arm64.tar.gz",
+          "99101158c796997ec85023d395c133fa90c782bd5faa56f8c3824817d28b0ee8"
+        ],
+        "openbsd_386": [
+          "go1.24.6.openbsd-386.tar.gz",
+          "b6193420489f24d5560b87ccb38caf52cecb308d892d99bf21d1ef0d2c99de04"
+        ],
+        "openbsd_amd64": [
+          "go1.24.6.openbsd-amd64.tar.gz",
+          "8dc0d94afbc65be9cafebe543b88a841dcf3429e50f668ea714200ef9f4489bd"
+        ],
+        "openbsd_arm": [
+          "go1.24.6.openbsd-arm.tar.gz",
+          "c29563d14d8e4b5fa89f130afac40abba7a1ee1e87fcc759a95f1e9b5831bf68"
+        ],
+        "openbsd_arm64": [
+          "go1.24.6.openbsd-arm64.tar.gz",
+          "3d97bdc5e1997cccfaa398242c52e8a97d3b626d988a65248bbdbf2f1ab188bf"
+        ],
+        "openbsd_ppc64": [
+          "go1.24.6.openbsd-ppc64.tar.gz",
+          "54cf517933db0bff58f3e527e7fa194f505d562c71b1fb0050d3365fcdda4914"
+        ],
+        "openbsd_riscv64": [
+          "go1.24.6.openbsd-riscv64.tar.gz",
+          "f7bdd8f882ecbc01ff6c1782ce3e29298445dd99b3dd4299423257df307c7b0d"
+        ],
+        "plan9_386": [
+          "go1.24.6.plan9-386.tar.gz",
+          "9bc0a801dc0d8d0705ac9493219b926b2e3c0105b8921c6c2fce69d14c4b9007"
+        ],
+        "plan9_amd64": [
+          "go1.24.6.plan9-amd64.tar.gz",
+          "7133c28acc277d3c5e8317fd9454b3a0902138c384466f818644b504b8b89ffe"
+        ],
+        "plan9_arm": [
+          "go1.24.6.plan9-arm.tar.gz",
+          "c4e2aa8aa4353f75fc083ca728b73917467cef88c6f5f917ca420578672c6d58"
+        ],
+        "solaris_amd64": [
+          "go1.24.6.solaris-amd64.tar.gz",
+          "cfcb4f1f7e987c6dee893c4401546516cc271c1ac7d7fb37a32b25343dc7df32"
+        ],
+        "windows_386": [
+          "go1.24.6.windows-386.zip",
+          "39b4d31b933d2f7c8913e70fb0fffef27252e441c386eac5c13632cbb28dfb6e"
+        ],
+        "windows_amd64": [
+          "go1.24.6.windows-amd64.zip",
+          "4fbc8af2cfca9e5059019b5150a426eb78e1e57718bf08f0e52b1c942a2782bf"
+        ],
+        "windows_arm64": [
+          "go1.24.6.windows-arm64.zip",
+          "45c41b237d00e92e4cf8adce11b4c5258048b47a92bfbb1f4ef3b928d6fcb0b2"
+        ]
+      },
+      "1.25.0": {
+        "aix_ppc64": [
+          "go1.25.0.aix-ppc64.tar.gz",
+          "e5234a7dac67bc86c528fe9752fc9d63557918627707a733ab4cac1a6faed2d4"
+        ],
+        "darwin_amd64": [
+          "go1.25.0.darwin-amd64.tar.gz",
+          "5bd60e823037062c2307c71e8111809865116714d6f6b410597cf5075dfd80ef"
+        ],
+        "darwin_arm64": [
+          "go1.25.0.darwin-arm64.tar.gz",
+          "544932844156d8172f7a28f77f2ac9c15a23046698b6243f633b0a0b00c0749c"
+        ],
+        "dragonfly_amd64": [
+          "go1.25.0.dragonfly-amd64.tar.gz",
+          "5ed3cf9a810a1483822538674f1336c06b51aa1b94d6d545a1a0319a48177120"
+        ],
+        "freebsd_386": [
+          "go1.25.0.freebsd-386.tar.gz",
+          "abea5d5c6697e6b5c224731f2158fe87c602996a2a233ac0c4730cd57bf8374e"
+        ],
+        "freebsd_amd64": [
+          "go1.25.0.freebsd-amd64.tar.gz",
+          "86e6fe0a29698d7601c4442052dac48bd58d532c51cccb8f1917df648138730b"
+        ],
+        "freebsd_arm": [
+          "go1.25.0.freebsd-arm.tar.gz",
+          "d90b78e41921f72f30e8bbc81d9dec2cff7ff384a33d8d8debb24053e4336bfe"
+        ],
+        "freebsd_arm64": [
+          "go1.25.0.freebsd-arm64.tar.gz",
+          "451d0da1affd886bfb291b7c63a6018527b269505db21ce6e14724f22ab0662e"
+        ],
+        "freebsd_riscv64": [
+          "go1.25.0.freebsd-riscv64.tar.gz",
+          "7b565f76bd8bda46549eeaaefe0e53b251e644c230577290c0f66b1ecdb3cdbe"
+        ],
+        "illumos_amd64": [
+          "go1.25.0.illumos-amd64.tar.gz",
+          "b1e1fdaab1ad25aa1c08d7a36c97d45d74b98b89c3f78c6d2145f77face54a2c"
+        ],
+        "linux_386": [
+          "go1.25.0.linux-386.tar.gz",
+          "8c602dd9d99bc9453b3995d20ce4baf382cc50855900a0ece5de9929df4a993a"
+        ],
+        "linux_amd64": [
+          "go1.25.0.linux-amd64.tar.gz",
+          "2852af0cb20a13139b3448992e69b868e50ed0f8a1e5940ee1de9e19a123b613"
+        ],
+        "linux_arm64": [
+          "go1.25.0.linux-arm64.tar.gz",
+          "05de75d6994a2783699815ee553bd5a9327d8b79991de36e38b66862782f54ae"
+        ],
+        "linux_armv6l": [
+          "go1.25.0.linux-armv6l.tar.gz",
+          "a5a8f8198fcf00e1e485b8ecef9ee020778bf32a408a4e8873371bfce458cd09"
+        ],
+        "linux_loong64": [
+          "go1.25.0.linux-loong64.tar.gz",
+          "cab86b1cf761b1cb3bac86a8877cfc92e7b036fc0d3084123d77013d61432afc"
+        ],
+        "linux_mips": [
+          "go1.25.0.linux-mips.tar.gz",
+          "d66b6fb74c3d91b9829dc95ec10ca1f047ef5e89332152f92e136cf0e2da5be1"
+        ],
+        "linux_mips64": [
+          "go1.25.0.linux-mips64.tar.gz",
+          "4082e4381a8661bc2a839ff94ba3daf4f6cde20f8fb771b5b3d4762dc84198a2"
+        ],
+        "linux_mips64le": [
+          "go1.25.0.linux-mips64le.tar.gz",
+          "70002c299ec7f7175ac2ef673b1b347eecfa54ae11f34416a6053c17f855afcc"
+        ],
+        "linux_mipsle": [
+          "go1.25.0.linux-mipsle.tar.gz",
+          "b00a3a39eff099f6df9f1c7355bf28e4589d0586f42d7d4a394efb763d145a73"
+        ],
+        "linux_ppc64": [
+          "go1.25.0.linux-ppc64.tar.gz",
+          "df166f33bd98160662560a72ff0b4ba731f969a80f088922bddcf566a88c1ec1"
+        ],
+        "linux_ppc64le": [
+          "go1.25.0.linux-ppc64le.tar.gz",
+          "0f18a89e7576cf2c5fa0b487a1635d9bcbf843df5f110e9982c64df52a983ad0"
+        ],
+        "linux_riscv64": [
+          "go1.25.0.linux-riscv64.tar.gz",
+          "c018ff74a2c48d55c8ca9b07c8e24163558ffec8bea08b326d6336905d956b67"
+        ],
+        "linux_s390x": [
+          "go1.25.0.linux-s390x.tar.gz",
+          "34e5a2e19f2292fbaf8783e3a241e6e49689276aef6510a8060ea5ef54eee408"
+        ],
+        "netbsd_386": [
+          "go1.25.0.netbsd-386.tar.gz",
+          "f8586cdb7aa855657609a5c5f6dbf523efa00c2bbd7c76d3936bec80aa6c0aba"
+        ],
+        "netbsd_amd64": [
+          "go1.25.0.netbsd-amd64.tar.gz",
+          "ae8dc1469385b86a157a423bb56304ba45730de8a897615874f57dd096db2c2a"
+        ],
+        "netbsd_arm": [
+          "go1.25.0.netbsd-arm.tar.gz",
+          "1ff7e4cc764425fc9dd6825eaee79d02b3c7cafffbb3691687c8d672ade76cb7"
+        ],
+        "netbsd_arm64": [
+          "go1.25.0.netbsd-arm64.tar.gz",
+          "e1b310739f26724216aa6d7d7208c4031f9ff54c9b5b9a796ddc8bebcb4a5f16"
+        ],
+        "openbsd_386": [
+          "go1.25.0.openbsd-386.tar.gz",
+          "4802a9b20e533da91adb84aab42e94aa56cfe3e5475d0550bed3385b182e69d8"
+        ],
+        "openbsd_amd64": [
+          "go1.25.0.openbsd-amd64.tar.gz",
+          "c016cd984bebe317b19a4f297c4f50def120dc9788490540c89f28e42f1dabe1"
+        ],
+        "openbsd_arm": [
+          "go1.25.0.openbsd-arm.tar.gz",
+          "a1e31d0bf22172ddde42edf5ec811ef81be43433df0948ece52fecb247ccfd8d"
+        ],
+        "openbsd_arm64": [
+          "go1.25.0.openbsd-arm64.tar.gz",
+          "343ea8edd8c218196e15a859c6072d0dd3246fbbb168481ab665eb4c4140458d"
+        ],
+        "openbsd_ppc64": [
+          "go1.25.0.openbsd-ppc64.tar.gz",
+          "694c14da1bcaeb5e3332d49bdc2b6d155067648f8fe1540c5de8f3cf8e157154"
+        ],
+        "openbsd_riscv64": [
+          "go1.25.0.openbsd-riscv64.tar.gz",
+          "aa510ad25cf54c06cd9c70b6d80ded69cb20188ac6e1735655eef29ff7e7885f"
+        ],
+        "plan9_386": [
+          "go1.25.0.plan9-386.tar.gz",
+          "46f8cef02086cf04bf186c5912776b56535178d4cb319cd19c9fdbdd29231986"
+        ],
+        "plan9_amd64": [
+          "go1.25.0.plan9-amd64.tar.gz",
+          "29b34391d84095e44608a228f63f2f88113a37b74a79781353ec043dfbcb427b"
+        ],
+        "plan9_arm": [
+          "go1.25.0.plan9-arm.tar.gz",
+          "0a047107d13ebe7943aaa6d54b1d7bbd2e45e68ce449b52915a818da715799c2"
+        ],
+        "solaris_amd64": [
+          "go1.25.0.solaris-amd64.tar.gz",
+          "9977f9e4351984364a3b2b78f8b88bfd1d339812356d5237678514594b7d3611"
+        ],
+        "windows_386": [
+          "go1.25.0.windows-386.zip",
+          "df9f39db82a803af0db639e3613a36681ab7a42866b1384b3f3a1045663961a7"
+        ],
+        "windows_amd64": [
+          "go1.25.0.windows-amd64.zip",
+          "89efb4f9b30812eee083cc1770fdd2913c14d301064f6454851428f9707d190b"
+        ],
+        "windows_arm64": [
+          "go1.25.0.windows-arm64.zip",
+          "27bab004c72b3d7bd05a69b6ec0fc54a309b4b78cc569dd963d8b3ec28bfdb8c"
         ]
       }
     }

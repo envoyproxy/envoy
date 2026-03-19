@@ -7,9 +7,9 @@ namespace Quic {
 
 Envoy::Quic::QuicClientPacketWriterFactoryPtr
 QuicPlatformPacketWriterConfigFactory::createQuicClientPacketWriterFactory(
-    const Protobuf::Message& /*config*/,
+    const Protobuf::Message& /*config*/, Event::Dispatcher& dispatcher,
     Envoy::ProtobufMessage::ValidationVisitor& /*validation_visitor*/) {
-  return std::make_unique<QuicPlatformPacketWriterFactory>();
+  return std::make_unique<QuicPlatformPacketWriterFactory>(dispatcher);
 }
 
 /**

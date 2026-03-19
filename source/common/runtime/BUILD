@@ -18,7 +18,7 @@ envoy_cc_library(
         "runtime_keys.h",
     ],
     deps = [
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -46,8 +46,8 @@ envoy_cc_library(
         # AVOID ADDING TO THESE DEPENDENCIES IF POSSIBLE
         # Any code using runtime guards depends on this library, and the more dependencies there are,
         # the harder it is to runtime-guard without dependency loops.
-        "@com_google_absl//absl/flags:commandlineflag",
-        "@com_google_absl//absl/flags:flag",
+        "@abseil-cpp//absl/flags:commandlineflag",
+        "@abseil-cpp//absl/flags:flag",
         "//envoy/http:codec_runtime_overrides",
         "//envoy/runtime:runtime_interface",
         "//source/common/singleton:const_singleton",
@@ -107,6 +107,6 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic/platform:quiche_flags_impl_lib",
-        "@com_github_google_quiche//:quic_platform_base",
+        "@quiche//:quic_platform_base",
     ]),
 )

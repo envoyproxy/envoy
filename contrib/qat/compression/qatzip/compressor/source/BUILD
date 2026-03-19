@@ -15,7 +15,10 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 COMMON_ENV = {
-    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+    "LDFLAGS": " ".join([
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/envoy/bazel/external/lib",
+    ]),
 }
 
 configure_make(
@@ -29,10 +32,10 @@ configure_make(
     # Include the numa_archive genrule output so that libnuma.a is available
     # for the linker to find with -lnuma. Include zlib_ng_archive when building
     # with zlib-ng so that libz.a is available for the configure script.
-    data = ["//bazel/external:numa_archive"] + select({
-        "//bazel:zlib_ng": ["//bazel/external:zlib_ng_archive"],
-        "//conditions:default": [],
-    }),
+    data = [
+        "//bazel/external:numa_archive",
+        "//bazel/external:zlib_archive",
+    ],
     # Point to the directory containing the libnuma.a and libz.a archives.
     # The cc_library targets don't produce files that can be found with -lnuma
     # or -lz, so we need to use the genrule outputs.
@@ -42,7 +45,7 @@ configure_make(
         },
         "//conditions:default": COMMON_ENV,
     }),
-    lib_source = "@com_github_intel_qatzip//:all",
+    lib_source = "@qatzip//:all",
     out_static_libs = [
         "libqatzip.a",
     ],
@@ -53,8 +56,8 @@ configure_make(
         "//bazel/foreign_cc:lz4",
         "//bazel:zlib",
         "//contrib/qat:qatlib",
-        # Use boringssl alias to select fips vs non-fips version.
-        "//bazel:boringcrypto",
+        # Use crypto label_flag to select the SSL library.
+        "//bazel:crypto",
         "@numactl//:numa",
     ],
     alwayslink = False,

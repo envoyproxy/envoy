@@ -536,6 +536,40 @@ actions:
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_, envoy::config::route::v3::RateLimit::UNSPECIFIED);
+}
+
+TEST_F(RateLimitPolicyEntryTest, RateLimitKeyWithXRateLimitOptionOff) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: fake_key
+x_ratelimit_option: "OFF"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_, envoy::config::route::v3::RateLimit::OFF);
+}
+
+TEST_F(RateLimitPolicyEntryTest, RateLimitKeyWithXRateLimitOption) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: fake_key
+x_ratelimit_option: DRAFT_VERSION_03
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_,
+            envoy::config::route::v3::RateLimit::DRAFT_VERSION_03);
 }
 
 TEST_F(RateLimitPolicyEntryTest, GenericKeyWithSetDescriptorKey) {
@@ -1918,6 +1952,113 @@ actions:
                   {{{{"query_match",
                       "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"}}}}),
               testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "10.0.0.1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressMatchNoMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressMatchDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_key: "client_ip"
+    descriptor_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"client_ip", "10.0.0.1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressMatchDefaultValue) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%REQ(x-client-id)%"
+    default_value: "unknown"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header;
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "unknown"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, RemoteAddressMatchWithFormatter) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address_match:
+    descriptor_value: "%REQ(x-client-id)%"
+    address_matcher:
+      ranges:
+      - address_prefix: "10.0.0.0"
+        prefix_len: 8
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-client-id", "client-123"}};
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "client-123"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 } // namespace

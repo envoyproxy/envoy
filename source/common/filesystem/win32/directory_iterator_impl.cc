@@ -1,7 +1,8 @@
+#include "source/common/filesystem/directory_iterator_impl.h"
+
 #include "envoy/common/exception.h"
 
 #include "source/common/common/fmt.h"
-#include "source/common/filesystem/directory_iterator_impl.h"
 
 #include "absl/strings/strip.h"
 

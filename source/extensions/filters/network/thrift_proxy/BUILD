@@ -92,7 +92,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
-        "@com_google_absl//absl/types:any",
+        "@abseil-cpp//absl/types:any",
     ],
 )
 
@@ -145,14 +145,14 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "tracing_interface",
     hdrs = ["tracing.h"],
-    deps = ["@com_google_absl//absl/types:optional"],
+    deps = ["@abseil-cpp//absl/types:optional"],
 )
 
 envoy_cc_library(
@@ -185,7 +185,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -238,7 +238,7 @@ envoy_cc_library(
         ":protocol_interface",
         "//source/common/common:macros",
         "//source/common/runtime:runtime_features_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
     alwayslink = 1,
 )
@@ -283,7 +283,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

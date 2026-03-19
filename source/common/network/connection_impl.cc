@@ -124,6 +124,8 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+  // Ensure that the access log is written.
+  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -141,6 +143,17 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 }
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
+
+void ConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(handler);
+}
+
+void ConnectionImpl::ensureAccessLogWritten() {
+  if (!access_log_written_) {
+    access_log_written_ = true;
+    filter_manager_.log(AccessLog::AccessLogType::TcpConnectionEnd);
+  }
+}
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
@@ -246,6 +259,42 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
 
   ioHandle().enableFileEvents(Event::FileReadyType::Write |
                               (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
+}
+
+void ConnectionImpl::onBufferHighWatermarkTimeout() {
+  ENVOY_CONN_LOG(debug, "buffer high watermark timeout reached", *this);
+  if (!socket_->isOpen()) {
+    return;
+  }
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
+}
+
+void ConnectionImpl::scheduleBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timeout_.count() == 0) {
+    return;
+  }
+
+  if (buffer_high_watermark_timer_ == nullptr) {
+    buffer_high_watermark_timer_ =
+        dispatcher_.createTimer([this]() -> void { onBufferHighWatermarkTimeout(); });
+  }
+
+  if (!buffer_high_watermark_timer_->enabled()) {
+    ENVOY_CONN_LOG(debug, "scheduling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_->enableTimer(buffer_high_watermark_timeout_);
+  }
+}
+
+void ConnectionImpl::maybeCancelBufferHighWatermarkTimeout() {
+  if (buffer_high_watermark_timer_ == nullptr || !buffer_high_watermark_timer_->enabled()) {
+    return;
+  }
+
+  if (!write_buffer_->highWatermarkTriggered() && !read_buffer_->highWatermarkTriggered()) {
+    ENVOY_CONN_LOG(debug, "cancelling buffer high watermark timeout", *this);
+    buffer_high_watermark_timer_->disableTimer();
+  }
 }
 
 Connection::State ConnectionImpl::state() const {
@@ -613,10 +662,28 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
+void ConnectionImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (timeout == buffer_high_watermark_timeout_) {
+    return;
+  }
+
+  buffer_high_watermark_timeout_ = timeout;
+
+  if (buffer_high_watermark_timer_ != nullptr && buffer_high_watermark_timer_->enabled()) {
+    buffer_high_watermark_timer_->disableTimer();
+  }
+
+  if (state() == State::Open &&
+      (write_buffer_->highWatermarkTriggered() || read_buffer_->highWatermarkTriggered())) {
+    scheduleBufferHighWatermarkTimeout();
+  }
+}
+
 void ConnectionImpl::onReadBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowReadBufferLowWatermark", *this);
   if (state() == State::Open) {
     readDisable(false);
+    maybeCancelBufferHighWatermarkTimeout();
   }
 }
 
@@ -624,6 +691,7 @@ void ConnectionImpl::onReadBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveReadBufferHighWatermark", *this);
   if (state() == State::Open) {
     readDisable(true);
+    scheduleBufferHighWatermarkTimeout();
   }
 }
 
@@ -631,6 +699,9 @@ void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
   ASSERT(write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = false;
+  if (state() == State::Open) {
+    maybeCancelBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onBelowWriteBufferLowWatermark();
@@ -642,6 +713,9 @@ void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!write_buffer_above_high_watermark_);
   write_buffer_above_high_watermark_ = true;
+  if (state() == State::Open) {
+    scheduleBufferHighWatermarkTimeout();
+  }
   for (ConnectionCallbacks* callback : callbacks_) {
     if (callback) {
       callback->onAboveWriteBufferHighWatermark();
@@ -1107,6 +1181,14 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+}
+
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // Ensure that connection is closed and the access log is written before the StreamInfo is
+  // destroyed. We need to write the access log here because the StreamInfo is owned by this class,
+  // and will be destroyed before the base class destructor runs.
+  close(ConnectionCloseType::NoFlush);
+  ensureAccessLogWritten();
 }
 
 void ClientConnectionImpl::connect() {

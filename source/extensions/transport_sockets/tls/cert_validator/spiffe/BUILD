@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     external_deps = ["ssl"],
     deps = [
+        "//envoy/router:string_accessor_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:assert_lib",
@@ -33,8 +34,8 @@ envoy_cc_extension(
         "//source/common/tls:stats_lib",
         "//source/common/tls:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
-        "@com_google_absl//absl/base",
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/hash",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

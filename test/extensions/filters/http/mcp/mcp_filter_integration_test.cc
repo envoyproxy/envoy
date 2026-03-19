@@ -436,6 +436,200 @@ TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test chunk-by-chunk request body parsing
+TEST_P(McpFilterIntegrationTest, ChunkByChunkBodyParsing) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string full_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json, text/event-stream"}});
+
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Send body in multiple chunks
+  // Chunk 1: partial JSON - just the opening and jsonrpc field
+  std::string chunk1 = R"({"jsonrpc":"2.0",)";
+  Buffer::OwnedImpl buffer1(chunk1);
+  encoder.encodeData(buffer1, false);
+
+  // Chunk 2: id field
+  std::string chunk2 = R"("id":1,)";
+  Buffer::OwnedImpl buffer2(chunk2);
+  encoder.encodeData(buffer2, false);
+
+  // Chunk 3: method field
+  std::string chunk3 = R"("method":"initialize",)";
+  Buffer::OwnedImpl buffer3(chunk3);
+  encoder.encodeData(buffer3, false);
+
+  // Chunk 4: params and closing (with end_stream)
+  std::string chunk4 = R"("params":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  Buffer::OwnedImpl buffer4(chunk4);
+  encoder.encodeData(buffer4, true);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(full_body, upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that tracing headers are correctly injected when enabled.
+TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      propagate_trace_context: {}
+      propagate_baggage: {}
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // SPELLCHECKER(off)
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  auto tp = upstream_request_->headers().get(Http::LowerCaseString("traceparent"));
+  ASSERT_FALSE(tp.empty());
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+            tp[0]->value().getStringView());
+
+  auto ts = upstream_request_->headers().get(Http::LowerCaseString("tracestate"));
+  ASSERT_FALSE(ts.empty());
+  // SPELLCHECKER(off)
+  EXPECT_EQ("rojo=00f067aa0ba902b7", ts[0]->value().getStringView());
+  // SPELLCHECKER(on)
+
+  auto baggage = upstream_request_->headers().get(Http::LowerCaseString("baggage"));
+  ASSERT_FALSE(baggage.empty());
+  EXPECT_EQ("userId=alice", baggage[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that tracing headers are NOT injected when disabled.
+TEST_P(McpFilterIntegrationTest, TracingHeadersDisabled) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // SPELLCHECKER(off)
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7",
+        "baggage": "userId=alice"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("tracestate")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("baggage")).empty());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that invalid tracing headers are NOT injected.
+TEST_P(McpFilterIntegrationTest, InvalidTracingHeadersNotInjected) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      propagate_trace_context: {}
+      propagate_baggage: {}
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "invalid",
+        "baggage": "invalid"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("traceparent")).empty());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("baggage")).empty());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

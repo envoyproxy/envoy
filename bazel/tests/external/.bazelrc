@@ -19,6 +19,7 @@ common --noenable_bzlmod
 build --workspace_status_command="bash get_workspace_status"
 build --incompatible_strict_action_env
 build --action_env=SPHINX_RUNNER_ARGS
+build --copt=-Wno-deprecated-declarations
 build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build --action_env=BUILD_DOCS_SHA
 build --jobs=HOST_CPUS*.8

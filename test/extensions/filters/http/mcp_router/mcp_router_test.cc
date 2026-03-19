@@ -1,6 +1,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/mcp_router/mcp_router.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -30,6 +31,8 @@ TEST(ParseMethodStringTest, AllMethods) {
   EXPECT_EQ(parseMethodString("resources/unsubscribe"), McpMethod::ResourcesUnsubscribe);
   EXPECT_EQ(parseMethodString("prompts/list"), McpMethod::PromptsList);
   EXPECT_EQ(parseMethodString("prompts/get"), McpMethod::PromptsGet);
+  EXPECT_EQ(parseMethodString("completion/complete"), McpMethod::CompletionComplete);
+  EXPECT_EQ(parseMethodString("logging/setLevel"), McpMethod::LoggingSetLevel);
   EXPECT_EQ(parseMethodString("ping"), McpMethod::Ping);
   // Notifications (client -> server only).
   EXPECT_EQ(parseMethodString("notifications/initialized"), McpMethod::NotificationInitialized);
@@ -43,6 +46,7 @@ TEST(ParseMethodStringTest, AllMethods) {
 class McpRouterConfigTest : public testing::Test {
 protected:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Stats::TestUtil::TestStore store_;
 };
 
 // Verifies multiple backends enable multiplexing mode and findBackend works.
@@ -59,7 +63,7 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -86,7 +90,7 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -101,11 +105,23 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
   EXPECT_EQ(backend->path, "/mcp");
+}
+
+// Verifies metadata namespace defaults to "envoy.filters.http.mcp" when not specified.
+TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
 class BackendStreamCallbacksTest : public testing::Test {};
@@ -283,7 +299,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -298,7 +314,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -317,7 +333,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -335,7 +351,7 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -355,7 +371,7 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfig config(proto_config, factory_context_);
+  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -372,7 +388,8 @@ protected:
 
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
-    return std::make_shared<McpRouterConfig>(proto_config, factory_context_);
+    return std::make_shared<McpRouterConfig>(proto_config, std::string("test."),
+                                             *store_.rootScope(), factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,
@@ -403,8 +420,9 @@ protected:
     (*current->mutable_fields())[path.back()].set_number_value(value);
   }
 
-  void setMcpMethodMetadata(const std::string& method, int64_t id = 1) {
-    auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())["mcp_proxy"];
+  void setMcpMethodMetadata(const std::string& method, int64_t id = 1,
+                            const std::string& metadata_namespace = "envoy.filters.http.mcp") {
+    auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())[metadata_namespace];
     (*mcp_metadata.mutable_fields())["method"].set_string_value(method);
     (*mcp_metadata.mutable_fields())["id"].set_number_value(static_cast<double>(id));
   }
@@ -414,6 +432,7 @@ protected:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
+  Stats::TestUtil::TestStore store_;
 };
 
 // Verifies subject extraction from dynamic metadata succeeds.

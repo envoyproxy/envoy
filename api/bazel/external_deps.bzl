@@ -86,31 +86,12 @@ def load_repository_locations(repository_locations_spec):
         if "sha256" not in location or len(location["sha256"]) == 0:
             _fail_missing_attribute("sha256", key)
 
-        if "project_name" not in location:
-            _fail_missing_attribute("project_name", key)
-
-        if "project_desc" not in location:
-            _fail_missing_attribute("project_desc", key)
-
-        if "project_url" not in location:
-            _fail_missing_attribute("project_url", key)
-        project_url = location["project_url"]
-        if not project_url.startswith("https://") and not project_url.startswith("http://"):
-            fail("project_url must start with https:// or http://: " + project_url)
-
         if "version" not in location:
             _fail_missing_attribute("version", key)
 
-        if "release_date" not in location:
-            _fail_missing_attribute("release_date", key)
-        release_date = location["release_date"]
-
-        # Starlark doesn't have regexes.
-        if len(release_date) != 10 or release_date[4] != "-" or release_date[7] != "-":
-            fail("release_date must match YYYY-DD-MM: " + release_date)
-
-        # Note: use_category, extensions, cpe, and other metadata fields are now in
-        # separate YAML files (bazel/deps.yaml and api/bazel/deps.yaml) and are
-        # validated in the merged JSON by downstream tools.
+        # Note: project_name, project_desc, project_url, release_date, use_category,
+        # extensions, cpe, and other metadata fields are now in separate YAML files
+        # (bazel/deps.yaml and api/bazel/deps.yaml) and are validated in the merged
+        # JSON by downstream tools.
 
     return locations

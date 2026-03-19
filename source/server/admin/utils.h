@@ -16,7 +16,14 @@ namespace Utility {
 // HistogramBucketsMode determines how histogram statistics get reported. Not
 // all modes are supported for all formats, with the "Unset" variant allowing
 // different formats to have different default behavior.
-enum class HistogramBucketsMode { Unset, Summary, Cumulative, Disjoint, Detailed };
+enum class HistogramBucketsMode {
+  Unset,
+  Summary,
+  Cumulative,
+  Disjoint,
+  Detailed,
+  PrometheusNative
+};
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 

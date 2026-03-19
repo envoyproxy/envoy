@@ -1,5 +1,7 @@
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
+
 #include "source/common/config/utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
@@ -16,7 +18,8 @@ constexpr double MAX_HITS_ADDEND = 1000000000;
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit)
-    : apply_on_stream_done_(config.apply_on_stream_done()) {
+    : apply_on_stream_done_(config.apply_on_stream_done()),
+      x_ratelimit_option_(config.x_ratelimit_option()) {
   if (config.has_hits_addend()) {
     if (!config.hits_addend().format().empty()) {
       // Ensure only format or number is set.
@@ -158,6 +161,10 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           action.query_parameter_value_match(), context, std::move(formatter_or_error.value())));
       break;
     }
+    case ProtoRateLimit::Action::ActionSpecifierCase::kRemoteAddressMatch:
+      actions_.emplace_back(
+          new Router::RemoteAddressMatchAction(action.remote_address_match(), context));
+      break;
     default:
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));
@@ -215,6 +222,8 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
     descriptor.hits_addend_ = hits_addend_.value();
   }
 
+  // Populate enable_x_rate_limit_headers.
+  descriptor.x_ratelimit_option_ = x_ratelimit_option_;
   descriptors.emplace_back(std::move(descriptor));
 }
 

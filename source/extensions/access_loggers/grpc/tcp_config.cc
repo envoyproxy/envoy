@@ -21,7 +21,7 @@ namespace TcpGrpc {
 AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::GenericFactoryContext& context,
-    std::vector<Formatter::CommandParserPtr>&&) {
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
@@ -30,7 +30,8 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
 
   return std::make_shared<TcpGrpcAccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
-      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()));
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()),
+      command_parsers);
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {

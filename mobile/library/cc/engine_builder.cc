@@ -24,6 +24,7 @@
 #include "source/common/http/matching/inputs.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -340,6 +341,13 @@ EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
   native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
+
+#if defined(__APPLE__)
+EngineBuilder& EngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
+  enable_network_change_monitor_ = network_change_monitor_on;
+  return *this;
+}
+#endif
 
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
@@ -1073,17 +1081,27 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   Protobuf::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   for (auto& guard_and_value : runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(absl::StrJoin(
+            {"envoy", "reloadable_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
   Protobuf::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
+    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(
+            absl::StrJoin({"envoy", "restart_features", guard_and_value.first}, ".")) == nullptr) {
+      // Not a registered runtime guard, skip it.
+      continue;
+    }
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   Protobuf::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -1149,6 +1167,10 @@ EngineSharedPtr EngineBuilder::build() {
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
   envoy_engine->run(options);
+
+  if (enable_network_change_monitor_) {
+    engine->initializeNetworkChangeMonitor();
+  }
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

@@ -1,4 +1,3 @@
-#include "ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
@@ -13,10 +12,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
@@ -40,6 +39,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Filters::Common::MutationRules::Checker;
+using Filters::Common::ProcessingEffect::Effect;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
@@ -75,6 +75,7 @@ constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_c
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
 constexpr absl::string_view FailedOpenField = "failed_open";
+constexpr absl::string_view ReceivedImmediateResponseField = "received_immediate_response";
 constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
 constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
 constexpr absl::string_view ResponseHeaderProcessingEffectField =
@@ -304,7 +305,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
-      status_on_error_(toErrorCode(config.status_on_error().code())) {
+      status_on_error_(toErrorCode(config.status_on_error().code())),
+      allow_content_length_header_(config.allow_content_length_header()) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -371,9 +373,8 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 }
 
 // Handles the potential cases on when to update the effect field.
-ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
-                                                ProcessingEffect::Effect new_effect) {
-  if (new_effect != ProcessingEffect::Effect::None) {
+Effect updateProcessingEffect(Effect current_effect, Effect new_effect) {
+  if (new_effect != Effect::None) {
     // Do nothing. Default value is None and we want to log the most recent effect that is not none.
     return new_effect;
   }
@@ -382,8 +383,7 @@ ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current
 
 void ExtProcLoggingInfo::recordProcessingEffect(
     ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction,
-    ProcessingEffect::Effect processing_effect) {
+    envoy::config::core::v3::TrafficDirection traffic_direction, Effect processing_effect) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
   switch (callback_state) {
   case ProcessorState::CallbackState::HeadersCallback:
@@ -476,6 +476,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
   (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
+  (*struct_msg->mutable_fields())[ReceivedImmediateResponseField].set_bool_value(
+      received_immediate_response_);
   (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
       static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
@@ -615,6 +617,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   }
   if (field_name == FailedOpenField) {
     return failed_open_;
+  }
+  if (field_name == ReceivedImmediateResponseField) {
+    return received_immediate_response_;
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
@@ -891,7 +896,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::HeadersCallback);
+                             ProcessorState::CallbackState::HeadersCallback, false);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -1420,7 +1425,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
 void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
+                             new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -1448,7 +1453,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
       callback_state = ProcessorState::CallbackState::TrailersCallback;
     }
     state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(), callback_state);
+                               config_->messageTimeout(), callback_state, false);
     ENVOY_STREAM_LOG(debug, "Sending trailers message", *decoder_callbacks_);
   }
   encodeProtocolConfig(req);
@@ -1865,6 +1870,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = handleStreamingImmediateResponse(response->streamed_immediate_response());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
+    logging_info_->setReceivedImmediateResponse();
     if (config_->disableImmediateResponse()) {
       ENVOY_STREAM_LOG(debug, "Filter has disable_immediate_response configured. ",
                        *decoder_callbacks_,
@@ -2072,7 +2078,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
-      ProcessingEffect::Effect imm_resp_effect = ProcessingEffect::Effect::None;
+      Effect imm_resp_effect = Effect::None;
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
           stats_.rejected_header_mutations_, imm_resp_effect);

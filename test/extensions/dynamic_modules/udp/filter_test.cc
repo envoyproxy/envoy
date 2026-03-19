@@ -1,5 +1,5 @@
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -166,7 +166,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithNoConfig) {
 
   auto config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
       proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
-  EXPECT_FALSE(config->filter_config_.empty());
+  EXPECT_TRUE(config->filter_config_.empty());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MultipleFiltersShareConfig) {
@@ -327,7 +327,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
       static_cast<void*>(filter_config_.get()),
       {const_cast<char*>("test_counter"), strlen("test_counter")}, &counter_id);
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
-  EXPECT_EQ(0, counter_id);
+  EXPECT_EQ(1, counter_id);
 
   // Increment the counter via the filter.
   result = envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
@@ -335,8 +335,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(
-      stats_, "dynamic_module_udp_listener_filter.test_filter.test_counter");
+  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_filter.test_counter");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(5, counter->value());
 }
@@ -368,8 +367,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsGaugeDefineAndOperations) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
 
   // Verify gauge value.
-  auto gauge =
-      TestUtility::findGauge(stats_, "dynamic_module_udp_listener_filter.test_filter.test_gauge");
+  auto gauge = TestUtility::findGauge(stats_, "dynamicmodulescustom.test_filter.test_gauge");
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(105, gauge->value());
 }

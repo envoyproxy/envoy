@@ -109,10 +109,14 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    }
   }
   void onBelowWriteBufferLowWatermark() override {
-    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    }
   }
 
   TimeSource& timeSource() { return time_source_; }
@@ -537,6 +541,7 @@ private:
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
+    bool noContextPropagation() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;

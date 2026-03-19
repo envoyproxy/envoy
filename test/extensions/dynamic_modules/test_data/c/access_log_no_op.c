@@ -1,13 +1,13 @@
 #include <assert.h>
 #include <string.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
 
 // This is a minimal implementation of an access logger module.
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 envoy_dynamic_module_type_access_logger_config_module_ptr

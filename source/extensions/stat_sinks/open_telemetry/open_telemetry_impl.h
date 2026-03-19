@@ -110,28 +110,23 @@ private:
   // Sets common fields for a data point.
   // For gauge metrics,
   // temporality should be AGGREGATION_TEMPORALITY_UNSPECIFIED.
-  // For the aggregation case, attributes should be nullptr as they have already been
-  // set.
   template <typename DataPoint>
   void setCommonDataPoint(
       DataPoint& data_point,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* attributes,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality) {
     data_point.set_time_unix_nano(snapshot_time_ns_);
-    if (attributes) {
-      // When attributes are present, set the start time for delta/cumulative metrics.
-      data_point.mutable_attributes()->CopyFrom(*attributes);
-      switch (temporality) {
-      case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
-        data_point.set_start_time_unix_nano(delta_start_time_ns_);
-        break;
-      case AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE:
-        data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
-        break;
-      default:
-        // Do not set start time for UNSPECIFIED.
-        break;
-      }
+    data_point.mutable_attributes()->CopyFrom(attributes);
+    switch (temporality) {
+    case AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA:
+      data_point.set_start_time_unix_nano(delta_start_time_ns_);
+      break;
+    case AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE:
+      data_point.set_start_time_unix_nano(cumulative_start_time_ns_);
+      break;
+    default:
+      // Do not set start time for UNSPECIFIED.
+      break;
     }
   }
 
@@ -249,15 +244,29 @@ private:
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
-class OpenTelemetryGrpcMetricsExporter : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
+/**
+ * Abstract base class for OTLP metrics exporters.
+ */
+class OtlpMetricsExporter {
 public:
-  ~OpenTelemetryGrpcMetricsExporter() override = default;
+  virtual ~OtlpMetricsExporter() = default;
 
   /**
-   * Send Metrics Message.
-   * @param message supplies the metrics to send.
+   * Send metrics to the configured OTLP service.
+   * @param metrics the OTLP metrics export request.
    */
   virtual void send(MetricsExportRequestPtr&& metrics) PURE;
+};
+
+using OtlpMetricsExporterSharedPtr = std::shared_ptr<OtlpMetricsExporter>;
+
+/**
+ * gRPC implementation of OtlpMetricsExporter.
+ */
+class OpenTelemetryGrpcMetricsExporter : public OtlpMetricsExporter,
+                                         public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
+public:
+  ~OpenTelemetryGrpcMetricsExporter() override = default;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -291,12 +300,14 @@ private:
 using OpenTelemetryGrpcMetricsExporterImplPtr =
     std::unique_ptr<OpenTelemetryGrpcMetricsExporterImpl>;
 
-class OpenTelemetryGrpcSink : public Stats::Sink {
+/**
+ * Stats sink that exports metrics via OTLP (gRPC or HTTP).
+ */
+class OpenTelemetrySink : public Stats::Sink {
 public:
-  OpenTelemetryGrpcSink(const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
-                        const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter,
-                        int64_t create_time_ns)
-      : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter),
+  OpenTelemetrySink(const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
+                    const OtlpMetricsExporterSharedPtr& metrics_exporter, int64_t create_time_ns)
+      : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(metrics_exporter),
         // Use the time when the sink is created as the last flush time for the first flush.
         last_flush_time_ns_(create_time_ns), proxy_start_time_ns_(create_time_ns) {}
 
@@ -314,7 +325,7 @@ public:
 
 private:
   const OtlpMetricsFlusherSharedPtr metrics_flusher_;
-  const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
+  const OtlpMetricsExporterSharedPtr metrics_exporter_;
   int64_t last_flush_time_ns_;
   int64_t proxy_start_time_ns_;
 };

@@ -1,3 +1,5 @@
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+
 #include "test/integration/filters/test_network_async_tcp_filter.pb.h"
 #include "test/integration/integration.h"
 
@@ -19,6 +21,7 @@ public:
           cluster_name: cluster_0
     )EOF")) {
     enableHalfClose(true);
+    access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   }
 
   void init(bool kill_after_on_data = false) {
@@ -37,10 +40,21 @@ public:
           auto* filter_chain = listener->mutable_filter_chains(0);
           auto* filter = filter_chain->mutable_filters(0);
           filter->mutable_typed_config()->PackFrom(proto_config);
+
+          auto* access_log = listener->add_access_log();
+          access_log->set_name("envoy.access_loggers.file");
+          envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+          access_log_config.set_path(access_log_path_);
+          access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+              "DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE% "
+              "US_CLOSE_TYPE=%UPSTREAM_DETECTED_CLOSE_TYPE%\n");
+          access_log->mutable_typed_config()->PackFrom(access_log_config);
         });
 
     BaseIntegrationTest::initialize();
   }
+
+  std::string access_log_path_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpAsyncClientIntegrationTest,
@@ -206,7 +220,9 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
-  ASSERT_TRUE(fake_upstream_connection->waitForRstDisconnect());
+  EXPECT_EQ(waitForAccessLog(access_log_path_, 0, true),
+            "DS_CLOSE_TYPE=RemoteReset US_CLOSE_TYPE=-");
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test if RST close can be detected from upstream.
@@ -237,6 +253,8 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
   test_server_->waitForNumHistogramSamplesGe("cluster.cluster_0.upstream_cx_length_ms", 1);
+  EXPECT_EQ(waitForAccessLog(access_log_path_, 0, true),
+            "DS_CLOSE_TYPE=LocalReset US_CLOSE_TYPE=-");
   tcp_client->waitForDisconnect();
 }
 

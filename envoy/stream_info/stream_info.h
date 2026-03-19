@@ -293,6 +293,7 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
+  const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -638,6 +639,27 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
+   * @param close_type the upstream detected close type.
+   */
+  virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return StreamInfo::DetectedCloseType the upstream detected close type.
+   */
+  virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
+
+  /**
+   * @param reason the upstream local close reason.
+   */
+  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
+
+  /**
+   * @return absl::string_view the upstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view upstreamLocalCloseReason() const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -666,6 +688,26 @@ public:
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+
+  /**
+   * Add a host to the list of upstream hosts that were attempted for this request.
+   * This is useful for tracking retry behavior in access logs.
+   * @param host the host description that was attempted.
+   */
+  virtual void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return the list of all upstream hosts that were attempted for this request,
+   * in the order they were attempted. This includes both successful and failed attempts.
+   */
+  virtual const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const PURE;
+
+  /**
+   * @return the list of all upstream connection IDs that were attempted for this request,
+   * in the order they were attempted. This helps identify connection reuse patterns.
+   */
+  virtual const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const PURE;
 };
 
 /**
@@ -1027,9 +1069,9 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
-   * @param failure_reason the downstream local close reason.
+   * @param reason the downstream local close reason.
    */
-  virtual void setDownstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
 
   /**
    * @return absl::string_view the downstream local close reason, if local close did not occur an

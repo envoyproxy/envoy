@@ -16,7 +16,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -78,17 +78,20 @@ public:
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name, bool evictable,
-                             const ScopeStatsLimitSettings& limits) override {
+                             const ScopeStatsLimitSettings& limits,
+                             StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->createScope(name, evictable, limits), store_);
+        lock_, wrapped_scope_->createScope(name, evictable, limits, std::move(matcher)), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
-                                   const ScopeStatsLimitSettings& limits) override {
+                                   const ScopeStatsLimitSettings& limits,
+                                   StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits), store_);
+        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, std::move(matcher)),
+        store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -211,10 +214,9 @@ private:
 };
 
 // A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
-class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+class NotifyingAllocator : public Stats::Allocator {
 public:
-  using Stats::AllocatorImpl::AllocatorImpl;
-
+  NotifyingAllocator(Stats::SymbolTable& symbol_table) : Stats::Allocator(symbol_table) {}
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
@@ -246,7 +248,7 @@ protected:
   Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                       const StatNameTagVector& stat_name_tags) override {
     Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        Stats::Allocator::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
       absl::MutexLock l(mutex_);
@@ -566,7 +568,7 @@ public:
   virtual Stats::Store& statStore() PURE;
   virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
-  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
+  virtual Stats::NotifyingAllocator& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -649,8 +651,8 @@ public:
 
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
-  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
-    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+  Stats::NotifyingAllocator& notifyingStatsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocator*>(stats_allocator_.get());
     RELEASE_ASSERT(ret != nullptr,
                    "notifyingStatsAllocator() is not created when real_stats is true");
     return *ret;
@@ -673,7 +675,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTableImpl symbol_table_;
-  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
+  std::unique_ptr<Stats::Allocator> stats_allocator_;
 };
 
 } // namespace Envoy

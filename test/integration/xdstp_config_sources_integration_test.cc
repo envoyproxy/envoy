@@ -35,7 +35,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, XdsTpConfigsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         XdsTpConfigsIntegrationTest::protocolTestParamsToString);
 
 // Validate that a bootstrap cluster that has an xds-tp based config EDS source
 // works.

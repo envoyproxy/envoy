@@ -3870,20 +3870,6 @@ TEST_F(Http1ClientConnectionImplTest,
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   dynamic_cast<Http1::ClientConnectionImpl*>(codec_.get())->dumpState(ostream, 0);
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
-
-  // TODO(paul-r-gall): re-enable. Balsa Parser does not invoke the `onHeaderField` and
-  //     `onHeaderValue` callbacks until all headers are received and parsed, so the
-  //     mid-headers dump methods do not dump useful information.
-  if (false) {
-    // Check for header map and partial headers.
-    EXPECT_THAT(
-        ostream.contents(),
-        testing::HasSubstr(
-            "absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n  'server', 'foo'\n"));
-    EXPECT_THAT(ostream.contents(),
-                testing::HasSubstr("header_parsing_state_: Value, current_header_field_: "
-                                   "Content-Length, current_header_value_: 8"));
-  }
 }
 
 TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
@@ -3921,13 +3907,6 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   // Check for body data.
   EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
                                             "Done"));
-  // TODO(paul-r-gall): re-enable or remove. Less sure about what's happening in this case.
-  if (false) {
-    EXPECT_THAT(
-        ostream.contents(),
-        testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
-                           "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
-  }
 }
 
 TEST_F(Http1ClientConnectionImplTest, ShouldDumpCorrespondingRequestWithoutAllocatingMemory) {

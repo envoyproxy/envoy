@@ -414,6 +414,24 @@ local_cluster_rate_limit: {}
                   .ok());
 }
 
+TEST(Factory, GlobalEmptyConfigWithServerContext) {
+  const std::string yaml = R"(
+stat_prefix: test
+  )";
+
+  LocalRateLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto callback =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

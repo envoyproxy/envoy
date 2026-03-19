@@ -58,11 +58,13 @@ envoy_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

@@ -131,20 +131,19 @@ ServerContextImpl::ServerContextImpl(
         });
   }
 
-  // The rest of the code assumes non-empty TLS certificates.
-  if (tls_certificates.empty()) {
-    return;
-  }
-
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can fail.
-  absl::StatusOr<SessionContextID> id_or_error =
-      generateHashForSessionContextId(config.serverNames());
-  SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
-  const SessionContextID& session_id = *id_or_error;
+  // TODO(kuat): TLS selectors do not support resumption, so session ID is not populated.
+  absl::optional<SessionContextID> session_id;
+  if (!tls_certificates.empty()) {
+    absl::StatusOr<SessionContextID> id_or_error =
+        generateHashForSessionContextId(config.serverNames());
+    SET_AND_RETURN_IF_NOT_OK(id_or_error.status(), creation_status);
+    session_id = *id_or_error;
+  }
 
-  for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
+  for (uint32_t i = 0; i < tls_contexts_.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
       SET_AND_RETURN_IF_NOT_OK(cert_validator_->addClientValidationContext(
@@ -194,32 +193,38 @@ ServerContextImpl::ServerContextImpl(
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));
     }
 
-    int rc =
-        SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id.data(), session_id.size());
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    if (session_id) {
+      int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id->data(),
+                                              session_id->size());
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
 
-    auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
-    if (ocsp_resp_bytes.empty()) {
-      if (ctx.is_must_staple_) {
-        creation_status =
-            absl::InvalidArgumentError("OCSP response is required for must-staple certificate");
-        return;
+    // tls_contexts_ is resized to be max(1, tls_certificates.size()) to it may be larger than
+    // the number of certificates.
+    if (i < tls_certificates.size()) {
+      auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
+      if (ocsp_resp_bytes.empty()) {
+        if (ctx.is_must_staple_) {
+          creation_status =
+              absl::InvalidArgumentError("OCSP response is required for must-staple certificate");
+          return;
+        }
+        if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
+          creation_status =
+              absl::InvalidArgumentError("Required OCSP response is missing from TLS context");
+          return;
+        }
+      } else {
+        auto response_or_error =
+            Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
+        SET_AND_RETURN_IF_NOT_OK(response_or_error.status(), creation_status);
+        if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
+          creation_status =
+              absl::InvalidArgumentError("OCSP response does not match its TLS certificate");
+          return;
+        }
+        ctx.ocsp_response_ = std::move(response_or_error.value());
       }
-      if (ocsp_staple_policy_ == Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple) {
-        creation_status =
-            absl::InvalidArgumentError("Required OCSP response is missing from TLS context");
-        return;
-      }
-    } else {
-      auto response_or_error =
-          Ocsp::OcspResponseWrapperImpl::create(ocsp_resp_bytes, factory_context_.timeSource());
-      SET_AND_RETURN_IF_NOT_OK(response_or_error.status(), creation_status);
-      if (!response_or_error.value()->matchesCertificate(*ctx.cert_chain_)) {
-        creation_status =
-            absl::InvalidArgumentError("OCSP response does not match its TLS certificate");
-        return;
-      }
-      ctx.ocsp_response_ = std::move(response_or_error.value());
     }
   }
 }
@@ -243,20 +248,21 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
     for (const auto& ctx : tls_contexts_) {
       X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
       RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
-      X509_NAME* cert_subject = X509_get_subject_name(cert);
+      const X509_NAME* cert_subject = X509_get_subject_name(cert);
       RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
 
       const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
       if (cn_index >= 0) {
-        X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
+        const X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
         RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
 
-        ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+        const ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
         if (ASN1_STRING_length(cn_asn1) <= 0) {
           return absl::InvalidArgumentError("Invalid TLS context has an empty subject CN");
         }
 
-        rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
+        rc =
+            EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(cn_asn1), ASN1_STRING_length(cn_asn1));
         RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
       }
 
@@ -273,13 +279,13 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
             ++san_count;
             break;
           case GEN_DNS:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.dNSName),
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.dNSName),
                                   ASN1_STRING_length(san->d.dNSName));
             RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
             ++san_count;
             break;
           case GEN_URI:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_data(san->d.uniformResourceIdentifier),
+            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.uniformResourceIdentifier),
                                   ASN1_STRING_length(san->d.uniformResourceIdentifier));
             RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
             ++san_count;

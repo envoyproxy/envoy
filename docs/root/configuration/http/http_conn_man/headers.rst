@@ -178,7 +178,7 @@ The following keys are supported:
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate. The current proxy's certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
-4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format.
+4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format. Note that this is not the validated chain; it is the original chain provided by the client which may include certificates not in the validated chain.
 5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
@@ -481,6 +481,46 @@ The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where th
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
 
+Inferring x-forwarded-proto from PROXY protocol destination port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that terminates TLS and
+forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
+original protocol for correct redirect behavior and routing decisions.
+
+The :ref:`forward_proto_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_proto_config>`
+configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
+When configured:
+
+1. If the connection's local address was restored from PROXY protocol (indicated by the
+   :ref:`proxy_protocol <config_listener_filters_proxy_protocol>` listener filter)
+2. And the destination port is in ``https_destination_ports``, ``x-forwarded-proto`` is set to ``https``
+3. Or if the destination port is in ``http_destination_ports``, ``x-forwarded-proto`` is set to ``http``
+
+If the port is not in either list or the address was not restored from PROXY protocol, the behavior
+falls back to using the current connection's TLS status.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  http_connection_manager:
+    forward_proto_config:
+      https_destination_ports: [443, 8443]
+      http_destination_ports: [80, 8080]
+
+This is particularly useful for the following deployment pattern:
+
+.. code-block:: text
+
+  Client (HTTPS:443) → L4 Load Balancer (TLS termination) → PROXY protocol → Envoy (HTTP)
+
+In this scenario, without this configuration, Envoy would set ``x-forwarded-proto: http`` because
+it sees an unencrypted connection. With ``https_destination_ports`` configured to include 443,
+Envoy correctly sets ``x-forwarded-proto: https`` based on the original destination port from the
+PROXY protocol header.
+
 .. _config_http_conn_man_headers_x-envoy-local-overloaded:
 
 x-envoy-local-overloaded
@@ -515,6 +555,39 @@ following features are available:
 
 See the architecture overview on
 :ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
+.. note::
+
+ Three configuration settings control ``x-request-id`` generation and preservation:
+
+ :ref:`generate_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
+  When ``true`` (the default), Envoy generates a new ``x-request-id`` for requests that
+  do not already have one. When ``false``, the entire request ID generation and mutation
+  logic is skipped. Disabling this can reduce overhead in high-throughput scenarios where
+  request ID tracking is not needed.
+
+ :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  When ``true``, Envoy uses the downstream connection's remote address to determine whether
+  a request is an *edge request* (i.e., from an external client). For edge requests, Envoy
+  replaces any existing ``x-request-id`` with a newly generated value by default. When
+  ``false`` (the default), requests are never treated as edge requests, so any existing
+  ``x-request-id`` is preserved.
+
+ :ref:`preserve_external_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.preserve_external_request_id>`
+  When ``true``, Envoy keeps an existing ``x-request-id`` on edge requests rather than
+  replacing it. This setting only has an effect when ``use_remote_address`` is ``true``,
+  since edge requests cannot occur otherwise.
+
+ The resulting behavior is:
+
+ * **No ``x-request-id`` in the request** -- Envoy generates a new UUID (if
+   ``generate_request_id`` is enabled).
+ * **``x-request-id`` present, non-edge request** (``use_remote_address`` is ``false``, or
+   the downstream address is internal) -- Envoy preserves the existing value.
+ * **``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``false``**
+   -- Envoy replaces the value with a new UUID.
+ * **``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``true``**
+   -- Envoy preserves the existing value.
 
 .. _config_http_conn_man_headers_x-ot-span-context:
 
