@@ -133,23 +133,23 @@ bool StatsRequest::nextChunk(Buffer::Instance& response) {
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
-      renderStat<Stats::TextReadoutSharedPtr>(iter->first, response, variant);
+      renderStat<Stats::TextReadout*>(iter->first, response, variant);
       stat_map_.erase(iter);
       ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Counter:
-      renderStat<Stats::CounterSharedPtr>(iter->first, response, variant);
+      renderStat<Stats::Counter*>(iter->first, response, variant);
       stat_map_.erase(iter);
       ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Gauge:
-      renderStat<Stats::GaugeSharedPtr>(iter->first, response, variant);
+      renderStat<Stats::Gauge*>(iter->first, response, variant);
       stat_map_.erase(iter);
       ++phase_stat_count_;
       break;
     case StatOrScopesIndex::Histogram: {
-      auto histogram = absl::get<Stats::HistogramSharedPtr>(variant);
-      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+      auto histogram = absl::get<Stats::Histogram*>(variant);
+      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram);
       if (parent_histogram != nullptr) {
         render_->generate(response, iter->first, *parent_histogram);
         ++phase_stat_count_;
@@ -196,8 +196,8 @@ void StatsRequest::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
 }
 
 template <class StatType> void StatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
-  Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
-    if (!params_.shouldShowMetricWithoutFilter(*stat)) {
+  Stats::IterateFn<StatType> check_stat = [this](StatType& stat) -> bool {
+    if (!params_.shouldShowMetricWithoutFilter(stat)) {
       return true;
     }
 
@@ -209,11 +209,11 @@ template <class StatType> void StatsRequest::populateStatsFromScopes(const Scope
     // This duplicates logic in shouldShowMetric in `StatsParams`, but
     // differs in that Prometheus only uses stat->name() for filtering, not
     // rendering, so it only grab the name if there's a filter.
-    std::string name = stat->name();
+    std::string name = stat.name();
     if (params_.re2_filter_ != nullptr && !re2::RE2::PartialMatch(name, *params_.re2_filter_)) {
       return true;
     }
-    stat_map_[name] = stat;
+    stat_map_[name] = &stat;
     return true;
   };
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {

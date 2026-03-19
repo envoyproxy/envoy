@@ -51,9 +51,8 @@ StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server
 
 Http::Code StatsHandler::handlerResetCounters(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                               AdminStream&) {
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    counter->reset();
-  }
+  Stats::StatFn<Stats::Counter> reset_fn = [](Stats::Counter& counter) { counter.reset(); };
+  server_.stats().forEachCounter(nullptr, reset_fn);
   server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
@@ -173,6 +172,7 @@ Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
+
   prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
                    params, request_headers, response_headers, response);
   return Http::Code::OK;
@@ -188,8 +188,13 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
+  std::vector<Stats::Counter*> counters;
+  std::vector<Stats::Gauge*> gauges;
+  std::vector<Stats::ParentHistogram*> histograms;
+  std::vector<Stats::TextReadout*> text_readouts;
+
   PrometheusStatsFormatter::statsAsPrometheus(
-      stats.counters(), stats.gauges(), stats.histograms(), text_readouts_vec, cluster_manager,
+      counters, gauges, histograms, text_readouts, cluster_manager,
       request_headers, response_headers, response, params, custom_namespaces);
 }
 

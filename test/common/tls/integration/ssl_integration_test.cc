@@ -144,7 +144,7 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   expected_counters["cluster.cluster_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256"].second = {
       {"cipher_suite", "ECDHE-RSA-AES128-GCM-SHA256"}};
 
-  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+  for (const Stats::CounterSharedPtr& counter : *TestUtility::counters(test_server_)) {
     // Useful for debugging when the test is failing.
     if (counter->name().find("ssl") != std::string::npos) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
@@ -982,7 +982,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientAllCurve
     return makeSslClientConnection(ecdsaAllCurvesClientOptions());
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+  for (const Stats::CounterSharedPtr& counter : *TestUtility::counters(test_server_)) {
     // Useful for debugging when the test is failing.
     if (counter->name().find("ssl") != std::string::npos) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());

@@ -124,7 +124,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
-  EXPECT_EQ(4UL, store_->counters().size());
+  EXPECT_EQ(4UL, TestUtility::counters(*store_).size());
   EXPECT_EQ(2UL, store_->gauges().size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
@@ -190,7 +190,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
-  EXPECT_EQ(4UL, store_->counters().size());
+  EXPECT_EQ(4UL, TestUtility::counters(*store_).size());
   EXPECT_EQ(2UL, store_->gauges().size());
   EXPECT_EQ(2UL, store_->textReadouts().size());
 }

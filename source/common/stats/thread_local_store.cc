@@ -150,13 +150,13 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
   return stats_matcher_->slowRejects(fast_reject_result, stat_name);
 }
 
-std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
+/*std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
   forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
                  [&ret](Counter& counter) { ret.emplace_back(CounterSharedPtr(&counter)); });
   return ret;
-}
+  }*/
 
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
                                                             const ScopeStatsLimitSettings& limits,

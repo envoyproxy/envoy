@@ -15,8 +15,8 @@ namespace Server {
 // Captures context for a streaming request, implementing the AdminHandler interface.
 class StatsRequest : public Admin::Request {
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
-  using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
-                                     Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
+  using StatOrScopes = absl::variant<ScopeVec, Stats::TextReadout*, Stats::Counter*,
+                                     Stats::Gauge*, Stats::Histogram*>;
 
   // Ordered to match the StatsOrScopes variant.
   enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };

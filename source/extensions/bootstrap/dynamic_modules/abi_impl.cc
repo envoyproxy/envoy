@@ -94,11 +94,14 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
   const absl::string_view name_view(name.ptr, name.length);
 
   // Use iterate() instead of forEachCounter() to enable early exit once the stat is found.
+  // TODO(jmarantz): consider converting to StatName by-name lookup instead of iterating
+  // over the entire store.
+  // Note that calling name() on the stat will take a lock on the symbol table anyway.
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Counter> counter_callback =
-      [&name_view, &found, value_ptr](const Envoy::Stats::CounterSharedPtr& counter) -> bool {
-    if (counter->name() == name_view) {
-      *value_ptr = counter->value();
+      [&name_view, &found, value_ptr](Envoy::Stats::Counter& counter) -> bool {
+    if (counter.name() == name_view) {
+      *value_ptr = counter.value();
       found = true;
       return false; // Stop iteration.
     }
@@ -118,9 +121,9 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
   // Use iterate() instead of forEachGauge() to enable early exit once the stat is found.
   bool found = false;
   Envoy::Stats::IterateFn<Envoy::Stats::Gauge> gauge_callback =
-      [&name_view, &found, value_ptr](const Envoy::Stats::GaugeSharedPtr& gauge) -> bool {
-    if (gauge->name() == name_view) {
-      *value_ptr = gauge->value();
+      [&name_view, &found, value_ptr](Envoy::Stats::Gauge& gauge) -> bool {
+    if (gauge.name() == name_view) {
+      *value_ptr = gauge.value();
       found = true;
       return false; // Stop iteration.
     }

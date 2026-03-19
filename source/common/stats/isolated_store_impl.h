@@ -40,7 +40,7 @@ public:
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   ScopeSharedPtr rootScope() override;
   ConstScopeSharedPtr constRootScope() const override;
-  std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
+  //std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override {
     // TODO(jmarantz): should we filter out gauges where
     // gauge.importMode() != Gauge::ImportMode::Uninitialized ?
@@ -255,7 +255,7 @@ private:
 
     bool iterate(const IterateFn<Base>& fn) const {
       for (auto& stat : stats_) {
-        if (!fn(stat.second)) {
+        if (!fn(*stat.second)) {
           return false;
         }
       }
@@ -432,8 +432,8 @@ private:
     if (!prefix_str.empty() && !absl::EndsWith(prefix_str, ".")) {
       prefix_str += ".";
     }
-    return [fn, prefix_str](const RefcountPtr<StatType>& stat) -> bool {
-      return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
+    return [fn, prefix_str](StatType& stat) -> bool {
+      return !absl::StartsWith(stat.name(), prefix_str) || fn(stat);
     };
   }
 

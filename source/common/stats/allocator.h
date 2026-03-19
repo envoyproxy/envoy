@@ -14,6 +14,8 @@
 namespace Envoy {
 namespace Stats {
 
+//using CounterSharedPtr = RefcountPtr<Counter>;
+
 /**
  * Helper class for Store to manage memory for statistics.
  */

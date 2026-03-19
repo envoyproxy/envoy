@@ -181,7 +181,7 @@ public:
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
-  std::vector<CounterSharedPtr> counters() const override;
+  //std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
@@ -333,7 +333,7 @@ private:
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
-        if (!fn(iter.second)) {
+        if (!fn(*iter.second)) {
           return false;
         }
       }

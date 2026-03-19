@@ -478,7 +478,7 @@ void Allocator::markCounterForDeletion(const CounterSharedPtr& counter) {
   ASSERT(counter.get() == *iter);
   // Duplicates are ASSERTed in ~Allocator. These might occur if there was
   // a race bug in reference counting, causing a stat to be double-deleted.
-  deleted_counters_.emplace_back(*iter);
+  deleted_counters_.emplace_back(counter);
   counters_.erase(iter);
   sinked_counters_.erase(counter.get());
 }
@@ -492,7 +492,7 @@ void Allocator::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
   }
   ASSERT(gauge.get() == *iter);
   // Duplicates are ASSERTed in ~Allocator.
-  deleted_gauges_.emplace_back(*iter);
+  deleted_gauges_.emplace_back(gauge);
   gauges_.erase(iter);
   sinked_gauges_.erase(gauge.get());
 }
@@ -506,7 +506,7 @@ void Allocator::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_read
   }
   ASSERT(text_readout.get() == *iter);
   // Duplicates are ASSERTed in ~Allocator.
-  deleted_text_readouts_.emplace_back(*iter);
+  deleted_text_readouts_.emplace_back(text_readout);
   text_readouts_.erase(iter);
   sinked_text_readouts_.erase(text_readout.get());
 }

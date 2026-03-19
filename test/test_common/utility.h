@@ -26,6 +26,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "test/test_common/file_system_for_test.h"
@@ -183,6 +184,8 @@ public:
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0, uint64_t n_slice = 1);
+
+  static std::vector<Stats::CounterSharedPtr> counters(Stats::Store& store);
 
   /**
    * Finds a stat in a vector with the given name.
