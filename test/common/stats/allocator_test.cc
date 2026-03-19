@@ -4,7 +4,7 @@
 
 #include "envoy/stats/sink.h"
 
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
@@ -18,10 +18,10 @@ namespace Envoy {
 namespace Stats {
 namespace {
 
-class AllocatorImplTest : public testing::Test {
+class AllocatorTest : public testing::Test {
 protected:
-  AllocatorImplTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
-  ~AllocatorImplTest() override { clearStorage(); }
+  AllocatorTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
+  ~AllocatorTest() override { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) { return {name, symbol_table_}; }
 
@@ -41,12 +41,12 @@ protected:
   // Declare the pool before the allocator because the allocator could contain
   // a TestSinkPredicates object whose lifetime should be bounded by that of the pool.
   StatNamePool pool_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   bool are_stats_marked_for_deletion_ = false;
 };
 
 // Allocate 2 counters of the same name, and you'll get the same object.
-TEST_F(AllocatorImplTest, CountersWithSameName) {
+TEST_F(AllocatorTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
   CounterSharedPtr c1 = alloc_.makeCounter(counter_name, StatName(), {});
   EXPECT_EQ(1, c1->use_count());
@@ -64,7 +64,7 @@ TEST_F(AllocatorImplTest, CountersWithSameName) {
   EXPECT_EQ(2, c2->value());
 }
 
-TEST_F(AllocatorImplTest, GaugesWithSameName) {
+TEST_F(AllocatorTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
   GaugeSharedPtr g1 = alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1, g1->use_count());
@@ -88,7 +88,7 @@ TEST_F(AllocatorImplTest, GaugesWithSameName) {
 // zero at the same time as we are allocating another instance of that
 // stat. This test reproduces that race organically by having a 12 threads each
 // iterate 10k times.
-TEST_F(AllocatorImplTest, RefCountDecAllocRaceOrganic) {
+TEST_F(AllocatorTest, RefCountDecAllocRaceOrganic) {
   StatName counter_name = makeStat("counter.name");
   StatName gauge_name = makeStat("gauge.name");
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
@@ -119,25 +119,25 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceOrganic) {
 // makeCounter() until the first thread finishes destructing the object. Thus
 // the test gives thread2 5 seconds to complete before releasing thread 1 to
 // complete its destruction of the counter.
-TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
+TEST_F(AllocatorTest, RefCountDecAllocRaceSynchronized) {
   StatName counter_name = makeStat("counter.name");
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   alloc_.sync().enable();
-  alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
+  alloc_.sync().waitOn(Allocator::DecrementToZeroSyncPoint);
   Thread::ThreadPtr thread = thread_factory.createThread([&]() {
     CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
     counter->inc();
     counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
   });
 
-  alloc_.sync().barrierOn(AllocatorImpl::DecrementToZeroSyncPoint);
+  alloc_.sync().barrierOn(Allocator::DecrementToZeroSyncPoint);
   EXPECT_TRUE(alloc_.isMutexLockedForTest());
-  alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
+  alloc_.sync().signal(Allocator::DecrementToZeroSyncPoint);
   thread->join();
   EXPECT_FALSE(alloc_.isMutexLockedForTest());
 }
 
-TEST_F(AllocatorImplTest, HiddenGauge) {
+TEST_F(AllocatorTest, HiddenGauge) {
   GaugeSharedPtr hidden_gauge =
       alloc_.makeGauge(makeStat("hidden"), StatName(), {}, Gauge::ImportMode::HiddenAccumulate);
   EXPECT_EQ(hidden_gauge->importMode(), Gauge::ImportMode::HiddenAccumulate);
@@ -154,7 +154,7 @@ TEST_F(AllocatorImplTest, HiddenGauge) {
   EXPECT_FALSE(never_import_hidden_gauge->hidden());
 }
 
-TEST_F(AllocatorImplTest, ForEachCounter) {
+TEST_F(AllocatorTest, ForEachCounter) {
   StatNameHashSet stat_names;
   std::vector<CounterSharedPtr> counters;
 
@@ -207,7 +207,7 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
   EXPECT_EQ(num_iterations, 0);
 }
 
-TEST_F(AllocatorImplTest, ForEachGauge) {
+TEST_F(AllocatorTest, ForEachGauge) {
   StatNameHashSet stat_names;
   std::vector<GaugeSharedPtr> gauges;
 
@@ -260,7 +260,7 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   EXPECT_EQ(num_iterations, 0);
 }
 
-TEST_F(AllocatorImplTest, ForEachTextReadout) {
+TEST_F(AllocatorTest, ForEachTextReadout) {
   StatNameHashSet stat_names;
   std::vector<TextReadoutSharedPtr> text_readouts;
 
@@ -316,7 +316,7 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
 
 // Verify that we don't crash if a nullptr is passed in for the size lambda for
 // the for each stat methods.
-TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
+TEST_F(AllocatorTest, ForEachWithNullSizeLambda) {
   std::vector<CounterSharedPtr> counters;
   std::vector<TextReadoutSharedPtr> text_readouts;
   std::vector<GaugeSharedPtr> gauges;
@@ -363,7 +363,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
 // Currently, if we ask for a stat from the Allocator that has already been
 // marked for deletion (i.e. rejected) we get a new stat with the same name.
 // This test documents this behavior.
-TEST_F(AllocatorImplTest, AskForDeletedStat) {
+TEST_F(AllocatorTest, AskForDeletedStat) {
   const size_t num_stats = 10;
   are_stats_marked_for_deletion_ = true;
 
@@ -431,7 +431,7 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   EXPECT_EQ(rejected_text_readout.value(), "deleted value");
 }
 
-TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
+TEST_F(AllocatorTest, ForEachSinkedCounter) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
@@ -477,7 +477,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
   EXPECT_EQ(num_iterations, 0);
 }
 
-TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
+TEST_F(AllocatorTest, ForEachSinkedGauge) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
@@ -522,7 +522,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   EXPECT_EQ(num_iterations, 0);
 }
 
-TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
+TEST_F(AllocatorTest, ForEachSinkedGaugeHidden) {
   GaugeSharedPtr unhidden_gauge;
   GaugeSharedPtr hidden_gauge;
 
@@ -547,7 +547,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHidden) {
   EXPECT_EQ(num_iterations, 1);
 }
 
-TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
+TEST_F(AllocatorTest, ForEachSinkedGaugeHiddenPredicate) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
@@ -581,7 +581,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGaugeHiddenPredicate) {
   EXPECT_EQ(num_iterations, 2);
 }
 
-TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
+TEST_F(AllocatorTest, ForEachSinkedTextReadout) {
   std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();

@@ -240,6 +240,8 @@ api_listener:
   EXPECT_ENVOY_BUG(connection.enableHalfClose(true), "Unexpected function call");
   EXPECT_ENVOY_BUG(connection.isHalfCloseEnabled(), "Unexpected function call");
   EXPECT_ENVOY_BUG(connection.addAccessLogHandler(nullptr), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.setBufferHighWatermarkTimeout(std::chrono::milliseconds(100)),
+                   "Unexpected function call");
 
   // Validate methods updated in SyntheticConnection.
   EXPECT_DEATH(connection.getSocket(), "not implemented");

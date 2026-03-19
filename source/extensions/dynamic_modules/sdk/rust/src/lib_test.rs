@@ -1,7 +1,7 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
-use std::sync::atomic::{AtomicBool, AtomicUsize}; // These are used for testing, not for actual concurrency.
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
 #[test]
 fn test_loggers() {
@@ -2472,6 +2472,20 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin
   false
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -3498,14 +3512,313 @@ fn test_lb_config_vec_metric_invalid_id() {
 }
 
 // =============================================================================
+// CatchUnwind Tests
+// =============================================================================
+
+static SEND_RESPONSE_STATUS_CODE: AtomicU32 = AtomicU32::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_send_response(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  status_code: u32,
+  _headers_vector: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_vector_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  SEND_RESPONSE_STATUS_CODE.store(status_code, std::sync::atomic::Ordering::SeqCst);
+}
+
+static RESET_STREAM_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_close(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+) {
+  NETWORK_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static LISTENER_CLOSE_SOCKET_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_close_socket(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  LISTENER_CLOSE_SOCKET_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_catch_unwind_http_filter_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  SEND_RESPONSE_STATUS_CODE.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+  assert_eq!(
+    SEND_RESPONSE_STATUS_CODE.load(std::sync::atomic::Ordering::SeqCst),
+    500,
+  );
+}
+
+#[test]
+fn test_catch_unwind_network_filter_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_read(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_read");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_read(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_filter_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_accept");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_accept(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_response_headers_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      panic!("intentional panic in on_response_headers");
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_response_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration,
+  );
+  assert!(RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_network_on_write_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_write(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_write");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_write(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_on_data_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_data");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_http_callout_done(
+      &mut wrapper,
+      &mut envoy_filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      None,
+      None,
+    );
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_http_callout_done should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+#[test]
+fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_scheduled should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+// =============================================================================
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _priority: u32,
   _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
   _weights: *const u32,
+  _regions: *const abi::envoy_dynamic_module_type_module_buffer,
+  _zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _sub_zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs_per_host: usize,
   _count: usize,
   _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
 ) -> bool {
@@ -3528,6 +3841,60 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _health_status: abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_find_host_by_address(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _index: usize,
+  _is_added: bool,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  _host: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  _details: *const std::ffi::c_char,
+  _details_length: usize,
+) {
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   _priority: u32,
@@ -3542,6 +3909,207 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
   _index: usize,
 ) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
   std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> abi::envoy_dynamic_module_type_host_health {
+  abi::envoy_dynamic_module_type_host_health::Unhealthy
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _address: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_host_health,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+) -> u32 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _stat: abi::envoy_dynamic_module_type_host_stat,
+) -> u64 {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _region: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _sub_zone: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_set_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_data(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _data: *mut usize,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut f64,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _index: usize,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut bool,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> usize {
+  0
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+  _host_index: usize,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  _priority: u32,
+  _locality_index: usize,
+) -> u32 {
+  0
 }
 
 #[no_mangle]
@@ -3720,6 +4288,19 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_get_downstrea
   _result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> bool {
   false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_http_callout(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  _callout_id_out: *mut u64,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _headers: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _timeout_milliseconds: u64,
+) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+  abi::envoy_dynamic_module_type_http_callout_init_result::CannotCreateRequest
 }
 
 // =============================================================================
@@ -4167,11 +4748,12 @@ fn test_cluster_lb_choose_host_with_context() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
       let ctx = context.expect("context should be Some");
       assert_eq!(ctx.get_host_selection_retry_count(), 3);
       assert_eq!(ctx.compute_hash_key(), Some(12345));
-      Some(0x1234 as *mut _)
+      cluster::HostSelectionResult::Selected(0x1234 as *mut _)
     }
   }
 
@@ -4181,10 +4763,14 @@ fn test_cluster_lb_choose_host_with_context() {
     .returning(|| 3);
   mock_ctx.expect_compute_hash_key().returning(|| Some(12345));
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+
   let mut lb = TestClusterLb;
-  let result = lb.choose_host(Some(&mock_ctx));
-  assert!(result.is_some());
-  assert_eq!(result.unwrap(), 0x1234 as *mut _);
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0x1234 as *mut _),
+    _ => panic!("Expected Selected"),
+  }
 }
 
 #[test]
@@ -4194,15 +4780,64 @@ fn test_cluster_lb_choose_host_without_context() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
       assert!(context.is_none());
-      None
+      cluster::HostSelectionResult::NoHost
     }
   }
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   let mut lb = TestClusterLb;
-  let result = lb.choose_host(None);
-  assert!(result.is_none());
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::NoHost => {},
+    _ => panic!("Expected NoHost"),
+  }
+}
+
+#[test]
+fn test_cluster_lb_choose_host_async_pending() {
+  struct TestAsyncHandle {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::AsyncHostSelectionHandle for TestAsyncHandle {
+    fn cancel(&mut self) {
+      self
+        .cancelled
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestAsyncLb {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+  }
+  impl cluster::ClusterLb for TestAsyncLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      cluster::HostSelectionResult::AsyncPending(Box::new(TestAsyncHandle {
+        cancelled: self.cancelled.clone(),
+      }))
+    }
+  }
+
+  let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+  let mut lb = TestAsyncLb {
+    cancelled: cancelled.clone(),
+  };
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::AsyncPending(mut handle) => {
+      assert!(!cancelled.load(std::sync::atomic::Ordering::SeqCst));
+      handle.cancel();
+      assert!(cancelled.load(std::sync::atomic::Ordering::SeqCst));
+    },
+    _ => panic!("Expected AsyncPending"),
+  }
 }
 
 #[test]
@@ -4212,23 +4847,36 @@ fn test_cluster_lb_context_full_workflow() {
     fn choose_host(
       &mut self,
       context: Option<&dyn cluster::ClusterLbContext>,
-    ) -> Option<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-      let ctx = context?;
+      _async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      let ctx = match context {
+        Some(c) => c,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
 
-      let sni = ctx.get_downstream_connection_sni()?;
+      let sni = match ctx.get_downstream_connection_sni() {
+        Some(s) => s,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(sni, "backend.example.com");
 
-      let (host_header, _) = ctx.get_downstream_header("host", 0)?;
+      let (host_header, _) = match ctx.get_downstream_header("host", 0) {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(host_header, "backend.example.com");
 
-      let hash = ctx.compute_hash_key()?;
+      let hash = match ctx.compute_hash_key() {
+        Some(h) => h,
+        None => return cluster::HostSelectionResult::NoHost,
+      };
       assert_eq!(hash, 99999);
 
       if ctx.should_select_another_host(0, 0) {
-        return None;
+        return cluster::HostSelectionResult::NoHost;
       }
 
-      Some(0xABCD as *mut _)
+      cluster::HostSelectionResult::Selected(0xABCD as *mut _)
     }
   }
 
@@ -4245,7 +4893,500 @@ fn test_cluster_lb_context_full_workflow() {
     .expect_should_select_another_host()
     .returning(|_, _| false);
 
+  let mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
   let mut lb = SniBasedLb;
-  let result = lb.choose_host(Some(&mock_ctx));
-  assert_eq!(result, Some(0xABCD as *mut _));
+  let result = lb.choose_host(Some(&mock_ctx), Box::new(mock_completion));
+  match result {
+    cluster::HostSelectionResult::Selected(host) => assert_eq!(host, 0xABCD as *mut _),
+    _ => panic!("Expected Selected"),
+  }
+}
+
+// =================================================================================================
+// Async Host Selection Tests
+// =================================================================================================
+
+#[test]
+fn test_async_host_selection_complete_with_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_some() && details == "resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(Some(0x1234 as *mut _), "resolved");
+}
+
+#[test]
+fn test_async_host_selection_complete_no_host() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details == "dns_failure")
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "dns_failure");
+}
+
+#[test]
+fn test_async_host_selection_complete_empty_details() {
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host.is_none() && details.is_empty())
+    .times(1)
+    .returning(|_, _| ());
+
+  mock_completion.async_host_selection_complete(None, "");
+}
+
+#[test]
+fn test_async_host_selection_with_stored_completion() {
+  struct DnsResolvingLb {
+    pending_completion: Option<Box<dyn cluster::EnvoyAsyncHostSelectionComplete>>,
+  }
+  impl cluster::ClusterLb for DnsResolvingLb {
+    fn choose_host(
+      &mut self,
+      _context: Option<&dyn cluster::ClusterLbContext>,
+      async_completion: Box<dyn cluster::EnvoyAsyncHostSelectionComplete>,
+    ) -> cluster::HostSelectionResult {
+      self.pending_completion = Some(async_completion);
+      struct NoOpHandle;
+      impl cluster::AsyncHostSelectionHandle for NoOpHandle {
+        fn cancel(&mut self) {}
+      }
+      cluster::HostSelectionResult::AsyncPending(Box::new(NoOpHandle))
+    }
+  }
+
+  let mut mock_completion = cluster::MockEnvoyAsyncHostSelectionComplete::new();
+  mock_completion
+    .expect_async_host_selection_complete()
+    .withf(|host, details| host == &Some(0xBEEF as *mut _) && details == "dns_resolved")
+    .times(1)
+    .returning(|_, _| ());
+
+  let mut lb = DnsResolvingLb {
+    pending_completion: None,
+  };
+  let result = lb.choose_host(None, Box::new(mock_completion));
+  assert!(matches!(
+    result,
+    cluster::HostSelectionResult::AsyncPending(_)
+  ));
+
+  // Simulate async DNS resolution completing.
+  let completion = lb.pending_completion.take().unwrap();
+  completion.async_host_selection_complete(Some(0xBEEF as *mut _), "dns_resolved");
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
+  static mut CLUSTER_NAME_RECEIVED: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_ADDED.store(true, Ordering::SeqCst);
+      unsafe {
+        CLUSTER_NAME_RECEIVED = cluster_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(CLUSTER_NAME_RECEIVED, "test_cluster");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static mut REMOVED_CLUSTER_NAME: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_cluster_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      cluster_name: &str,
+    ) {
+      CLUSTER_REMOVED.store(true, Ordering::SeqCst);
+      unsafe {
+        REMOVED_CLUSTER_NAME = cluster_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "removed_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  CLUSTER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(REMOVED_CLUSTER_NAME, "removed_cluster");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling cluster lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      cluster_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_ADDED: AtomicBool = AtomicBool::new(false);
+  static mut LISTENER_NAME_RECEIVED: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_ADDED.store(true, Ordering::SeqCst);
+      unsafe {
+        LISTENER_NAME_RECEIVED = listener_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_ADDED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(LISTENER_NAME_RECEIVED, "test_listener");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static mut REMOVED_LISTENER_NAME: String = String::new();
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_REMOVED.store(true, Ordering::SeqCst);
+      unsafe {
+        REMOVED_LISTENER_NAME = listener_name.to_string();
+      }
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "removed_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_REMOVED.load(Ordering::SeqCst));
+  unsafe {
+    assert_eq!(REMOVED_LISTENER_NAME, "removed_listener");
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  // Calling listener lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
 }
