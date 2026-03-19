@@ -917,6 +917,59 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 }
 
+// Stats created on-demand (e.g. upstream_rq_2xx) should be inherited by a new scope with the
+// same prefix, so that their values survive scope recreation during xDS updates.
+// See https://github.com/envoyproxy/envoy/issues/43984
+TEST_F(StatsThreadLocalStoreTest, OverlappingScopesInheritOnDemandCounters) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+
+  // Create on-demand stats.
+  scope1->counterFromString("on_demand_counter").add(42);
+  scope1->gaugeFromString("on_demand_gauge", Gauge::ImportMode::Accumulate).set(100);
+  Histogram& h1 = scope1->histogramFromString("on_demand_histogram", Histogram::Unit::Unspecified);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 7));
+  h1.recordValue(7);
+  scope1->textReadoutFromString("on_demand_text_readout").set("hello");
+  EXPECT_EQ(1UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->gauges().size());
+  EXPECT_EQ(1UL, store_->histograms().size());
+  EXPECT_EQ(1UL, store_->textReadouts().size());
+
+  // Create scope2 with the same prefix to simulate CDS update creating a new cluster with the same
+  // prefix.
+  ScopeSharedPtr scope2 = store_->createScope("scope1.");
+
+  // Destroy scope1 (simulates old cluster being torn down).
+  scope1.reset();
+
+  // The on-demand stats should be still there.
+  Counter& c = scope2->counterFromString("on_demand_counter");
+  EXPECT_EQ(42UL, c.value());
+
+  Gauge& g = scope2->gaugeFromString("on_demand_gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(100UL, g.value());
+
+  Histogram& h2 = scope2->histogramFromString("on_demand_histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(&h1, &h2);
+
+  TextReadout& t = scope2->textReadoutFromString("on_demand_text_readout");
+  EXPECT_EQ("hello", t.value());
+
+  // After scope2 is also destroyed, stats should be cleaned up.
+  scope2.reset();
+  EXPECT_EQ(0UL, store_->counters().size());
+  EXPECT_EQ(0UL, store_->gauges().size());
+  EXPECT_EQ(0UL, store_->histograms().size());
+  EXPECT_EQ(0UL, store_->textReadouts().size());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -1974,7 +2027,9 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
-  { ScopeSharedPtr scope1 = store.createScope("scope1."); }
+  {
+    ScopeSharedPtr scope1 = store.createScope("scope1.");
+  }
   tls.shutdownGlobalThreading();
   store.shutdownThreading();
   tls.shutdownThread();

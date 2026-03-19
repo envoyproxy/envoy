@@ -180,7 +180,28 @@ ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable
 }
 
 void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
+  ScopeImplSharedPtr superseded_scope;
   Thread::LockGuard lock(lock_);
+
+  // Inherit stats from any existing scope with the same prefix. This will ensure that counters
+  // created on-demand (e.g. upstream_rq_2xx) survive scope recreation during xDS updates.
+  // See https://github.com/envoyproxy/envoy/issues/43984
+  for (auto& [_, weak] : scopes_) {
+    if (auto existing = weak.lock()) {
+      if (existing->prefix() == new_scope->prefix()) {
+        const auto& src = existing->centralCacheNoThreadAnalysis();
+        const auto& dst = new_scope->centralCacheNoThreadAnalysis();
+        dst->counters_.insert(src->counters_.begin(), src->counters_.end());
+        dst->gauges_.insert(src->gauges_.begin(), src->gauges_.end());
+        dst->histograms_.insert(src->histograms_.begin(), src->histograms_.end());
+        dst->text_readouts_.insert(src->text_readouts_.begin(), src->text_readouts_.end());
+        // Keep old scope alive to prevent deadlock during destruction with lock held.
+        superseded_scope = std::move(existing);
+        break;
+      }
+    }
+  }
+
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
 }
 
