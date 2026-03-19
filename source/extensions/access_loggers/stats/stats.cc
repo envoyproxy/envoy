@@ -75,9 +75,7 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  // We hold a shared_ptr to the parent StatsAccessLog to reduce overhead by managing fewer
-  // shared_ptrs (passing 1 instead of 2 separate shared pointers for scope and stat_name_pool).
-  // This ensures the parent and its members exist for the lifetime of AccessLogState.
+  // Hold a shared_ptr to the parent to ensure the parent and its members exist for the lifetime of AccessLogState.
   std::shared_ptr<const StatsAccessLog> parent_;
   Stats::Scope& scope_;
 
