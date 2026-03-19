@@ -73,6 +73,21 @@ Since these modules run in the same process as Envoy, they can access all memory
 This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
 It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.
 
+Error handling (Rust SDK)
+--------------------------
+The Rust SDK provides an optional ``CatchUnwind`` wrapper that can be used to wrap
+filter implementations. When a wrapped callback panics, the SDK logs the panic payload
+and returns a fail-closed default:
+
+* HTTP request-path callbacks send a 500 response and return ``StopIteration``.
+* HTTP response-path callbacks reset the stream and return ``StopIteration``.
+* Network filter callbacks close the connection and return ``StopIteration``.
+* Listener filter callbacks close the socket and return ``StopIteration``.
+
+When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
+from aborting the entire Envoy process. The affected request or connection is
+terminated; other traffic is unaffected.
+
 Getting started
 --------------------------
 

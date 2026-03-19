@@ -261,8 +261,11 @@ private:
       parent_.connection_state_ = ConnectionState::ConnectingToPrimary;
       // Next attempt will be to the primary, set the value that
       // determines whether to set initial_resource_versions or not.
-      parent_.grpc_mux_callbacks_.onEstablishmentFailure(parent_.previously_connected_to_ ==
-                                                         ConnectedTo::Primary);
+      const bool next_attempt_may_send_initial_resource_version =
+          parent_.previously_connected_to_ == ConnectedTo::Primary ||
+          parent_.previously_connected_to_ == ConnectedTo::None;
+      parent_.grpc_mux_callbacks_.onEstablishmentFailure(
+          next_attempt_may_send_initial_resource_version);
     }
 
     void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
@@ -339,8 +342,11 @@ private:
       parent_.failover_grpc_stream_->closeStream();
       // Next attempt will be to the primary, set the value that
       // determines whether to set initial_resource_versions or not.
-      parent_.grpc_mux_callbacks_.onEstablishmentFailure(parent_.previously_connected_to_ ==
-                                                         ConnectedTo::Primary);
+      const bool next_attempt_may_send_initial_resource_version =
+          parent_.previously_connected_to_ == ConnectedTo::Primary ||
+          parent_.previously_connected_to_ == ConnectedTo::None;
+      parent_.grpc_mux_callbacks_.onEstablishmentFailure(
+          next_attempt_may_send_initial_resource_version);
       // Setting the connection state to None, and when the retry timer will
       // expire, Envoy will try to connect to the primary source.
       parent_.connection_state_ = ConnectionState::None;

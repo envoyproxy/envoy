@@ -1,6 +1,6 @@
 #include "envoy/stats/sink.h"
 
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 

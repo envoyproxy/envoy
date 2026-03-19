@@ -33,10 +33,21 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
     proxy_info.emplace("", address_or_error.value());
   }
 
-  auto& inner_config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
-  ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
-      outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
+  auto& inner_config_factory =
+      outer_config.has_transport_socket()
+          ? Config::Utility::getAndCheckFactory<
+                Server::Configuration::UpstreamTransportSocketConfigFactory>(
+                outer_config.transport_socket())
+          : Config::Utility::getAndCheckFactoryByName<
+                Server::Configuration::UpstreamTransportSocketConfigFactory>(
+                "envoy.transport_sockets.raw_buffer");
+  ProtobufTypes::MessagePtr inner_factory_config =
+      outer_config.has_transport_socket()
+          ? Config::Utility::translateToFactoryConfig(outer_config.transport_socket(),
+                                                      context.messageValidationVisitor(),
+                                                      inner_config_factory)
+          : inner_config_factory.createEmptyConfigProto();
+
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
