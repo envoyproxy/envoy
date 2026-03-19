@@ -79,5 +79,15 @@ INSTANTIATE_TEST_SUITE_P(GetAndSetTests, BitArrayTest,
 
 TEST_P(BitArrayTest, CanSetAndGetAllBits) { populateBitArrayAndCheckValuesStoredCorrectly(); }
 
+TEST_P(BitArrayTest, SetOutOfBounds) {
+  BitArray bit_array(bit_width_, num_items_);
+  EXPECT_DEATH(bit_array.set(num_items_, 0), "");
+}
+
+TEST_P(BitArrayTest, GetOutOfBounds) {
+  BitArray bit_array(bit_width_, num_items_);
+  EXPECT_DEATH(bit_array.get(num_items_), "");
+}
+
 } // namespace
 } // namespace Envoy
