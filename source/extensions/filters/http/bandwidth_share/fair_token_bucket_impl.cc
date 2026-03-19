@@ -11,8 +11,6 @@ namespace HttpFilters {
 namespace BandwidthShareFilter {
 namespace FairTokenBucket {
 
-const char Factory::ConsumeSyncPoint[] = "consume";
-
 Factory::Factory(uint64_t max_tokens, TimeSource& time_source,
                  std::chrono::milliseconds spill_frequency, double fill_rate)
     : impl_(max_tokens, time_source, fill_rate), time_source_(time_source),
@@ -199,7 +197,6 @@ void Tenant::addToQueue(std::shared_ptr<Request> request) {
 
 uint64_t Request::consume(uint64_t want_tokens) {
   Thread::LockGuard lock(tenant_->parent_->mutex_);
-  tenant_->parent_->synchronizer_.syncPoint(Factory::ConsumeSyncPoint);
   tenant_->parent_->spill();
   uint64_t got = 0;
   if (held_tokens_) {

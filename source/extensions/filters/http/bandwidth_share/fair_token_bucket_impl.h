@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "source/common/common/thread.h"
-#include "source/common/common/thread_synchronizer.h"
 #include "source/common/common/token_bucket_impl.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -60,7 +59,6 @@ class Tenant;
  */
 class Factory : public std::enable_shared_from_this<Factory> {
 public:
-  static const char ConsumeSyncPoint[];
   /**
    * @param max_tokens supplies the maximum number of tokens in the bucket.
    * @param time_source supplies the time source.
@@ -97,7 +95,6 @@ private:
   // i.e. it is scoped with the same lifetime.
   absl::flat_hash_map<absl::string_view, std::weak_ptr<Tenant>>
       active_tenants_ ABSL_GUARDED_BY(tenants_mutex_);
-  mutable Thread::ThreadSynchronizer synchronizer_; // Used only for testing.
   friend class FactoryTest;
   friend class Request;
   friend class Tenant;

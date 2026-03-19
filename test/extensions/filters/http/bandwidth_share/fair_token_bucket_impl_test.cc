@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace BandwidthShareFilter {
 namespace FairTokenBucket {
 
-class FactoryTest : public testing::Test {
+class ClientTest : public testing::Test {
 protected:
   bool isMutexLocked(Factory& factory) {
     auto locked = factory.mutex_.tryLock();
@@ -28,28 +28,28 @@ protected:
   std::shared_ptr<Factory> factory_ = Factory::create(1000, time_system_);
 };
 
-TEST_F(FactoryTest, NotImplementedConsumeWithTimeToNextToken) {
+TEST_F(ClientTest, NotImplementedConsumeWithTimeToNextToken) {
   Client client(*factory_, "foo", 1);
   std::chrono::milliseconds unused_out;
   EXPECT_ENVOY_BUG(client.consume(750, true, unused_out), "not expected");
 }
 
-TEST_F(FactoryTest, NotImplementedConsumeWithAllowPartialFalse) {
+TEST_F(ClientTest, NotImplementedConsumeWithAllowPartialFalse) {
   Client client(*factory_, "foo", 1);
   EXPECT_ENVOY_BUG(client.consume(750, false), "not expected");
 }
 
-TEST_F(FactoryTest, NotImplementedNextTokenAvailable) {
+TEST_F(ClientTest, NotImplementedNextTokenAvailable) {
   Client client(*factory_, "foo", 1);
   EXPECT_ENVOY_BUG(client.nextTokenAvailable(), "not expected");
 }
 
-TEST_F(FactoryTest, MaybeResetDoesNothingAndThisTestJustProvidesCoverage) {
+TEST_F(ClientTest, MaybeResetDoesNothingAndThisTestJustProvidesCoverage) {
   Client client(*factory_, "foo", 1);
   client.maybeReset(12345);
 }
 
-TEST_F(FactoryTest, InitializationAndTimeBothFillTheBucket) {
+TEST_F(ClientTest, InitializationAndTimeBothFillTheBucket) {
   Client client(*factory_, "foo", 1);
   EXPECT_EQ(750, client.consume(750));
   EXPECT_EQ(250, client.consume(750));
@@ -58,7 +58,7 @@ TEST_F(FactoryTest, InitializationAndTimeBothFillTheBucket) {
   EXPECT_EQ(500, client.consume(500));
 }
 
-TEST_F(FactoryTest, CompetingRequestsGetAppropriateShares) {
+TEST_F(ClientTest, CompetingRequestsGetAppropriateShares) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 2);
   Client client2(*factory_, "foo", 2);
@@ -79,7 +79,7 @@ TEST_F(FactoryTest, CompetingRequestsGetAppropriateShares) {
   EXPECT_EQ(800, client3.consume(1000));
 }
 
-TEST_F(FactoryTest, DeletingARequestCancelsItsShare) {
+TEST_F(ClientTest, DeletingARequestCancelsItsShare) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 2);
   Client client2(*factory_, "foo", 2);
@@ -99,7 +99,7 @@ TEST_F(FactoryTest, DeletingARequestCancelsItsShare) {
   EXPECT_EQ(500, client2.consume(1000));
 }
 
-TEST_F(FactoryTest, PoorlyDividedSplitsStillEmptyTheBucket) {
+TEST_F(ClientTest, PoorlyDividedSplitsStillEmptyTheBucket) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   Client client2(*factory_, "bar", 73);
@@ -120,7 +120,7 @@ TEST_F(FactoryTest, PoorlyDividedSplitsStillEmptyTheBucket) {
   EXPECT_EQ(bar_fraction, client2.consume(1000));
 }
 
-TEST_F(FactoryTest, PoorlyDividedSplitsWithinATenantStillEmptiesTheBucket) {
+TEST_F(ClientTest, PoorlyDividedSplitsWithinATenantStillEmptiesTheBucket) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   Client client2(*factory_, "foo", 1);
@@ -141,7 +141,7 @@ TEST_F(FactoryTest, PoorlyDividedSplitsWithinATenantStillEmptiesTheBucket) {
   EXPECT_EQ(333, client3.consume(1000));
 }
 
-TEST_F(FactoryTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
+TEST_F(ClientTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   Client client2(*factory_, "foo", 1);
@@ -166,7 +166,7 @@ TEST_F(FactoryTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
   EXPECT_EQ(300, client3.consume(300));
 }
 
-TEST_F(FactoryTest, PoorlyDividedSplitsCanBeSubdivided) {
+TEST_F(ClientTest, PoorlyDividedSplitsCanBeSubdivided) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   Client client2(*factory_, "foo2", 1);
@@ -192,7 +192,7 @@ TEST_F(FactoryTest, PoorlyDividedSplitsCanBeSubdivided) {
   EXPECT_EQ(bar_fraction, client3.consume(1000));
 }
 
-TEST_F(FactoryTest, UnclaimedSharesCanStackUp) {
+TEST_F(ClientTest, UnclaimedSharesCanStackUp) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   // Empty the bucket and queue up another 4000 for baz.
@@ -213,7 +213,7 @@ TEST_F(FactoryTest, UnclaimedSharesCanStackUp) {
   EXPECT_EQ(2998, client0.consume(4000));
 }
 
-TEST_F(FactoryTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherRequestsOrTenants) {
+TEST_F(ClientTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherRequestsOrTenants) {
   Client client0(*factory_, "baz", 1);
   Client client1(*factory_, "foo", 1);
   Client client2(*factory_, "foo", 1);
@@ -236,10 +236,36 @@ TEST_F(FactoryTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherRequ
   uint64_t bar_gets = client3.consume(1000);
   // Combined they should get all the tokens.
   EXPECT_EQ(1000, foo_gets + foo2_gets + bar_gets);
-  // Both foos should be fully satisfied, and bar should have 600.
+  // Both `foo` should be fully satisfied, and `bar` should have 600.
   EXPECT_EQ(100, foo_gets);
   EXPECT_EQ(300, foo2_gets);
   EXPECT_EQ(600, bar_gets);
+}
+
+TEST_F(ClientTest, ThreadsOperateAsExpected) {
+  Thread::MutexBasicLockable mu;
+  uint64_t total_consumed ABSL_GUARDED_BY(mu) = 0;
+  struct {
+    std::thread thread;
+    uint64_t consumed ABSL_GUARDED_BY(mu) = 0;
+    Client client{*factory_, "foo", 1},
+  } threads[10];
+  for (size_t i = 0; i < 10; i++) {
+    threads[index].thread = std::thread([i, &] {
+      while (true) {
+        uint64_t got = client.consume(1000);
+        {
+          Thread::LockGuard lock(mu);
+          threads[index].consumed += got;
+          total_consumed += got;
+          if (total_consumed >= 100000) {
+            break;
+          }
+        }
+        std::this_thread::yield();
+      }
+    });
+  }
 }
 
 } // namespace FairTokenBucket
