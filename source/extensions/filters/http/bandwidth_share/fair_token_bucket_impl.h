@@ -116,7 +116,6 @@ public:
   void addToQueue(std::shared_ptr<Request> request) ABSL_EXCLUSIVE_LOCKS_REQUIRED(&Factory::mutex_);
   void removeFromQueue(std::shared_ptr<Request> request)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(&Factory::mutex_);
-  void preDestroy();
   ~Tenant();
 
 private:

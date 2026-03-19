@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
+#include <algorithm>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 
@@ -35,13 +37,14 @@ std::shared_ptr<Tenant> Factory::getTenant(absl::string_view tenant_name, uint64
     Thread::LockGuard lock(tenants_mutex_);
     auto it = active_tenants_.find(tenant_name);
     if (it == active_tenants_.end() || (tenant = it->second.lock()) == nullptr) {
-      tenant = std::make_shared<Tenant>(tenant_name, shared_from_this(), 1);
+      tenant = std::make_shared<Tenant>(tenant_name, shared_from_this(), weight);
       if (it != active_tenants_.end()) {
         // Replace the entry rather than update in-place so the key always points
         // to the current live Tenant::name_.
         active_tenants_.erase(it);
       }
       active_tenants_.emplace(tenant->name_, tenant);
+      return tenant;
     }
   }
   {
@@ -182,17 +185,17 @@ void Factory::spill() {
   }
 }
 
-void Factory::addToQueue(std::shared_ptr<Tenant> weak_tenant) {
-  waiting_tenants_.push_back(std::move(weak_tenant));
+void Factory::addToQueue(std::shared_ptr<Tenant> tenant) {
+  waiting_tenants_.push_back(std::move(tenant));
 }
 
-void Tenant::addToQueue(std::shared_ptr<Request> weak_request) {
+void Tenant::addToQueue(std::shared_ptr<Request> request) {
   if (waiting_requests_.empty()) {
     // This is the first request on this tenant, so add the tenant to the
     // parent queue.
     parent_->addToQueue(shared_from_this());
   }
-  waiting_requests_.push_back(std::move(weak_request));
+  waiting_requests_.push_back(std::move(request));
 }
 
 uint64_t Request::consume(uint64_t want_tokens) {
