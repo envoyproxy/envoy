@@ -22,6 +22,13 @@ namespace {
 absl::Mutex function_registry_mutex;
 absl::flat_hash_map<std::string, void*> function_registry ABSL_GUARDED_BY(function_registry_mutex);
 
+// Process-wide shared data registry. Modules register opaque data pointers by name during
+// bootstrap, and other modules resolve them by name during configuration creation. Unlike the
+// function registry, this allows overwriting existing entries.
+absl::Mutex shared_data_registry_mutex;
+absl::flat_hash_map<std::string, void*>
+    shared_data_registry ABSL_GUARDED_BY(shared_data_registry_mutex);
+
 } // namespace
 
 extern "C" {
@@ -87,6 +94,31 @@ bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module
   auto it = function_registry.find(key_str);
   if (it != function_registry.end()) {
     *function_ptr_out = it->second;
+    return true;
+  }
+  return false;
+}
+
+// ---------------------- Shared data registry callbacks --------------------------------
+
+bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                        void* data_ptr) {
+  if (data_ptr == nullptr) {
+    return false;
+  }
+  std::string key_str(key.ptr, key.length);
+  absl::WriterMutexLock lock(shared_data_registry_mutex);
+  shared_data_registry[key_str] = data_ptr;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                   void** data_ptr_out) {
+  std::string key_str(key.ptr, key.length);
+  absl::ReaderMutexLock lock(shared_data_registry_mutex);
+  auto it = shared_data_registry.find(key_str);
+  if (it != shared_data_registry.end()) {
+    *data_ptr_out = it->second;
     return true;
   }
   return false;
@@ -359,6 +391,14 @@ __attribute__((weak)) bool
 envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle: "
                "not implemented in this context");
   return false;
 }
@@ -2884,6 +2924,93 @@ envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
   IS_ENVOY_BUG("envoy_dynamic_module_callback_udp_listener_filter_set_gauge: not implemented in "
                "this context");
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// ---------------------- Upstream HTTP TCP Bridge callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the upstream bridge abi_impl.cc when the upstream bridge extension is used.
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size: "
+               "not implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_module_http_header*, size_t,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_module_http_header*, size_t, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header*, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers: "
+               "not implemented in this context");
 }
 
 __attribute__((weak)) bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(

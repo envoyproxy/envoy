@@ -92,6 +92,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register, retrieve, and overwrite
+// shared data via the process-wide shared data registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SharedDataRegistryRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap shared data registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_data_test"));
+}
+
 // This test verifies that Envoy automatically registers an init target for every bootstrap
 // extension and that the module can signal readiness to unblock startup.
 TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {
@@ -142,6 +150,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
       Envoy::ExpectedLogMessages({{"info", "Bootstrap cluster lifecycle test: server initialized"},
                                   {"info", "Cluster lifecycle enabled: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
+}
+
+// This test verifies that the Rust bootstrap extension can receive listener lifecycle events
+// (add/update and removal) via the ListenerUpdateCallbacks mechanism.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Bootstrap listener lifecycle test: server initialized"},
+                                  {"info", "Listener lifecycle enabled: true"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide
