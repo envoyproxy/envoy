@@ -185,6 +185,25 @@ bool hasWildcard(absl::string_view path) {
   return path.find('*') != std::string::npos || path.find('?') != std::string::npos;
 }
 
+bool isWithinDirectory(absl::string_view path, absl::string_view directory) {
+  std::filesystem::path normalized_directory =
+      std::filesystem::path{std::string(directory)}.lexically_normal();
+  std::filesystem::path normalized_path = std::filesystem::path{std::string(path)}.lexically_normal();
+
+  if (normalized_directory.empty()) {
+    normalized_directory = std::filesystem::path(".");
+  }
+  if (normalized_path.is_absolute() != normalized_directory.is_absolute()) {
+    return false;
+  }
+  const std::filesystem::path relative_path = normalized_path.lexically_relative(normalized_directory);
+  if (relative_path.empty()) {
+    return normalized_path == normalized_directory;
+  }
+  const auto relative_begin = relative_path.begin();
+  return relative_begin == relative_path.end() || *relative_begin != "..";
+}
+
 absl::StatusOr<std::vector<std::string>>
 expandIncludePath(const std::string& include_path, const std::string& including_file_path,
                   Api::Api& api) {
@@ -194,6 +213,12 @@ expandIncludePath(const std::string& include_path, const std::string& including_
   const std::string resolved_path = isAbsolutePath(include_path)
                                         ? normalizePath(include_path)
                                         : joinPath(include_base_directory, include_path);
+
+  if (!isWithinDirectory(resolved_path, include_base_directory)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Include path \"", include_path, "\" resolves outside base directory \"",
+                     include_base_directory, "\""));
+  }
 
   if (hasWildcard(resolved_path)) {
     const std::filesystem::path resolved_fs_path(resolved_path);

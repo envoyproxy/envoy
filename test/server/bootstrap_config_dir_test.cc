@@ -208,6 +208,121 @@ include: ./a.yaml
   TestEnvironment::removePath(config_root);
 }
 
+TEST(BootstrapConfigDirectoryTest, IncludeNestedPathWithinBaseDirectoryIsAllowed) {
+  Api::ApiPtr api = Api::createApiForTest();
+
+  const std::string config_root =
+      TestEnvironment::temporaryPath("bootstrap_config_include_nested_path");
+  TestEnvironment::removePath(config_root);
+  TestEnvironment::createPath(config_root);
+  TestEnvironment::createPath(absl::StrCat(config_root, "/includes"));
+
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/includes/cluster.yaml"),
+                                            R"EOF(
+static_resources:
+  clusters:
+  - name: nested-cluster
+    type: STATIC
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: nested-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
+)EOF",
+                                            /*fully_qualified_path=*/true);
+
+  const std::string config_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/bootstrap.yaml"),
+                                                R"EOF(
+include: includes/cluster.yaml
+node:
+  id: nested-id
+  cluster: nested-cluster
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                                                /*fully_qualified_path=*/true);
+
+  OptionsImplBase options;
+  options.setConfigPath(config_path);
+  options.setLocalAddressIpVersion(Network::Address::IpVersion::v4);
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  const absl::Status status = InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+  ASSERT_TRUE(status.ok()) << status;
+  ASSERT_EQ(1, bootstrap.static_resources().clusters_size());
+  EXPECT_EQ("nested-cluster", bootstrap.static_resources().clusters(0).name());
+
+  TestEnvironment::removePath(config_root);
+}
+
+TEST(BootstrapConfigDirectoryTest, IncludeOutsideBaseDirectoryIsRejected) {
+  Api::ApiPtr api = Api::createApiForTest();
+
+  const std::string parent_dir =
+      TestEnvironment::temporaryPath("bootstrap_config_include_outside_parent");
+  const std::string config_root = absl::StrCat(parent_dir, "/config");
+  TestEnvironment::removePath(parent_dir);
+  TestEnvironment::createPath(config_root);
+
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(parent_dir, "/outside.yaml"),
+                                            R"EOF(
+static_resources:
+  clusters:
+  - name: outside-cluster
+    type: STATIC
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: outside-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
+)EOF",
+                                            /*fully_qualified_path=*/true);
+
+  const std::string config_path =
+      TestEnvironment::writeStringToFileForTest(absl::StrCat(config_root, "/bootstrap.yaml"),
+                                                R"EOF(
+include: ../outside.yaml
+node:
+  id: root-id
+  cluster: root-cluster
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                                                /*fully_qualified_path=*/true);
+
+  OptionsImplBase options;
+  options.setConfigPath(config_path);
+  options.setLocalAddressIpVersion(Network::Address::IpVersion::v4);
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  const absl::Status status = InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(std::string::npos, status.message().find("resolves outside base directory"));
+
+  TestEnvironment::removePath(parent_dir);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
