@@ -112,12 +112,58 @@ TEST_F(FactoryTest, PoorlyDividedSplitsStillEmptyTheBucket) {
   time_system_.setMonotonicTime(std::chrono::seconds(1));
 
   // Each of them should get their expected amount maybe plus the indivisible
-  // part. There is no hard rule about who gets the remainder.
+  // part. The remainders go to whoever is earliest in the queue.
   uint64_t remainder = 1000 % 74;
   uint64_t foo_fraction = 1000 / 74;
   uint64_t bar_fraction = 1000 / 74 * 73;
   EXPECT_EQ(foo_fraction + remainder, client1.consume(1000));
   EXPECT_EQ(bar_fraction, client2.consume(1000));
+}
+
+TEST_F(FactoryTest, PoorlyDividedSplitsWithinATenantStillEmptiesTheBucket) {
+  Client client0(*factory_, "baz", 1);
+  Client client1(*factory_, "foo", 1);
+  Client client2(*factory_, "foo", 1);
+  Client client3(*factory_, "foo", 1);
+  // Empty the bucket for baz.
+  EXPECT_EQ(1000, client0.consume(1000));
+  // Queue a 1000 request for everyone else.
+  EXPECT_EQ(0, client1.consume(1000));
+  EXPECT_EQ(0, client2.consume(1000));
+  EXPECT_EQ(0, client3.consume(1000));
+  // Fill the bucket.
+  time_system_.setMonotonicTime(std::chrono::seconds(1));
+
+  // Each of them should get their expected amount maybe plus the indivisible
+  // part. The remainders go to whoever is earliest in the queue.
+  EXPECT_EQ(334, client1.consume(1000));
+  EXPECT_EQ(333, client2.consume(1000));
+  EXPECT_EQ(333, client3.consume(1000));
+}
+
+TEST_F(FactoryTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
+  Client client0(*factory_, "baz", 1);
+  Client client1(*factory_, "foo", 1);
+  Client client2(*factory_, "foo", 1);
+  Client client3(*factory_, "bar", 1);
+  // Empty the bucket for baz.
+  EXPECT_EQ(1000, client0.consume(1000));
+  // At first pass, bar will have 500 available, and foo will have 500.
+  // First foo client only wants 100.
+  EXPECT_EQ(0, client1.consume(100));
+  // Second foo client wants 600.
+  EXPECT_EQ(0, client2.consume(600));
+  // And bar wants 300.
+  EXPECT_EQ(0, client3.consume(300));
+
+  // Fill the bucket.
+  time_system_.setMonotonicTime(std::chrono::seconds(1));
+
+  // Each of them should get everything they wanted, as the leftovers get
+  // respilled until the spilling is done.
+  EXPECT_EQ(100, client1.consume(100));
+  EXPECT_EQ(600, client2.consume(600));
+  EXPECT_EQ(300, client3.consume(300));
 }
 
 TEST_F(FactoryTest, PoorlyDividedSplitsCanBeSubdivided) {
