@@ -89,7 +89,6 @@ private:
   TimeSource& time_source_;
   absl::optional<MonotonicTime> next_spill_ ABSL_GUARDED_BY(mutex_);
   std::chrono::milliseconds spill_frequency_;
-  bool is_limiting_ ABSL_GUARDED_BY(mutex_){false};
   std::vector<std::shared_ptr<Tenant>> waiting_tenants_ ABSL_GUARDED_BY(mutex_);
   Thread::MutexBasicLockable tenants_mutex_;
   // Map from tenant_name to Tenant.

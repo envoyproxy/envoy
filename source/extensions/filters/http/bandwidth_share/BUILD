@@ -17,7 +17,6 @@ envoy_cc_library(
     hdrs = ["fair_token_bucket_impl.h"],
     deps = [
         "//envoy/common:time_interface",
-        "//envoy/event:dispatcher_interface",
         "//source/common/common:thread_lib",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",

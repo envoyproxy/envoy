@@ -31,7 +31,6 @@ std::shared_ptr<Factory> Factory::create(uint64_t max_tokens, TimeSource& time_s
 }
 
 std::shared_ptr<Tenant> Factory::getTenant(absl::string_view tenant_name, uint64_t weight) {
-  ASSERT(weight > 0);
   std::shared_ptr<Tenant> tenant;
   {
     Thread::LockGuard lock(tenants_mutex_);
@@ -268,7 +267,9 @@ void Factory::removeFromQueue(std::shared_ptr<Tenant> tenant) {
 }
 
 Client::Client(Factory& factory, absl::string_view tenant_name, uint64_t weight)
-    : request_(factory.getTenant(tenant_name, weight)->makeRequest()) {}
+    : request_(factory.getTenant(tenant_name, weight)->makeRequest()) {
+  ASSERT(weight > 0);
+}
 
 Client::~Client() { request_->cancel(); }
 
