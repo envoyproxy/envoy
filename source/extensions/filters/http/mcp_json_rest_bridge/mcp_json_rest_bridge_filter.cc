@@ -245,14 +245,15 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    mcp_operation_ = McpOperation::ToolsList;
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         config_->getToolsListHttpRule();
     if (http_rule.ok() && !http_rule->get().empty()) {
+      mcp_operation_ = McpOperation::ToolsList;
       // We don't support pagination for the tools/list request for now.
       auto request_headers = decoder_callbacks_->requestHeaders();
       if (request_headers.has_value()) {
-        // tools/list should be mapped to a GET request with empty body.
+        // TODO(guoyilin42): Add config validation logic to ensure tool_list_http_rule is mapped to
+        // a GET request with an empty body.
         request_headers->setPath(http_rule->get());
         request_headers->setMethod(Http::Headers::get().MethodValues.Get);
         request_headers->removeContentLength();
@@ -265,6 +266,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
       if (decoder_callbacks_->downstreamCallbacks().has_value()) {
         decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
       }
+    } else {
+      // If tools_list_http_rule is not configured, pass through the request.
+      mcp_operation_ = McpOperation::Unspecified;
+      request_body_str_ = json_rpc.dump();
     }
   } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
