@@ -7,6 +7,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/utility.h"
@@ -25,6 +26,18 @@ namespace Tls {
 namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
+
+absl::optional<Api::IoError::IoErrorCode> checkForConnectionReset() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    const uint32_t err = ERR_peek_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_SYS &&
+        ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
+      return Api::IoError::IoErrorCode::ConnectionReset;
+    }
+  }
+  return absl::nullopt;
+}
 
 } // namespace
 
@@ -122,6 +135,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  absl::optional<Api::IoError::IoErrorCode> err_code;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
     Buffer::Reservation reservation = read_buffer.reserveForRead();
@@ -146,19 +160,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
             end_stream = true;
             break;
           }
-          // Check the BoringSSL error queue for ECONNRESET. The BIO layer
-          // (io_handle_bio.cc) stores the system error code via ERR_put_error
-          // when IoHandle::readv() fails, so the errno is captured at the
-          // syscall boundary in os_sys_calls_impl.cc.
-          {
-            const uint32_t pending_err = ERR_peek_error();
-            if (ERR_GET_LIB(pending_err) == ERR_LIB_SYS &&
-                ERR_GET_REASON(pending_err) == SOCKET_ERROR_CONNRESET) {
-              drainErrorQueue();
-              return {PostIoAction::Close, bytes_read, false,
-                      Api::IoError::IoErrorCode::ConnectionReset};
-            }
-          }
+          err_code = checkForConnectionReset();
           FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
@@ -183,7 +185,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, err_code};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
@@ -331,15 +333,11 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
         bytes_to_retry_ = bytes_to_write;
         break;
       case SSL_ERROR_SYSCALL: {
-        // Check the BoringSSL error queue for ECONNRESET.
-        const uint32_t pending_err = ERR_peek_error();
-        if (ERR_GET_LIB(pending_err) == ERR_LIB_SYS &&
-            ERR_GET_REASON(pending_err) == SOCKET_ERROR_CONNRESET) {
-          drainErrorQueue();
-          return {PostIoAction::Close, total_bytes_written, false,
-                  Api::IoError::IoErrorCode::ConnectionReset};
-        }
+        auto reset_err = checkForConnectionReset();
         drainErrorQueue();
+        if (reset_err.has_value()) {
+          return {PostIoAction::Close, total_bytes_written, false, reset_err.value()};
+        }
         return {PostIoAction::Close, total_bytes_written, false};
       }
       case SSL_ERROR_WANT_READ:
