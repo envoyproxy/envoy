@@ -237,6 +237,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov @bsurber
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
+/*/extensions/filters/http/bandwidth_share @ravenblackx @sergkir85
 # HTTP Basic Auth
 /*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
 # HTTP API Key Auth
