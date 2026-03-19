@@ -28,13 +28,13 @@ namespace Matcher {
 namespace {
 
 using ::Envoy::Matcher::ActionFactory;
+using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 using ::Envoy::Matcher::IsStringAction;
-using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::SkippedMatchCb;
@@ -59,7 +59,7 @@ public:
     TestUtility::validate(matcher_);
   }
 
-  MatchResult doMatch() {
+  ActionMatchResult doMatch() {
     auto match_tree = factory_.create(matcher_);
     return match_tree()->match(TestData(), skipped_match_cb_);
   }
@@ -431,13 +431,11 @@ matcher_tree:
   loadConfig(yaml);
 
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(Envoy::Matcher::DataAvailability::NotAvailable);
     validateUnableToMatch();
   }
   {
-    auto input = TestDataInputStringFactory(
-        {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
+    auto input = TestDataInputStringFactory(Envoy::Matcher::DataAvailability::AllDataAvailable);
     validateNoMatch();
   }
 }

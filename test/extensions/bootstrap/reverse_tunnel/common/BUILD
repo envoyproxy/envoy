@@ -20,3 +20,14 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "rping_interceptor_test",
+    size = "medium",
+    srcs = ["rping_interceptor_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
+    ],
+)

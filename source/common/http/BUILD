@@ -263,6 +263,7 @@ envoy_cc_library(
         "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:linked_hash_map",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:http2_core_alt_svc_wire_format_lib",
@@ -677,5 +678,31 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
+    ],
+)
+
+envoy_cc_library(
+    name = "session_idle_list_interface",
+    hdrs = ["session_idle_list_interface.h"],
+    deps = [
+        "//envoy/event:timer_interface",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "session_idle_list_lib",
+    srcs = ["session_idle_list.cc"],
+    hdrs = ["session_idle_list.h"],
+    deps = [
+        ":session_idle_list_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/quic:envoy_quic_clock_lib",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/time",
     ],
 )

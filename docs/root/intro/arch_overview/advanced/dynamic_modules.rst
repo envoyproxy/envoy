@@ -16,17 +16,23 @@ that the dynamic module can call to interact with Envoy.
 
 Implementing the ABI from scratch requires an extensive understanding of the Envoy internals. For users, we provide an
 official SDK that abstracts these details and provides a high-level API to implement dynamic modules. The SDK is currently
-available in Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
+available in C++, Go, and Rust. In theory, any language that can produce a shared library can be used to implement dynamic modules.
 Future development may include support for other languages.
 
 Currently, dynamic modules are supported at the following extension points:
 
 * As a :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`.
+* As a :ref:`cluster <envoy_v3_api_msg_extensions.clusters.dynamic_modules.v3.ClusterConfig>`.
 * As a :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`.
 * As a :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`.
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As an :ref:`HTTP matching data input <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`.
+* As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
+* As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
+* As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
+* As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 
 There are a few design goals for the dynamic modules:
 
@@ -66,6 +72,21 @@ The dynamic modules should be used under the assumption that all modules are ful
 Since these modules run in the same process as Envoy, they can access all memory and resources available to the main process.
 This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
 It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.
+
+Error handling (Rust SDK)
+--------------------------
+The Rust SDK provides an optional ``CatchUnwind`` wrapper that can be used to wrap
+filter implementations. When a wrapped callback panics, the SDK logs the panic payload
+and returns a fail-closed default:
+
+* HTTP request-path callbacks send a 500 response and return ``StopIteration``.
+* HTTP response-path callbacks reset the stream and return ``StopIteration``.
+* Network filter callbacks close the connection and return ``StopIteration``.
+* Listener filter callbacks close the socket and return ``StopIteration``.
+
+When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
+from aborting the entire Envoy process. The affected request or connection is
+terminated; other traffic is unaffected.
 
 Getting started
 --------------------------

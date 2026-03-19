@@ -467,6 +467,10 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state().observed_decode_end_stream_ = end_stream;
+  }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
@@ -569,6 +573,11 @@ void FilterManager::maybeContinueDecoding(StreamDecoderFilters::Iterator continu
 
 void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                                   bool end_stream) {
+  // If the stream has been reset, do not process any more frames.
+  if (stopDecoderFilterChain()) {
+    return;
+  }
+
   // Headers filter iteration should always start with the next filter if available.
   StreamDecoderFilters::Iterator entry =
       commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
@@ -876,6 +885,11 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
 void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map) {
   ScopeTrackerScopeState scope(&*this, dispatcher_);
   filter_manager_callbacks_.resetIdleTimer();
+
+  // If the stream has been reset, do not process any more frames.
+  if (stopDecoderFilterChain()) {
+    return;
+  }
 
   // Filter iteration may start at the current filter.
   StreamDecoderFilters::Iterator entry =
@@ -1871,6 +1885,10 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+    parent_.state_.observed_encode_end_stream_ = end_stream;
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);

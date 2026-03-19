@@ -325,6 +325,7 @@ lang
 libcurl
 libsxg
 LLVM
+LLM
 LPT
 LRS
 Loggable
@@ -425,6 +426,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -666,6 +668,7 @@ bulkstring
 bulkstrings
 bursty
 bytecode
+bytearray
 bytestream
 bytestring
 cacert
@@ -839,6 +842,7 @@ evbuffers
 evconnlistener
 evented
 eventfd
+eventstream
 evwatch
 exe
 execlp
@@ -863,6 +867,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup
@@ -1509,6 +1514,7 @@ tracestate
 transcode
 transcoded
 transcoder
+transcodes
 transcoding
 transferral
 trds
@@ -1543,6 +1549,7 @@ unref
 unreferenced
 unzigzag
 upcasts
+upsert
 upstreams
 uptime
 upvalue
@@ -1660,8 +1667,10 @@ cpuacct.usage
 cpufreq
 effective_cpus
 cpus
+shrinker
 ja3
 ja4
+jsonl
 HBONE
 waypoint
 ztunnel
@@ -1670,4 +1679,10 @@ UIDs
 configurability
 WDS
 OIDC
+Bredband
+Bevtec
 doublings
+lcalpha
+nblk
+chr
+IWYU

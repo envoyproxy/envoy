@@ -21,6 +21,33 @@ constexpr absl::string_view JSONRPC_VERSION = "2.0";
 constexpr absl::string_view JSONRPC_FIELD = "jsonrpc";
 constexpr absl::string_view METHOD_FIELD = "method";
 constexpr absl::string_view ID_FIELD = "id";
+constexpr absl::string_view RESULT_FIELD = "result";
+constexpr absl::string_view PARAMS_FIELD = "params";
+constexpr absl::string_view ARGUMENTS_FIELD = "arguments";
+constexpr absl::string_view ERROR_CODE_FIELD = "code";
+constexpr absl::string_view ERROR_MESSAGE_FIELD = "message";
+
+constexpr absl::string_view TYPE_FIELD = "type";
+constexpr absl::string_view TEXT_FIELD = "text";
+constexpr absl::string_view CONTENT_FIELD = "content";
+constexpr absl::string_view IS_ERROR_FIELD = "isError";
+constexpr absl::string_view ERROR_FIELD = "error";
+
+// MCP Initialize constants
+constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
+constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
+constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
+constexpr absl::string_view TOOLS_FIELD = "tools";
+constexpr absl::string_view LIST_CHANGED_FIELD = "listChanged";
+constexpr absl::string_view SERVER_INFO_FIELD = "serverInfo";
+constexpr absl::string_view NAME_FIELD = "name";
+constexpr absl::string_view VERSION_FIELD = "version";
+constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
+
+constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
+
+// HTTP header names
+constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 
 // Method names
 namespace Methods {

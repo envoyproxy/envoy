@@ -71,8 +71,8 @@ Api::IoCallUint64Result IoHandleImpl::close() {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
-      // Notify the peer we won't write more data. shutdown(WRITE).
-      peer_handle_->setWriteEnd();
+      // Notify the peer that it will not receive more data. shutdown(WRITE).
+      peer_handle_->setEof();
       // Notify the peer that we no longer accept data. shutdown(RD).
       peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
@@ -162,16 +162,16 @@ Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uin
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
 
-  auto* const dest_buffer = peer_handle_->getWriteBuffer();
+  auto* const dest_buffer = peer_handle_->getReceiveBuffer();
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice && !dest_buffer->highWatermarkTriggered(); i++) {
@@ -198,17 +198,17 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
   const uint64_t max_bytes_to_write = buffer.length();
   const uint64_t total_bytes_to_write =
-      moveUpTo(*peer_handle_->getWriteBuffer(), buffer,
+      moveUpTo(*peer_handle_->getReceiveBuffer(), buffer,
                // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
                MAX_FRAGMENT * FRAGMENT_SIZE);
   peer_handle_->setNewDataAvailable();
@@ -360,11 +360,11 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   // Support only shutdown write.
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
-  if (!write_shutdown_) {
+  if (!sent_eof_) {
     ASSERT(peer_handle_);
-    // Notify the peer we won't write more data.
-    peer_handle_->setWriteEnd();
-    write_shutdown_ = true;
+    // Notify the peer that it will not receive more data.
+    peer_handle_->setEof();
+    sent_eof_ = true;
   }
   return {0, 0};
 }

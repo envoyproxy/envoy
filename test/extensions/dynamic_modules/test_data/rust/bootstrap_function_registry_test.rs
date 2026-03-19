@@ -7,10 +7,11 @@ fn my_program_init() -> bool {
 }
 
 fn my_new_bootstrap_extension_config_fn(
-  _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+  envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
   _name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+  envoy_extension_config.signal_init_complete();
   Some(Box::new(MyBootstrapExtensionConfig {}))
 }
 

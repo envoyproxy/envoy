@@ -9,26 +9,26 @@ namespace Matcher {
 
 /**
  * A match tree that iterates over a list of matchers to find the first one that matches. If one
- * does, the MatchResult will be the one specified by the individual matcher.
+ * does, the ActionMatchResult will be the one specified by the individual matcher.
  */
 template <class DataType> class ListMatcher : public MatchTree<DataType> {
 public:
   explicit ListMatcher(absl::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
 
-  MatchResult match(const DataType& matching_data,
-                    SkippedMatchCb skipped_match_cb = nullptr) override {
+  ActionMatchResult match(const DataType& matching_data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     for (const auto& matcher : matchers_) {
-      FieldMatchResult result = matcher.first->match(matching_data);
+      MatchResult result = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
-      if (result.isInsufficientData()) {
-        return MatchResult::insufficientData();
+      if (result == MatchResult::InsufficientData) {
+        return ActionMatchResult::insufficientData();
       }
-      if (result.isNoMatch()) {
+      if (result == MatchResult::NoMatch) {
         continue;
       }
 
-      MatchResult processed_result = MatchTree<DataType>::handleRecursionAndSkips(
+      ActionMatchResult processed_result = MatchTree<DataType>::handleRecursionAndSkips(
           matcher.second, matching_data, skipped_match_cb);
       // Continue to next matcher if the result is a no-match or is skipped.
       if (processed_result.isNoMatch()) {

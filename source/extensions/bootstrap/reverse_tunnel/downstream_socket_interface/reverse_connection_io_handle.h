@@ -205,6 +205,14 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   /**
+   * No-op for reverse connections
+   */
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override {
+    ENVOY_LOG(info, "Bind called on rc socket handle: {}", address->logicalName());
+    return Api::SysCallIntResult{0, 0};
+  }
+
+  /**
    * Get the file descriptor for the pipe monitor used to wake up accept().
    * @return the file descriptor for the pipe monitor
    */

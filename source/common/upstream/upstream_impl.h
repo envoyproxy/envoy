@@ -173,11 +173,16 @@ public:
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return endpoint_metadata_;
   }
+  std::size_t metadataHash() const override {
+    absl::ReaderMutexLock lock(&metadata_mutex_);
+    return endpoint_metadata_hash_;
+  }
   void metadata(MetadataConstSharedPtr new_metadata) override {
     auto& new_socket_factory = resolveTransportSocketFactory(address(), new_metadata.get());
     {
       absl::WriterMutexLock lock(&metadata_mutex_);
       endpoint_metadata_ = new_metadata;
+      endpoint_metadata_hash_ = new_metadata ? MessageUtil::hash(*new_metadata) : 0;
       // Update data members dependent on metadata.
       socket_factory_ = new_socket_factory;
     }
@@ -269,6 +274,7 @@ private:
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
   MetadataConstSharedPtr endpoint_metadata_ ABSL_GUARDED_BY(metadata_mutex_);
+  std::size_t endpoint_metadata_hash_ ABSL_GUARDED_BY(metadata_mutex_){0};
   const MetadataConstSharedPtr locality_metadata_;
   const std::shared_ptr<const envoy::config::core::v3::Locality> locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
@@ -408,6 +414,7 @@ public:
 
     // If any of the degraded flags are set, host is degraded.
     if (healthFlagsGet(enumToInt(HealthFlag::DEGRADED_ACTIVE_HC) |
+                       enumToInt(HealthFlag::DEGRADED_OUTLIER_DETECTION) |
                        enumToInt(HealthFlag::DEGRADED_EDS_HEALTH))) {
       return Host::Health::Degraded;
     }
@@ -443,7 +450,8 @@ protected:
                    HostDescriptionConstSharedPtr host);
   static absl::optional<Network::Address::InstanceConstSharedPtr> maybeGetProxyRedirectAddress(
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      HostDescriptionConstSharedPtr host);
+      HostDescriptionConstSharedPtr host,
+      const Network::UpstreamTransportSocketFactory& socket_factory);
 
 private:
   // Helper function to check multiple health flags at once.
@@ -848,6 +856,9 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return buffer_high_watermark_timeout_;
+  }
   uint64_t features() const override { return features_; }
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return *http_protocol_options_;
@@ -1090,6 +1101,7 @@ private:
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds buffer_high_watermark_timeout_;
   const uint32_t max_response_headers_count_;
   const absl::optional<uint16_t> max_response_headers_kb_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;

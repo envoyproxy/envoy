@@ -7,6 +7,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/rping_interceptor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +23,7 @@ class ReverseConnectionIOHandle;
  * This class is used internally by ReverseConnectionIOHandle to manage the lifecycle
  * of accepted downstream connections.
  */
-class DownstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
+class DownstreamReverseConnectionIOHandle : public RpingInterceptor {
 public:
   /**
    * Constructor that takes ownership of the socket and stores parent pointer and connection key.
@@ -33,11 +35,12 @@ public:
   ~DownstreamReverseConnectionIOHandle() override;
 
   // Network::IoHandle overrides.
-  // Intercept reads to handle reverse connection keep-alive pings.
-  Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
   Api::IoCallUint64Result close() override;
   Api::SysCallIntResult shutdown(int how) override;
+
+  // RPING Interceptor overrides.
+  // Send the RPING response from here.
+  void onPingMessage() override;
 
   /**
    * Tell this IO handle to ignore close() and shutdown() calls.
@@ -60,10 +63,6 @@ private:
   std::string connection_key_;
   // Flag to ignore close and shutdown calls during socket hand-off.
   bool ignore_close_and_shutdown_{false};
-
-  // Whether to actively echo RPING messages while the connection is idle.
-  // Disabled permanently after the first non-RPING application byte is observed.
-  bool ping_echo_active_{true};
 };
 
 } // namespace ReverseConnection

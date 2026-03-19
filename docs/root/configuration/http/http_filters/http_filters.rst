@@ -6,6 +6,7 @@ HTTP filters
 .. toctree::
   :maxdepth: 2
 
+  a2a_filter
   adaptive_concurrency_filter
   admission_control_filter
   aws_lambda_filter
@@ -31,6 +32,7 @@ HTTP filters
   ext_authz_filter
   ext_proc_filter
   fault_filter
+  file_server_filter
   file_system_buffer_filter
   gcp_authn_filter
   geoip_filter
@@ -65,6 +67,7 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
+  sse_to_metadata_filter
   stateful_session_filter
   sxg_filter
   tap_filter
