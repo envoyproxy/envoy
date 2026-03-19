@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace {
 
+using ::testing::IsEmpty;
 using ::testing::StrEq;
 
 class McpJsonRestBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -57,6 +58,9 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializeSuccess) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
 
   const std::string expected_response = R"({
     "jsonrpc": "2.0",
@@ -104,6 +108,9 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializedSuccess) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("202"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), IsEmpty());
+  EXPECT_THAT(response->headers().getContentLengthValue(), IsEmpty());
+  EXPECT_THAT(response->body(), IsEmpty());
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
@@ -159,13 +166,29 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallTranscoding) {
   upstream_request_->encodeHeaders(response_headers, false);
 
   Buffer::OwnedImpl response_data;
-  response_data.add(R"({"id":"mocked"})");
+  response_data.add(R"({"displayName":"bar","createTime":"1970-01-01T00:00:22Z"})");
   upstream_request_->encodeData(response_data, true);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
-  EXPECT_THAT(nlohmann::json::parse(response->body()), nlohmann::json::parse(R"({"id":"mocked"})"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 321,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"displayName\":\"bar\",\"createTime\":\"1970-01-01T00:00:22Z\"}"
+        }
+      ],
+      "isError": false
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
 } // namespace

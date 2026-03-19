@@ -49,6 +49,12 @@ public:
             format_string:
               text_format_source:
                 inline_string: "baz"
+          on_downstream_data:
+          - object_key: on_data
+            factory_key: foo
+            format_string:
+              text_format_source:
+                inline_string: "on_data_set"
       - name: envoy.filters.network.echo
         typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
@@ -56,7 +62,7 @@ public:
   }
 
   void SetUp() override {
-    useListenerAccessLog("%FILTER_STATE(early)%|%FILTER_STATE(late)%");
+    useListenerAccessLog("%FILTER_STATE(early)%|%FILTER_STATE(late)%|%FILTER_STATE(on_data)%");
     BaseIntegrationTest::initialize();
   }
 };
@@ -70,7 +76,8 @@ TEST_P(SetFilterStateIntegrationTest, PlaintextConnectionAppliesBothLifecycleLis
   ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("\"bar\"|\"baz\""));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("\"bar\"|\"baz\"|\"on_data_set\""));
 }
 
 class SetFilterStateDownstreamTlsIntegrationTest

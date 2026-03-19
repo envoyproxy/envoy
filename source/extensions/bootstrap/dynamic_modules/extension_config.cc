@@ -48,6 +48,68 @@ void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
                    "traffic");
 }
 
+bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
+  if (cluster_lifecycle_enabled_) {
+    return false;
+  }
+  cluster_lifecycle_enabled_ = true;
+  cluster_update_callbacks_handle_ =
+      context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
+  // Register a shutdown callback to release the handle before the underlying TLS data is
+  // destroyed. The TLS shutdown happens in terminate() after ShutdownExit callbacks fire.
+  cluster_lifecycle_shutdown_handle_ = context_.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+      [this]() { cluster_update_callbacks_handle_.reset(); });
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_add_or_update_ != nullptr) {
+    on_bootstrap_extension_cluster_add_or_update_(thisAsVoidPtr(), in_module_config_,
+                                                  {cluster_name.data(), cluster_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(const std::string& cluster_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
+    on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
+                                            {cluster_name.data(), cluster_name.size()});
+  }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
+  if (listener_lifecycle_enabled_) {
+    return false;
+  }
+  if (listener_manager_ == nullptr) {
+    ENVOY_LOG(error, "cannot enable listener lifecycle before server is initialized");
+    return false;
+  }
+  listener_lifecycle_enabled_ = true;
+  listener_update_callbacks_handle_ = listener_manager_->addListenerUpdateCallbacks(*this);
+  // Register a shutdown callback to release the handle before the ListenerManager is destroyed.
+  listener_lifecycle_shutdown_handle_ = context_.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+      [this]() { listener_update_callbacks_handle_.reset(); });
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onListenerAddOrUpdate(absl::string_view listener_name,
+                                                                  const Network::ListenerConfig&) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_listener_add_or_update_ != nullptr) {
+    on_bootstrap_extension_listener_add_or_update_(thisAsVoidPtr(), in_module_config_,
+                                                   {listener_name.data(), listener_name.size()});
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string& listener_name) {
+  if (in_module_config_ != nullptr && on_bootstrap_extension_listener_removal_ != nullptr) {
+    on_bootstrap_extension_listener_removal_(thisAsVoidPtr(), in_module_config_,
+                                             {listener_name.data(), listener_name.size()});
+  }
+}
+
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_config_scheduled_ != nullptr) {
     on_bootstrap_extension_config_scheduled_(thisAsVoidPtr(), in_module_config_, event_id);
@@ -247,6 +309,34 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_admin_request.status();
   }
 
+  auto on_cluster_add_or_update =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionClusterAddOrUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update");
+  if (!on_cluster_add_or_update.ok()) {
+    return on_cluster_add_or_update.status();
+  }
+
+  auto on_cluster_removal =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionClusterRemovalType>(
+          "envoy_dynamic_module_on_bootstrap_extension_cluster_removal");
+  if (!on_cluster_removal.ok()) {
+    return on_cluster_removal.status();
+  }
+
+  auto on_listener_add_or_update =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionListenerAddOrUpdateType>(
+          "envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update");
+  if (!on_listener_add_or_update.ok()) {
+    return on_listener_add_or_update.status();
+  }
+
+  auto on_listener_removal =
+      dynamic_module->getFunctionPointer<OnBootstrapExtensionListenerRemovalType>(
+          "envoy_dynamic_module_on_bootstrap_extension_listener_removal");
+  if (!on_listener_removal.ok()) {
+    return on_listener_removal.status();
+  }
+
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
@@ -276,6 +366,10 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
   config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
   config->on_bootstrap_extension_admin_request_ = on_admin_request.value();
+  config->on_bootstrap_extension_cluster_add_or_update_ = on_cluster_add_or_update.value();
+  config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
+  config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
+  config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
 
   return config;
 }

@@ -41,13 +41,13 @@ void FileEventImpl::setEnabled(uint32_t events) {
   uint32_t events_to_notify = 0;
   if ((events & Event::FileReadyType::Read) && (io_source_.isReadable() ||
                                                 // Notify Read event when end-of-stream is received.
-                                                io_source_.isPeerShutDownWrite())) {
+                                                io_source_.hasReceivedEof())) {
     events_to_notify |= Event::FileReadyType::Read;
   }
-  if ((events & Event::FileReadyType::Write) && io_source_.isPeerWritable()) {
+  if ((events & Event::FileReadyType::Write) && io_source_.isWritable()) {
     events_to_notify |= Event::FileReadyType::Write;
   }
-  if ((events & Event::FileReadyType::Closed) && io_source_.isPeerShutDownWrite()) {
+  if ((events & Event::FileReadyType::Closed) && io_source_.hasReceivedEof()) {
     events_to_notify |= Event::FileReadyType::Closed;
   }
   if (events_to_notify != 0) {

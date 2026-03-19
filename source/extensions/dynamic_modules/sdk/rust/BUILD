@@ -31,6 +31,11 @@ cargo_build_script(
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/18/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
+                # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include/x86_64-linux-gnu",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include/aarch64-linux-gnu",
             ]),
         },
         "//conditions:default": {},
@@ -44,6 +49,11 @@ cargo_build_script(
             "@llvm_toolchain_llvm//:lib/libclang.so",
             "@llvm_toolchain_llvm//:lib_legacy",
         ],
+        "//conditions:default": [],
+    }) + select({
+        # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+        "@platforms//cpu:x86_64": ["@sysroot_linux_amd64//:headers"],
+        "@platforms//cpu:aarch64": ["@sysroot_linux_arm64//:headers"],
         "//conditions:default": [],
     }),
     edition = "2021",
