@@ -536,13 +536,11 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
     store_->mergeHistograms([]() -> void {});
 
     // First eviction marks stats as unused.
+    g1.sub(1); // Make value 0 so it can be marked unused
     store_->evictUnused();
     EXPECT_FALSE(c1.used());
     EXPECT_FALSE(g1.used());
     EXPECT_FALSE(h1.used());
-
-    // Make gauge 0 so it can be evicted in the second pass.
-    g1.sub(1);
   }
 
   // Second eviction removes stats.
@@ -709,6 +707,7 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     store_->mergeHistograms([]() -> void {});
 
     // Eviction only marks unused but does not remove the counters.
+    g1.set(0); // Make value 0 so it can be marked unused
     store_->evictUnused();
 
     EXPECT_EQ(&c1, &scope->counterFromString("c1"));
@@ -734,9 +733,7 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     EXPECT_EQ(1UL, store_->histograms().size());
   }
 
-  // Make gauge value zero so it can be evicted
-  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
-  g1.sub(5);
+  // Gauge value was already made zero above
 
   // Eviction removes here.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
@@ -785,13 +782,12 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   // 2. MarkUnused / Evict
   // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
   // Since we just used it (g1.add(10)), the first call will only mark it as unused.
+  g1.sub(10); // Make value 0 so it can be marked unused
   store_->evictUnused();
   EXPECT_FALSE(g1.used());
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Second pass evicts from scope cache because it is now unused.
-  // We need to set it to 0 otherwise it won't be evicted.
-  g1.sub(10);
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
 
@@ -839,7 +835,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGauges) {
 
   // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
   store_->evictUnused();
-  EXPECT_FALSE(g1.used());
+  EXPECT_TRUE(g1.used()); // Value was non-zero, it should stay used.
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Second pass would normally evict from scope cache if it was zero, but since it's non-zero,
@@ -859,7 +855,11 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGauges) {
   g1.sub(10);
   EXPECT_EQ(0, g1.value());
 
-  // First pass actually evicts it here because it is already unused
+  // First pass marks unused
+  store_->evictUnused();
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+
+  // Second pass actually evicts it here
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
   main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);

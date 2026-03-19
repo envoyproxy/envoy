@@ -86,10 +86,10 @@ public:
   };
 
   ~AccessLogState() override {
-    for (const auto& [key, info] : inflight_gauges_) {
-      auto& gauge_stat =
-          scope_->gaugeFromStatNameWithTags(key.stat_name_, key.tags(), key.import_mode_);
-      gauge_stat.sub(info.value_);
+    for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
+      auto& gauge_stat = scope_->gaugeFromStatNameWithTags(p.first.stat_name_, p.first.tags(),
+                                                           p.first.import_mode_);
+      gauge_stat.sub(p.second.value_);
     }
   }
 

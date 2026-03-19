@@ -84,16 +84,6 @@ TEST_F(AllocatorTest, GaugesWithSameName) {
   EXPECT_EQ(0, g2->value());
 }
 
-TEST_F(AllocatorTest, GaugeSubSetsUsed) {
-  StatName gauge_name = makeStat("gauge.sub_sets_used");
-  GaugeSharedPtr gauge =
-      alloc_.makeGauge(gauge_name, StatName(), {}, Gauge::ImportMode::Accumulate);
-
-  EXPECT_FALSE(gauge->used());
-  gauge->sub(0);
-  EXPECT_TRUE(gauge->used());
-}
-
 // Test for a race-condition where we may decrement the ref-count of a stat to
 // zero at the same time as we are allocating another instance of that
 // stat. This test reproduces that race organically by having a 12 threads each

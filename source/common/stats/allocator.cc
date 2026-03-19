@@ -212,13 +212,8 @@ public:
     flags_ |= Flags::Used;
   }
   void sub(uint64_t amount) override {
-    ENVOY_BUG(used() || amount == 0,
-              absl::StrCat("Gauge subtracted without being used: amount=", amount));
-    // Mark as used to prevent the stat from being evicted before flush.
-    flags_ |= Flags::Used;
-    ENVOY_BUG(child_value_ >= amount,
-              absl::StrCat("subtracted amount ", amount, " is greater than current value ",
-                           static_cast<uint64_t>(child_value_)));
+    ASSERT(child_value_ >= amount);
+    ASSERT(used() || amount == 0);
     child_value_ -= amount;
   }
   uint64_t value() const override { return child_value_ + parent_value_; }

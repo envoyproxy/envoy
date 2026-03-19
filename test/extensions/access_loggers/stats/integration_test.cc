@@ -392,8 +392,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
 
   // When the gauge is evicted after ADD but before SUB, the access logger can successfully recreate
   // it when the request ends. A newly recreated gauge starts at 0, so subtracting from it causes a
-  // subtraction underflow warning which is expected to trigger ENVOY_BUG.
-  EXPECT_ENVOY_BUG(
+  // subtraction underflow warning which is expected to trigger EXPECT_DEBUG_DEATH.
+  EXPECT_DEBUG_DEATH(
       {
         init(config_yaml, /*autonomous_upstream=*/false,
              /*flush_access_log_on_new_request=*/true);
@@ -424,7 +424,7 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
 
         codec_client1->close();
       },
-      "greater than current value");
+      "child_value_ >= amount");
 }
 
 } // namespace
