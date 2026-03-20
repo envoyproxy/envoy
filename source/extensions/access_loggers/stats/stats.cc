@@ -19,13 +19,12 @@ using Extensions::Matching::Actions::TransformStat::ActionContext;
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  AccessLogState(std::shared_ptr<const StatsAccessLog> parent)
-      : parent_(std::move(parent)), scope_(parent_->scope()) {}
+  AccessLogState(std::shared_ptr<const StatsAccessLog> parent) : parent_(std::move(parent)) {}
 
   ~AccessLogState() override {
     for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
-      auto& gauge_stat = scope_.gaugeFromStatNameWithTags(p.first.stat_name_, p.first.tags(),
-                                                          p.first.import_mode_);
+      auto& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
+          p.first.stat_name_, p.first.tags(), p.first.import_mode_);
       gauge_stat.sub(p.second.value_);
     }
   }
@@ -47,7 +46,7 @@ public:
       it = new_it;
     }
     it->second.value_ += value;
-    scope_.gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+    parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
   }
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
@@ -60,7 +59,7 @@ public:
 
     // Create the gauge so it gets registered in the stat store (expected by some tests and stats
     // logic)
-    auto& gauge_stat = scope_.gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    auto& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
@@ -75,9 +74,9 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  // Hold a shared_ptr to the parent to ensure the parent and its members exist for the lifetime of AccessLogState.
+  // Hold a shared_ptr to the parent to ensure the parent and its members exist for the lifetime of
+  // AccessLogState.
   std::shared_ptr<const StatsAccessLog> parent_;
-  Stats::Scope& scope_;
 
   struct InflightGauge {
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
