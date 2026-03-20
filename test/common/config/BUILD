@@ -298,5 +298,6 @@ envoy_cc_test(
         "//source/common/config:resource_type_helper_lib",
         "//source/common/protobuf:message_validator_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
