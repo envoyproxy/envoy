@@ -35,6 +35,7 @@
 #include "gtest/gtest.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_dispatcher.h"
+#include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -812,6 +813,82 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
 
   // Shutdown dispatcher before local mocks go out of scope to prevent
   // sessions from referencing destroyed filter chain objects.
+  envoy_quic_dispatcher_.Shutdown();
+}
+
+// Same handshake test with the GetCertChains QUICHE flag disabled to exercise the
+// old GetCertChain code path in SelectCertificate (envoy_tls_server_handshaker.cc
+// L124-138). The default flag value is true, so the existing test covers L104-121.
+TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithOldCertChainAPI) {
+  SetQuicReloadableFlag(quic_use_proof_source_get_cert_chains, false);
+
+  loadCerts();
+
+  Network::MockFilterChainManager session_filter_chain_manager;
+  Filter::NetworkFilterFactoriesList filter_factory;
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::NiceMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
+  filter_factory.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+          [&](Network::FilterManager& filter_manager) {
+            filter_manager.addReadFilter(read_filter);
+            read_filter->callbacks_->connection().addConnectionCallbacks(
+                network_connection_callbacks);
+            read_filter->callbacks_->connection().setConnectionStats(
+                {read_total, read_current, write_total, write_current, nullptr, nullptr});
+          }));
+
+  EXPECT_CALL(listener_config_, filterChainManager())
+      .WillOnce(ReturnRef(session_filter_chain_manager));
+  EXPECT_CALL(session_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(&filter_chain_));
+  EXPECT_CALL(filter_chain_, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
+  EXPECT_CALL(listener_config_, filterChainFactory()).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+      .WillOnce(Invoke([](Network::Connection& connection,
+                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+        EXPECT_EQ(1u, filter_factories.size());
+        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+        dynamic_cast<EnvoyQuicServerSession&>(connection)
+            .set_max_inbound_header_list_size(64 * 1024);
+        return true;
+      }));
+  EXPECT_CALL(*read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(network_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+  EXPECT_CALL(write_total, add(_)).Times(AnyNumber());
+
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+
+  EnvoyQuicClock clock(*dispatcher_);
+  Buffer::OwnedImpl payload = generateChloPacketToSend(quic_version_, quic_config_, connection_id_);
+  Buffer::RawSliceVector slice = payload.getRawSlices();
+  ASSERT(slice.size() == 1);
+  auto encrypted_packet =
+      std::make_unique<quic::QuicEncryptedPacket>(static_cast<char*>(slice[0].mem_), slice[0].len_);
+  auto received_packet = std::unique_ptr<quic::QuicReceivedPacket>(
+      quic::test::ConstructReceivedPacket(*encrypted_packet, clock.Now()));
+
+  envoy_quic_dispatcher_.ProcessPacket(
+      envoyIpAddressToQuicSocketAddress(
+          listen_socket_->connectionInfoProvider().localAddress()->ip()),
+      peer_addr, *received_packet);
+  EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_);
+  ASSERT_NE(session, nullptr);
+  EXPECT_TRUE(session->IsEncryptionEstablished());
+
   envoy_quic_dispatcher_.Shutdown();
 }
 
