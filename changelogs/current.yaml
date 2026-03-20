@@ -115,6 +115,9 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
 - area: tls
   change: |
     Fixed on-demand TLS selector to enforce session resumption settings.
@@ -151,6 +154,12 @@ bug_fixes:
     added after server initialization completed. The ``SrdsFactory`` interface
     was incorrectly using the server-level init manager instead of the listener-level init manager,
     causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -295,6 +304,11 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: dynamic_modules
+  change: |
+    Rust SDK now provides an opt-in ``CatchUnwind`` wrapper for filter callbacks. When a
+    wrapped callback panics, Envoy logs the panic and returns a fail-closed error (e.g.
+    HTTP 500, stream reset, connection close) instead of aborting the process.
 - area: http_11_proxy
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
@@ -581,6 +595,9 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added a process-wide shared data registry to the dynamic modules ABI.
+- area: dynamic_modules
+  change: |
     Added support for loading dynamic module binaries from local file paths via the new
     :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
     field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
@@ -592,6 +609,11 @@ new_features:
     listener initialization with SHA256 verification, written to a temporary file, and loaded
     via ``dlopen``. If the remote fetch fails, the filter is not installed and requests pass
     through (fail-open).
+- area: dynamic_modules
+  change: |
+    Added caching for remotely fetched dynamic modules. Since ``newDynamicModuleFromBytes``
+    writes modules to a deterministic path based on SHA256, subsequent config updates
+    referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
@@ -735,5 +757,14 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
+    This filter is currently a work-in-progress and not recommended for production use.
+- area: http_filter
+  change: |
+    Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
+    ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
+    This is necessary if the route configuration may depend on the filter state values set.
 
 deprecated:

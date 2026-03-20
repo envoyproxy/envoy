@@ -7,6 +7,7 @@
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
+pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
 pub mod http;
@@ -19,6 +20,7 @@ pub mod upstream_http_tcp_bridge;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
+pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
 pub use http::*;
@@ -36,6 +38,16 @@ mod mod_test;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
+
+pub(crate) fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+  match payload.downcast::<String>() {
+    Ok(s) => *s,
+    Err(payload) => match payload.downcast::<&str>() {
+      Ok(s) => s.to_string(),
+      Err(_) => "<non-string panic payload>".to_string(),
+    },
+  }
+}
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
@@ -162,6 +174,56 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
   }
 }
 
+/// Register an opaque data pointer under a name in the process-wide shared data registry.
+///
+/// This allows modules loaded in the same process to share arbitrary state — such as runtime
+/// handles, configuration snapshots, or shared caches — without requiring direct access to
+/// each other's globals. For example, a bootstrap extension can register a Tokio runtime handle
+/// and HTTP filters or cluster extensions can retrieve and use it for async operations.
+///
+/// Unlike [`register_function`], the shared data registry allows overwriting an existing entry.
+/// If the key already exists, the data pointer is updated and the function returns `true`. This
+/// supports patterns where shared state is refreshed (e.g., after a configuration reload).
+/// Callers are responsible for managing the lifetime of overwritten data pointers.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized` or
+/// `on_scheduled`).
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
+/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
+/// opaque pointers.
+pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_shared_data(
+      str_to_module_buffer(key),
+      data_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered data pointer by name from the process-wide shared data
+/// registry. The returned pointer can be cast to the expected data type and used directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found = unsafe {
+    abi::envoy_dynamic_module_callback_get_shared_data(str_to_module_buffer(key), &mut ptr)
+  };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
@@ -241,18 +303,23 @@ macro_rules! envoy_log {
   ($level:expr, $($arg:tt)*) => {
     {
       #[cfg(not(test))]
-      unsafe {
-        // Avoid allocating the message if the log level is not enabled.
-        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+      {
+        let level = $level;
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and envoy_dynamic_module_callback_log
+        // are FFI calls provided by the Envoy host.
+        let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
+        if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
-          $crate::abi::envoy_dynamic_module_callback_log(
-            $level,
-            $crate::abi::envoy_dynamic_module_type_module_buffer {
-              ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-              length: message_bytes.len(),
-            },
-          );
+          unsafe {
+            $crate::abi::envoy_dynamic_module_callback_log(
+              level,
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: message_bytes.len(),
+              },
+            );
+          }
         }
       }
       // In unit tests, just print to stderr since the Envoy symbols are not available.
