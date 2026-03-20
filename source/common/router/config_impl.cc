@@ -870,7 +870,12 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     }
   }
 
-  matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    matches &= Http::HeaderUtility::matchHeadersIndividually(headers, config_headers_);
+  } else {
+    matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+  }
   if (!matches) {
     return false;
   }
@@ -2048,7 +2053,14 @@ const Envoy::Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
 const VirtualCluster*
 CommonVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
-    if (Http::HeaderUtility::matchHeaders(headers, entry.headers_)) {
+    bool matched;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.route_match_headers_individually")) {
+      matched = Http::HeaderUtility::matchHeadersIndividually(headers, entry.headers_);
+    } else {
+      matched = Http::HeaderUtility::matchHeaders(headers, entry.headers_);
+    }
+    if (matched) {
       return &entry;
     }
   }

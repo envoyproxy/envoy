@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +61,10 @@ bool RouteEntryImplBase::headersMatch(const RpcInvocationImpl& invocation) const
   const auto& headers = invocation.attachment().headers();
   ENVOY_LOG(debug, "dubbo route matcher: headers size {}, metadata headers size {}",
             config_headers_.size(), headers.size());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    return Http::HeaderUtility::matchHeadersIndividually(headers, config_headers_);
+  }
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
 

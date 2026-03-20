@@ -13,6 +13,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -52,7 +53,12 @@ void HealthCheckCacheManager::onTimer() {
 
 Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                            bool end_stream) {
-  if (Http::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
+  const bool header_matched =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")
+          ? Http::HeaderUtility::matchHeadersIndividually(headers, *header_match_data_)
+          : Http::HeaderUtility::matchHeaders(headers, *header_match_data_);
+  if (header_matched) {
     health_check_request_ = true;
     callbacks_->streamInfo().healthCheck(true);
 

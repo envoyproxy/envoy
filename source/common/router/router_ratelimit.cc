@@ -269,7 +269,14 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
                                                 const std::string&,
                                                 const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& info) const {
-  if (expect_match_ != Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
+  bool header_match;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    header_match = Http::HeaderUtility::matchHeadersIndividually(headers, action_headers_);
+  } else {
+    header_match = Http::HeaderUtility::matchHeaders(headers, action_headers_);
+  }
+  if (expect_match_ != header_match) {
     return false;
   }
 

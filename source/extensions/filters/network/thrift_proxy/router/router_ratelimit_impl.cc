@@ -4,6 +4,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 
 namespace Envoy {
@@ -80,8 +81,15 @@ bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
                                                 const std::string&, const MessageMetadata& metadata,
                                                 const Network::Address::Instance&) const {
-  if (expect_match_ ==
-      Http::HeaderUtility::matchHeaders(metadata.requestHeaders(), action_headers_)) {
+  bool header_match;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    header_match =
+        Http::HeaderUtility::matchHeadersIndividually(metadata.requestHeaders(), action_headers_);
+  } else {
+    header_match = Http::HeaderUtility::matchHeaders(metadata.requestHeaders(), action_headers_);
+  }
+  if (expect_match_ == header_match) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
     return true;
   } else {

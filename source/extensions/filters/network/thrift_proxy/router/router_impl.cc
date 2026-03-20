@@ -8,6 +8,7 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 #include "absl/strings/match.h"
@@ -115,6 +116,10 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
 }
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    return Http::HeaderUtility::matchHeadersIndividually(headers, config_headers_);
+  }
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
 

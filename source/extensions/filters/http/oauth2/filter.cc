@@ -635,8 +635,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
+  const bool match_individually = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.route_match_headers_individually");
   for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
+    const bool matched = match_individually ? matcher->matchesHeadersIndividually(headers)
+                                           : matcher->matchesHeaders(headers);
+    if (matched) {
       config_->stats().oauth_passthrough_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
@@ -895,8 +899,12 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
 }
 
 bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
+  const bool match_individually = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.route_match_headers_individually");
   for (const auto& matcher : config_->denyRedirectMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
+    const bool matched = match_individually ? matcher->matchesHeadersIndividually(headers)
+                                           : matcher->matchesHeaders(headers);
+    if (matched) {
       ENVOY_STREAM_LOG(debug, "redirect is denied for this request", *decoder_callbacks_);
       return false;
     }
