@@ -115,6 +115,9 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
 - area: tls
   change: |
     Fixed on-demand TLS selector to enforce session resumption settings.
@@ -151,6 +154,12 @@ bug_fixes:
     added after server initialization completed. The ``SrdsFactory`` interface
     was incorrectly using the server-level init manager instead of the listener-level init manager,
     causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -744,10 +753,15 @@ new_features:
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
     This filter is currently a work-in-progress and not recommended for production use.
+- area: http_filter
+  change: |
+    Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
+    ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
+    This is necessary if the route configuration may depend on the filter state values set.
 - area: http
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
-    which will close idle downstream HTTP connections (including HTTP/2 and HTTP/3) when the overload
+    which will close idle downstream HTTP connections (including HTTP/3 QUIC) when the overload
     manager enters the active state.
 
 deprecated:

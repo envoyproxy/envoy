@@ -29,18 +29,20 @@ public:
   // TODO(bencebeky): Tune this value.
   static constexpr size_t kNumSessionsToCreatePerLoop = 16;
 
-  ActiveQuicListener(
-      Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
-      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
-      Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
-      const quic::QuicConfig& quic_config, bool kernel_worker_routing,
-      const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
-      uint32_t packets_to_read_to_connection_count_ratio,
-      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-      QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-      bool reject_new_connections = false, bool enable_session_idle_list = false);
+  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
+                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
+                     Network::SocketSharedPtr&& listen_socket,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+                     bool kernel_worker_routing,
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     QuicStatNames& quic_stat_names,
+                     uint32_t packets_to_read_to_connection_count_ratio,
+                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+                     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+                     QuicConnectionIdGeneratorPtr&& cid_generator,
+                     QuicConnectionIdWorkerSelector worker_selector,
+                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+                     bool reject_new_connections = false, bool enable_session_idle_list = false);
 
   ~ActiveQuicListener() override;
 
