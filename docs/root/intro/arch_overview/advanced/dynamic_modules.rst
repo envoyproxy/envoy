@@ -32,6 +32,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`input matcher <envoy_v3_api_msg_extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher>`.
 * As a :ref:`TLS certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig>`.
 * As a :ref:`load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`.
+* As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 
 There are a few design goals for the dynamic modules:
 
@@ -71,6 +72,21 @@ The dynamic modules should be used under the assumption that all modules are ful
 Since these modules run in the same process as Envoy, they can access all memory and resources available to the main process.
 This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
 It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.
+
+Error handling (Rust SDK)
+--------------------------
+The Rust SDK provides an optional ``CatchUnwind`` wrapper that can be used to wrap
+filter implementations. When a wrapped callback panics, the SDK logs the panic payload
+and returns a fail-closed default:
+
+* HTTP request-path callbacks send a 500 response and return ``StopIteration``.
+* HTTP response-path callbacks reset the stream and return ``StopIteration``.
+* Network filter callbacks close the connection and return ``StopIteration``.
+* Listener filter callbacks close the socket and return ``StopIteration``.
+
+When ``CatchUnwind`` is applied to a filter, this prevents a single panicking module
+from aborting the entire Envoy process. The affected request or connection is
+terminated; other traffic is unaffected.
 
 Getting started
 --------------------------

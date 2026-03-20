@@ -13,26 +13,26 @@ behavior_changes:
     Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 - area: on_demand
   change: |
-    The on_demand filter, when doing On Demand CDS, will no longer do internal redirects after CDS is
-    successful. Filters appearing in the filter chain before the On Demand Filter will no longer be
+    The on-demand filter, when doing on-demand CDS, will no longer do internal redirects after CDS is
+    successful. Filters appearing in the filter chain before the on-demand filter will no longer be
     invoked twice. This behavior can be temporarily reverted by setting the runtime guard
     ``envoy.reloadable_features.on_demand_cluster_no_recreate_stream`` to ``false``.
 - area: boringssl/fips
   change: |
-    The previous flag for specifying FIPS builds (ie ``--define=boringssl=fips``) will no longer work and
+    The previous flag for specifying FIPS builds (i.e., ``--define=boringssl=fips``) will no longer work and
     has been replaced by ``--config=boringssl-fips``. This change will allow us to better support custom
     SSL libraries, and will allow FIPS-compliant Envoy to be built with the imminent switch to Bazel bzlmod.
 - area: tls
   change: |
     Set
     :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
-    to true by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
+    to ``true`` by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
     the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
 - area: ext_proc
   change: |
-    The processing_effect_lib has been moved from :ref:`extensions/filters/http/ext_proc namespace
-    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` to
-    extensions/filters/common/processing_effect namespace. All path references within the Envoy
+    The ``processing_effect_lib`` has been moved from the :ref:`extensions/filters/http/ext_proc
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` namespace to the
+    ``extensions/filters/common/processing_effect`` namespace. All path references within the Envoy
     codebase have been updated.
 
 minor_behavior_changes:
@@ -81,18 +81,17 @@ minor_behavior_changes:
     accepted.
 - area: ext_proc
   change: |
-    added received_immediate_response flag in :ref:'FilterStats
-    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcLoggingInfo>'.
+    Added ``received_immediate_response`` flag in the ``ExtProcLoggingInfo`` filter state.
 - area: happy_eyeballs
   change: |
     Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
-    containing non-IP addresses is removed. This behaviour can be reverted by setting the runtime
+    containing non-IP addresses is removed. This behavior can be reverted by setting the runtime
     guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
 - area: ext_authz
   change: |
-    Added tracking bits for :ref:'procesing effect <envoy.filters.http.ext_proc.ProcessingEffect' for request
-    headers and failed open occurrence in the ExtAuthzLoggingInfo. This new data will be automatically
-    collected and can be accesses via method requestProcessingEffect() and failedOpen().
+    Added tracking bits for processing effect for request headers and failed open occurrence in the
+    ``ExtAuthzLoggingInfo``. This new data will be automatically collected and can be accessed via
+    ``requestProcessingEffect()`` and ``failedOpen()``.
 - area: dynamic_modules
   change: |
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
@@ -116,15 +115,19 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
 - area: tls
   change: |
-    Fix on-demand TLS selector to enforce session resumption settings.
+    Fixed on-demand TLS selector to enforce session resumption settings.
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
 - area: load_report
   change: |
-    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
+    Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
+    of the gRPC stream.
 - area: http
   change: |
     Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec
@@ -151,6 +154,12 @@ bug_fixes:
     added after server initialization completed. The ``SrdsFactory`` interface
     was incorrectly using the server-level init manager instead of the listener-level init manager,
     causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -166,13 +175,14 @@ bug_fixes:
     Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
 - area: watch-dog
   change: |
-    Fixed a bug where the worker-threads' watch-dogs were configured using the main-thread's configuration.
+    Fixed a bug where the worker thread watchdogs were configured using the main thread's configuration.
     This change can be reverted by setting the runtime guard ``envoy.restart_features.worker_threads_watchdog_fix``
     to ``false``.
 - area: ext_proc
   change: |
-    Fixed a bug to support two ext_proc filters configured in the chain. This change can be reverted by setting
-    the runtime guard ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
+    Fixed a bug that prevented two ext_proc filters from being configured in the same filter chain. This
+    change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
 - area: ext_proc
   change: |
     Fixed message-valued CEL attribute serialization (for example
@@ -193,18 +203,18 @@ bug_fixes:
     to the client.
 - area: formatter
   change: |
-    Supported the log formatter ``UPSTREAM_LOCAL_CLOSE_REASON``.
+    Added support for the ``UPSTREAM_LOCAL_CLOSE_REASON`` log formatter.
 - area: formatter
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
 - area: spiffe
   change: |
-    Reduce the number of the file watches needed by :ref:`trust_bundles
+    Reduced the number of file watches needed by :ref:`trust_bundles
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
-    is used in multiple places. Add support for :ref:`watched_directory
+    is used in multiple places. Added support for :ref:`watched_directory
     <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
-    atomic symbolic file updates.  Add content hashing during file watching to handle excessive watch notifications.
+    atomic symbolic file updates. Added content hashing during file watching to handle excessive watch notifications.
 - area: odcds
   change: |
     Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
@@ -227,7 +237,7 @@ bug_fixes:
 - area: mcp_router
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
-    headers. Previously this caused a spurious 500 error.
+    headers. Previously, this caused a spurious 500 error.
 - area: upstream
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
@@ -250,16 +260,32 @@ bug_fixes:
     The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
 - area: contrib
   change: |
-    Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
-    peak_ewma loadbalancer.
+    Fixed a segfault from a timer thread-safety violation, a ring buffer overflow, and incorrect alpha
+    calculation in the ``peak_ewma`` load balancer.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
+    HTTP requests into raw TCP data for upstream connections and convert TCP responses back into HTTP
+    responses via explicit send callbacks. See :ref:`envoy.upstreams.http.dynamic_modules
+    <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 - area: filters
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
+- area: tls
+  change: |
+    Added a per-connection filter state object to select a workload trust domain in the SPIFFE validator in
+    the multi-tenant deployments.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
@@ -270,6 +296,15 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: dynamic_modules
+  change: |
+    Rust SDK now provides an opt-in ``CatchUnwind`` wrapper for filter callbacks. When a
+    wrapped callback panics, Envoy logs the panic and returns a fail-closed error (e.g.
+    HTTP 500, stream reset, connection close) instead of aborting the process.
+- area: http_11_proxy
+  change: |
+    Added ability to configure a default proxy address that is used when the proxy address is not
+    configured via metadata.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -282,7 +317,7 @@ new_features:
     Added :ref:`detect_degraded_hosts <envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
     to enable passive degraded host detection. When enabled, outlier detection marks hosts as degraded when they return
     the ``x-envoy-degraded`` header. Degraded hosts are deprioritized in load balancing but remain in rotation (not
-    ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to false.
+    ejected). The degraded state is cleared using the same backoff algorithm as ejection. Defaults to ``false``.
 - area: http2
   change: |
     Added :ref:`max_header_field_size_kb
@@ -292,8 +327,13 @@ new_features:
     wire when larger single headers need to be supported.
 - area: dynamic_modules
   change: |
-    Added dynamic module input matcher extension which would allow implementing custom matching logic
+    Added dynamic module input matcher extension that allows implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added listener lifecycle event callbacks to the bootstrap dynamic module extension. Modules can
+    opt in via ``enable_listener_lifecycle`` to receive ``on_listener_add_or_update`` and
+    ``on_listener_removal`` notifications when listeners change in the ``ListenerManager``.
 - area: memory
   change: |
     Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
@@ -326,7 +366,7 @@ new_features:
     at config load if both are specified.
 - area: stats
   change: |
-    Added support to limit the number of stats stored in each stats scope in the stats library.
+    Added support to limit the number of metrics stored in each scope within the stats library.
 - area: stats
   change: |
     The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
@@ -343,20 +383,20 @@ new_features:
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 - area: access_log
   change: |
-    Added customization support on stats in the stats :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
+    Added stats customization support for the :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
-    where modules built with a SDK version can be loaded by Envoy
-    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
+    where modules built with an SDK version can be loaded by Envoy
+    binaries of the next Envoy version. For example, a module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
 - area: dynamic modules
   change: |
     Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
 - area: dynamic modules
   change: |
-    Added support for dynamic modules authors to register any combination of http, network, listener,
-    udp listener, and bootstrap filters in the rust SDK.
+    Added support for dynamic modules authors to register any combination of HTTP, network, listener,
+    UDP listener, and bootstrap filters in the Rust SDK.
 - area: dynamic modules
   change: |
     Added connection state and flow control ABI callbacks for the dynamic module network filter,
@@ -421,15 +461,15 @@ new_features:
     request path once the data is available. Allows CEL matching based on both request and response
     headers. This may cause a behavior change for matchers that previously would silently fail to
     match due to attempting to match response headers in the request path. This behavior can be
-    toggled off by setting runtime guard
-    ``envoy.reloadable_features.enable_cel_response_path_matching`` to false.
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.enable_cel_response_path_matching`` to ``false``.
 - area: access_log
   change: |
-    Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
+    Added support for gauges in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: network
   change: |
-    Added support access logging in network filters like http filters, by allowing network filters to register as access logger
-    instances.
+    Added access logging support for network filters, similar to HTTP filters, by allowing network filters to
+    register as access logger instances.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
@@ -517,6 +557,14 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: connection
+  change: |
+    Add support for closing connections when they stay above the buffer high watermark for a configured time.
+    This can be enabled by setting the :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_high_watermark_timeout>`
+    field on the listener and :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.cluster.v3.Cluster.per_connection_buffer_high_watermark_timeout>`
+    field on the cluster. By default, the timeout is disabled.
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
@@ -539,6 +587,9 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added a process-wide shared data registry to the dynamic modules ABI.
+- area: dynamic_modules
+  change: |
     Added support for loading dynamic module binaries from local file paths via the new
     :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
     field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
@@ -550,6 +601,11 @@ new_features:
     listener initialization with SHA256 verification, written to a temporary file, and loaded
     via ``dlopen``. If the remote fetch fails, the filter is not installed and requests pass
     through (fail-open).
+- area: dynamic_modules
+  change: |
+    Added caching for remotely fetched dynamic modules. Since ``newDynamicModuleFromBytes``
+    writes modules to a deterministic path based on SHA256, subsequent config updates
+    referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
@@ -594,7 +650,7 @@ new_features:
     to populate a header with the autonomous system organization name from the MaxMind ASN database.
 - area: tracers
   change: |
-    Add log events to spans created by OpenTelemetry tracer.
+    Added log events to spans created by the OpenTelemetry tracer.
 - area: mcp_router
   change: |
     Added SSE response support for MCP ``resources/list`` fanout aggregation.
@@ -623,11 +679,11 @@ new_features:
     ``MCP-Session-Id`` header are now recognized as valid MCP traffic in ``REJECT_NO_MCP`` mode.
 - area: a2a
   change: |
-    Added the parsing support for A2A(Agent2Agent) protocol. It is used to parse the A2A JSON-RPC messages.
+    Added parsing support for the A2A (Agent2Agent) protocol, enabling parsing of A2A JSON-RPC messages.
 - area: mcp
   change: |
-    Added options ``propagate_trace_context`` and ``propagate_baggage`` for extracting traceparent & tracestate
-    and baggage from mcp params, respectively.
+    Added options ``propagate_trace_context`` and ``propagate_baggage`` for extracting ``traceparent``,
+    ``tracestate``, and baggage from MCP parameters, respectively.
 - area: mcp_json_rest_bridge
   change: |
     Added the MCP JSON REST Bridge HTTP filter configuration to transcode MCP JSON-RPC requests into
@@ -644,6 +700,10 @@ new_features:
     Added support for MCP session negotiation, including ``initialize`` and
     ``notifications/initialized`` methods. This filter is currently a work-in-progress and not
     recommended for production use.
+- area: listener_manager
+  change: |
+    Added ``ListenerUpdateCallbacks`` interface to ``ListenerManager``, similar to the existing
+    ``ClusterUpdateCallbacks`` on ``ClusterManager``.
 - area: matching
   change: |
     Added :ref:`local reply matcher input <envoy_v3_api_msg_type.matcher.v3.HttpResponseLocalReplyMatchInput>`
@@ -684,6 +744,18 @@ new_features:
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 - area: formatter
   change: |
-    Fixed a bug where the ``%TRACE_ID%`` string doesn't get substituted correctly in response body formatter.
+    Fixed a bug in the custom response policy filter's local response policy where ``%TRACE_ID%`` was 
+    not correctly substituted in the response body.
+- area: network_filter
+  change: |
+    Added support for
+    ``on_downstream_data`` (see
+    :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
+    to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
+    connection filter state to be populated after first receiving data from the downstream connection.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
+    This filter is currently a work-in-progress and not recommended for production use.
 
 deprecated:
