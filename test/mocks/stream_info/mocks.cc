@@ -250,7 +250,12 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, customFlags()).WillByDefault(Invoke([this]() {
     return absl::string_view(stream_flags_);
   }));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnPointee(&virtual_host_));
+  ON_CALL(*this, virtualHost()).WillByDefault(Invoke([this]() -> OptRef<const Router::VirtualHost> {
+    return makeOptRefFromPtr<const Router::VirtualHost>(virtual_host_.get());
+  }));
+  ON_CALL(*this, virtualHostSharedPtr())
+      .WillByDefault(
+          Invoke([this]() -> Router::VirtualHostConstSharedPtr { return virtual_host_; }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;
