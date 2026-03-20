@@ -16,12 +16,27 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":starttls_socket_factory_lib",
         ":starttls_socket_lib",
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "starttls_socket_factory_lib",
+    srcs = ["starttls_socket_factory.cc"],
+    hdrs = ["starttls_socket_factory.h"],
+    deps = [
+        ":starttls_socket_lib",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/ssl:context_interface",
+        "//envoy/upstream:host_description_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:transport_socket_options_lib",
     ],
 )
 
