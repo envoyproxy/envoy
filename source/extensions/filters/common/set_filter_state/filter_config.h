@@ -46,7 +46,7 @@ private:
                            Server::Configuration::GenericFactoryContext& context) const;
   const LifeSpan life_span_;
   const std::vector<Value> values_;
-  const bool clear_route_cache_;
+  const bool clear_route_cache_{false};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

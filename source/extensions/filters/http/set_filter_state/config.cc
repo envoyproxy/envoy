@@ -29,7 +29,7 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   for (auto policy : policies) {
     policy.get().updateFilterState({&headers}, decoder_callbacks_->streamInfo());
   }
-  if (config_->clearRouteCache()) {
+  if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks()) {
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return Http::FilterHeadersStatus::Continue;
