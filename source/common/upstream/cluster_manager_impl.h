@@ -821,6 +821,7 @@ private:
   };
 
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
+  // This map is ordered so that config dumping is consistent.
   using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
