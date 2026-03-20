@@ -4,7 +4,6 @@
 
 #include "envoy/network/filter.h"
 
-#include "openssl/ssl.h"
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
 
@@ -20,11 +19,6 @@ public:
                            EnvoyQuicProofSource* proof_source);
 
   ~EnvoyTlsServerHandshaker() override = default;
-
-  // Disables session ticket support by setting SSL_OP_NO_TICKET on the
-  // underlying SSL connection. Called by EnvoyProofSourceHandle during
-  // certificate selection when session tickets should not be issued.
-  void disableTicketSupport() { SSL_set_options(ssl(), SSL_OP_NO_TICKET); }
 
 protected:
   std::unique_ptr<quic::ProofSourceHandle> MaybeCreateProofSourceHandle() override;

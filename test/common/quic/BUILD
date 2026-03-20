@@ -262,7 +262,6 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_server_session_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
-        "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_lib",
         "//source/server:configuration_lib",

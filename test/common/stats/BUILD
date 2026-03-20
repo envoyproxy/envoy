@@ -13,8 +13,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "allocator_impl_test",
-    srcs = ["allocator_impl_test.cc"],
+    name = "allocator_test",
+    srcs = ["allocator_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:allocator_lib",

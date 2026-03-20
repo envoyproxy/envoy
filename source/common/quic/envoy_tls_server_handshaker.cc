@@ -97,7 +97,7 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyProofSourceHandle::SelectCe
     auto ticket_config = factory.getSessionTicketConfig();
     if (ticket_config.disable_stateless_resumption || !ticket_config.has_keys ||
         ticket_config.handles_session_resumption) {
-      handshaker_->disableTicketSupport();
+      handshaker_->tls_connection().DisableTicketSupport();
     }
   }
 

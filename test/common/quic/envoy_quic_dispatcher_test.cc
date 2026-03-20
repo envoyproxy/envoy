@@ -14,7 +14,6 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
@@ -583,8 +582,8 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
   EXPECT_EQ(2u, envoy_quic_dispatcher_.NumSessions());
 }
 
-// Test with EnvoyQuicProofSource and runtime guard enabled to exercise
-// EnvoyTlsServerHandshaker::SelectCertificate and ComputeSignature.
+// Test with EnvoyQuicProofSource, real ContextManagerImpl, and runtime guard enabled
+// to exercise full TLS handshake through EnvoyTlsServerHandshaker.
 class EnvoyQuicDispatcherWithSessionTicketTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       protected Logger::Loggable<Logger::Id::main> {
@@ -627,8 +626,7 @@ public:
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.quic_session_ticket_support", "true"}});
 
-    // Set up cert and transport socket factory BEFORE any handshake.
-    // The EXPECT_CALL on setSecretUpdateCallback must be set before create()/initialize().
+    // Set up transport socket factory. Capture secret_update_callback_ for loadCerts().
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_))
         .Times(testing::AtLeast(1u))
         .WillRepeatedly(testing::SaveArg<0>(&secret_update_callback_));
@@ -642,18 +640,26 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
-    // Set up cert selector.
-    auto selector_factory = Extensions::TransportSockets::Tls::
-        TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
-    const Protobuf::Any any;
-    Server::Configuration::MockGenericFactoryContext ctx;
-    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
-    tls_cert_selector_factory_cb_ =
-        selector_factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true)
-            .value();
-    EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-        .WillRepeatedly(ReturnRef(*tls_cert_selector_factory_cb_));
+    // Wire up filter chain manager for proof source lookups.
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+        .WillRepeatedly(Return(&filter_chain_));
 
+    auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
+    envoy_quic_dispatcher_.InitializeWithWriter(writer);
+    EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
+        .WillRepeatedly(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
+  }
+
+  void SetUp() override {
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
+        .WillRepeatedly(Return(1024 * 1024));
+  }
+
+  // Loads certs into the transport socket factory using the proof source test's pattern.
+  // Must be called from test body (not constructor) to ensure all mocks are fully initialized.
+  void loadCerts() {
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
@@ -669,29 +675,21 @@ public:
     EXPECT_CALL(tls_cert_config_, certificateChain()).WillRepeatedly(ReturnRef(expected_certs_));
     EXPECT_CALL(tls_cert_config_, privateKey()).WillRepeatedly(ReturnRef(pkey_));
 
-    // Wire up filter chain manager for proof source lookups.
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-        .WillRepeatedly(Return(&filter_chain_));
+    auto selector_factory = Extensions::TransportSockets::Tls::
+        TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
+    const Protobuf::Any any;
+    Server::Configuration::MockGenericFactoryContext ctx;
+    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+    tls_cert_selector_factory_cb_ =
+        selector_factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true)
+            .value();
+    EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
+        .WillRepeatedly(ReturnRef(*tls_cert_selector_factory_cb_));
 
-    // Trigger cert loading.
-    RELEASE_ASSERT(secret_update_callback_ != nullptr, "secret_update_callback_ not set");
-    THROW_IF_NOT_OK(secret_update_callback_());
-
-    auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
-    envoy_quic_dispatcher_.InitializeWithWriter(writer);
-    EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))
-        .WillRepeatedly(Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
+    ASSERT_TRUE(secret_update_callback_ != nullptr);
+    ASSERT_TRUE(secret_update_callback_().ok());
   }
 
-  void SetUp() override {
-    time_system_.advanceTimeAndRun(std::chrono::milliseconds(100), *dispatcher_,
-                                   Event::Dispatcher::RunType::NonBlock);
-    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes())
-        .WillRepeatedly(Return(1024 * 1024));
-  }
-
-  // Buffered packet store checks are not needed here — this test only sends a single
-  // CHLO to exercise the handshaker code path, not to verify packet buffering behavior.
   void TearDown() override {
     envoy_quic_dispatcher_.Shutdown();
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -711,6 +709,11 @@ protected:
   Server::PerHandlerListenerStats per_worker_stats_;
   testing::NiceMock<Network::MockFilterChain> filter_chain_;
   testing::NiceMock<Network::MockFilterChainManager> filter_chain_manager_;
+  // TLS members declared BEFORE dispatcher so they outlive it during destruction.
+  // This prevents "Pure virtual function called" when sessions clean up SSL state.
+  Server::Configuration::MockServerFactoryContext factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
+  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   EnvoyQuicProofSource* proof_source_;
   quic::QuicCryptoServerConfig crypto_config_;
   quic::QuicConfig quic_config_;
@@ -722,9 +725,6 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   quic::QuicConnectionId connection_id_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
-  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   std::function<absl::Status()> secret_update_callback_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;
   Ssl::TlsCertificateSelectorFactoryPtr tls_cert_selector_factory_cb_;
@@ -739,8 +739,51 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicDispatcherSessionTicketTests,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSupport) {
-  // Process CHLO — this triggers EnvoyTlsServerHandshaker::SelectCertificate
-  // and ComputeSignature through the real handshake path.
+  // Load certs into the transport socket factory.
+  loadCerts();
+
+  // Set up filter chain mocks for session creation (same pattern as PreparedFilterChainMocks).
+  Network::MockFilterChainManager session_filter_chain_manager;
+  Filter::NetworkFilterFactoriesList filter_factory;
+  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+  Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::NiceMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
+  filter_factory.push_back(
+      std::make_unique<Config::TestExtensionConfigProvider<Network::FilterFactoryCb>>(
+          [&](Network::FilterManager& filter_manager) {
+            filter_manager.addReadFilter(read_filter);
+            read_filter->callbacks_->connection().addConnectionCallbacks(
+                network_connection_callbacks);
+            read_filter->callbacks_->connection().setConnectionStats(
+                {read_total, read_current, write_total, write_current, nullptr, nullptr});
+          }));
+
+  EXPECT_CALL(listener_config_, filterChainManager())
+      .WillOnce(ReturnRef(session_filter_chain_manager));
+  EXPECT_CALL(session_filter_chain_manager, findFilterChain(_, _)).WillOnce(Return(&filter_chain_));
+  EXPECT_CALL(filter_chain_, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
+  EXPECT_CALL(listener_config_, filterChainFactory()).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+      .WillOnce(Invoke([](Network::Connection& connection,
+                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+        EXPECT_EQ(1u, filter_factories.size());
+        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+        dynamic_cast<EnvoyQuicServerSession&>(connection)
+            .set_max_inbound_header_list_size(64 * 1024);
+        return true;
+      }));
+  EXPECT_CALL(*read_filter, onNewConnection())
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(network_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+  EXPECT_CALL(write_total, add(_)).Times(AnyNumber());
+
+  // Process CHLO — triggers full TLS handshake through EnvoyTlsServerHandshaker.
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
@@ -760,11 +803,16 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
       envoyIpAddressToQuicSocketAddress(
           listen_socket_->connectionInfoProvider().localAddress()->ip()),
       peer_addr, *received_packet);
+  // Verify session was created and handshake completed through EnvoyTlsServerHandshaker.
+  EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
+  const quic::QuicSession* session =
+      quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_);
+  ASSERT_NE(session, nullptr);
+  EXPECT_TRUE(session->IsEncryptionEstablished());
 
-  // The CHLO exercises EnvoyTlsServerHandshaker code paths for coverage even if
-  // the handshake doesn't fully complete (test certs may not match the SNI).
-  // Verify the dispatcher processed the packet without crashing.
-  EXPECT_GE(envoy_quic_dispatcher_.NumSessions(), 0u);
+  // Shutdown dispatcher before local mocks go out of scope to prevent
+  // sessions from referencing destroyed filter chain objects.
+  envoy_quic_dispatcher_.Shutdown();
 }
 
 } // namespace Quic

@@ -57,10 +57,13 @@ public:
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc, Buffer::Instance& data);
+  void handleMcpMethod(const nlohmann::json& json_rpc);
+
+  // Modifies the response from upstream into JSON-RPC response.
+  void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
 
   // Maps the tool call request to the backend API.
-  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc, Buffer::Instance& data);
+  void mapMcpToolToApiBackend(const nlohmann::json& json_rpc);
 
   // Sends MCP error response.
   void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
@@ -90,6 +93,9 @@ private:
   absl::optional<int> session_id_;
   std::string server_name_;
   Buffer::OwnedImpl request_body_;
+  std::string request_body_str_;
+  Buffer::OwnedImpl response_body_;
+  std::string response_body_str_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };
