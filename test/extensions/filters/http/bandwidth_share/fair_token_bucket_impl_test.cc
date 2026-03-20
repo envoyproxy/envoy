@@ -13,7 +13,7 @@ namespace BandwidthShareFilter {
 namespace FairTokenBucket {
 
 auto IsBetween = [](uint64_t min, uint64_t max) {
-  return testing::AllOf(testing::Gt(min), testing::Lt(max));
+  return testing::AllOf(testing::Ge(min), testing::Le(max));
 };
 
 class ClientTest : public testing::Test {
@@ -238,53 +238,68 @@ TEST_F(ClientTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherReque
 }
 
 TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
-  Thread::MutexBasicLockable mu;
+  absl::Mutex mu;
   uint64_t total_consumed = 0;
-  struct {
+  struct ThreadData {
     std::thread thread;
     uint64_t consumed = 0;
+    bool acting = true;
     absl::optional<Client> client;
   } threads[10];
   for (size_t i = 0; i < 10; i++) {
     threads[i].client.emplace(*factory_, "foo", 1);
-    threads[i].thread = std::thread([&, index = i] {
+    threads[i].thread = std::thread([&mu, &total_consumed, thread = &threads[i]] {
       while (true) {
-        uint64_t got = threads[index].client->consume(1000);
+        uint64_t got = thread->client->consume(1000);
         {
-          Thread::LockGuard lock(mu);
-          threads[index].consumed += got;
+          absl::MutexLock lock(mu);
+          thread->acting = false;
+          thread->consumed += got;
           total_consumed += got;
           if (total_consumed >= 100000) {
             break;
           }
+          mu.Await(absl::Condition(&thread->acting));
         }
-        std::this_thread::yield();
       }
     });
   }
-  while (true) {
-    time_system_.advanceTimeWaitImpl(std::chrono::milliseconds(10));
-    std::this_thread::yield();
-    {
-      Thread::LockGuard lock(mu);
-      if (total_consumed >= 100000) {
-        break;
+  const auto all_threads_blocked = [&]() {
+    for (int i = 0; i < 10; i++) {
+      if (threads[i].acting) {
+        return false;
       }
     }
+    return true;
+  };
+  while (true) {
+    absl::MutexLock lock(mu);
+    // Wait for all threads to have consumed, then advance time.
+    mu.Await(absl::Condition(&all_threads_blocked));
+    for (int i = 0; i < 10; i++) {
+      threads[i].acting = true;
+    }
+    if (total_consumed >= 100000) {
+      break;
+    }
+    time_system_.advanceTimeWaitImpl(std::chrono::milliseconds(50));
   }
   for (size_t i = 0; i < 10; i++) {
     threads[i].thread.join();
   }
-  // Since it's battling threads we can't necessarily expect an exact fair share,
-  // so just verify that it's reasonably close.
-  Thread::LockGuard lock(mu);
+  // Since it's battling threads, and one of them got the initial bucket fill,
+  // an exact fair share cannot be expected, so just verify that
+  // everyone got a reasonable share.
+  absl::MutexLock lock(mu);
   for (size_t i = 0; i < 10; i++) {
-    EXPECT_THAT(threads[i].consumed, IsBetween(8000, 15000));
+    EXPECT_THAT(threads[i].consumed, IsBetween(9000, 11000));
   }
-  EXPECT_THAT(std::chrono::duration_cast<std::chrono::milliseconds>(
+  // We definitely shouldn't have granted more than 100000 tokens in less
+  // than 99 fake-seconds.
+  EXPECT_THAT(std::chrono::duration_cast<std::chrono::seconds>(
                   time_system_.monotonicTime().time_since_epoch())
                   .count(),
-              IsBetween(90000, 140000));
+              IsBetween(99, 101));
 }
 
 } // namespace FairTokenBucket
