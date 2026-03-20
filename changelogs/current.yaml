@@ -747,6 +747,7 @@ new_features:
 - area: http
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
-    which will close idle HTTP connections when the overload manager enters the active state.
+    which will close idle downstream HTTP connections (including HTTP/2 and HTTP/3) when the overload
+    manager enters the active state.
 
 deprecated:

@@ -9,6 +9,7 @@
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
@@ -42,7 +43,7 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-    bool reject_new_connections, bool close_idle_connections_when_overloaded)
+    bool reject_new_connections, bool enable_session_idle_list)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
@@ -99,8 +100,7 @@ ActiveQuicListener::ActiveQuicListener(
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
       *connection_id_generator_, debug_visitor_factory,
-      close_idle_connections_when_overloaded ? std::make_unique<Http::SessionIdleList>(dispatcher)
-                                             : nullptr);
+      enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher) : nullptr);
 
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
@@ -288,8 +288,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
-      context_(context), reject_new_connections_(config.reject_new_connections()),
-      close_idle_connections_when_overloaded_(config.close_idle_connections_when_overloaded()) {
+      context_(context), reject_new_connections_(config.reject_new_connections()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -456,13 +455,21 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
+  bool enable_session_idle_list = false;
+  for (const auto& action :
+       context_.serverFactoryContext().bootstrap().overload_manager().actions()) {
+    if (action.name() == Server::OverloadActionNames::get().CloseIdleHttpConnections) {
+      enable_session_idle_list = true;
+      break;
+    }
+  }
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
       makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
-      close_idle_connections_when_overloaded_);
+      enable_session_idle_list);
 }
 
 } // namespace Quic

@@ -40,7 +40,7 @@ public:
       EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
       QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
       EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-      bool reject_new_connections = false, bool close_idle_connections_when_overloaded = false);
+      bool reject_new_connections = false, bool enable_session_idle_list = false);
 
   ~ActiveQuicListener() override;
 
@@ -166,7 +166,6 @@ private:
   bool reject_new_connections_{};
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
-  bool close_idle_connections_when_overloaded_{false};
 };
 
 } // namespace Quic
