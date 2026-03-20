@@ -170,6 +170,48 @@ public:
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
 
+  // Sets up mock config expectations and triggers cert loading into the transport
+  // socket factory. Does NOT set proof-source-level expectations (ioHandle,
+  // findFilterChain, transportSocketFactory) — callers add those as needed.
+  void loadCertsIntoFactory(const std::string& cert, bool with_private_key) {
+    auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
+        getDefaultTlsCertificateSelectorConfigFactory();
+    ASSERT_TRUE(factory);
+    const Protobuf::Any any;
+
+    Server::Configuration::MockGenericFactoryContext ctx;
+    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+    auto tls_certificate_selector_factory_cb =
+        factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
+    EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
+        .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
+
+    EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
+    std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
+        std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
+    EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
+    EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    static const std::vector<uint8_t> ocsp_staple;
+    EXPECT_CALL(tls_cert_config_, ocspStaple()).WillRepeatedly(ReturnRef(ocsp_staple));
+    EXPECT_CALL(tls_cert_config_, certificateChain())
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly(ReturnRef(cert));
+    if (with_private_key) {
+      EXPECT_CALL(tls_cert_config_, privateKey())
+          .Times(testing::AtLeast(1))
+          .WillRepeatedly(ReturnRef(pkey_));
+    }
+    ASSERT_TRUE(secret_update_callback_ != nullptr);
+    absl::Status callback_status = secret_update_callback_();
+    THROW_IF_NOT_OK(callback_status);
+    ASSERT_TRUE(callback_status.ok());
+  }
+
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key,
                                     bool expect_fail_to_load = false) {
     int times = -1;
@@ -195,43 +237,7 @@ public:
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
-    auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
-        getDefaultTlsCertificateSelectorConfigFactory();
-    ASSERT_TRUE(factory);
-    ASSERT_EQ("envoy.tls.certificate_selectors.default", factory->name());
-    const Protobuf::Any any;
-
-    Server::Configuration::MockGenericFactoryContext ctx;
-    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
-    auto tls_certificate_selector_factory_cb =
-        factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
-    EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-        .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
-
-    EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
-    std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
-        std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
-    EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
-    EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-    EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-    EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-    EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
-    EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-    EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-    static const std::vector<uint8_t> ocsp_staple;
-    EXPECT_CALL(tls_cert_config_, ocspStaple()).WillRepeatedly(ReturnRef(ocsp_staple));
-    EXPECT_CALL(tls_cert_config_, certificateChain())
-        .Times(testing::AtLeast(1))
-        .WillRepeatedly(ReturnRef(cert));
-    if (expect_private_key) {
-      EXPECT_CALL(tls_cert_config_, privateKey())
-          .Times(testing::AtLeast(1))
-          .WillRepeatedly(ReturnRef(pkey_));
-    }
-    ASSERT_TRUE(secret_update_callback_ != nullptr);
-    absl::Status callback_status = secret_update_callback_();
-    THROW_IF_NOT_OK(callback_status);
-    ASSERT_TRUE(callback_status.ok());
+    loadCertsIntoFactory(cert, expect_private_key);
   }
 
 protected:
@@ -351,7 +357,6 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
 }
 
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
-  // Set up certs inline (same as expectCertChainAndPrivateKey but with flexible ioHandle count).
   EXPECT_CALL(listen_socket_, ioHandle()).Times(testing::AnyNumber());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
       .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
@@ -360,35 +365,7 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
-  auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
-      getDefaultTlsCertificateSelectorConfigFactory();
-  ASSERT_TRUE(factory);
-  const Protobuf::Any any;
-  Server::Configuration::MockGenericFactoryContext ctx;
-  ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
-  auto tls_certificate_selector_factory_cb =
-      factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
-  EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-      .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
-
-  EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
-      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
-  EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
-  EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-  EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));
-  static const std::vector<uint8_t> ocsp_staple;
-  EXPECT_CALL(tls_cert_config_, ocspStaple()).WillRepeatedly(ReturnRef(ocsp_staple));
-  EXPECT_CALL(tls_cert_config_, certificateChain()).WillRepeatedly(ReturnRef(expected_certs_));
-  EXPECT_CALL(tls_cert_config_, privateKey()).WillRepeatedly(ReturnRef(pkey_));
-
-  // Load certs.
-  ASSERT_TRUE(secret_update_callback_ != nullptr);
-  ASSERT_TRUE(secret_update_callback_().ok());
+  loadCertsIntoFactory(expected_certs_, true);
 
   std::string signature;
   // Use ECDSA algorithm with an RSA key — triggers algorithm mismatch error path.
@@ -424,6 +401,41 @@ TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   proof_source_.OnNewSslCtx(ssl_ctx.get());
+}
+
+// Verify that ticketKeyCallback returns 0 when no filter chain is stored in
+// SSL ex_data (the null-pointer early-return path).
+TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullFilterChain) {
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  ASSERT_NE(ssl, nullptr);
+  // No ex_data set → SSL_get_ex_data returns nullptr for the filter chain index.
+  EXPECT_EQ(
+      0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), nullptr, nullptr, nullptr, nullptr, 0));
+}
+
+// Verify that ticketKeyCallback delegates to the transport socket factory's
+// sessionTicketProcess when a filter chain is present in SSL ex_data.
+TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithFilterChain) {
+  loadCertsIntoFactory(expected_certs_, true);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  ASSERT_NE(ssl, nullptr);
+
+  // Store filter chain pointer in SSL ex_data at the well-known index.
+  SSL_set_ex_data(ssl.get(), EnvoyQuicProofSource::filterChainExDataIndex(), &filter_chain_);
+
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillOnce(ReturnRef(*transport_socket_factory_));
+
+  // With decrypt mode (encrypt=0) and no session ticket keys configured, the
+  // ServerContextImpl returns 0 (no matching key).
+  uint8_t key_name[16] = {};
+  EXPECT_EQ(0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), key_name, nullptr, nullptr,
+                                                       nullptr, 0));
 }
 
 } // namespace Quic

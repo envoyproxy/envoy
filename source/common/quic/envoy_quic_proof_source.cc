@@ -122,6 +122,19 @@ void EnvoyQuicProofSource::updateFilterChainManager(
   filter_chain_manager_ = &filter_chain_manager;
 }
 
+int EnvoyQuicProofSource::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv,
+                                            EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx, int encrypt) {
+  auto* filter_chain =
+      static_cast<const Network::FilterChain*>(SSL_get_ex_data(ssl, filterChainExDataIndex()));
+  if (filter_chain == nullptr) {
+    return 0;
+  }
+
+  auto& transport_socket_factory =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
+  return transport_socket_factory.sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+}
+
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
   registerCertCompression(ssl_ctx);
 
@@ -129,21 +142,7 @@ void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
     return;
   }
 
-  SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx,
-                                   [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
-                                      HMAC_CTX* hmac_ctx, int encrypt) -> int {
-                                     auto* filter_chain = static_cast<const Network::FilterChain*>(
-                                         SSL_get_ex_data(ssl, filterChainExDataIndex()));
-                                     if (filter_chain == nullptr) {
-                                       return 0;
-                                     }
-
-                                     auto& transport_socket_factory =
-                                         static_cast<const QuicServerTransportSocketFactory&>(
-                                             filter_chain->transportSocketFactory());
-                                     return transport_socket_factory.sessionTicketProcess(
-                                         ssl, key_name, iv, ctx, hmac_ctx, encrypt);
-                                   });
+  SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, ticketKeyCallback);
 }
 
 } // namespace Quic
