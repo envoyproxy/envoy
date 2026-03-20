@@ -160,7 +160,7 @@ TEST_F(ClientTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
   time_system_.setMonotonicTime(std::chrono::seconds(1));
 
   // Each of them should get everything they wanted, as the leftovers get
-  // respilled until the spilling is done.
+  // spilled again until the spilling is done.
   EXPECT_EQ(100, client1.consume(100));
   EXPECT_EQ(600, client2.consume(600));
   EXPECT_EQ(300, client3.consume(300));
