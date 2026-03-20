@@ -17,10 +17,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dynamic_descriptor_lib",
+    hdrs = ["dynamic_descriptor.h"],
+    deps = [
+        "//envoy/ratelimit:ratelimit_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "local_ratelimit_lib",
-    srcs = ["local_ratelimit_impl.cc"],
+    srcs = [
+        "dynamic_descriptor.cc",
+        "local_ratelimit_impl.cc",
+    ],
     hdrs = ["local_ratelimit_impl.h"],
     deps = [
+        ":dynamic_descriptor_lib",
         ":local_ratelimit_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
