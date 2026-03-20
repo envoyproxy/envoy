@@ -147,7 +147,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   }
 
   if (config.has_tunneling_config()) {
-    tunneling_config_ = std::make_unique<TunnelingConfigImpl>(config.tunneling_config(), context);
+    tunneling_config_ =
+        std::make_unique<const TunnelingConfigImpl>(config.tunneling_config(), context);
   }
 
   if (config.has_access_log_options()) {
