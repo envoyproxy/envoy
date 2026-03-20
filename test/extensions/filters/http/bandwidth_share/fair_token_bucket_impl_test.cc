@@ -3,6 +3,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -11,18 +12,12 @@ namespace HttpFilters {
 namespace BandwidthShareFilter {
 namespace FairTokenBucket {
 
+auto IsBetween = [](uint64_t min, uint64_t max) {
+  return testing::AllOf(testing::Gt(min), testing::Lt(max));
+};
+
 class ClientTest : public testing::Test {
 protected:
-  bool isMutexLocked(Factory& factory) {
-    auto locked = factory.mutex_.tryLock();
-    if (locked) {
-      factory.mutex_.unlock();
-    }
-    return !locked;
-  }
-
-  Thread::ThreadSynchronizer& synchronizer(Factory& factory) { return factory.synchronizer_; };
-
   Event::SimulatedTimeSystem time_system_;
   std::chrono::milliseconds time_to_next_token_;
   std::shared_ptr<Factory> factory_ = Factory::create(1000, time_system_);
@@ -242,18 +237,19 @@ TEST_F(ClientTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherReque
   EXPECT_EQ(600, bar_gets);
 }
 
-TEST_F(ClientTest, ThreadsOperateAsExpected) {
+TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
   Thread::MutexBasicLockable mu;
-  uint64_t total_consumed ABSL_GUARDED_BY(mu) = 0;
+  uint64_t total_consumed = 0;
   struct {
     std::thread thread;
-    uint64_t consumed ABSL_GUARDED_BY(mu) = 0;
-    Client client{*factory_, "foo", 1},
+    uint64_t consumed = 0;
+    absl::optional<Client> client;
   } threads[10];
   for (size_t i = 0; i < 10; i++) {
-    threads[index].thread = std::thread([i, &] {
+    threads[i].client.emplace(*factory_, "foo", 1);
+    threads[i].thread = std::thread([&, index = i] {
       while (true) {
-        uint64_t got = client.consume(1000);
+        uint64_t got = threads[index].client->consume(1000);
         {
           Thread::LockGuard lock(mu);
           threads[index].consumed += got;
@@ -266,6 +262,29 @@ TEST_F(ClientTest, ThreadsOperateAsExpected) {
       }
     });
   }
+  while (true) {
+    time_system_.advanceTimeWaitImpl(std::chrono::milliseconds(10));
+    std::this_thread::yield();
+    {
+      Thread::LockGuard lock(mu);
+      if (total_consumed >= 100000) {
+        break;
+      }
+    }
+  }
+  for (size_t i = 0; i < 10; i++) {
+    threads[i].thread.join();
+  }
+  // Since it's battling threads we can't necessarily expect an exact fair share,
+  // so just verify that it's reasonably close.
+  Thread::LockGuard lock(mu);
+  for (size_t i = 0; i < 10; i++) {
+    EXPECT_THAT(threads[i].consumed, IsBetween(8000, 15000));
+  }
+  EXPECT_THAT(std::chrono::duration_cast<std::chrono::milliseconds>(
+                  time_system_.monotonicTime().time_since_epoch())
+                  .count(),
+              IsBetween(90000, 140000));
 }
 
 } // namespace FairTokenBucket
