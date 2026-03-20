@@ -1517,7 +1517,7 @@ peer certificate, or no issuer.
   downstreamSslConnection:sha256PeerCertificateIssuerDigest()
 
 Returns the hex-encoded SHA256 fingerprint of the direct issuer (CA) certificate from the peer
-certificate chain. The issuer is identified by searching the chain for a certificate whose public
+certificate. The issuer is identified by searching the chain for a certificate whose public
 key cryptographically signs the peer leaf certificate. Requires the peer certificate chain to have
 been successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
 ``validation_context``). Returns ``""`` if there is no validated peer certificate chain or no
@@ -1530,7 +1530,7 @@ issuer certificate can be found.
 
   downstreamSslConnection:serialNumberPeerCertificateIssuer()
 
-Returns the serial number of the direct issuer (CA) certificate from the peer certificate chain.
+Returns the serial number of the direct issuer (CA) certificate from the peer certificate.
 The issuer is identified by searching the chain for a certificate whose public key cryptographically
 signs the peer leaf certificate. Requires the peer certificate chain to have been successfully
 validated (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``).

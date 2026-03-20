@@ -1349,7 +1349,7 @@ Current supported substitution commands include:
 ``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%``
   HTTP/TCP/THRIFT
     The hex-encoded SHA256 fingerprint of the verified issuer (CA) certificate from the
-    validated downstream TLS peer certificate chain. Requires a validated peer certificate chain
+    validated downstream TLS peer certificate. Requires a validated peer certificate chain
     (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``). Returns
     ``"-"`` if there is no validated peer certificate chain or no issuer certificate can be found.
   UDP
@@ -1358,7 +1358,7 @@ Current supported substitution commands include:
 ``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
   HTTP/TCP/THRIFT
     The serial number of the verified issuer (CA) certificate from the validated downstream TLS
-    peer certificate chain. Requires a validated peer certificate chain (e.g., mTLS with
+    peer certificate. Requires a validated peer certificate chain (e.g., mTLS with
     ``require_client_certificate: true`` and a ``validation_context``). Returns ``"-"`` if there
     is no validated peer certificate chain or no issuer certificate can be found.
   UDP
