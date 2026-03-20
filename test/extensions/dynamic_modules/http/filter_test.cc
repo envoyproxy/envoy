@@ -90,6 +90,162 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/43063
+//
+// Reproduces the scenario where ext_authz + dynamic module + HTTP/2 causes the final DATA frame
+// body to be emptied. The sequence is:
+//   1. ext_authz buffers HTTP/2 body during async auth (decodingBuffer() becomes non-null)
+//   2. Auth completes, buffered data is drained to upstream, but decodingBuffer() remains non-null
+//   3. Final DATA frame arrives as a NEW Buffer::Instance (different pointer from decodingBuffer())
+//   4. BUG: addDecodedData() fires because decodingBuffer() != nullptr, moving chunk content away
+//   5. The dynamic module sees an empty chunk, router sends empty END_STREAM -> upstream timeout
+//
+// This test verifies the bug by checking that chunk data is preserved after decodeData returns.
+// With the current buggy code, the chunk will be empty after decodeData.
+TEST_P(DynamicModuleTestLanguages, DecodeDataStaleDecodingBufferBug) {
+  const std::string filter_name = "foo";
+  const std::string filter_config = "bar";
+
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config,
+          Envoy::Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // Simulate ext_authz scenario: decodingBuffer() returns a stale non-null pointer.
+  // This represents the buffered_request_data_ that was allocated during ext_authz's
+  // StopAllIterationAndWatermark but has since been drained. The unique_ptr is never reset
+  // to nullptr, so decodingBuffer() still returns non-null.
+  Buffer::OwnedImpl stale_decoding_buffer; // empty, simulating drained buffer
+  EXPECT_CALL(decoder_callbacks, decodingBuffer())
+      .WillRepeatedly(testing::Return(&stale_decoding_buffer));
+  // Mock addDecodedData to actually move data away (simulating commonHandleBufferData behavior)
+  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _))
+      .WillRepeatedly(
+          Invoke([&](Buffer::Instance& data, bool) -> void { stale_decoding_buffer.move(data); }));
+
+  // Step 1: Send request headers (non end_stream).
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, false));
+
+  // Step 2: Send a non-final data chunk. decodingBuffer() != nullptr but end_of_stream=false,
+  // so addDecodedData is not called. This works correctly.
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(data1, false));
+  EXPECT_EQ(5U, data1.length()); // data preserved
+
+  // Step 3: Send request trailers (needed for Rust no_op module lifecycle assertions).
+  TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
+
+  // Step 4: Send the final data chunk with end_of_stream=true.
+  // This is a NEW Buffer::Instance at a different address than stale_decoding_buffer.
+  // BUG: decodingBuffer() != nullptr triggers addDecodedData, which moves chunk content away.
+  Buffer::OwnedImpl final_chunk("world12345"); // 10 bytes
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(final_chunk, true));
+
+  // ASSERTION: The final chunk data should be preserved (10 bytes).
+  // With the bug, addDecodedData moves the content into stale_decoding_buffer, leaving
+  // final_chunk empty. The router would then send an empty END_STREAM to upstream.
+  EXPECT_EQ(10U, final_chunk.length())
+      << "BUG #43063: final chunk data was moved away by addDecodedData due to stale "
+         "decodingBuffer() pointer. The router will send an empty END_STREAM causing upstream "
+         "timeout.";
+
+  // Complete response lifecycle (needed for Rust no_op module lifecycle assertions).
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl response_data("resp");
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(response_data, false));
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
+  filter->onStreamComplete();
+  filter->onDestroy();
+}
+
+// Symmetric test for encodeData path (same bug pattern on the response side).
+TEST_P(DynamicModuleTestLanguages, EncodeDataStaleEncodingBufferBug) {
+  const std::string filter_name = "foo";
+  const std::string filter_config = "bar";
+
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config,
+          Envoy::Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // Simulate stale encodingBuffer() (same pattern as decode side).
+  Buffer::OwnedImpl stale_encoding_buffer;
+  EXPECT_CALL(encoder_callbacks, encodingBuffer())
+      .WillRepeatedly(testing::Return(&stale_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _))
+      .WillRepeatedly(
+          Invoke([&](Buffer::Instance& data, bool) -> void { stale_encoding_buffer.move(data); }));
+
+  // Complete request lifecycle first (needed for Rust no_op module lifecycle assertions).
+  TestRequestHeaderMapImpl request_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl request_data("req");
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(request_data, false));
+  TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
+
+  // Now test the encode (response) path.
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl resp_data1("hello");
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(resp_data1, false));
+  EXPECT_EQ(5U, resp_data1.length());
+
+  // Send response trailers (needed for Rust no_op module lifecycle assertions).
+  TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
+  Buffer::OwnedImpl final_resp_chunk("world12345");
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(final_resp_chunk, true));
+
+  EXPECT_EQ(10U, final_resp_chunk.length())
+      << "BUG #43063: final response chunk data was moved away by addEncodedData due to stale "
+         "encodingBuffer() pointer.";
+
+  filter->onStreamComplete();
+  filter->onDestroy();
+}
+
 #ifndef __SANITIZE_ADDRESS__
 // TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
 // and we need to figure out a way to fix it.
@@ -558,12 +714,13 @@ TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   filter->setEncoderFilterCallbacks(encoder_callbacks);
   Buffer::OwnedImpl request_body;
   EXPECT_CALL(decoder_callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&request_body));
-  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
+  // The body_callbacks module always returns Continue and never returns StopIterationAndBuffer,
+  // so request_body_buffering_ stays false and addDecodedData is never called.
+  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _)).Times(0);
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(encoder_callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&response_body));
-  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
+  // Same for response direction.
+  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks, modifyDecodingBuffer(_))
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(request_body);

@@ -246,6 +246,13 @@ private:
   // continueDecoding() or continueEncoding() multiple times.
   bool in_continue_ = false;
 
+  // True if this filter is currently buffering request/response body data, i.e. the most recent
+  // decodeData/encodeData callback returned StopIterationAndBuffer or StopIterationAndWatermark.
+  // Used to guard the addDecodedData/addEncodedData calls so that we only merge the final
+  // end_of_stream chunk into the buffer when THIS filter is actively buffering.
+  bool request_body_buffering_ = false;
+  bool response_body_buffering_ = false;
+
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
   // the stack calling it, which can be problematic. For example, with Rust, that might cause

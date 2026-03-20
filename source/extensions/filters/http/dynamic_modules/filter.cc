@@ -73,9 +73,12 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (end_of_stream && decoder_callbacks_->decodingBuffer()) {
-    // To make the very last chunk of the body available to the filter when buffering is enabled,
-    // we need to call addDecodedData. See the code comment there for more details.
+  if (end_of_stream && request_body_buffering_ && decoder_callbacks_->decodingBuffer()) {
+    // When THIS filter is actively buffering (previously returned StopIterationAndBuffer or
+    // StopIterationAndWatermark), merge the final chunk into the buffered data so the module can
+    // see the complete body via BufferedRequestBody. We must only do this when this filter itself
+    // is buffering — not when decodingBuffer() is stale non-null from another filter (e.g.
+    // ext_authz). See https://github.com/envoyproxy/envoy/issues/43063.
     decoder_callbacks_->addDecodedData(chunk, false);
   }
   current_request_body_ = &chunk;
@@ -83,6 +86,11 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_request_body_ = nullptr;
   in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
+  request_body_buffering_ =
+      (status ==
+           envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndBuffer ||
+       status ==
+           envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndWatermark);
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -121,9 +129,9 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
   if (sent_local_reply_) { // See the comment on the flag.
     return FilterDataStatus::Continue;
   }
-  if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
-    // To make the very last chunk of the body available to the filter when buffering is enabled,
-    // we need to call addEncodedData. See the code comment there for more details.
+  if (end_of_stream && response_body_buffering_ && encoder_callbacks_->encodingBuffer()) {
+    // Same guard as decodeData: only merge when THIS filter is actively buffering.
+    // See https://github.com/envoyproxy/envoy/issues/43063.
     encoder_callbacks_->addEncodedData(chunk, false);
   }
   current_response_body_ = &chunk;
@@ -131,6 +139,11 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
       config_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_response_body_ = nullptr;
   in_continue_ = status == envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
+  response_body_buffering_ =
+      (status ==
+           envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndBuffer ||
+       status ==
+           envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndWatermark);
   return static_cast<FilterDataStatus>(status);
 };
 
