@@ -115,11 +115,11 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
           background_fetches_.erase(it);
         }
         if (background_fetches_.find(sha256) == background_fetches_.end()) {
-          background_fetches_.emplace(
-              std::string(sha256),
-              std::make_unique<BackgroundFetchState>(
-                  context.clusterManager(), module_config.module().remote(),
-                  module_config.do_not_close(), module_config.load_globally()));
+          background_fetches_.emplace(std::string(sha256),
+                                      std::make_unique<BackgroundFetchState>(
+                                          context.clusterManager(), module_config.module().remote(),
+                                          module_config.do_not_close(),
+                                          module_config.load_globally()));
         }
         return absl::InvalidArgumentError(
             "Remote module not cached; background fetch in progress. SHA256: " +
@@ -240,7 +240,7 @@ DynamicModuleConfigFactory::BackgroundFetchState::BackgroundFetchState(
 
 void DynamicModuleConfigFactory::BackgroundFetchState::onSuccess(const std::string& data) {
   auto result = Extensions::DynamicModules::newDynamicModuleFromBytes(data, sha256_, do_not_close_,
-                                                                     load_globally_);
+                                                                      load_globally_);
   if (!result.ok()) {
     ENVOY_LOG(error, "Failed to load background-fetched module: {}", result.status().message());
   } else {

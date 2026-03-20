@@ -62,8 +62,8 @@ private:
   struct BackgroundFetchState : public Config::DataFetcher::RemoteDataFetcherCallback,
                                 public Logger::Loggable<Logger::Id::dynamic_modules> {
     BackgroundFetchState(Upstream::ClusterManager& cm,
-                         const envoy::config::core::v3::RemoteDataSource& source,
-                         bool do_not_close, bool load_globally);
+                         const envoy::config::core::v3::RemoteDataSource& source, bool do_not_close,
+                         bool load_globally);
 
     // Config::DataFetcher::RemoteDataFetcherCallback
     void onSuccess(const std::string& data) override;
