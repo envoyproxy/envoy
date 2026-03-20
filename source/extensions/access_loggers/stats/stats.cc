@@ -59,7 +59,8 @@ public:
 
     // Create the gauge so it gets registered in the stat store (expected by some tests and stats
     // logic)
-    auto& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+    Stats::Gauge& gauge_stat =
+        parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
@@ -167,8 +168,8 @@ bool GaugeKey::operator==(const GaugeKey& rhs) const {
   if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_) {
     return false;
   }
-  auto lhs_tags = tags();
-  auto rhs_tags = rhs.tags();
+  Stats::StatNameTagVectorOptConstRef lhs_tags = tags();
+  Stats::StatNameTagVectorOptConstRef rhs_tags = rhs.tags();
   if (lhs_tags.has_value() != rhs_tags.has_value()) {
     return false;
   }
@@ -456,7 +457,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
                                              : Stats::Gauge::ImportMode::Accumulate;
 
   if (op == Gauge::OperationType::SET) {
-    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    Stats::Gauge& gauge_stat =
+        scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
     gauge_stat.set(value);
   } else if (op == Gauge::OperationType::PAIRED_ADD ||
              op == Gauge::OperationType::PAIRED_SUBTRACT) {

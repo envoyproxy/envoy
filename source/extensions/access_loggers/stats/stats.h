@@ -45,7 +45,7 @@ struct GaugeKey {
     // We hash the logical tag content to match operator== behavior, ignoring
     // whether the tags are stored in owned_tags_ or borrowed_tags_. This ensures
     // that two equal keys produce the same hash regardless of their storage representation.
-    auto tags = key.tags();
+    Stats::StatNameTagVectorOptConstRef tags = key.tags();
     if (tags.has_value()) {
       h = H::combine(std::move(h), key.stat_name_, key.import_mode_, true);
       for (const auto& tag : tags.value().get()) {
