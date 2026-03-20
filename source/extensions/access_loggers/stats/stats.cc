@@ -23,7 +23,7 @@ public:
 
   ~AccessLogState() override {
     for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
-      auto& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
+      Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
           p.first.stat_name_, p.first.tags(), p.first.import_mode_);
       gauge_stat.sub(p.second.value_);
     }
