@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
+
 // GaugeKey serves as a lock-free map key composed of exactly the configuration
 // properties that define a fully resolved gauge metric.
 //
@@ -41,6 +42,9 @@ struct GaugeKey {
   bool operator==(const GaugeKey& rhs) const;
 
   template <typename H> friend H AbslHashValue(H h, const GaugeKey& key) {
+    // We hash the logical tag content to match operator== behavior, ignoring
+    // whether the tags are stored in owned_tags_ or borrowed_tags_. This ensures
+    // that two equal keys produce the same hash regardless of their storage representation.
     auto tags = key.tags();
     if (tags.has_value()) {
       h = H::combine(std::move(h), key.stat_name_, key.import_mode_, true);

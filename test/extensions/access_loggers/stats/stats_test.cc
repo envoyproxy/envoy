@@ -13,6 +13,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/hash/hash_testing.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1238,7 +1239,41 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   key_owned.makeOwned();
 
   EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same
-  EXPECT_EQ(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_owned));
+}
+
+TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::StatNamePool pool(symbol_table);
+
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
+
+  Stats::StatName name1 = pool.add("name1");
+  Stats::StatName name2 = pool.add("name2");
+  Stats::StatName tag_n1 = pool.add("tag_n1");
+  Stats::StatName tag_v1 = pool.add("tag_v1");
+  Stats::StatName tag_v2 = pool.add("tag_v2");
+
+  Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
+  Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
+
+  GaugeKey key_empty1(name1, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
+  GaugeKey key_empty2(name2, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
+  GaugeKey key_empty3(name1, Stats::Gauge::ImportMode::NeverImport, absl::nullopt);
+
+  GaugeKey key_borrowed(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
+  GaugeKey key_owned(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
+  key_owned.makeOwned();
+
+  GaugeKey key_tags2(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags2));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      key_empty1,
+      key_empty2,
+      key_empty3,
+      key_borrowed,
+      key_owned,
+      key_tags2,
+  }));
 }
 
 } // namespace StatsAccessLog
