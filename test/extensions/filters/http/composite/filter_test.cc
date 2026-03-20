@@ -1782,6 +1782,13 @@ TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispa
   EXPECT_EQ(&dispatcher, &wrapper.dispatcher());
   EXPECT_TRUE(wrapper.filter_to_inject_.has_value());
   EXPECT_EQ(1, wrapper.errors_.size());
+
+  // No-op methods for code coverage.
+  wrapper.filterConfigName();
+  wrapper.setFilterConfigName("");
+  wrapper.route();
+  wrapper.filterDisabled("");
+  wrapper.requestHeaders();
 }
 
 TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
