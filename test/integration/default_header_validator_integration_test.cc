@@ -79,10 +79,8 @@ public:
   std::string additionallyAllowedCharactersInUrlPath() {
     // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
     std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
-    if (downstream_protocol_ == Http::CodecType::HTTP2 ||
-        downstream_protocol_ == Http::CodecType::HTTP3) {
+    if (downstream_protocol_ == Http::CodecType::HTTP2) {
       // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path.
-      // HTTP/3 also defaults to allowing it for alignment with HTTP/2.
       additionally_allowed_characters += generateExtendedAsciiString();
     }
     return additionally_allowed_characters;

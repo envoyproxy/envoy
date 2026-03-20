@@ -833,8 +833,9 @@ message Http3ProtocolOptions {
   bool disable_connection_flow_control_for_streams = 8;
 
   // Whether to disallow obsolete text in header field values.
-  // If not set, it defaults to false for alignment with HTTP/2.
-  bool disallow_obs_text = 9;
+  // If not set, it defaults to true for alignment with current behavior.
+  // Note that HTTP/2 defaults to false, we should unify it in the future.
+  google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
 // A message to control transformations to the :scheme header
