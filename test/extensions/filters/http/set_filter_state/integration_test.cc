@@ -199,7 +199,7 @@ TEST_F(SetMetadataIntegrationTest, ClearRouteCache) {
         inline_string: "%REQ(client-ip)%"
   clear_route_cache: true
   )EOF";
-  
+
   EXPECT_CALL(decoder_callbacks_, downstreamCallbacks()).Times(2);
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   runFilter(yaml_config);
@@ -207,7 +207,6 @@ TEST_F(SetMetadataIntegrationTest, ClearRouteCache) {
       info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
   ASSERT_NE(nullptr, ip_address);
   EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
-
 }
 
 } // namespace SetFilterState
