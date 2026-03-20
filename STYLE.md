@@ -52,10 +52,11 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
-* Prefer `OptRef<const T>` or `const Type&` as return types for functions that return references
-  to existing objects. If the caller needs to take ownership of the returned object, add a separate
-  function with a `SharedPtr` or `UniquePtr` suffix that returns a shared or unique pointer to
-  extend or transfer ownership. For example:
+* For accessor functions, prefer `OptRef<const T>` or `const Type&` as return types for functions
+  that return *const* references to existing objects *when there is no intention of mutation*.
+  If the caller needs to take ownership of the returned object via a `shared_ptr`, add a separate
+  function with a `SharedPtr` suffix that returns a shared pointer to
+  extend ownership. For example:
   * `const ConnectionInfoProvider& connectionInfoProvider() const;`
   * `ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const;`
   * `OptRef<const Route> route() const;`
