@@ -19,8 +19,8 @@ absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>> RedisCluster::RedisHost
     Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
     const absl::optional<std::string>& zone) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RedisCluster::RedisHost>(new RedisCluster::RedisHost(
-      cluster, hostname, address, parent, primary, zone, creation_status));
+  auto ret = std::make_unique<RedisCluster::RedisHost>(cluster, hostname, address, parent, primary,
+                                                       zone, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }

@@ -230,13 +230,14 @@ private:
     // Zone information for zone-aware routing
     const std::string& primaryZone() const { return primary_zone_; }
 
-    // Get replicas in a specific zone. Returns nullptr if no replicas in that zone.
-    const Upstream::HostSetImpl* replicasInZone(const std::string& zone) const {
+    // Get replicas in a specific zone. Returns null unique_ptr if no replicas in that zone.
+    const std::unique_ptr<Upstream::HostSetImpl>& replicasInZone(const std::string& zone) const {
+      static const std::unique_ptr<Upstream::HostSetImpl> null_ptr;
       if (zone.empty()) {
-        return nullptr;
+        return null_ptr;
       }
       auto it = replicas_by_zone_.find(zone);
-      return (it != replicas_by_zone_.end()) ? it->second.get() : nullptr;
+      return (it != replicas_by_zone_.end()) ? it->second : null_ptr;
     }
 
   private:

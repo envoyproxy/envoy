@@ -180,7 +180,7 @@ RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
       // Falls back to other replicas or primary if needed.
       const std::string& client_zone = redis_context->clientZone();
       if (!client_zone.empty()) {
-        const auto* local_replicas = shard->replicasInZone(client_zone);
+        const auto& local_replicas = shard->replicasInZone(client_zone);
         if (local_replicas) {
           auto host = chooseRandomHost(*local_replicas, random_);
           if (host) {
@@ -200,7 +200,7 @@ RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
       const std::string& client_zone = redis_context->clientZone();
       if (!client_zone.empty()) {
         // Try local replicas first
-        const auto* local_replicas = shard->replicasInZone(client_zone);
+        const auto& local_replicas = shard->replicasInZone(client_zone);
         if (local_replicas) {
           auto host = chooseRandomHost(*local_replicas, random_);
           if (host) {
