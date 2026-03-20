@@ -608,6 +608,12 @@ new_features:
     referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
 - area: dynamic_modules
   change: |
+    Added ``nack_on_cache_miss`` option for remote dynamic module sources. When enabled,
+    uncached remote modules cause configuration rejection (NACK) with a background fetch,
+    instead of blocking listener warming. This enables remote modules in ECDS and per-route
+    configurations where an init manager is not available.
+- area: dynamic_modules
+  change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
     modules to access buffered data from ``on_scheduled`` and other callbacks. Added
     ``envoy_dynamic_module_callback_network_filter_get_cluster_host_count`` to query cluster host counts

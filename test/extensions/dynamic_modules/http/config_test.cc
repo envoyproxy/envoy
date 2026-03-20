@@ -460,6 +460,313 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   std::filesystem::remove(temp_path);
 }
 
+// When nack_on_cache_miss is set but the module is already cached, loading succeeds normally.
+TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHit) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+  std::ifstream input(module_path, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  Buffer::OwnedImpl hash_buffer(module_bytes);
+  const std::string sha256 =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+
+  // Pre-write the module to the cache path so the cache-hit branch fires.
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
+  std::filesystem::create_directories(cached_path.parent_path());
+  std::filesystem::copy_file(module_path, cached_path,
+                             std::filesystem::copy_options::overwrite_existing);
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: ")EOF",
+                                                                    sha256, R"EOF("
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_TRUE(cb_or_error.ok()) << cb_or_error.status().message();
+
+  // Clean up.
+  std::filesystem::remove(cached_path);
+}
+
+// A cache miss with nack_on_cache_miss rejects the config.
+TEST_F(DynamicModuleFilterConfigTest, NackModeCacheMissReturnsError) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("not cached"));
+}
+
+// The background fetch triggered by NACK mode writes the module to disk, so a subsequent
+// config push finds it cached and succeeds.
+TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchPopulatesCache) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+  std::ifstream input(module_path, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  Buffer::OwnedImpl hash_buffer(module_bytes);
+  const std::string sha256 =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: ")EOF",
+                                                                    sha256, R"EOF("
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  // Set up cluster and HTTP client to return the module bytes on fetch.
+  auto& cm = context_.server_factory_context_.cluster_manager_;
+  cm.initializeThreadLocalClusters({"cluster_1"});
+  NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(module_bytes);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  // First call: cache miss → NACK. The mock HTTP client fires synchronously,
+  // so the background fetch writes the module to disk before we return.
+  DynamicModuleConfigFactory factory;
+  auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result1.ok());
+  EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
+
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
+  EXPECT_TRUE(std::filesystem::exists(cached_path));
+
+  // Second call finds the cached file and succeeds.
+  auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_TRUE(result2.ok()) << result2.status().message();
+
+  // Clean up.
+  std::filesystem::remove(cached_path);
+}
+
+// When the background fetch fails, no file lands on disk and the next config push
+// cleans up the old state and starts a fresh fetch.
+TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchFailure) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  // Cluster is not initialized, so the fetch fails immediately.
+  DynamicModuleConfigFactory factory;
+  auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result1.ok());
+  EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
+
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(
+      "deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678");
+  EXPECT_FALSE(std::filesystem::exists(cached_path));
+
+  // Second call cleans up the completed (failed) entry and starts a new fetch.
+  auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result2.ok());
+  EXPECT_THAT(result2.status().message(), testing::HasSubstr("not cached"));
+}
+
+// NACK mode works without an init manager (ECDS / per-route path).
+TEST_F(DynamicModuleFilterConfigTest, NackModeWithoutInitManager) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                            stats_scope_, /*init_manager=*/nullptr);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
+  EXPECT_THAT(result.status().message(), testing::Not(testing::HasSubstr("init manager")));
+}
+
+// When a fetch is still in-flight, a second config push for the same SHA256
+// reuses the existing entry instead of starting a duplicate fetch.
+TEST_F(DynamicModuleFilterConfigTest, NackModeInFlightDedup) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  // Set up the cluster so the fetch starts but capture the callback without firing it.
+  auto& cm = context_.server_factory_context_.cluster_manager_;
+  cm.initializeThreadLocalClusters({"cluster_1"});
+  NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* captured_cb = nullptr;
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured_cb = &callbacks;
+            return &request;
+          }));
+
+  DynamicModuleConfigFactory factory;
+
+  // First call: starts a background fetch.
+  auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result1.ok());
+  EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
+  EXPECT_NE(captured_cb, nullptr);
+
+  // Second call while the fetch is still in-flight: no new send_ expected (WillOnce above
+  // would fail if a second call happened).
+  auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result2.ok());
+  EXPECT_THAT(result2.status().message(), testing::HasSubstr("not cached"));
+
+  // Clean up: cancel the in-flight request so the fetcher destructor doesn't assert.
+  EXPECT_CALL(request, cancel());
+}
+
+// When a background fetch delivers bytes that pass SHA256 validation but are
+// not a valid shared object, onSuccess logs the error, the invalid file is
+// cleaned up by newDynamicModuleFromBytes, and the entry is marked completed.
+TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
+  const std::string bad_data = "this is not a valid shared object";
+  Buffer::OwnedImpl hash_buffer(bad_data);
+  const std::string sha256 =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: ")EOF",
+                                                                    sha256, R"EOF("
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  auto& cm = context_.server_factory_context_.cluster_manager_;
+  cm.initializeThreadLocalClusters({"cluster_1"});
+  NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(bad_data);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                            stats_scope_, &init_manager_);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
+
+  // newDynamicModuleFromBytes writes the file, tries dlopen, fails, then deletes the file.
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
+  EXPECT_FALSE(std::filesystem::exists(cached_path));
+}
+
 // When the cached temp file is deleted, the factory should detect the missing file
 // and fall through to the remote fetch path.
 TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {

@@ -97,6 +97,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         dynamic_module = Extensions::DynamicModules::newDynamicModule(
             cached_path, module_config.do_not_close(), module_config.load_globally());
         if (dynamic_module.ok()) {
+          background_fetches_.erase(sha256);
           return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
                                             module_config, context, scope);
         }
@@ -104,6 +105,25 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         // identical bytes, so there is no point in falling through to the remote path.
         return absl::InvalidArgumentError("Cached remote module failed to load: " +
                                           std::string(dynamic_module.status().message()));
+      }
+
+      // In NACK mode, reject the config and kick off a background fetch. The control
+      // plane will retry, and the next attempt picks up the cached file above.
+      if (module_config.nack_on_cache_miss()) {
+        auto it = background_fetches_.find(sha256);
+        if (it != background_fetches_.end() && it->second->completed_) {
+          background_fetches_.erase(it);
+        }
+        if (background_fetches_.find(sha256) == background_fetches_.end()) {
+          background_fetches_.emplace(
+              std::string(sha256),
+              std::make_unique<BackgroundFetchState>(
+                  context.clusterManager(), module_config.module().remote(),
+                  module_config.do_not_close(), module_config.load_globally()));
+        }
+        return absl::InvalidArgumentError(
+            "Remote module not cached; background fetch in progress. SHA256: " +
+            std::string(sha256));
       }
 
       // No cached file — need async fetch, which requires init_manager.
@@ -207,6 +227,33 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
       async_state->filter_factory_cb(callbacks);
     }
   };
+}
+
+DynamicModuleConfigFactory::BackgroundFetchState::BackgroundFetchState(
+    Upstream::ClusterManager& cm, const envoy::config::core::v3::RemoteDataSource& source,
+    bool do_not_close, bool load_globally)
+    : sha256_(source.sha256()), do_not_close_(do_not_close), load_globally_(load_globally) {
+  fetcher_ = std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
+                                                                      source.sha256(), *this);
+  fetcher_->fetch();
+}
+
+void DynamicModuleConfigFactory::BackgroundFetchState::onSuccess(const std::string& data) {
+  auto result = Extensions::DynamicModules::newDynamicModuleFromBytes(data, sha256_, do_not_close_,
+                                                                     load_globally_);
+  if (!result.ok()) {
+    ENVOY_LOG(error, "Failed to load background-fetched module: {}", result.status().message());
+  } else {
+    ENVOY_LOG(info, "Background fetch complete, module cached for SHA256 {}", sha256_);
+  }
+  completed_ = true;
+}
+
+void DynamicModuleConfigFactory::BackgroundFetchState::onFailure(
+    Config::DataFetcher::FailureReason reason) {
+  ENVOY_LOG(error, "Background fetch failed for SHA256 {}, reason: {}", sha256_,
+            static_cast<int>(reason));
+  completed_ = true;
 }
 
 Envoy::Http::FilterFactoryCb
