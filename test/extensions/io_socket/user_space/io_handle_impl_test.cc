@@ -72,7 +72,7 @@ TEST_F(IoHandleImplTest, BasicRecv) {
     EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
   }
   {
-    io_handle_->setWriteEnd();
+    io_handle_->setEof();
     auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
     EXPECT_TRUE(result.ok());
   }
@@ -108,7 +108,7 @@ TEST_F(IoHandleImplTest, RecvPeek) {
   }
   {
     // Peek upon shutdown.
-    io_handle_->setWriteEnd();
+    io_handle_->setEof();
     auto result = io_handle_->recv(buf_.data(), buf_.size(), MSG_PEEK);
     EXPECT_EQ(0, result.return_value_);
     ASSERT(result.ok());
@@ -138,7 +138,7 @@ TEST_F(IoHandleImplTest, MultipleRecvDrain) {
     EXPECT_EQ(3, result.return_value_);
 
     EXPECT_EQ("bcd", absl::string_view(buf_.data(), 3));
-    EXPECT_EQ(0, io_handle_->getWriteBuffer()->length());
+    EXPECT_EQ(0, io_handle_->getReceiveBuffer()->length());
   }
 }
 
@@ -148,7 +148,7 @@ TEST_F(IoHandleImplTest, ReadEmpty) {
   auto result = io_handle_->read(buf, 10);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
-  io_handle_->setWriteEnd();
+  io_handle_->setEof();
   result = io_handle_->read(buf, 10);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
@@ -173,12 +173,12 @@ TEST_F(IoHandleImplTest, ReadContent) {
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(3, result.return_value_);
   ASSERT_EQ(3, buf.length());
-  ASSERT_EQ(4, io_handle_->getWriteBuffer()->length());
+  ASSERT_EQ(4, io_handle_->getReceiveBuffer()->length());
   result = io_handle_->read(buf, 10);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(4, result.return_value_);
   ASSERT_EQ(7, buf.length());
-  ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
+  ASSERT_EQ(0, io_handle_->getReceiveBuffer()->length());
 }
 
 TEST_F(IoHandleImplTest, WriteClearsDrainTrackers) {
@@ -285,7 +285,7 @@ TEST_F(IoHandleImplTest, BasicReadv) {
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
 
-  io_handle_->setWriteEnd();
+  io_handle_->setEof();
   result = io_handle_->readv(1024, &slice, 1);
   // EOF
   EXPECT_TRUE(result.ok());
@@ -310,23 +310,23 @@ TEST_F(IoHandleImplTest, ReadvMultiSlices) {
 TEST_F(IoHandleImplTest, FlowControl) {
   io_handle_->setWatermarks(128);
   EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(io_handle_->isWritable());
+  EXPECT_TRUE(io_handle_->canReceiveData());
 
   // Populate the data for io_handle_.
   Buffer::OwnedImpl buffer(std::string(256, 'a'));
   io_handle_peer_->write(buffer);
 
   EXPECT_TRUE(io_handle_->isReadable());
-  EXPECT_FALSE(io_handle_->isWritable());
+  EXPECT_FALSE(io_handle_->canReceiveData());
 
   bool writable_flipped = false;
   // During the repeated recv, the writable flag must switch to true.
-  auto& internal_buffer = *io_handle_->getWriteBuffer();
+  auto& internal_buffer = *io_handle_->getReceiveBuffer();
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
     ENVOY_LOG_MISC(debug, "internal buffer length = {}", internal_buffer.length());
     EXPECT_TRUE(io_handle_->isReadable());
-    bool writable = io_handle_->isWritable();
+    bool writable = io_handle_->canReceiveData();
     ENVOY_LOG_MISC(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
                    writable);
     if (writable) {
@@ -343,7 +343,7 @@ TEST_F(IoHandleImplTest, FlowControl) {
 
   // Finally the buffer is empty.
   EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(io_handle_->isWritable());
+  EXPECT_TRUE(io_handle_->canReceiveData());
 }
 
 // Consistent with other IoHandle: allow write empty data when handle is closed.
@@ -434,7 +434,7 @@ TEST_F(IoHandleImplTest, WriteByMove) {
   auto result = io_handle_peer_->write(buf);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(10, result.return_value_);
-  EXPECT_EQ("0123456789", io_handle_->getWriteBuffer()->toString());
+  EXPECT_EQ("0123456789", io_handle_->getReceiveBuffer()->toString());
   EXPECT_EQ(0, buf.length());
 }
 
@@ -444,7 +444,7 @@ TEST_F(IoHandleImplTest, WriteAgain) {
   io_handle_peer_->setWatermarks(128);
   Buffer::OwnedImpl pending_data(std::string(256, 'a'));
   io_handle_->write(pending_data);
-  EXPECT_FALSE(io_handle_peer_->isWritable());
+  EXPECT_FALSE(io_handle_peer_->canReceiveData());
 
   Buffer::OwnedImpl buf("0123456789");
   auto result = io_handle_->write(buf);
@@ -465,8 +465,8 @@ TEST_F(IoHandleImplTest, PartialWrite) {
     EXPECT_TRUE(result.ok());
     EXPECT_EQ(result.return_value_, FRAGMENT_SIZE + 1);
     EXPECT_EQ(pending_data.length(), INITIAL_SIZE - (FRAGMENT_SIZE + 1));
-    EXPECT_TRUE(io_handle_peer_->isWritable());
-    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(), std::string(FRAGMENT_SIZE + 1, 'a'));
+    EXPECT_TRUE(io_handle_peer_->canReceiveData());
+    EXPECT_EQ(io_handle_peer_->getReceiveBuffer()->toString(), std::string(FRAGMENT_SIZE + 1, 'a'));
   }
   {
     // Write another fragment since when high watermark is reached.
@@ -474,8 +474,8 @@ TEST_F(IoHandleImplTest, PartialWrite) {
     EXPECT_TRUE(result1.ok());
     EXPECT_EQ(result1.return_value_, FRAGMENT_SIZE);
     EXPECT_EQ(pending_data.length(), INITIAL_SIZE - (FRAGMENT_SIZE + 1) - FRAGMENT_SIZE);
-    EXPECT_FALSE(io_handle_peer_->isWritable());
-    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(),
+    EXPECT_FALSE(io_handle_peer_->canReceiveData());
+    EXPECT_EQ(io_handle_peer_->getReceiveBuffer()->toString(),
               std::string(2 * FRAGMENT_SIZE + 1, 'a'));
   }
   {
@@ -490,18 +490,19 @@ TEST_F(IoHandleImplTest, PartialWrite) {
     auto result_drain =
         io_handle_peer_->read(black_hole_buffer, FRAGMENT_SIZE + FRAGMENT_SIZE / 2 + 2);
     ASSERT_EQ(result_drain.return_value_, FRAGMENT_SIZE + FRAGMENT_SIZE / 2 + 2);
-    EXPECT_TRUE(io_handle_peer_->isWritable());
+    EXPECT_TRUE(io_handle_peer_->canReceiveData());
   }
   {
     // The buffer in peer is less than FRAGMENT_SIZE away from high watermark. Write a FRAGMENT_SIZE
     // anyway.
-    auto len = io_handle_peer_->getWriteBuffer()->length();
-    EXPECT_LT(io_handle_peer_->getWriteBuffer()->highWatermark() - len, FRAGMENT_SIZE);
+    auto len = io_handle_peer_->getReceiveBuffer()->length();
+    EXPECT_LT(io_handle_peer_->getReceiveBuffer()->highWatermark() - len, FRAGMENT_SIZE);
     EXPECT_GT(pending_data.length(), FRAGMENT_SIZE);
     auto result3 = io_handle_->write(pending_data);
     EXPECT_EQ(result3.return_value_, FRAGMENT_SIZE);
-    EXPECT_FALSE(io_handle_peer_->isWritable());
-    EXPECT_EQ(io_handle_peer_->getWriteBuffer()->toString(), std::string(len + FRAGMENT_SIZE, 'a'));
+    EXPECT_FALSE(io_handle_peer_->canReceiveData());
+    EXPECT_EQ(io_handle_peer_->getReceiveBuffer()->toString(),
+              std::string(len + FRAGMENT_SIZE, 'a'));
   }
 }
 
@@ -552,7 +553,7 @@ TEST_F(IoHandleImplTest, PartialWritev) {
   EXPECT_EQ(result.return_value_, 256);
   pending_data.drain(result.return_value_);
   EXPECT_EQ(pending_data.length(), 3);
-  EXPECT_FALSE(io_handle_peer_->isWritable());
+  EXPECT_FALSE(io_handle_peer_->canReceiveData());
 
   // Confirm that the further write return `EAGAIN`.
   auto slices2 = pending_data.getRawSlices();
@@ -562,7 +563,7 @@ TEST_F(IoHandleImplTest, PartialWritev) {
   // Make the peer writable again.
   Buffer::OwnedImpl black_hole_buffer;
   io_handle_peer_->read(black_hole_buffer, 10240);
-  EXPECT_TRUE(io_handle_peer_->isWritable());
+  EXPECT_TRUE(io_handle_peer_->canReceiveData());
   auto slices3 = pending_data.getRawSlices();
   auto result3 = io_handle_->writev(slices3.data(), slices3.size());
   EXPECT_EQ(result3.return_value_, 3);
@@ -600,8 +601,8 @@ TEST_F(IoHandleImplTest, WritevToPeer) {
       Buffer::RawSlice{raw_data.data() + 1, 2},
   };
   io_handle_peer_->writev(slices.data(), slices.size());
-  EXPECT_EQ(3, io_handle_->getWriteBuffer()->length());
-  EXPECT_EQ("012", io_handle_->getWriteBuffer()->toString());
+  EXPECT_EQ(3, io_handle_->getReceiveBuffer()->length());
+  EXPECT_EQ("012", io_handle_->getReceiveBuffer()->toString());
 }
 
 TEST_F(IoHandleImplTest, EventScheduleBasic) {
@@ -710,13 +711,13 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggersReadEvent) {
   io_handle_->setWatermarks(128);
 
   EXPECT_FALSE(io_handle_->isReadable());
-  EXPECT_TRUE(io_handle_peer_->isWritable());
+  EXPECT_TRUE(io_handle_peer_->canReceiveData());
 
   Buffer::OwnedImpl buf_to_write(std::string(256, 'a'));
   io_handle_peer_->write(buf_to_write);
 
   EXPECT_TRUE(io_handle_->isReadable());
-  EXPECT_FALSE(io_handle_->isWritable());
+  EXPECT_FALSE(io_handle_->canReceiveData());
 
   auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   // No event is available.
@@ -734,13 +735,13 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggersReadEvent) {
   {
     SCOPED_TRACE("drain very few data.");
     auto result = io_handle_->recv(buf_.data(), 1, 0);
-    EXPECT_FALSE(io_handle_->isWritable());
+    EXPECT_FALSE(io_handle_->canReceiveData());
   }
   {
     SCOPED_TRACE("drain to low watermark.");
     auto result = io_handle_->recv(buf_.data(), 232, 0);
     EXPECT_TRUE(schedulable_cb->enabled_);
-    EXPECT_TRUE(io_handle_->isWritable());
+    EXPECT_TRUE(io_handle_->canReceiveData());
     EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
     schedulable_cb->invokeCallback();
   }
@@ -977,7 +978,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
 
   Buffer::OwnedImpl buf(std::string(256, 'a'));
   io_handle_->write(buf);
-  EXPECT_FALSE(io_handle_peer_->isWritable());
+  EXPECT_FALSE(io_handle_peer_->canReceiveData());
 
   io_handle_->shutdown(ENVOY_SHUT_WR);
   ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));

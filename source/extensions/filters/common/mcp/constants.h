@@ -27,6 +27,12 @@ constexpr absl::string_view ARGUMENTS_FIELD = "arguments";
 constexpr absl::string_view ERROR_CODE_FIELD = "code";
 constexpr absl::string_view ERROR_MESSAGE_FIELD = "message";
 
+constexpr absl::string_view TYPE_FIELD = "type";
+constexpr absl::string_view TEXT_FIELD = "text";
+constexpr absl::string_view CONTENT_FIELD = "content";
+constexpr absl::string_view IS_ERROR_FIELD = "isError";
+constexpr absl::string_view ERROR_FIELD = "error";
+
 // MCP Initialize constants
 constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
