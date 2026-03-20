@@ -4533,7 +4533,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   Context formatter_context;
 
