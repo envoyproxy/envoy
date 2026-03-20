@@ -253,18 +253,14 @@ absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
 
   auto spiffe_data = getSpiffeData();
   for (auto& ca : spiffe_data->ca_certs_) {
-    const X509_NAME* name = X509_get_subject_name(ca.get());
+    X509_NAME* name = X509_get_subject_name(ca.get());
 
     // Check for duplicates.
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
       continue;
     }
 
-    #ifdef OPENSSL_IS_BORINGSSL
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
-    #else
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(const_cast<X509_NAME*>(name)));
-    #endif
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError("Failed to load trusted client CA certificate");
     }

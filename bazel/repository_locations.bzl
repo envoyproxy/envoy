@@ -721,65 +721,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
     ),
 
-    aws_lc_clang_x86_64 = dict(
-        version = "14.0.0",
-        sha256 = "61582215dafafb7b576ea30cc136be92c877ba1f1c31ddbbd372d6d65622fef5",
-        strip_prefix = "clang+llvm-{version}-x86_64-linux-gnu-ubuntu-18.04",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-x86_64-linux-gnu-ubuntu-18.04.tar.xz"],
-    ),
-    aws_lc_clang_aarch64 = dict(
-        version = "14.0.0",
-        sha256 = "1792badcd44066c79148ffeb1746058422cc9d838462be07e3cb19a4b724a1ee",
-        strip_prefix = "clang+llvm-{version}-aarch64-linux-gnu",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-aarch64-linux-gnu.tar.xz"],
-    ),
-    aws_lc_clang_ppc64le = dict(
+    fips_clang_ppc64le = dict(
         version = "14.0.0",
         sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
         strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
     ),
 
-    aws_lc_go_x86_64 = dict(
-        version = "1.18.1",
-        sha256 = "b3b815f47ababac13810fc6021eb73d65478e0b2db4b09d348eefad9581a2334",
-        strip_prefix = "go",
-        urls = ["https://dl.google.com/go/go{version}.linux-amd64.tar.gz"],
-    ),
-    aws_lc_go_aarch64 = dict(
-        version = "1.18.1",
-        sha256 = "56a91851c97fb4697077abbca38860f735c32b38993ff79b088dac46e4735633",
-        strip_prefix = "go",
-        urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
-    ),
-    aws_lc_go_ppc64le = dict(
+    fips_go_ppc64le = dict(
         version = "1.18.1",
         sha256 = "33db623d1eecf362fe365107c12efc90eff0b9609e0b3345e258388019cb552a",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
     ),
 
-    aws_lc_ninja = dict(
-        version = "1.10.2",
-        sha256 = "ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed",
-        strip_prefix = "ninja-{version}",
-        urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
-    ),
-    aws_lc_cmake_linux_x86_64 = dict(
-        version = "3.22.1",
-        sha256 = "73565c72355c6652e9db149249af36bcab44d9d478c5546fd926e69ad6b43640",
-        strip_prefix = "cmake-{version}-linux-x86_64",
-        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
-    ),
-    aws_lc_cmake_linux_aarch64 = dict(
-        version = "3.22.1",
-        sha256 = "601443375aa1a48a1a076bda7e3cca73af88400463e166fffc3e1da3ce03540b",
-        strip_prefix = "cmake-{version}-linux-aarch64",
-        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
-    ),
-    aws_lc_cmake_linux_ppc64le = dict(
-        version = "3.22.1",
-        sha256 = "0e998229549d7b3f368703d20e248e7ee1f853910d42704aa87918c213ea82c0",
+    fips_cmake_src = dict(
+        version = "4.2.3",
+        sha256 = "7efaccde8c5a6b2968bad6ce0fe60e19b6e10701a12fce948c2bf79bac8a11e9",
         strip_prefix = "cmake-{version}",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
     ),

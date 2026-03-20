@@ -27,13 +27,13 @@ cc_library(
 genrule(
     name = "ninja_bin",
     srcs = [
-        "@aws_lc_ninja//:all",
-        "@aws_lc_ninja//:configure.py",
+        "@fips_ninja//:all",
+        "@fips_ninja//:configure.py",
     ],
     outs = ["ninja"],
     cmd = """
 set -eo pipefail
-SRC_DIR=$$(dirname $(location @aws_lc_ninja//:configure.py))
+SRC_DIR=$$(dirname $(location @fips_ninja//:configure.py))
 OUT_FILE=$$(realpath $@)
 PYTHON_BIN=$$(realpath $(PYTHON3))
 cd "$$SRC_DIR"
@@ -56,16 +56,16 @@ cp ninja "$$OUT_FILE"
 genrule(
     name = "cmake_bin",
     srcs = [
-        "@aws_lc_cmake_linux_ppc64le//:all",
-        "@aws_lc_cmake_linux_ppc64le//:bootstrap",
+        "@fips_cmake_src//:all",
+        "@fips_cmake_src//:bootstrap",
     ],
     outs = ["cmake"],
     cmd = """
 set -eo pipefail
-SRC_DIR=$$(dirname $(location @aws_lc_cmake_linux_ppc64le//:bootstrap))
+SRC_DIR=$$(dirname $(location @fips_cmake_src//:bootstrap))
 MAKE_BIN=$$(dirname $(location @rules_foreign_cc//toolchains/private:make_tool))
 export PATH="$${MAKE_BIN}:$$PATH"
-CLANG_BIN=$$(dirname $(location @aws_lc_clang_ppc64le//:bin/clang))
+CLANG_BIN=$$(dirname $(location @fips_clang_ppc64le//:bin/clang))
 export CC="$${CLANG_BIN}/clang"
 export CXX="$${CLANG_BIN}/clang++"
 cd "$$SRC_DIR"
@@ -73,9 +73,14 @@ cd "$$SRC_DIR"
 make -j$$(nproc)
 cp bin/cmake $@
 """,
+    target_compatible_with = select({
+        "@platforms//cpu:x86_64": ["@platforms//:incompatible"],
+        "@platforms//cpu:aarch64": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     tools = [
-        "@aws_lc_clang_ppc64le//:bin/clang",
-        "@aws_lc_clang_ppc64le//:bin/clang++",
+        "@fips_clang_ppc64le//:bin/clang",
+        "@fips_clang_ppc64le//:bin/clang++",
         "@rules_foreign_cc//toolchains/private:make_tool",
     ],
 )
@@ -93,26 +98,26 @@ genrule(
         "@envoy//bazel/external:aws_lc.genrule_cmd",
     ] + select({
         "@platforms//cpu:x86_64": [
-            "@aws_lc_clang_x86_64//:bin/clang",
-            "@aws_lc_clang_x86_64//:bin/clang++",
-            "@aws_lc_go_x86_64//:all",
-            "@aws_lc_go_x86_64//:bin/go",
-            "@aws_lc_cmake_linux_x86_64//:all",
-            "@aws_lc_cmake_linux_x86_64//:bin/cmake",
+            "@llvm_toolchain_llvm//:bin/clang",
+            "@llvm_toolchain_llvm//:bin/clang++",
+            "@fips_go_linux_amd64//:all",
+            "@fips_go_linux_amd64//:bin/go",
+            "@fips_cmake_linux_x86_64//:all",
+            "@fips_cmake_linux_x86_64//:bin/cmake",
          ],
         "@platforms//cpu:aarch64": [
-            "@aws_lc_clang_aarch64//:bin/clang",
-            "@aws_lc_clang_aarch64//:bin/clang++",
-            "@aws_lc_go_aarch64//:all",
-            "@aws_lc_go_aarch64//:bin/go",
-            "@aws_lc_cmake_linux_aarch64//:all",
-            "@aws_lc_cmake_linux_aarch64//:bin/cmake",
+            "@llvm_toolchain_llvm//:bin/clang",
+            "@llvm_toolchain_llvm//:bin/clang++",
+            "@fips_go_linux_arm64//:all",
+            "@fips_go_linux_arm64//:bin/go",
+            "@fips_cmake_linux_aarch64//:all",
+            "@fips_cmake_linux_aarch64//:bin/cmake",
         ],
         "@platforms//cpu:ppc64le": [
-            "@aws_lc_clang_ppc64le//:bin/clang",
-            "@aws_lc_clang_ppc64le//:bin/clang++",
-            "@aws_lc_go_ppc64le//:all",
-            "@aws_lc_go_ppc64le//:bin/go",
+            "@fips_clang_ppc64le//:bin/clang",
+            "@fips_clang_ppc64le//:bin/clang++",
+            "@fips_go_ppc64le//:all",
+            "@fips_go_ppc64le//:bin/go",
             ":cmake_bin",
         ],
         "//conditions:default": [],

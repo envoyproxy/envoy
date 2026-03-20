@@ -310,48 +310,19 @@ def _aws_lc():
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
     )
     NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "aws_lc_ninja",
-        build_file_content = NINJA_BUILD_CONTENT,
-    )
-    CMAKE_BUILD_CONTENT = "%s\nexports_files([\"bin/cmake\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "aws_lc_cmake_linux_x86_64",
-        build_file_content = CMAKE_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "aws_lc_cmake_linux_aarch64",
-        build_file_content = CMAKE_BUILD_CONTENT,
-    )
     CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "aws_lc_cmake_linux_ppc64le",
+        name = "fips_cmake_src",
         build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
     )
     CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "aws_lc_clang_x86_64",
-        build_file_content = CLANG_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "aws_lc_clang_aarch64",
-        build_file_content = CLANG_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "aws_lc_clang_ppc64le",
+        name = "fips_clang_ppc64le",
         build_file_content = CLANG_BUILD_CONTENT,
     )
     GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
     external_http_archive(
-        name = "aws_lc_go_x86_64",
-        build_file_content = GO_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "aws_lc_go_aarch64",
-        build_file_content = GO_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "aws_lc_go_ppc64le",
+        name = "fips_go_ppc64le",
         build_file_content = GO_BUILD_CONTENT,
     )
 

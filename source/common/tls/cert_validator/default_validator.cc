@@ -551,7 +551,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (cert == nullptr) {
       break;
     }
-    const X509_NAME* name = X509_get_subject_name(cert.get());
+    X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
@@ -561,8 +561,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
       continue;
     }
 
-    // AWS-LC/OpenSSL require non-const input to X509_NAME_dup; BoringSSL accepts const.
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(const_cast<X509_NAME*>(name)));
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
